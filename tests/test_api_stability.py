@@ -27,8 +27,8 @@ def test_stability_tiers_partition_the_public_surface() -> None:
     }
     sizes = {name: len(members) for name, members in tiers.items()}
 
-    assert sizes == {"stable": 45, "experimental": 123, "implementation": 13}
-    assert sum(sizes.values()) == 181 == len(helia_profiler.__all__)
+    assert sizes == {"stable": 45, "experimental": 127, "implementation": 13}
+    assert sum(sizes.values()) == 185 == len(helia_profiler.__all__)
 
     for left, right in combinations(tiers, 2):
         assert not tiers[left] & tiers[right], (
@@ -95,6 +95,7 @@ def test_public_surface_membership_snapshot() -> None:
         "DoctorCheck",
         "DoctorResult",
         "DoctorVersionCheck",
+        "EnergyFacts",
         "EngineConfig",
         "EngineDTypeCapability",
         "EngineError",
@@ -104,6 +105,7 @@ def test_public_surface_membership_snapshot() -> None:
         "FirmwareError",
         "FirmwareMeta",
         "FixtureBatchCompletion",
+        "FixtureBoardPowerRequest",
         "FixtureBuild",
         "FixtureCapabilities",
         "FixtureCapability",
@@ -116,11 +118,13 @@ def test_public_surface_membership_snapshot() -> None:
         "FixtureMemory",
         "FixtureMethod",
         "FixtureOutput",
+        "FixturePowerGuard",
         "FixturePowerSync",
         "FixturePsramObservation",
         "FixturePsramPayload",
         "FixturePsramWeights",
         "FixtureRailEnergy",
+        "FixtureRailPowerRequest",
         "FixtureRole",
         "FixtureRuntimeSource",
         "FixtureStatePolicy",

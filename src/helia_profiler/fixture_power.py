@@ -16,6 +16,11 @@ from .power.sync import SyncWiring
 if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest, FixtureTiming
 
+#: The only rail-energy scope a fixture capture measures: the whole rail over
+#: the timed restore-and-invoke loop, with nothing subtracted.
+GROSS_RAIL_SCOPE = "gross_rail_restore_and_invoke"
+NO_SUBTRACTION = "none"
+
 
 @dataclass(frozen=True)
 class FixturePowerSync:
@@ -276,10 +281,10 @@ def fixture_rail_energy(
     raw.read()
     return FixtureRailEnergy(
         timing.iterations,
-        "gross_rail_restore_and_invoke",
+        GROSS_RAIL_SCOPE,
         request.rail,
         request.serial,
-        "none",
+        NO_SUBTRACTION,
         window.duration_s,
         window.avg_power_w,
         window.avg_current_a,

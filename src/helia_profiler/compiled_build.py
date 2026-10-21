@@ -6,16 +6,22 @@ host with :func:`load_build`. :func:`run_build` captures from it without
 rebuilding and returns a :class:`RunResult` with the run's identity, its
 measurements and, when asked, the comparison of its outputs with reference
 outputs.
+
+Power takes two routes. A build compiled with a ``power_sync`` method measures
+the gross MCU-rail energy of its timed loop when run with a
+:class:`~helia_profiler.FixtureRailPowerRequest`; any other build can run its
+timing capture through a configured supply with a
+:class:`~helia_profiler.FixtureBoardPowerRequest`, which measures no energy.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping, TypeAlias
 
 from ._files import write_text_atomically
 from .errors import CaptureError, ConfigError
@@ -25,14 +31,31 @@ if TYPE_CHECKING:
     from ._fixture_build import FixtureBuild, FixtureMethod, TypedFixture
     from .expect import Expect, Verification
     from .fixture_capture import FixtureCaptureGuard, FixtureCaptureResult
+    from .fixture_power import (
+        FixtureBoardPowerRequest,
+        FixturePowerGuard,
+        FixturePowerSync,
+        FixtureRailEnergy,
+        FixtureRailPowerRequest,
+    )
     from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
+    from .fixture_target import FixtureTarget
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
+
+    _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
 COMPILED_BUILD_SCHEMA_VERSION = 2
 
 _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "binding", "build"})
+
+#: The rail-energy route the run API admits (helia-profiler#558): the gross MCU
+#: rail over the timed restore-and-invoke loop of a carried heliaAOT or LiteRT
+#: build on the Apollo510 EVB.
+_POWER_ENGINES = ("helia-aot", "litert")
+_POWER_BOARDS = ("apollo510_evb",)
+_POWER_RAIL = "MCU"
 
 
 @dataclass(frozen=True)
@@ -55,12 +78,14 @@ class CompiledBuild:
 
         return self._identity(fixture_run_identity(self.build))
 
-    def _identity(self, identity: RunIdentity) -> RunIdentity:
-        return replace(
-            identity,
-            run=replace(identity.run, lifecycle=self.lifecycle.value),
-            intent_hash=self.plan.intent_hash,
-        )
+    def _identity(self, identity: RunIdentity, rail: str | None = None) -> RunIdentity:
+        """*identity* under this build's lifecycle and plan, naming the requested *rail*."""
+        from .identity import EnergyFacts
+
+        run = replace(identity.run, lifecycle=self.lifecycle.value)
+        if rail is not None and isinstance(run.energy, EnergyFacts):
+            run = replace(run, energy=replace(run.energy, rail=rail))
+        return replace(identity, run=run, intent_hash=self.plan.intent_hash)
 
     def verify(self) -> None:
         """Re-check the build against its pinned files and its plan; raise on any mismatch.
@@ -246,22 +271,37 @@ class CompiledBuild:
         settle_seconds: float,
         expect: Expect | None = None,
         expected_duration_s: float | None = None,
+        power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,
+        power_guard: FixturePowerGuard | None = None,
     ) -> RunResult:
         """Flash the recorded image, capture one run and compare outputs when *expect* is given.
 
         A failed capture comes back with ``capture.state == "failure"`` and no
         verification; errors raised while capturing propagate.
 
+        *power* selects the instrument: a :class:`FixtureRailPowerRequest`
+        measures the MCU rail of a build compiled with the same
+        ``power_sync`` wiring, and a :class:`FixtureBoardPowerRequest`
+        powers the board through a configured supply for a timing capture
+        of a build without power wiring. Either needs *power_guard*, the
+        station's authority over that instrument and rail; *guard* keeps
+        its authority over the board and probe. Every refusal comes before
+        the device is touched.
+
         Raises:
-            ConfigError: The build does not verify, or *expect* cannot be compared.
+            ConfigError: The build does not verify, *expect* cannot be
+                compared, or *power* does not fit the build or the run API's
+                rail-energy route.
             CaptureError: The device reports counts other than the build's.
         """
         from ._fixture_record import fixture_capture_request
         from .expect import check_fixture_expectation, compare_fixture_outputs
         from .fixture_capture import capture_fixture
         from .fixture_identity import fixture_run_identity
+        from .fixture_power import FixtureRailPowerRequest
 
         self.verify()
+        self._check_power(power, power_guard, settle_seconds)
         if expect is not None and expect.source == "build" and not self.build.outputs:
             raise ConfigError(
                 "This compiled build carries no expected outputs",
@@ -279,7 +319,15 @@ class CompiledBuild:
             )
         except ValueError as exc:
             raise ConfigError(f"Cannot capture from this compiled build: {exc}") from exc
-        capture = capture_fixture(request, guard=guard)
+        rail = power if isinstance(power, FixtureRailPowerRequest) else None
+        if rail is not None:
+            request = replace(request, rail_power=rail)
+        elif power is not None:
+            request = replace(request, board_power=power)
+        capture = capture_fixture(
+            request,
+            guard=guard if power_guard is None else _PowerCaptureGuard(guard, power_guard),
+        )
         timing = capture.timing
         if capture.state == "success" and (
             timing is None
@@ -291,28 +339,174 @@ class CompiledBuild:
                 f"runs {self.build.iterations} and {self.build.warmups}",
                 hint=f"The capture's evidence is in {evidence_dir}.",
             )
-        identity = self._identity(fixture_run_identity(self.build, capture))
+        identity = self._identity(
+            fixture_run_identity(self.build, capture), rail.rail if rail is not None else None
+        )
         verification = (
             compare_fixture_outputs(self.build, capture, expect)
             if expect is not None and capture.state == "success"
             else None
         )
-        return RunResult(self, capture, identity, verification)
+        return RunResult(self, capture, identity, verification, power)
+
+    def _check_power(
+        self,
+        power: _PowerRequest,
+        power_guard: FixturePowerGuard | None,
+        settle_seconds: float,
+    ) -> None:
+        """Refuse a power request this build or the run API's rail-energy route cannot take."""
+        from .fixture_capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
+        from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+
+        wiring = self.build.power_sync
+        if power is None:
+            if power_guard is not None:
+                raise ConfigError(
+                    "A power_guard was given without a power request",
+                    hint="Pass power= with the instrument and rail it authorizes, or drop it.",
+                )
+            if wiring is not None:
+                raise ConfigError(
+                    "This build is compiled for rail energy and needs a FixtureRailPowerRequest",
+                    hint="Its firmware waits for the instrument's GO before its timed loop.",
+                )
+            return
+        if isinstance(power, FixtureBoardPowerRequest):
+            if wiring is not None:
+                raise ConfigError(
+                    "A supply-only FixtureBoardPowerRequest measures no energy; "
+                    "this build is compiled for rail energy",
+                    hint="Pass a FixtureRailPowerRequest, or build without power_sync.",
+                )
+        elif isinstance(power, FixtureRailPowerRequest):
+            if wiring is None:
+                raise ConfigError(
+                    "This build has no power wiring to measure rail energy with",
+                    hint="Build with FixtureMethod(..., power_sync=FixturePowerSync(...)).",
+                )
+            requested = power.firmware_wiring()
+            if replace(requested, protocol_version=wiring.protocol_version) != wiring:
+                raise ConfigError(
+                    f"The power request's GPIO pins {_pins(requested)} "
+                    f"differ from the build's {_pins(wiring)}",
+                    hint="Wire the instrument as the firmware was built, or build again.",
+                )
+            if requested.protocol_version != wiring.protocol_version:
+                raise ConfigError(
+                    f"The build's firmware speaks power protocol {wiring.protocol_version}; "
+                    f"the run API's rail request speaks protocol {requested.protocol_version}",
+                    hint="Build again with build(); it compiles the current protocol.",
+                )
+            if power.rail != _POWER_RAIL:
+                raise ConfigError(
+                    f"The run API measures the {_POWER_RAIL} rail only, not {power.rail!r}"
+                )
+            _require_power_route(self.build.engine.value, self.build.target.board, self.lifecycle)
+        else:
+            raise ConfigError(
+                f"Unknown power request {type(power).__name__}",
+                hint="Pass a FixtureRailPowerRequest or a FixtureBoardPowerRequest.",
+            )
+        limit, kind = (
+            (_RAIL_SETTLE_LIMIT_S, "a rail capture")
+            if isinstance(power, FixtureRailPowerRequest)
+            else (_SETTLE_LIMIT_S, "a supply-only capture")
+        )
+        if not (type(settle_seconds) in (int, float) and 0 < settle_seconds <= limit):
+            raise ConfigError(
+                f"settle_seconds must be a number above 0 and at most {limit} for {kind}, "
+                f"not {settle_seconds!r}",
+                hint="It bounds each wait for READY and for completion.",
+            )
+        if power_guard is None:
+            raise ConfigError(
+                "A power request needs a power_guard",
+                hint="Pass the station's authority over the instrument and rail as power_guard=.",
+            )
+        if not all(
+            callable(getattr(power_guard, name, None)) for name in ("check", "verify_power_device")
+        ):
+            raise ConfigError(
+                f"power_guard {type(power_guard).__name__} is not a FixturePowerGuard",
+                hint="It needs check() and verify_power_device().",
+            )
+
+
+@dataclass(frozen=True)
+class _PowerCaptureGuard:
+    """The caller's board and probe authority joined with the station's power authority."""
+
+    board: FixtureCaptureGuard
+    power: FixturePowerGuard
+
+    def check(self, *, require_free: bool, remaining_s: float) -> None:
+        self.board.check(require_free=require_free, remaining_s=remaining_s)
+        if self.power is not self.board:
+            self.power.check(require_free=require_free, remaining_s=remaining_s)
+
+    def verify_target(self, *, target: FixtureTarget, jlink_serial: str) -> None:
+        self.board.verify_target(target=target, jlink_serial=jlink_serial)
+
+    def verify_power_device(self, *, serial: str, rail: str) -> None:
+        self.power.verify_power_device(serial=serial, rail=rail)
+
+
+def _pins(wiring: FixturePowerSync) -> str:
+    return f"(sync {wiring.sync_gpio_pin}, state {wiring.state_gpio_pin}, GO {wiring.go_gpio_pin})"
+
+
+def _require_power_route(engine: str | None, board: str | None, lifecycle: Lifecycle) -> None:
+    """Refuse rail energy outside the route the run API admits."""
+    if lifecycle is not Lifecycle.CARRY:
+        raise ConfigError(
+            "The run API measures rail energy over a Lifecycle.CARRY build's timed loop, "
+            f"not a Lifecycle.{lifecycle.name} one, which runs the model stateless",
+            hint="Build with lifecycle=Lifecycle.CARRY for a power run.",
+        )
+    if engine not in _POWER_ENGINES:
+        raise ConfigError(
+            "The run API measures rail energy for heliaAOT and LiteRT builds, "
+            + (f"not {engine}" if engine else "and the plan names no engine"),
+            hint="Use a heliaAOT or LiteRT plan.",
+        )
+    if board not in _POWER_BOARDS:
+        raise ConfigError(
+            "The run API measures rail energy on the apollo510_evb, "
+            + (f"not {board}" if board else "and the plan names no board"),
+            hint="Build for apollo510_evb.",
+        )
 
 
 @dataclass(frozen=True)
 class RunResult:
-    """One capture from a :class:`CompiledBuild`."""
+    """One capture from a :class:`CompiledBuild`.
+
+    ``power`` is the power request the run was captured with, or ``None``.
+    """
 
     compiled: CompiledBuild
     capture: FixtureCaptureResult
     identity: RunIdentity
     verification: Verification | None
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
 
     @property
     def succeeded(self) -> bool:
         """True only for a ``success`` capture."""
         return self.capture.state == "success"
+
+    @property
+    def energy(self) -> FixtureRailEnergy | None:
+        """The capture's gross MCU-rail energy, or ``None`` when it measured none.
+
+        It holds the measured iterations, duration, mean power and current,
+        energy and energy per iteration, the rail and instrument serial, the
+        hash-pinned raw instrument trace, and the protocol-2 READY, GO,
+        gate and DONE samples in ``completion``. A failed capture measures
+        none.
+        """
+        return self.capture.rail_energy
 
 
 def build(
@@ -330,7 +524,12 @@ def build(
     """Compile *plan* for *fixture*'s pinned inputs and return the compiled build.
 
     *lifecycle* must be one the plan's engine implements; it sets the timed
-    iterations and warmups the firmware runs. *host* supplies host-local
+    iterations and warmups the firmware runs. A *method* with ``power_sync``
+    compiles the protocol-2 power firmware, which a run measures with a
+    matching :class:`~helia_profiler.FixtureRailPowerRequest`; it is admitted
+    for a heliaAOT or LiteRT plan on the ``apollo510_evb`` under
+    ``Lifecycle.CARRY``, and refused otherwise. A plan frozen with power
+    enabled needs such a method. *host* supplies host-local
     settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
     heliaRT and LiteRT link a prepared runtime: without *runtime*, the one the
     plan names is taken from the HPX cache (``hpx runtimes prepare``), never
@@ -352,22 +551,28 @@ def build(
             hint="Use Lifecycle.CARRY or Lifecycle.SINGLE.",
         ) from exc
     if method.power_sync is not None:
-        if lifecycle is Lifecycle.SINGLE:
-            raise ConfigError(
-                "A single invocation is too short for a power capture",
-                hint="Use Lifecycle.CARRY for a power run.",
-            )
-        raise ConfigError(
-            "build() takes no power request yet",
-            hint="Build and capture power fixtures with helia_profiler.fixture for now.",
+        target = plan.settings.get("target", {})
+        _require_power_route(
+            plan.settings.get("engine", {}).get("type"), target.get("board"), lifecycle
         )
     config = plan.config(model=model, host=host)
+    if config.power.enabled and method.power_sync is None:
+        raise ConfigError(
+            "The plan is frozen with power enabled, but the method has no power_sync; "
+            "the build would measure timing only",
+            hint="Pass FixtureMethod(..., power_sync=FixturePowerSync(...)) to build() "
+            "and power= to run_build().",
+        )
     require_lifecycle(config.engine.type, lifecycle)
     iterations, warmup = lifecycle_invocations(
         lifecycle, config.profiling.iterations, config.profiling.warmup
     )
+    # The method's power_sync compiles the power firmware; a profile's power
+    # section has no meaning to a fixture build, which refuses it.
     config = replace(
-        config, profiling=replace(config.profiling, iterations=iterations, warmup=warmup)
+        config,
+        profiling=replace(config.profiling, iterations=iterations, warmup=warmup),
+        power=replace(config.power, enabled=False),
     )
     fixture_build = build_fixed_fixture(
         config,
@@ -453,9 +658,9 @@ def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
 def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
     """SHA-256 tying *build* to the plan and lifecycle it was compiled from.
 
-    It covers the plan's intent hash, the lifecycle, the timing scope and
-    state policy the build records, its prepared runtime manifest, and what
-    it observes, and no host path.
+    It covers the plan's intent hash, the lifecycle, the timing scope,
+    state policy and power wiring the build records, its prepared runtime
+    manifest, and what it observes, and no host path.
     """
     payload = {
         "plan": plan.intent_hash,
@@ -466,6 +671,9 @@ def _binding(plan: FrozenRun, lifecycle: Lifecycle, build: FixtureBuild) -> str:
         "observe_ram": build.observe_ram,
         "observe_aot_arenas": [list(arena) for arena in build.aot_arena_scan],
     }
+    # A timing build omits the key, so a timing build saved before power wiring still verifies.
+    if build.power_sync is not None:
+        payload["power_sync"] = asdict(build.power_sync)
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
     return hashlib.sha256(encoded.encode()).hexdigest()
 
@@ -488,6 +696,8 @@ def run_build(
     settle_seconds: float,
     expect: Expect | None = None,
     expected_duration_s: float | None = None,
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,
+    power_guard: FixturePowerGuard | None = None,
 ) -> RunResult:
     """Flash *compiled*'s image, capture one run and compare outputs; see :meth:`CompiledBuild.run`."""
     return compiled.run(
@@ -497,6 +707,8 @@ def run_build(
         settle_seconds=settle_seconds,
         expect=expect,
         expected_duration_s=expected_duration_s,
+        power=power,
+        power_guard=power_guard,
     )
 
 

@@ -76,7 +76,9 @@ RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: statistic; an ExecuTorch run's lifecycle is single. Otherwise additive.
 #: v17: the engine id tflm is now litert, in engine and wherever a summary
 #: names the engine. Otherwise unchanged.
-RUN_SUMMARY_SCHEMA_VERSION = 17
+#: v18: #558 identity.run adds energy: how the run's energy was measured, null
+#: for a profile without power and unknown for one with it. Otherwise additive.
+RUN_SUMMARY_SCHEMA_VERSION = 18
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",

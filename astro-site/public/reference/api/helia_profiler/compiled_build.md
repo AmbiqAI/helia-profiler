@@ -88,7 +88,7 @@ from; :func:`build` computes it and :meth:`verify` recomputes it.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:38`
+Source: `src/helia_profiler/compiled_build.py:61`
 
 ### helia_profiler.CompiledBuild.plan
 
@@ -98,7 +98,7 @@ Source: `src/helia_profiler/compiled_build.py:38`
 plan: FrozenRun
 ```
 
-Source: `src/helia_profiler/compiled_build.py:46`
+Source: `src/helia_profiler/compiled_build.py:69`
 
 ### helia_profiler.CompiledBuild.build
 
@@ -108,7 +108,7 @@ Source: `src/helia_profiler/compiled_build.py:46`
 build: FixtureBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:47`
+Source: `src/helia_profiler/compiled_build.py:70`
 
 ### helia_profiler.CompiledBuild.lifecycle
 
@@ -118,7 +118,7 @@ Source: `src/helia_profiler/compiled_build.py:47`
 lifecycle: Lifecycle
 ```
 
-Source: `src/helia_profiler/compiled_build.py:48`
+Source: `src/helia_profiler/compiled_build.py:71`
 
 ### helia_profiler.CompiledBuild.binding
 
@@ -128,7 +128,7 @@ Source: `src/helia_profiler/compiled_build.py:48`
 binding: str
 ```
 
-Source: `src/helia_profiler/compiled_build.py:49`
+Source: `src/helia_profiler/compiled_build.py:72`
 
 ### helia_profiler.CompiledBuild.identity
 
@@ -140,7 +140,7 @@ identity: RunIdentity
 
 The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs.
 
-Source: `src/helia_profiler/compiled_build.py:52`
+Source: `src/helia_profiler/compiled_build.py:75`
 
 ### helia_profiler.CompiledBuild.verify
 
@@ -171,7 +171,7 @@ profile builds from source, which a fixture build does not link.
 | --- | --- |
 | ConfigError | Naming the first fact that does not match. |
 
-Source: `src/helia_profiler/compiled_build.py:65`
+Source: `src/helia_profiler/compiled_build.py:90`
 
 ### helia_profiler.CompiledBuild.save
 
@@ -183,7 +183,7 @@ save(path: str | Path, *, roots: Mapping[str, Path]) -> Path
 
 Write the build as JSON with paths relative to *roots* and return its path.
 
-Source: `src/helia_profiler/compiled_build.py:179`
+Source: `src/helia_profiler/compiled_build.py:204`
 
 ### helia_profiler.CompiledBuild.load
 
@@ -197,7 +197,7 @@ load(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild
 
 Read and verify a build written by :meth:`save`, resolving paths under *roots*.
 
-Source: `src/helia_profiler/compiled_build.py:204`
+Source: `src/helia_profiler/compiled_build.py:229`
 
 ### helia_profiler.CompiledBuild.run
 
@@ -212,6 +212,8 @@ run(
     settle_seconds: float,
     expect: Expect | None = None,
     expected_duration_s: float | None = None,
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,
+    power_guard: FixturePowerGuard | None = None,
 ) -> RunResult
 ```
 
@@ -220,14 +222,23 @@ Flash the recorded image, capture one run and compare outputs when *expect* is g
 A failed capture comes back with ``capture.state == "failure"`` and no
 verification; errors raised while capturing propagate.
 
+*power* selects the instrument: a :class:`FixtureRailPowerRequest`
+measures the MCU rail of a build compiled with the same
+``power_sync`` wiring, and a :class:`FixtureBoardPowerRequest`
+powers the board through a configured supply for a timing capture
+of a build without power wiring. Either needs *power_guard*, the
+station's authority over that instrument and rail; *guard* keeps
+its authority over the board and probe. Every refusal comes before
+the device is touched.
+
 **Raises**
 
 | Name | Description |
 | --- | --- |
-| ConfigError | The build does not verify, or *expect* cannot be compared. |
+| ConfigError | The build does not verify, *expect* cannot be compared, or *power* does not fit the build or the run API's rail-energy route. |
 | CaptureError | The device reports counts other than the build's. |
 
-Source: `src/helia_profiler/compiled_build.py:240`
+Source: `src/helia_profiler/compiled_build.py:265`
 
 ## helia_profiler.RunResult
 
@@ -239,6 +250,7 @@ RunResult(
     capture: FixtureCaptureResult,
     identity: RunIdentity,
     verification: Verification | None,
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,
 ) -> None
 ```
 
@@ -246,9 +258,11 @@ RunResult(
 
 One capture from a :class:`CompiledBuild`.
 
+``power`` is the power request the run was captured with, or ``None``.
+
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:303`
+Source: `src/helia_profiler/compiled_build.py:481`
 
 ### helia_profiler.RunResult.compiled
 
@@ -258,7 +272,7 @@ Source: `src/helia_profiler/compiled_build.py:303`
 compiled: CompiledBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:307`
+Source: `src/helia_profiler/compiled_build.py:488`
 
 ### helia_profiler.RunResult.capture
 
@@ -268,7 +282,7 @@ Source: `src/helia_profiler/compiled_build.py:307`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/compiled_build.py:308`
+Source: `src/helia_profiler/compiled_build.py:489`
 
 ### helia_profiler.RunResult.identity
 
@@ -278,7 +292,7 @@ Source: `src/helia_profiler/compiled_build.py:308`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/compiled_build.py:309`
+Source: `src/helia_profiler/compiled_build.py:490`
 
 ### helia_profiler.RunResult.verification
 
@@ -288,7 +302,17 @@ Source: `src/helia_profiler/compiled_build.py:309`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:310`
+Source: `src/helia_profiler/compiled_build.py:491`
+
+### helia_profiler.RunResult.power
+
+`attribute` · `python`
+
+```python
+power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
+```
+
+Source: `src/helia_profiler/compiled_build.py:492`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -300,7 +324,25 @@ succeeded: bool
 
 True only for a ``success`` capture.
 
-Source: `src/helia_profiler/compiled_build.py:313`
+Source: `src/helia_profiler/compiled_build.py:495`
+
+### helia_profiler.RunResult.energy
+
+`attribute` · `python`
+
+```python
+energy: FixtureRailEnergy | None
+```
+
+The capture's gross MCU-rail energy, or ``None`` when it measured none.
+
+It holds the measured iterations, duration, mean power and current,
+energy and energy per iteration, the rail and instrument serial, the
+hash-pinned raw instrument trace, and the protocol-2 READY, GO,
+gate and DONE samples in ``completion``. A failed capture measures
+none.
+
+Source: `src/helia_profiler/compiled_build.py:500`
 
 ## helia_profiler.build
 
@@ -324,7 +366,12 @@ build(
 Compile *plan* for *fixture*'s pinned inputs and return the compiled build.
 
 *lifecycle* must be one the plan's engine implements; it sets the timed
-iterations and warmups the firmware runs. *host* supplies host-local
+iterations and warmups the firmware runs. A *method* with ``power_sync``
+compiles the protocol-2 power firmware, which a run measures with a
+matching :class:`~helia_profiler.FixtureRailPowerRequest`; it is admitted
+for a heliaAOT or LiteRT plan on the ``apollo510_evb`` under
+``Lifecycle.CARRY``, and refused otherwise. A plan frozen with power
+enabled needs such a method. *host* supplies host-local
 settings, such as ``{"work_dir": ...}``, as :meth:`FrozenRun.config` does.
 heliaRT and LiteRT link a prepared runtime: without *runtime*, the one the
 plan names is taken from the HPX cache (``hpx runtimes prepare``), never
@@ -332,7 +379,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:318`
+Source: `src/helia_profiler/compiled_build.py:512`
 
 ## helia_profiler.load_build
 
@@ -346,7 +393,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:477`
+Source: `src/helia_profiler/compiled_build.py:685`
 
 ## helia_profiler.run_build
 
@@ -362,6 +409,8 @@ run_build(
     settle_seconds: float,
     expect: Expect | None = None,
     expected_duration_s: float | None = None,
+    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,
+    power_guard: FixturePowerGuard | None = None,
 ) -> RunResult
 ```
 
@@ -369,4 +418,4 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:482`
+Source: `src/helia_profiler/compiled_build.py:690`

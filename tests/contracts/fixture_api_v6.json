@@ -1,7 +1,7 @@
 {
   "api_version": [
     6,
-    0
+    1
   ],
   "surface": {
     "BuildFacts": {
@@ -107,6 +107,34 @@
           "linker_reserved",
           "bool",
           "False"
+        ]
+      ],
+      "frozen": true,
+      "kind": "dataclass",
+      "methods": {},
+      "properties": []
+    },
+    "EnergyFacts": {
+      "fields": [
+        [
+          "scope",
+          "str",
+          "<required>"
+        ],
+        [
+          "rail",
+          "str | Unknown",
+          "<required>"
+        ],
+        [
+          "subtraction",
+          "str",
+          "<required>"
+        ],
+        [
+          "completion_protocol",
+          "int",
+          "<required>"
         ]
       ],
       "frozen": true,
@@ -2092,6 +2120,11 @@
           "timing_statistic",
           "str | Unknown",
           "Unknown(reason='the record predates this fact')"
+        ],
+        [
+          "energy",
+          "EnergyFacts | Unknown | None",
+          "None"
         ]
       ],
       "frozen": true,

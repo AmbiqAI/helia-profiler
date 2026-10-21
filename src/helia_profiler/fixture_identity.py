@@ -17,6 +17,7 @@ from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .identity import (
     BuildFacts,
+    EnergyFacts,
     KernelIdentity,
     RunFacts,
     RunIdentity,
@@ -53,14 +54,14 @@ def fixture_run_identity(
         dependency_lock_sha256=_sha(build.dependency_lock),
         model_sha256=_sha(build.model, Unknown("the record predates pinned models")),
         inputs_sha256=_inputs_sha256(build),
-        run=_run_facts(build),
+        run=_run_facts(build, capture),
         producer=_workspace_fact(_inputs(workspace), "hpx_version"),
         build_hash=_build_hash(build, archive),
         observation_hash=_observation_hash(capture) if capture is not None else None,
     )
 
 
-def _run_facts(build: FixtureBuild) -> RunFacts:
+def _run_facts(build: FixtureBuild, capture: FixtureCaptureResult | None) -> RunFacts:
     adapter = get_adapter(build.engine)
     boundary = adapter.instance_boundary
     return RunFacts(
@@ -79,7 +80,25 @@ def _run_facts(build: FixtureBuild) -> RunFacts:
         ),
         # fixed_fixture.cc.j2 reports one tick count over every timed invocation.
         timing_statistic="total",
+        energy=_energy(build, capture),
     )
+
+
+def _energy(build: FixtureBuild, capture: FixtureCaptureResult | None) -> EnergyFacts | None:
+    """The rail-energy method of a power build: its wiring fixes all but the rail.
+
+    The rail comes from the measurement; without one, only the power request names it.
+    """
+    from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION
+
+    wiring = build.power_sync
+    if wiring is None:
+        return None
+    measured = capture.rail_energy if capture is not None else None
+    rail = (
+        measured.rail if measured is not None else Unknown("the run's power request names the rail")
+    )
+    return EnergyFacts(GROSS_RAIL_SCOPE, rail, NO_SUBTRACTION, wiring.protocol_version)
 
 
 def _workspace(build: FixtureBuild) -> dict[str, Any] | Unknown:

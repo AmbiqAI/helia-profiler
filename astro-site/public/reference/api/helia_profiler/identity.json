@@ -7,11 +7,11 @@
   "language": "python",
   "modules": [
     {
-      "description": "Shared identity vocabulary: the identity of a captured run and the build, run, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "description": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
       "name": "identity",
       "path": "helia_profiler.identity",
       "submodules": [],
-      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, runtime and kernel facts it names, canonical engine and kernel names with today'…",
+      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names wit…",
       "symbols": [
         {
           "description": "An inference engine, by its shared name.\n\n**API tier:** `experimental`",
@@ -628,7 +628,103 @@
           "summary": "How the image was built and placed."
         },
         {
-          "description": "`dataclass`\n\nHow the model was run: state handling, invocation counts, the timed span and its clock.\n\n``timing_scope`` is what each timed span covers: ``invoke_only`` or\n``restore_and_invoke``, which also restores the fixed inputs.\n``instance_boundary`` is where one model instance ends: ``boot`` when the\nengine initializes once and every invocation reuses it, ``invocation``\nwhen each invocation loads and initializes its own.\n``first_invoke_initializer`` is whether the first invocation of an\ninstance runs the model's one-time initializer, such as a LiteRT\n``CALL_ONCE`` subgraph, and ``first_invoke_window`` where that invocation\nfalls: ``warmup`` or ``measured``. ``timing_clock`` is the clock that times\nthe span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``\nis its configured rate, not a measured one. ``timing_statistic`` is what\nthe reported time is: the ``total`` over the measured invocations or\ntheir ``mean``.\n\n**API tier:** `experimental`",
+          "description": "`dataclass`\n\nThe method a run's energy is measured with, whether or not the capture succeeded.\n\n``scope`` is what the measured window covers:\n``gross_rail_restore_and_invoke`` is everything the rail draws over the\ntimed restore-and-invoke loop. ``rail`` is the physical rail the run\nmeasures, such as ``MCU``: the rail requested, also after a failed\ncapture, and unknown only where no request is at hand, as in a build's\nidentity before it runs. ``subtraction`` is what is taken off the\nmeasurement, ``none`` when nothing is. ``completion_protocol`` is the\nversion of the firmware's READY, GO and DONE handshake that bounds the\nwindow. The measurement itself, or its absence, is the run's outcome,\nsuch as ``RunResult.energy``.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.EnergyFacts",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EnergyFacts.scope",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "scope",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "scope: str",
+              "source": {
+                "line": 158,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L158"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EnergyFacts.rail",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "rail",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "rail: str | Unknown",
+              "source": {
+                "line": 159,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L159"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EnergyFacts.subtraction",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "subtraction",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "subtraction: str",
+              "source": {
+                "line": 160,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L160"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.EnergyFacts.completion_protocol",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "completion_protocol",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "completion_protocol: int",
+              "source": {
+                "line": 161,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L161"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "EnergyFacts",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "EnergyFacts(scope: str, rail: str | Unknown, subtraction: str, completion_protocol: int) -> None",
+          "source": {
+            "line": 142,
+            "path": "src/helia_profiler/identity.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L142"
+          },
+          "summary": "The method a run's energy is measured with, whether or not the capture succeeded."
+        },
+        {
+          "description": "`dataclass`\n\nHow the model was run: state handling, invocation counts, the timed span and its clock.\n\n``timing_scope`` is what each timed span covers: ``invoke_only`` or\n``restore_and_invoke``, which also restores the fixed inputs.\n``instance_boundary`` is where one model instance ends: ``boot`` when the\nengine initializes once and every invocation reuses it, ``invocation``\nwhen each invocation loads and initializes its own.\n``first_invoke_initializer`` is whether the first invocation of an\ninstance runs the model's one-time initializer, such as a LiteRT\n``CALL_ONCE`` subgraph, and ``first_invoke_window`` where that invocation\nfalls: ``warmup`` or ``measured``. ``timing_clock`` is the clock that times\nthe span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``\nis its configured rate, not a measured one. ``timing_statistic`` is what\nthe reported time is: the ``total`` over the measured invocations or\ntheir ``mean``. ``energy`` is the method the run's energy is measured\nwith, stated after a failed capture too, and ``None`` when the run\nmeasures no energy; whether it was measured is the outcome, not a fact\nhere.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.RunFacts",
           "kind": "class",
@@ -647,9 +743,9 @@
               "returns": [],
               "signature": "lifecycle: str",
               "source": {
-                "line": 161,
+                "line": 186,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L161"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L186"
               },
               "summary": ""
             },
@@ -666,9 +762,9 @@
               "returns": [],
               "signature": "iterations: int",
               "source": {
-                "line": 162,
+                "line": 187,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L162"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L187"
               },
               "summary": ""
             },
@@ -685,9 +781,9 @@
               "returns": [],
               "signature": "warmups: int",
               "source": {
-                "line": 163,
+                "line": 188,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L163"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L188"
               },
               "summary": ""
             },
@@ -704,9 +800,9 @@
               "returns": [],
               "signature": "timing_scope: str",
               "source": {
-                "line": 164,
+                "line": 189,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L164"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L189"
               },
               "summary": ""
             },
@@ -723,9 +819,9 @@
               "returns": [],
               "signature": "instance_boundary: str | Unknown = _UNRECORDED",
               "source": {
-                "line": 165,
+                "line": 190,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L165"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L190"
               },
               "summary": ""
             },
@@ -742,9 +838,9 @@
               "returns": [],
               "signature": "first_invoke_initializer: bool | Unknown = _UNRECORDED",
               "source": {
-                "line": 166,
+                "line": 191,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L166"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L191"
               },
               "summary": ""
             },
@@ -761,9 +857,9 @@
               "returns": [],
               "signature": "first_invoke_window: str | Unknown = _UNRECORDED",
               "source": {
-                "line": 167,
+                "line": 192,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L167"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L192"
               },
               "summary": ""
             },
@@ -780,9 +876,9 @@
               "returns": [],
               "signature": "timing_clock: str | Unknown = _UNRECORDED",
               "source": {
-                "line": 168,
+                "line": 193,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L168"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L193"
               },
               "summary": ""
             },
@@ -799,9 +895,9 @@
               "returns": [],
               "signature": "timing_clock_hz: int | Unknown = _UNRECORDED",
               "source": {
-                "line": 169,
+                "line": 194,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L169"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L194"
               },
               "summary": ""
             },
@@ -818,9 +914,28 @@
               "returns": [],
               "signature": "timing_statistic: str | Unknown = _UNRECORDED",
               "source": {
-                "line": 170,
+                "line": 195,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L170"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L195"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RunFacts.energy",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "energy",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "energy: EnergyFacts | Unknown | None = None",
+              "source": {
+                "line": 196,
+                "path": "src/helia_profiler/identity.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L196"
               },
               "summary": ""
             }
@@ -829,11 +944,11 @@
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "RunFacts(\n    lifecycle: str,\n    iterations: int,\n    warmups: int,\n    timing_scope: str,\n    instance_boundary: str | Unknown = _UNRECORDED,\n    first_invoke_initializer: bool | Unknown = _UNRECORDED,\n    first_invoke_window: str | Unknown = _UNRECORDED,\n    timing_clock: str | Unknown = _UNRECORDED,\n    timing_clock_hz: int | Unknown = _UNRECORDED,\n    timing_statistic: str | Unknown = _UNRECORDED,\n) -> None",
+          "signature": "RunFacts(\n    lifecycle: str,\n    iterations: int,\n    warmups: int,\n    timing_scope: str,\n    instance_boundary: str | Unknown = _UNRECORDED,\n    first_invoke_initializer: bool | Unknown = _UNRECORDED,\n    first_invoke_window: str | Unknown = _UNRECORDED,\n    timing_clock: str | Unknown = _UNRECORDED,\n    timing_clock_hz: int | Unknown = _UNRECORDED,\n    timing_statistic: str | Unknown = _UNRECORDED,\n    energy: EnergyFacts | Unknown | None = None,\n) -> None",
           "source": {
-            "line": 142,
+            "line": 164,
             "path": "src/helia_profiler/identity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L142"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L164"
           },
           "summary": "How the model was run: state handling, invocation counts, the timed span and its clock."
         },
@@ -857,9 +972,9 @@
               "returns": [],
               "signature": "runtime: RuntimeIdentity",
               "source": {
-                "line": 185,
+                "line": 211,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L185"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L211"
               },
               "summary": ""
             },
@@ -876,9 +991,9 @@
               "returns": [],
               "signature": "kernels: KernelIdentity",
               "source": {
-                "line": 186,
+                "line": 212,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L186"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L212"
               },
               "summary": ""
             },
@@ -895,9 +1010,9 @@
               "returns": [],
               "signature": "prepared_archive_sha256: str | None",
               "source": {
-                "line": 187,
+                "line": 213,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L187"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L213"
               },
               "summary": ""
             },
@@ -914,9 +1029,9 @@
               "returns": [],
               "signature": "build: BuildFacts",
               "source": {
-                "line": 188,
+                "line": 214,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L188"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L214"
               },
               "summary": ""
             },
@@ -933,9 +1048,9 @@
               "returns": [],
               "signature": "baseline_id: str | Unknown",
               "source": {
-                "line": 189,
+                "line": 215,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L189"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L215"
               },
               "summary": ""
             },
@@ -952,9 +1067,9 @@
               "returns": [],
               "signature": "dependency_lock_sha256: str | Unknown",
               "source": {
-                "line": 190,
+                "line": 216,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L190"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L216"
               },
               "summary": ""
             },
@@ -971,9 +1086,9 @@
               "returns": [],
               "signature": "model_sha256: str | Unknown",
               "source": {
-                "line": 191,
+                "line": 217,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L191"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L217"
               },
               "summary": ""
             },
@@ -990,9 +1105,9 @@
               "returns": [],
               "signature": "inputs_sha256: str | Unknown",
               "source": {
-                "line": 192,
+                "line": 218,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L192"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L218"
               },
               "summary": ""
             },
@@ -1009,9 +1124,9 @@
               "returns": [],
               "signature": "run: RunFacts",
               "source": {
-                "line": 193,
+                "line": 219,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L193"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L219"
               },
               "summary": ""
             },
@@ -1028,9 +1143,9 @@
               "returns": [],
               "signature": "producer: str | Unknown",
               "source": {
-                "line": 194,
+                "line": 220,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L194"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L220"
               },
               "summary": ""
             },
@@ -1047,9 +1162,9 @@
               "returns": [],
               "signature": "build_hash: str | Unknown",
               "source": {
-                "line": 195,
+                "line": 221,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L195"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L221"
               },
               "summary": ""
             },
@@ -1066,9 +1181,9 @@
               "returns": [],
               "signature": "observation_hash: str | None = None",
               "source": {
-                "line": 196,
+                "line": 222,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L196"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L222"
               },
               "summary": ""
             },
@@ -1085,9 +1200,9 @@
               "returns": [],
               "signature": "intent_hash: str | None = None",
               "source": {
-                "line": 197,
+                "line": 223,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L197"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L223"
               },
               "summary": ""
             },
@@ -1104,9 +1219,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 199,
+                "line": 225,
                 "path": "src/helia_profiler/identity.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L199"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L225"
               },
               "summary": "JSON-ready form; an unknown fact becomes {\"unknown\": reason}."
             }
@@ -1117,9 +1232,9 @@
           "returns": [],
           "signature": "RunIdentity(\n    runtime: RuntimeIdentity,\n    kernels: KernelIdentity,\n    prepared_archive_sha256: str | None,\n    build: BuildFacts,\n    baseline_id: str | Unknown,\n    dependency_lock_sha256: str | Unknown,\n    model_sha256: str | Unknown,\n    inputs_sha256: str | Unknown,\n    run: RunFacts,\n    producer: str | Unknown,\n    build_hash: str | Unknown,\n    observation_hash: str | None = None,\n    intent_hash: str | None = None,\n) -> None",
           "source": {
-            "line": 173,
+            "line": 199,
             "path": "src/helia_profiler/identity.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L173"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/identity.py#L199"
           },
           "summary": "Everything a comparison needs to know about what ran."
         }

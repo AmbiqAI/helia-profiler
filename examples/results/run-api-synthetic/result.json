@@ -41,6 +41,7 @@
       "unknown": "the dependency state records no workspace"
     },
     "run": {
+      "energy": null,
       "first_invoke_initializer": false,
       "first_invoke_window": "warmup",
       "instance_boundary": "boot",

@@ -248,6 +248,11 @@ def _run_facts(ctx: PipelineContext) -> RunFacts:
         timing_clock=clock,
         timing_clock_hz=clock_hz,
         timing_statistic="mean",
+        energy=(
+            Unknown("a profile does not state how its energy is measured")
+            if ctx.config.power.enabled
+            else None
+        ),
     )
 
 

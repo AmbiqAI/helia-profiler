@@ -685,3 +685,15 @@ def test_a_run_without_a_resolved_soc_states_why_its_clock_is_unknown(tmp_path):
 
     assert identity.run.timing_clock == Unknown("the run resolved no SoC")
     assert identity.intent_hash is None
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_a_profile_with_power_states_its_energy_method_as_unknown(tmp_path, enabled):
+    ctx = _ctx(tmp_path)
+    ctx.config = replace(ctx.config, power=replace(ctx.config.power, enabled=enabled))
+
+    energy = profile_run_identity(ctx).run.energy
+
+    assert energy == (
+        Unknown("a profile does not state how its energy is measured") if enabled else None
+    )

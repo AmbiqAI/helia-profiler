@@ -160,7 +160,9 @@ def test_host_settings_reach_the_build(plan, fixture, calls):
 def test_a_single_invocation_is_refused_for_power(plan, fixture, calls):
     from types import SimpleNamespace
 
-    with pytest.raises(ConfigError, match="too short for a power capture"):
+    with pytest.raises(
+        ConfigError, match="not a Lifecycle.SINGLE one, which runs the model stateless"
+    ):
         power_method: Any = SimpleNamespace(power_sync=object())
         plan.build(fixture, method=power_method, lifecycle=Lifecycle.SINGLE)
     assert not calls
@@ -416,6 +418,8 @@ def test_load_build_and_run_build_delegate_to_the_record(plan, build, root, tmp_
         "settle_seconds": 1.0,
         "expect": None,
         "expected_duration_s": None,
+        "power": None,
+        "power_guard": None,
     }
 
 

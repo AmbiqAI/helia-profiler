@@ -103,6 +103,7 @@ from .identity import (
     BuildFacts,
     CanonicalEngine,
     CanonicalKernel,
+    EnergyFacts,
     KernelIdentity,
     RunFacts,
     RunIdentity,
@@ -112,7 +113,7 @@ from .identity import (
 from .placement import Placement
 from .results.models import ToolchainInfo
 
-FIXTURE_API_VERSION: Final[tuple[int, int]] = (6, 0)
+FIXTURE_API_VERSION: Final[tuple[int, int]] = (6, 1)
 
 __all__ = [
     "FIXTURE_API_VERSION",
@@ -211,5 +212,6 @@ __all__ = [
     "KernelIdentity",
     "BuildFacts",
     "RunFacts",
+    "EnergyFacts",
     "Unknown",
 ]

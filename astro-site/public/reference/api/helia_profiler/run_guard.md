@@ -1,6 +1,6 @@
 # helia_profiler.run_guard
 
-Who vouches for the board a run flashes: the guard protocol a capture consults and the operator guard the command line uses.
+Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command line uses, and the rail and supply requests a power run selects.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -139,6 +139,52 @@ verify() -> None
 
 Source: `src/helia_profiler/fixture_target.py:27`
 
+## helia_profiler.FixtureBoardPowerRequest
+
+`class` · `python`
+
+```python
+FixtureBoardPowerRequest(driver: str, serial: str, rail: str) -> None
+```
+
+`dataclass`
+
+Explicit station-owned supply path; enabling it does not request energy measurement.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_power.py:42`
+
+### helia_profiler.FixtureBoardPowerRequest.driver
+
+`attribute` · `python`
+
+```python
+driver: str
+```
+
+Source: `src/helia_profiler/fixture_power.py:46`
+
+### helia_profiler.FixtureBoardPowerRequest.serial
+
+`attribute` · `python`
+
+```python
+serial: str
+```
+
+Source: `src/helia_profiler/fixture_power.py:47`
+
+### helia_profiler.FixtureBoardPowerRequest.rail
+
+`attribute` · `python`
+
+```python
+rail: str
+```
+
+Source: `src/helia_profiler/fixture_power.py:48`
+
 ## helia_profiler.FixtureCaptureGuard
 
 `class` · `python`
@@ -177,3 +223,174 @@ Core CPUID and probe enumeration cannot establish the physical board.
 Reject if the caller has no current independent board/serial evidence.
 
 Source: `src/helia_profiler/fixture_capture.py:51`
+
+## helia_profiler.FixtureRailPowerRequest
+
+`class` · `python`
+
+```python
+FixtureRailPowerRequest(
+    serial: str,
+    rail: str,
+    io_voltage: float,
+    sync_gpio_pin: int,
+    state_gpio_pin: int,
+    go_gpio_pin: int,
+    sync_input_index: int = 0,
+    state_input_index: int = 1,
+    go_output_index: int = 0,
+    stats_rate_hz: int = 1000,
+) -> None
+```
+
+`dataclass`
+
+Station-selected instrument/rail and channels, separate from firmware wiring.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_power.py:57`
+
+### helia_profiler.FixtureRailPowerRequest.serial
+
+`attribute` · `python`
+
+```python
+serial: str
+```
+
+Source: `src/helia_profiler/fixture_power.py:61`
+
+### helia_profiler.FixtureRailPowerRequest.rail
+
+`attribute` · `python`
+
+```python
+rail: str
+```
+
+Source: `src/helia_profiler/fixture_power.py:62`
+
+### helia_profiler.FixtureRailPowerRequest.io_voltage
+
+`attribute` · `python`
+
+```python
+io_voltage: float
+```
+
+Source: `src/helia_profiler/fixture_power.py:63`
+
+### helia_profiler.FixtureRailPowerRequest.sync_gpio_pin
+
+`attribute` · `python`
+
+```python
+sync_gpio_pin: int
+```
+
+Source: `src/helia_profiler/fixture_power.py:64`
+
+### helia_profiler.FixtureRailPowerRequest.state_gpio_pin
+
+`attribute` · `python`
+
+```python
+state_gpio_pin: int
+```
+
+Source: `src/helia_profiler/fixture_power.py:65`
+
+### helia_profiler.FixtureRailPowerRequest.go_gpio_pin
+
+`attribute` · `python`
+
+```python
+go_gpio_pin: int
+```
+
+Source: `src/helia_profiler/fixture_power.py:66`
+
+### helia_profiler.FixtureRailPowerRequest.sync_input_index
+
+`attribute` · `python`
+
+```python
+sync_input_index: int = 0
+```
+
+Source: `src/helia_profiler/fixture_power.py:67`
+
+### helia_profiler.FixtureRailPowerRequest.state_input_index
+
+`attribute` · `python`
+
+```python
+state_input_index: int = 1
+```
+
+Source: `src/helia_profiler/fixture_power.py:68`
+
+### helia_profiler.FixtureRailPowerRequest.go_output_index
+
+`attribute` · `python`
+
+```python
+go_output_index: int = 0
+```
+
+Source: `src/helia_profiler/fixture_power.py:69`
+
+### helia_profiler.FixtureRailPowerRequest.stats_rate_hz
+
+`attribute` · `python`
+
+```python
+stats_rate_hz: int = 1000
+```
+
+Source: `src/helia_profiler/fixture_power.py:70`
+
+### helia_profiler.FixtureRailPowerRequest.firmware_wiring
+
+`method` · `python`
+
+```python
+firmware_wiring() -> FixturePowerSync
+```
+
+Source: `src/helia_profiler/fixture_power.py:93`
+
+## helia_profiler.FixturePowerGuard
+
+`class` · `python`
+
+```python
+FixturePowerGuard()
+```
+
+Station authority for the board and measured instrument/rail.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixture_power.py:97`
+
+### helia_profiler.FixturePowerGuard.check
+
+`method` · `python`
+
+```python
+check(*, require_free: bool, remaining_s: float) -> None
+```
+
+Source: `src/helia_profiler/fixture_power.py:100`
+
+### helia_profiler.FixturePowerGuard.verify_power_device
+
+`method` · `python`
+
+```python
+verify_power_device(*, serial: str, rail: str) -> None
+```
+
+Source: `src/helia_profiler/fixture_power.py:102`
