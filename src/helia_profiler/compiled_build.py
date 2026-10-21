@@ -335,17 +335,12 @@ class CompiledBuild:
             request,
             guard=guard if power_guard is None else _PowerCaptureGuard(guard, power_guard),
         )
-        timing = capture.timing
-        if capture.state == "success" and (
-            timing is None
-            or (timing.iterations, timing.warmups) != (self.build.iterations, self.build.warmups)
-        ):
-            counts = "none" if timing is None else f"{timing.iterations} and {timing.warmups}"
+        try:
+            _check_capture_counts(self, capture)
+        except ConfigError as exc:
             raise CaptureError(
-                f"The device reported {counts} timed iterations and warmups; this build "
-                f"runs {self.build.iterations} and {self.build.warmups}",
-                hint=f"The capture's evidence is in {evidence_dir}.",
-            )
+                exc.args[0], hint=f"The capture's evidence is in {evidence_dir}."
+            ) from exc
         identity = self._identity(
             fixture_run_identity(self.build, capture), rail.rail if rail is not None else None
         )
@@ -416,6 +411,20 @@ class _PowerCaptureGuard:
 
     def verify_power_device(self, *, serial: str, rail: str) -> None:
         self.power.verify_power_device(serial=serial, rail=rail)
+
+
+def _check_capture_counts(compiled: CompiledBuild, capture: FixtureCaptureResult) -> None:
+    timing = capture.timing
+    if capture.state == "success" and (
+        timing is None
+        or (timing.iterations, timing.warmups)
+        != (compiled.build.iterations, compiled.build.warmups)
+    ):
+        counts = "none" if timing is None else f"{timing.iterations} and {timing.warmups}"
+        raise ConfigError(
+            f"The device reported {counts} timed iterations and warmups; this build "
+            f"runs {compiled.build.iterations} and {compiled.build.warmups}"
+        )
 
 
 def _check_power_request(compiled: CompiledBuild, power: _PowerRequest) -> None:
