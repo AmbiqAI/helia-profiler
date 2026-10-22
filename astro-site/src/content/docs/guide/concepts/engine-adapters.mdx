@@ -167,9 +167,14 @@ engine choice cost in flash and RAM for the run at hand.
 | registry | `engines/__init__.py` |
 | protocol and artifacts | `engines/base.py` |
 | adapters | `engines/litert.py`, `engines/helia_rt/`, `engines/helia_aot/`, `engines/executorch.py` |
-| shared helpers | `engines/cmsis_nn.py`, `engines/ethos_u.py` |
+| shared helpers | `engines/cmsis_nn.py`, `engines/ethos_u.py`, `engines/semver.py` |
 | stage | `stages/prepare_engine.py` |
 | contract test | `tests/contracts/test_engine_artifact_types.py` |
+
+`tests/test_package_layout.py` classifies every engine Python module and checks
+absolute and relative imports, including lazy imports. Adapters may use their
+own internals and shared helpers; only the registry imports across adapters.
+Classify a new adapter or helper there when adding it.
 
 ## What next
 
