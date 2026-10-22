@@ -64,9 +64,16 @@ release pull requests from Conventional Commits.
 * **api:** retire fixture facade and pre-change readers ([#576](https://github.com/AmbiqAI/helia-profiler/issues/576))
 * **run:** save verified run results and portable observations ([#575](https://github.com/AmbiqAI/helia-profiler/issues/575))
 * **identity:** namespace semantic hashes ([#573](https://github.com/AmbiqAI/helia-profiler/issues/573))
-* **run:** run summaries advance to v18 and the interim fixture API to 6.1 for the explicit energy-method contract.
+* **run:** the final formats are profile summary v19, `hpx.frozen-run` v2,
+  `hpx.compiled-build` v3 and `hpx.run-result` v1; saved runs export portable
+  mapping `hpx-run-2`. Interim schemas from development are unsupported.
 * **engines:** tflm is no longer an accepted engine selector; use litert in configuration, CLI and records.
-* **run:** BuildRecord is now CompiledBuild, saved as hpx.compiled-build v2, and run summaries are v16.
+* **run:** `BuildRecord` is replaced by the public `CompiledBuild` workflow.
+  Import run types and functions from `helia_profiler`; the `helia_profiler.fixture`
+  facade and its interim API version are removed. Public root `Fixture*` types
+  remain available. Read old bundles with the HPX version that produced them,
+  or recreate plans/builds/captures; this release adds no legacy reader or
+  implicit migration window.
 
 ### Features
 
