@@ -56,6 +56,26 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.4.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.0...v0.4.1) (2026-10-23)
+
+
+### Features
+
+* **tools:** build a validation models file from pinned Zoo models ([c3b3501](https://github.com/AmbiqAI/helia-profiler/commit/c3b3501bf7ab06a982636b9bdf4fa2148c33675b))
+* **tools:** build a validation models file from pinned Zoo models ([64615dc](https://github.com/AmbiqAI/helia-profiler/commit/64615dc9e91674b3ee9f905a87a2cf26e5a5bed6))
+* **validation:** record model family, precision, source and CPU clock ([92d1d23](https://github.com/AmbiqAI/helia-profiler/commit/92d1d237a7c8658cecf0b1a6968c33b6a64f0eca))
+* **validation:** record model family, precision, source, and CPU clock ([33e8c23](https://github.com/AmbiqAI/helia-profiler/commit/33e8c23a3cb9b4f5803ca85af7156ed9466872e4))
+
+
+### Bug Fixes
+
+* **tools:** report malformed Zoo lists without a traceback ([df5f905](https://github.com/AmbiqAI/helia-profiler/commit/df5f905e037875d3baa7750e27da77b3ab1e42fb))
+
+
+### Documentation
+
+* **validation:** document the --models-file keys ([aad7bd0](https://github.com/AmbiqAI/helia-profiler/commit/aad7bd068eb44b5d7f3845aa1c67ee5ce4e2795f))
+
 ## [0.4.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 
