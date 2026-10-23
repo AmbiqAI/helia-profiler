@@ -16,6 +16,7 @@ from helia_profiler.validation.matrix import (
     CaseSpec,
     ExecuTorchBackend,
     MemoryProfile,
+    load_model_file,
 )
 from helia_profiler.validation.runner import (
     CaseResult,
@@ -561,3 +562,49 @@ def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
 
     assert result.status == "pass"
     assert seen["cmd"][-1] == "-v"
+
+
+def test_run_case_carries_model_labels_on_every_path(tmp_path: Path, monkeypatch):
+    (tmp_path / "kws.tflite").write_bytes(b"model")
+    registry = tmp_path / "zoo.yml"
+    registry.write_text(
+        "models:\n"
+        "  mlperf-tiny-kws-a8w8:\n"
+        "    path: kws.tflite\n"
+        "    family: mlperf-tiny-kws\n"
+        "    precision: a8w8\n"
+        "    source: zoo://mlperf-tiny-kws/a8w8@abc\n"
+    )
+    case = CaseSpec(
+        model=load_model_file(registry)["mlperf-tiny-kws-a8w8"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+    labels = ("mlperf-tiny-kws", "a8w8", "zoo://mlperf-tiny-kws/a8w8@abc")
+
+    def passing_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, timeout, check, env
+        config = yaml.safe_load(Path(cmd[-1]).read_text(encoding="utf-8"))
+        case_dir = Path(config["output"]["dir"])
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def hung_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, check, env
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    for fake_run, status in ((passing_run, "pass"), (hung_run, "fail")):
+        monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+        result = run_case(case=case, repo_root=tmp_path, output_root=tmp_path / status, timeout_s=1)
+        assert result.status == status
+        assert (result.family, result.precision, result.source) == labels

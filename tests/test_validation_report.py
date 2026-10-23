@@ -2,26 +2,22 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
-import subprocess
 from io import StringIO
 from pathlib import Path
 
 import pytest
-import yaml
 from rich.console import Console
 
 from helia_profiler.console import HpxConsole
-from helia_profiler.engines import EngineType
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
-from helia_profiler.validation.matrix import BOARDS, CaseSpec, load_model_file
 from helia_profiler.validation.report import (
-    _case_manifest,
     build_manifest,
     load_validation_report,
     write_validation_reports,
 )
-from helia_profiler.validation.runner import CaseResult, run_case
+from helia_profiler.validation.runner import CaseResult
 
 
 def _case(output_dir: Path) -> CaseResult:
@@ -458,63 +454,36 @@ def test_failed_case_with_malformed_summary_keeps_aggregate_report(tmp_path, con
     assert report["cases"][1]["resources"]["binary_sections"]["total"] == 87
 
 
-def test_custom_model_metadata_and_clock_reach_manifest(tmp_path: Path, monkeypatch) -> None:
-    (tmp_path / "kws.tflite").write_bytes(b"model")
-    registry = tmp_path / "zoo.yml"
-    registry.write_text(
-        """
-models:
-  mlperf-tiny-kws-a8w8:
-    path: kws.tflite
-    family: mlperf-tiny-kws
-    precision: a8w8
-    source: zoo://mlperf-tiny-kws/a8w8@abc
-"""
+@pytest.mark.usefixtures("missing_git_metadata")
+def test_custom_model_metadata_and_clock_reach_manifest(tmp_path: Path) -> None:
+    result = dataclasses.replace(
+        _case(tmp_path),
+        model_id="mlperf-tiny-kws-a8w8",
+        family="mlperf-tiny-kws",
+        precision="a8w8",
+        source="zoo://mlperf-tiny-kws/a8w8@abc",
     )
-    case = CaseSpec(
-        model=load_model_file(registry)["mlperf-tiny-kws-a8w8"],
-        engine=EngineType.HELIA_RT,
-        power=False,
-        board=BOARDS["apollo510_evb"],
+    assert result.output_dir is not None
+    case_dir = Path(result.output_dir)
+    case_dir.mkdir(parents=True)
+    (case_dir / "run_metadata.json").write_text(
+        json.dumps({"platform": {"cpu_clock_name": "lp", "cpu_clock_mhz": 96}})
     )
 
-    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):
-        del cwd, capture_output, text, timeout, check, env
-        case_dir = Path(yaml.safe_load(Path(cmd[-1]).read_text(encoding="utf-8"))["output"]["dir"])
-        case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(
-            json.dumps(
-                {
-                    "schema": "hpx.run-summary",
-                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
-                    "layers": 13,
-                    "total_cycles": 123456,
-                }
-            )
-        )
-        (case_dir / "run_metadata.json").write_text(
-            json.dumps({"platform": {"cpu_clock_name": "lp", "cpu_clock_mhz": 96}})
-        )
-        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+    case = build_manifest([result], tmp_path)["cases"][0]
 
-    monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
-    out = tmp_path / "out"
-    result = run_case(case=case, repo_root=tmp_path, output_root=out, timeout_s=30)
-
-    manifest = _case_manifest(result, out)
-
-    assert manifest["model"] == {
+    assert case["model"] == {
         "family": "mlperf-tiny-kws",
         "precision": "a8w8",
         "source": "zoo://mlperf-tiny-kws/a8w8@abc",
     }
-    assert manifest["identity"]["comparison_group"] == "mlperf-tiny-kws-a8w8"
-    assert manifest["provenance"]["cpu_clock_name"] == "lp"
-    assert manifest["provenance"]["cpu_clock_mhz"] == 96
+    assert case["provenance"]["cpu_clock_name"] == "lp"
+    assert case["provenance"]["cpu_clock_mhz"] == 96
 
 
+@pytest.mark.usefixtures("missing_git_metadata")
 def test_builtin_model_manifest_omits_model_object(tmp_path: Path) -> None:
-    manifest = _case_manifest(_case(tmp_path), tmp_path)
+    case = build_manifest([_case(tmp_path)], tmp_path)["cases"][0]
 
-    assert "model" not in manifest
-    assert "cpu_clock_name" not in manifest["provenance"]
+    assert "model" not in case
+    assert "cpu_clock_name" not in case["provenance"]
