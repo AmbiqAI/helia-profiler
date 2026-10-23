@@ -72,6 +72,18 @@ captures from it without rebuilding and returns a `RunResult`, saved as
 types are exported from the package root, which is the whole public Python
 contract; the `fixture_*` and `_fixture_*` modules behind it are internal.
 
+The retained build reuses the profile path's platform resolution, engine
+preparation, memory planning, firmware generation and build stages. It adds
+fixture binding and identity checks around them. Freeze, save/load and
+`api.observations` are host-only operations; build invokes host tools;
+`run_build` is the device boundary. Loading a saved result verifies retained
+evidence before observations map it into the portable result view.
+
+For implementation owners, verification responsibilities and focused tests, see
+the [contributor architecture map](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/architecture.md).
+The [fixed-fixture maintainer guide](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/fixed-fixture.md)
+has station setup, runtime preparation and evidence details.
+
 ### Errors are typed
 
 HPX uses subclasses of `HpxError` with an optional `hint` that
