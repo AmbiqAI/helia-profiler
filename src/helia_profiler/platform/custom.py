@@ -211,7 +211,7 @@ def _app_flash_load_addr(
     An explicit ``app_flash_load_addr:`` wins.  Otherwise the address is
     inherited from ``based_on``, using that part's *resolved* address so the
     inheritance carries whatever the base actually flashes at -- a built-in's
-    per-SoC override included -- rather than only the raw field.
+    map-derived address included -- rather than only the raw field.
 
     With neither, the result is ``None`` and the part has no address at all.
     That is deliberate.  The remaining case is a SoC declared from scratch

@@ -519,13 +519,7 @@ class JLinkResetController:
 
 def create_debug_memory_session() -> DebugMemorySession:
     """Create a pylink-backed debug-memory session."""
-    try:
-        import pylink
-    except ImportError as exc:
-        raise CaptureError(
-            "pylink-square package not installed (required for debug probe transports)",
-            hint="pip install pylink-square",
-        ) from exc
+    pylink = _pylink_module()
     _preload_jlink_linux_usb_runtime()
     try:
         return pylink.JLink()

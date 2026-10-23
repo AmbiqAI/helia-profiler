@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Mapping
 
+from .memory_map import mram_app_origin
 from .placement import Placement
 from .soc import SocFamily
 
@@ -80,9 +81,9 @@ class MemoryCapabilities:
     #: address in its generated ``flash_cmds.jlink``) -- the first MRAM/flash
     #: address above the part's bootloader-reserved region, NOT the MRAM
     #: *region* base in ``placement_bases``.  Resolved by
-    #: :func:`resolve_app_flash_load_addr`; ``None`` when no tier there has a
-    #: value it can stand behind for this part -- an unmapped family, or a
-    #: ``target.custom_socs`` part that stated no address and named no
+    #: :func:`resolve_app_flash_load_addr`; ``None`` when it has no value it
+    #: can stand behind for this part -- a built-in with no linked memory
+    #: map, or a ``target.custom_socs`` part that stated no address and named no
     #: ``based_on``.  The J-Link flash fallback refuses to guess an address then.
     app_flash_load_addr: int | None
 
@@ -312,105 +313,29 @@ def _placement_bases(soc: SocDef) -> Mapping[Placement, int]:
     return MappingProxyType(dict(bases))
 
 
-# App-image flash (``LoadFile``) address per family: ``NSX_SEGGER_PF_ADDR`` from
-# nsx-ambiq-sdk's per-SoC facts (``cmake/socs/facts/*.cmake``) -- the exact
-# address the NSX-generated ``flash_cmds.jlink`` recipes program, i.e. the first
-# MRAM/flash address above each part's bootloader-reserved region, NOT the MRAM
-# region base.  Verified against the facts file of every registered SoC
-# (apollo3p; apollo4p/4l; apollo510/510b/5b/330P/510L) plus real generated recipes,
-# and cross-checked against the AP5 linker script's MCU_MRAM origin (see the
-# apollo330P memory note in soc.py).  Keying by family is safe today: no
-# registered family mixes addresses across its parts.  One unregistered part
-# also agrees with its family: apollo4b (which has no facts file), from a real
-# generated recipe.
-#
-# Each value is whichever linker layout that part's DEFAULT NSX_LINKER_PROFILE
-# resolves to -- not "the SBL layout" as a blanket rule, because that differs
-# per part.  For the Apollo families here it happens to be SBL: `default` and
-# `itcm` are both sbl-based, and the nbl script (which would move AP5 MRAM to
-# 0x00400000) is not selectable from hpx.  Do NOT generalize that to new parts;
-# atomiq110 below defaults to *nbl*.  Keying is also coarser than NSX's own SoC
-# family axis -- NSX treats apollo330P and atomiq110 as separate families -- so
-# a part whose flash window departs from its family needs a per-SoC entry.
-#
-# "Verified against every registered SoC" is the whole warrant for keying by
-# family, and it does not extend past the registry: a ``target.custom_socs``
-# part was never checked against any facts file, so it does NOT read this table
-# (see ``resolve_app_flash_load_addr``).  Such a part states its own address or
-# inherits one from the ``based_on`` part it was derived from.
-_FAMILY_APP_FLASH_LOAD_ADDR: dict[SocFamily, int] = {
-    SocFamily.AP3: 0x0000C000,
-    SocFamily.AP4: 0x00018000,
-    SocFamily.AP5: 0x00410000,
-}
-
-# Per-SoC overrides, which win over the family baseline for BUILT-IN SoCs only
-# (see ``resolve_app_flash_load_addr``).
-#
-# atomiq110 is the motivating case and is NOT an Apollo5 part.  It heads a
-# separate Atomiq series (binned AP6 internally; the eventual family tag is
-# expected to be something like AT1).  ``SocFamily`` has no such member yet, so
-# it is provisionally tagged AP5 on the strength of the shared Cortex-M55/MVE
-# core -- a placeholder for the core tier, not a claim about its memory map.
-#
-# 0x22000000 is the **nbl** (no-bootloader) origin, and it is correct because
-# nsx's atomiq110.cmake makes nbl the default profile: the FPGA realization is
-# flashed straight over J-Link with no secure bootloader.  Its *sbl* scripts sit
-# at 0x22010000 and nsx keeps them "for a future silicon AT110" -- so when real
-# AT110 silicon arrives this value very likely becomes 0x22010000.  Do not
-# "correct" it to the sbl address for the FPGA part.  When a real Atomiq family
-# member is added, move this there and re-check every other AP5-keyed
-# capability for the same placeholder problem.
-_SOC_APP_FLASH_LOAD_ADDR: dict[str, int] = {
-    "atomiq110": 0x22000000,
-}
-
-
 def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
-    """Resolve *soc*'s app-image flash address from the three tiers below.
+    """Resolve *soc*'s app-image flash (``LoadFile``) address.
 
-    1. ``soc.app_flash_load_addr`` -- what the ``SocDef`` itself states.  Wins
-       over everything: it is the only tier a ``target.custom_socs`` entry can
-       write, and a user describing their own silicon outranks any table here.
-    2. ``_SOC_APP_FLASH_LOAD_ADDR`` -- the per-SoC override, for parts whose
-       flash window departs from their family's.
-    3. ``_FAMILY_APP_FLASH_LOAD_ADDR`` -- the family baseline.
+    ``soc.app_flash_load_addr`` wins when set: it is the only source a
+    ``target.custom_socs`` entry can write.  Otherwise a **built-in** SoC
+    (:attr:`~helia_profiler.platform.soc.SocDef.is_builtin`) loads at the
+    start of its verified linked MRAM window from
+    :mod:`~helia_profiler.platform.memory_map` -- the SBL-excluded app origin
+    NSX's generated ``flash_cmds.jlink`` programs (the nbl origin on
+    atomiq110, whose default profile has no bootloader).
 
-    Tiers 2 and 3 apply to **built-in** ``SocDef``s only, by
-    :attr:`~helia_profiler.platform.soc.SocDef.is_builtin` (which owns the
-    definition of "built-in" and why it is not a bare origin check).  Two
-    separate reasons for the gate itself, both load-bearing:
-
-    * Tier 2 is keyed by name, and ``target.custom_socs`` lets a user pick any
-      name -- those entries replace built-ins in the merged registry, so a name
-      match alone would let a user-chosen string silently outrank the ``family``
-      that same user declared, handing their part an address belonging to
-      something else entirely.
-    * Tier 3 is only as good as its verification, and that verification is
-      per-part: the table's addresses were checked against the NSX facts file
-      of every *registered* SoC.  Nothing was checked for a part hpx has never
-      seen.  Worse, ``SocFamily`` here is a core-tier axis coarser than NSX's
-      own -- ``AP5`` covers apollo330P and (provisionally) atomiq110, which
-      NSX treats as separate families and which load 0x00410000 and
-      0x22000000 respectively.  Reading a flash offset out of a tag that only
-      claims "Cortex-M55" is a guess, and a *plausible* one, which is the
-      dangerous kind: it is likely enough to be accepted by the part and land
-      the image at the wrong offset.
-
-    So a custom SoC resolves to ``None`` unless it states an address (directly
-    or inherited from the ``based_on`` part it was derived from, which
-    ``platform.custom`` resolves through this same function).  ``None`` is a
-    real answer meaning "nobody knows"; the J-Link flash fallback refuses to
-    program rather than guess.
+    A custom SoC resolves to ``None`` unless it states an address (directly
+    or inherited from its ``based_on`` part, which ``platform.custom``
+    resolves through this same function): a user-chosen name must not reach
+    a built-in's map, and nothing here was verified for a part hpx has never
+    seen.  ``None`` means "nobody knows"; the J-Link flash fallback refuses
+    to program rather than guess.
     """
     if soc.app_flash_load_addr is not None:
         return soc.app_flash_load_addr
     if not soc.is_builtin:
         return None
-    override = _SOC_APP_FLASH_LOAD_ADDR.get(soc.name)
-    if override is not None:
-        return override
-    return _FAMILY_APP_FLASH_LOAD_ADDR.get(soc.family)
+    return mram_app_origin(soc.name)
 
 
 def build_soc_capabilities(soc: SocDef) -> SocCapabilities:

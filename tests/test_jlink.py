@@ -547,10 +547,11 @@ class TestFlashBinaryFallback:
 def test_every_registered_soc_has_its_nsx_app_flash_load_address() -> None:
     """Pin the VALUE per SoC, not merely that some value exists.
 
-    Asserting only ``is not None`` would let a default creep into the family
-    lookup (``.get(family, 0x00410000)``) and hand every unmapped family the
-    Apollo5 address -- reinstating the exact bug this guards, invisibly.  These
-    are NSX's own ``NSX_SEGGER_PF_ADDR`` values from ``cmake/socs/facts/``.
+    Asserting only ``is not None`` would let a default creep into the
+    lookup and hand every unmapped part the Apollo5 address -- reinstating
+    the exact bug this guards, invisibly.  These are NSX's own
+    ``NSX_SEGGER_PF_ADDR`` values from ``cmake/socs/facts/``, which the
+    linked MRAM windows in ``platform.memory_map`` must keep matching.
 
     A new SoC must be added here deliberately: hpx's family axis is coarser
     than NSX's (apollo330P is its own NSX family but AP5 here), so "same
@@ -575,57 +576,7 @@ def test_every_registered_soc_has_its_nsx_app_flash_load_address() -> None:
     assert actual == expected
 
 
-def test_a_per_soc_address_overrides_its_family(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A part whose flash window departs from its family must win over it.
-
-    The motivating case is atomiq110, which is not an Apollo5 part at all --
-    it heads a separate Atomiq series and is only tagged AP5 as a placeholder
-    for its Cortex-M55 core tier.  It loads at 0x22000000, so without per-SoC
-    precedence it would silently inherit Apollo5's 0x00410000.
-
-    Uses a mixed-case registered name so that normalizing the lookup key
-    (``soc.name.lower()``) fails here instead of silently never matching the
-    mixed-case parts in the registry.
-    """
-    from helia_profiler.platform import capabilities, get_soc
-
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo330P", 0x22000000)
-
-    assert get_soc("apollo330P").capabilities.memory.app_flash_load_addr == 0x22000000
-
-
-def test_the_atomiq110_override_value_is_pinned() -> None:
-    """Pin atomiq110's address while it is still unreachable data.
-
-    atomiq110 is not yet a registered SoC, so no behavioural test can reach
-    this entry and a wrong value would land on main unnoticed.  The value
-    is nsx's ``NSX_SEGGER_PF_ADDR`` for the part and is the **nbl** origin,
-    because atomiq110.cmake makes nbl the default profile -- the FPGA
-    realization is flashed straight over J-Link with no secure bootloader.  Its
-    *sbl* scripts sit at 0x22010000, reserved for future AT110 silicon, so
-    "correcting" this to the sbl address would break the part that exists.
-    """
-    from helia_profiler.platform import capabilities
-
-    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000
-
-
-def test_a_per_soc_address_of_zero_is_honoured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """0 is a real address in the override tier too, not "no override".
-
-    The family tier already distinguishes 0 from None; writing this tier's
-    check as ``if override:`` would silently drop a legitimate 0 and fall
-    through to the family address -- the exact silent inheritance the override
-    map exists to prevent.
-    """
-    from helia_profiler.platform import capabilities, get_soc
-
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0)
-
-    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr == 0
-
-
-def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_custom_soc_cannot_forge_a_builtin_address() -> None:
     """A user-named custom SoC must not pick up a built-in's override.
 
     ``target.custom_socs`` names are user-chosen and replace built-ins in the
@@ -638,13 +589,13 @@ def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.Monkey
     are the only two ways a custom SoC gets an address of its own, and either
     of them answers before the origin gate is ever consulted.  With both
     absent, the *only* thing that can produce a non-``None`` answer here is the
-    name matching the patched override -- which is exactly the forgery, so the
-    gate is what this observes.
+    name matching apollo510's linked memory map -- which is exactly the
+    forgery, so the gate is what this observes.
     """
-    from helia_profiler.platform import capabilities
     from helia_profiler.platform.custom import build_custom_platform_registry
+    from helia_profiler.platform.memory_map import mram_app_origin
 
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
+    assert mram_app_origin("apollo510") is not None  # waiting under the name
     registry = build_custom_platform_registry(
         {
             "custom_socs": {
@@ -674,21 +625,21 @@ def test_a_custom_soc_cannot_forge_a_per_soc_override(monkeypatch: pytest.Monkey
     assert soc.capabilities.memory.app_flash_load_addr is None
 
 
-def test_a_family_with_no_registered_address_resolves_to_none(
+def test_a_soc_with_no_linked_map_resolves_to_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unmapped family must yield None so the flash fallback refuses to run.
+    """An unmapped built-in must yield None so the flash fallback refuses to run.
 
     Pinning the registered values alone cannot see this: a default in the
-    lookup (``.get(family, 0x00410000)``) leaves every mapped family correct
-    while silently handing the Apollo5 address to any family added later --
-    reinstating exactly the bug this field exists to prevent.
+    lookup leaves every mapped part correct while silently handing the
+    Apollo5 address to any part added later -- reinstating exactly the bug
+    this field exists to prevent.
     """
-    from helia_profiler.platform import capabilities, get_soc
+    from helia_profiler.platform import get_soc, memory_map
 
-    trimmed = dict(capabilities._FAMILY_APP_FLASH_LOAD_ADDR)
-    assert trimmed.pop(SocFamily.AP5) is not None
-    monkeypatch.setattr(capabilities, "_FAMILY_APP_FLASH_LOAD_ADDR", trimmed)
+    trimmed = dict(memory_map._MAPS)
+    assert trimmed.pop("apollo510")
+    monkeypatch.setattr(memory_map, "_MAPS", trimmed)
 
     assert get_soc("apollo510").capabilities.memory.app_flash_load_addr is None
 
