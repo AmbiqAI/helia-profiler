@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from threading import Lock
 from typing import Any
 
 from .stats import (
@@ -25,37 +26,49 @@ class FullRateRecorder:
         self.anchors: list[tuple[int, int, float]] = []
         self.current_spans: list[tuple[int, int, float] | None] = []
         self.voltage_spans: list[tuple[int, int, float] | None] = []
+        self._callback_lock = Lock()
+        self._stopped = False
         self._current_count = 0
         self._subscriptions: list[tuple[str, Any]] = []
+        self._controls: list[str] = []
 
     def _on_current(self, _topic: str, value: Any) -> None:
-        import numpy as np
+        with self._callback_lock:
+            if self._stopped:
+                return
+            import numpy as np
 
-        data = np.asarray(value["data"], dtype=np.float32)
-        sr = value["sample_rate"] / max(1, value.get("decimate_factor", 1))
-        utc = value.get("utc")
-        if utc is not None:
-            self.anchors.append((self._current_count, int(utc), float(sr)))
-        self.current.append(data.copy())
-        self.current_spans.append(_fullrate_sample_span(value, len(data)))
-        self._current_count += len(data)
+            data = np.asarray(value["data"], dtype=np.float32)
+            sr = value["sample_rate"] / max(1, value.get("decimate_factor", 1))
+            utc = value.get("utc")
+            if utc is not None:
+                self.anchors.append((self._current_count, int(utc), float(sr)))
+            self.current.append(data.copy())
+            self.current_spans.append(_fullrate_sample_span(value, len(data)))
+            self._current_count += len(data)
 
     def _on_voltage(self, _topic: str, value: Any) -> None:
-        import numpy as np
+        with self._callback_lock:
+            if self._stopped:
+                return
+            import numpy as np
 
-        data = np.asarray(value["data"], dtype=np.float32)
-        self.voltage.append(data.copy())
-        self.voltage_spans.append(_fullrate_sample_span(value, len(data)))
+            data = np.asarray(value["data"], dtype=np.float32)
+            self.voltage.append(data.copy())
+            self.voltage_spans.append(_fullrate_sample_span(value, len(data)))
 
     def start(self) -> bool:
         """Enable both channels, rolling back even a partially failed subscribe."""
+        with self._callback_lock:
+            self._stopped = False
         try:
             for channel, callback in (("i", self._on_current), ("v", self._on_voltage)):
                 topic = f"{self.device_path}/s/{channel}/!data"
                 self._subscriptions.append((topic, callback))
                 self.driver.subscribe(topic, ["pub"], callback)
-            self.driver.publish(f"{self.device_path}/s/i/ctrl", 1, timeout=0)
-            self.driver.publish(f"{self.device_path}/s/v/ctrl", 1, timeout=0)
+            for channel in ("i", "v"):
+                self._controls.append(channel)
+                self.driver.publish(f"{self.device_path}/s/{channel}/ctrl", 1, timeout=0)
             log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
             return True
         except Exception:
@@ -64,10 +77,13 @@ class FullRateRecorder:
             return False
 
     def stop(self) -> None:
-        """Best-effort stop both channels and every attempted subscription."""
-        for channel in ("i", "v"):
+        """Best-effort release of attempted controls and subscriptions."""
+        with self._callback_lock:
+            self._stopped = True
+        for channel in list(self._controls):
             try:
                 self.driver.publish(f"{self.device_path}/s/{channel}/ctrl", 0, timeout=0)
+                self._controls.remove(channel)
             except Exception:
                 log.debug("Failed to stop full-rate %s stream", channel, exc_info=True)
         for topic, callback in list(self._subscriptions):

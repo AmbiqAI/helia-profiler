@@ -61,7 +61,7 @@ class _FakeClockMisuse(BaseException):
 class _FakeCaptureClock:
     """Deterministic time for ``capture_gated``: integer microseconds, no real waits.
 
-    ``capture_gated`` samples GPI on a thread with real sleeps and times the
+    ``capture_gated`` samples GPI on a thread with interruptible waits and times the
     gate with ``time.monotonic``, so a test that classifies a gate duration
     would otherwise measure it. Here the poller runs synchronously inside the
     capture's ``stop.wait`` on this clock, and a GPI schedule written against
@@ -98,6 +98,9 @@ class _FakeCaptureClock:
                     return True
                 if timeout is None:
                     raise _FakeClockMisuse("an unbounded wait cannot run on the fake clock")
+                if clock._deadline_us is not None:
+                    clock.sleep(timeout)
+                    return self._set
                 deadline = clock.now_us + round(timeout * 1e6)
                 poller, clock._poller = clock._poller, None
                 if poller is not None:
@@ -179,6 +182,7 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     import sys
     import types
 
+    from helia_profiler.power.joulescope import _gated_resources as resources
     from helia_profiler.power.joulescope import capture_gated as module
 
     clock = _FakeCaptureClock()
@@ -188,6 +192,8 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     monkeypatch.setitem(sys.modules, "pyjoulescope_driver.time64", time64)
     monkeypatch.setattr(module, "time", clock.time)
     monkeypatch.setattr(module, "threading", clock.threading)
+    monkeypatch.setattr(resources, "time", clock.time)
+    monkeypatch.setattr(resources, "threading", clock.threading)
     return clock
 
 
@@ -1331,8 +1337,10 @@ class TestStreamedGateSelection:
             elif fullrate_case.startswith("setup_"):
                 expected_reason = "stream_setup_failed"
                 assert "u/js320/test/s/i/!data" in fake.unsubscribed
-                assert ("u/js320/test/s/i/ctrl", 0) in fake.controls
-                assert ("u/js320/test/s/v/ctrl", 0) in fake.controls
+                for channel in ("i", "v"):
+                    assert ((f"u/js320/test/s/{channel}/ctrl", 0) in fake.controls) == (
+                        fullrate_case == "setup_control_failure"
+                    )
                 assert fake._cb("/s/i/!data") is None
                 assert fake._cb("/s/v/!data") is None
             assert diagnostics["fullrate_xcheck_unavailable_reason"] == expected_reason
@@ -1343,6 +1351,29 @@ class TestStreamedGateSelection:
 
 class TestFakeCaptureClockRefusesWhatItCannotModel:
     """The fake clock fails loudly instead of silently mis-timing a capture."""
+
+    def test_poller_wait_preserves_the_outer_capture_deadline(self):
+        clock = _FakeCaptureClock()
+        event = clock.threading.Event()
+        observed = []
+
+        def poller():
+            event.wait(0.002)
+            observed.append(clock.elapsed_s)
+            event.wait(0.020)
+            pytest.fail("the poller advanced beyond the outer capture deadline")
+
+        clock.threading.Thread(target=poller).start()
+        assert event.wait(0.010) is False
+        assert observed == [0.002]
+        assert clock.elapsed_s == 0.010
+
+    def test_zero_interval_poller_wait_is_refused(self):
+        clock = _FakeCaptureClock()
+        event = clock.threading.Event()
+        clock.threading.Thread(target=lambda: event.wait(0.0)).start()
+        with pytest.raises(_FakeClockMisuse, match="non-positive sleep"):
+            event.wait(1.0)
 
     def test_ready_qualification_is_refused(self, monkeypatch):
         from helia_profiler.power.joulescope import capture_gated as module

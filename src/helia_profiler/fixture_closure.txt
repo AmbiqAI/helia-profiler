@@ -194,6 +194,7 @@ power/counter_gate.py
 power/diagnostics.py
 power/ina228_driver.py
 power/joulescope/__init__.py
+power/joulescope/_gated_resources.py
 power/joulescope/capture_gated.py
 power/joulescope/device.py
 power/joulescope/diagnostics.py
