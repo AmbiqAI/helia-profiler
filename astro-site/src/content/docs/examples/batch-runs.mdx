@@ -103,14 +103,49 @@ nightly `complete` suite on 2026-09-16 recorded, for `apollo510_evb`:
 ## Variations
 
 - Several boards at once: `--boards apollo510_evb,apollo330mP_evb --jlink-serials <serial>,<serial>`.
-- Your own models: `--model-paths a.tflite,b.tflite` or `--models-file models.txt`
-  registers them for one run with `--model-arena-size`.
+- Your own models: `--model-paths a.tflite,b.tflite` registers them for one
+  run with one `--model-arena-size`; `--models-file models.yaml` gives each
+  model its own ID and arena (see [Models file](#models-file)).
 - Power: `--power on --power-boards apollo510_evb --power-serials <joulescope serial>`
   turns the power stages on for the named boards ([Power measurement](../../guide/power/)).
 - Repeats for statistics: `--repeat 3` runs every case three times with
   `attempt` in the case id.
 - The full option list is the generated [`hpx validate`](../../reference/cli/validate/)
   reference.
+
+## Models file
+
+`--models-file` registers your own `.tflite` models with the validation
+matrix. The YAML holds a `models` mapping (or is that mapping) keyed by
+model ID; select the IDs with `--models` as usual.
+
+```yaml
+models:
+  mlperf-tiny-kws-a8w8:
+    path: models/kws_a8w8.tflite
+    arena_size: 32768
+    name: KWS Reference (a8w8)
+    family: mlperf-tiny-kws
+    precision: a8w8
+    source: zoo://mlperf-tiny-kws/a8w8@0124dea005e876b9589537180c0b1f111d115699
+```
+
+| Key | Required | Meaning |
+| --- | --- | --- |
+| `path` | yes | The `.tflite` file; a relative path resolves from the YAML file's directory. |
+| `arena_size` | no | Tensor arena in bytes; default 524288. |
+| `name` | no | Display name; default the ID. |
+| `description` | no | Free text for reports. |
+| `comparison_group` | no | Recorded in case identity to group models for comparison; default the ID. |
+| `family` | no | The model these precisions share, for example `mlperf-tiny-kws`. |
+| `precision` | no | The precision label, for example `a8w8` or `fp32`. |
+| `source` | no | Where the file came from, for example a `zoo://` reference. |
+
+An ID may not reuse a built-in model ID (`kws`, `vww`, `ic`, `ad`).
+`family`, `precision` and `source` reach each case's `model` object in
+`validation_manifest.json` but not its case ID. Custom models have no
+ExecuTorch PTE contract, so the matrix enumerates no ExecuTorch cases for
+them.
 
 ## Validated on
 
