@@ -6,16 +6,18 @@ description: "How one engine type becomes an adapter, a typed artifact bundle an
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-Show the seam that keeps the pipeline engine-agnostic. Everything an
-engine contributes to a run passes through one `prepare()` call and one
-typed artifact object; the rest of hpx reads those and never imports an
-engine package.
+The registry selects an adapter, and the preparation stage obtains its typed
+artifacts through `prepare()` or, for a supplied prepared runtime,
+`prepare_runtime()`. Shared build stages consume those artifacts. Specialized
+model-analysis and frozen-plan code also consult engine-specific helpers;
+the import rule below prevents dependencies between adapters, not every
+engine-specific import elsewhere in hpx.
 
 ## Diagram
 
 <BlockDiagram
   title="Engine dispatch"
-  caption="From the engine.type key to the objects the rest of the pipeline reads. The shared helpers are called by more than one adapter; the consumers never import an adapter."
+  caption="From the engine.type key to the objects the rest of the pipeline reads. Adapters share helpers and hand typed artifacts to the build stages."
   flow="grid"
   columns={3}
 >
