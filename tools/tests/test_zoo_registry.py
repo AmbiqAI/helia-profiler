@@ -116,3 +116,13 @@ def test_checked_in_list_is_valid():
         ("mlperf-tiny-kws", "a8w8"),
         ("mlperf-tiny-kws", "fp32"),
     }
+
+
+def test_malformed_list_reports(tmp_path, capsys):
+    models_list = tmp_path / "zoo.yaml"
+    models_list.write_text("models: [", encoding="utf-8")
+    output = tmp_path / "models.yaml"
+
+    assert zoo_registry.main(["--models", str(models_list), "--output", str(output)]) == 1
+
+    assert capsys.readouterr().err.startswith("zoo_registry: ")

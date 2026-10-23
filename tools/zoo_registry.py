@@ -68,11 +68,8 @@ def _model_id(entry: dict[str, Any]) -> str:
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
     with path.open("rb") as stream:
-        while chunk := stream.read(1 << 20):
-            digest.update(chunk)
-    return digest.hexdigest()
+        return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
 def build_registry(entries: list[dict[str, Any]], resolve: Resolver) -> dict[str, Any]:
@@ -112,7 +109,7 @@ def main(argv: list[str] | None = None, resolve: Resolver | None = None) -> int:
     try:
         entries = load_model_list(args.models)
         registry = build_registry(entries, resolve or _zoo_resolver(args.cache))
-    except (OSError, RuntimeError, ValueError, KeyError) as error:
+    except (OSError, RuntimeError, ValueError, KeyError, yaml.YAMLError) as error:
         print(f"zoo_registry: {error}", file=sys.stderr)
         return 1
     args.output.parent.mkdir(parents=True, exist_ok=True)
