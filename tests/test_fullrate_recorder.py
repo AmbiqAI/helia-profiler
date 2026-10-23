@@ -94,3 +94,16 @@ def test_unknown_source_span_is_not_integrated():
     result, reason = recorder.integrate(poll_samples=[], windows=None, counter_origin=(0, 16000000))
     assert result is None
     assert reason == "noncontiguous_or_unaligned_source_samples"
+
+
+def test_late_deliveries_after_stop_do_not_change_recording():
+    driver = MemoryDriver()
+    recorder = FullRateRecorder(driver, "memory")
+    assert recorder.start()
+    callbacks = list(driver.subscriptions.items())
+    recorder.stop()
+    for topic, callback in callbacks:
+        callback(topic, {"data": [1], "sample_id": 0, "sample_rate": 1000, "utc": 0})
+    assert not recorder.current
+    assert not recorder.voltage
+    assert not recorder.anchors

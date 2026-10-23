@@ -210,19 +210,30 @@ what they mean.
   any error the capture would otherwise raise;
 - a replaced capture error is hidden as context.
 
-The driver skips its duration wait on a start-hook failure, but teardown still
-sets stop and joins the poller for up to 1 s before disabling/unsubscribing
-streams. The join does not cancel a blocked vendor operation: stream teardown
-and device release can proceed while that poller remains alive. Starting the
-thread before the hook also does not guarantee a first snapshot has arrived.
-These are source behavior, not physical timing guarantees.
+The driver skips its duration wait on a start-hook failure. Shutdown first
+requests stop, closes admission to evidence processing and application callbacks,
+and drains work already admitted. It then joins the poller for up to 1 s before
+disabling/unsubscribing streams. No processing lock is held while application
+callbacks or vendor operations run: a GO-release callback may publish to the
+driver and wait for another thread's stream delivery.
 
-Mandatory stats setup precedes the stream-cleanup block. A failure there releases
-the logical device reference without explicitly disabling/unsubscribing stats.
-Optional gate/state cleanup covers successful subscriptions only; full-rate
-cleanup instead tracks every attempted subscription. Ordinary vendor cleanup
-exceptions are suppressed. These partial-setup and shutdown limits are retained
-by the C1 extraction (#582), rather than corrected by this draft.
+The join does not cancel a blocked vendor read. That read may outlive stream
+teardown and device release, but its eventual result or failure is discarded;
+it cannot invoke a late application callback or change retained capture evidence.
+Late stats, gate, state and full-rate deliveries are also ignored after their
+processing is closed, even if unsubscribe fails. An application callback already
+in flight must return before shutdown can finish; the 1 s join does not bound
+that drain. Starting the thread before the hook does not guarantee a first
+snapshot has arrived. These are host ownership rules, not physical timing or
+vendor-call cancellation guarantees.
+
+Cleanup covers partial setup: stats control and every stats/gate/state
+subscription attempt are tracked before calling the vendor, so registration
+followed by an exception still gets an unsubscribe attempt. Full-rate cleanup
+also tracks attempted subscriptions. Ordinary vendor cleanup exceptions are
+suppressed to preserve the initiating failure. The logical device reference is
+protected immediately after open, including recorder and resource construction
+failures. No reset of the prior current range is implied.
 
 **C-E2.** The capture stage passes any heliaPROFILER error through unchanged:
 a `PowerError`, and the `CaptureError` from a failed J-Link reset or USB CDC

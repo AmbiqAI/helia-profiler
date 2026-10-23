@@ -37,7 +37,7 @@ engine adapter or firmware module, and check both callers.
 | Semantic identity | `identity.py` defines facts; `frozen_run.py` owns intent identity; `fixture_identity.py` derives build/capture identity; `profile_identity.py` derives profile identity; `_identity_hash.py` shares hash rules | `tests/test_identity.py`, `tests/unit/test_fixture_identity.py`, `tests/test_profile_identity.py` |
 | Output comparison | `expect.py` owns `Expect`, references, tolerances and `Verification`; `compiled_build.py` applies the requested comparison after a successful capture | `tests/test_expect.py`, `tests/test_compiled_build.py` |
 | Saved run evidence | `run_record.py` reloads the build, checks pinned capture files, recomputes identity and output comparison; `records.py` verifies profile manifests | `tests/test_run_record.py`, `tests/test_result_view_contract.py` |
-| Gated Joulescope resources | `power/joulescope/capture_gated.py` private `_GatedCaptureResources` owns stream subscriptions, the poller thread and device release; `capture_gated` retains callback evidence, gate decisions, hook error precedence and reduction | `tests/test_gated_capture_lifecycle.py` (real threads), `tests/test_power.py` (deterministic numerical timelines), `tests/test_fullrate_recorder.py` |
+| Gated Joulescope resources | `power/joulescope/capture_gated.py` private `_GatedCaptureResources` owns stream attempts, the poller thread and processing admission/drain; `capture_gated` releases the device in its outer finally and retains callback evidence, gate decisions, hook error precedence and reduction | `tests/test_gated_capture_lifecycle.py` (real threads), `tests/test_power.py` (deterministic numerical timelines), `tests/test_fullrate_recorder.py` |
 | Portable observations | `_result_view.py`, `_run_view.py` map verified native records and preserve measurement scope | `tests/test_result_view_contract.py` |
 
 A successful capture and numerical acceptance are separate facts. Build/file
@@ -53,9 +53,13 @@ tests; the pytest marker alone does not install it. Template changes also need
 the compile gates described in [compile-gate.md](compile-gate.md).
 
 The gated capture owner starts streams before the poller and the start hook.
-Its inner stop sets the capture's stop event, joins with the existing bound,
-then disables/unsubscribes streams. Device release remains in the outer finally,
-after reduction. Mandatory setup failures reach only that outer release; a
-blocked vendor read can outlive the bounded join. See the source-reconciled
-limits in [capture-timeline.md](capture-timeline.md); these are not guarantees of
-physical timing or vendor-call cancellation.
+Its stop closes admission to processing, drains work already admitted, joins
+with the existing bound, then disables/unsubscribes attempted streams. Application
+callbacks execute without the admission lock held, so a GO publication can wait
+for a vendor callback on another thread. A callback already in flight must
+return before teardown finishes. Partial setup reaches stream cleanup; device
+release is protected immediately after open and remains after reduction.
+A blocked vendor read can outlive the bounded join, but its result cannot invoke
+application callbacks or mutate evidence after shutdown. See
+[capture-timeline.md](capture-timeline.md) for the distinction between host
+ownership, physical timing and vendor-call cancellation.

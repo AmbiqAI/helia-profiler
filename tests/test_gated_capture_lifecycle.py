@@ -21,6 +21,8 @@ class _Instrument:
     def __init__(self):
         self.events = []
         self.callbacks = {}
+        self.deliveries = {}
+        self.fail_after_subscribe = None
         self.fail_at = None
         self.cleanup_fails = False
         self.read_entered = threading.Event()
@@ -48,11 +50,15 @@ class _Instrument:
     def subscribe(self, topic, flags, callback):
         self._record("subscribe", topic)
         self.callbacks[topic] = callback
+        self.deliveries[topic] = callback
+        if topic.endswith(str(self.fail_after_subscribe)):
+            raise RuntimeError("subscribe registered then failed")
 
     def unsubscribe(self, topic, callback):
-        assert self.callbacks[topic] is callback
+        if topic in self.callbacks:
+            assert self.callbacks[topic] is callback
         self._record("unsubscribe", topic)
-        del self.callbacks[topic]
+        self.callbacks.pop(topic, None)
 
     def read(self, *_args):
         self.reads += 1
@@ -94,7 +100,7 @@ class _Instrument:
 
     def run(self, **kwargs):
         return JoulescopeDriver().capture_gated(
-            duration_s=2,
+            duration_s=kwargs.pop("duration_s", 2),
             io_voltage=1.8,
             sync_input_index=0,
             guard_s=0,
@@ -202,13 +208,16 @@ def test_snapshot_error_is_counted_and_later_polls_complete(instrument):
         ("subscribe", "s/stats/value", None),
     ],
 )
-def test_mandatory_setup_failure_only_closes_device(instrument, failure):
+def test_mandatory_setup_failure_cleans_attempted_resources(instrument, failure):
     instrument.fail_at = failure
     with pytest.raises(PowerError) as raised:
         instrument.run()
     assert isinstance(raised.value.__cause__, RuntimeError)
     assert instrument.events[-1] == ("device", "close", None)
-    assert ("publish", "s/stats/ctrl", 0) not in instrument.events
+    if failure[1] != "s/stats/scnt":
+        assert ("publish", "s/stats/ctrl", 0) in instrument.events
+    if failure[0] == "subscribe":
+        assert ("unsubscribe", "s/stats/value", None) in instrument.events
     assert not instrument.threads
 
 
@@ -254,3 +263,217 @@ def test_blocked_read_outlives_bounded_join_but_test_releases_it(instrument):
         for worker in instrument.threads:
             worker.join(5)
             assert not worker.is_alive()
+
+
+@pytest.mark.parametrize("topic", ["s/stats/value", "s/gpi/0/!data", "s/gpi/1/!data"])
+def test_subscribe_that_registers_then_fails_is_unsubscribed(instrument, topic):
+    instrument.fail_after_subscribe = topic
+    error = LookupError("stop after setup")
+
+    def started(_wait):
+        instrument.release_read.set()
+        raise error
+
+    expected = PowerError if topic == "s/stats/value" else LookupError
+    with pytest.raises(expected):
+        instrument.run(require_done_state=True, on_started=started)
+    assert not instrument.callbacks
+    assert ("unsubscribe", topic, None) in instrument.events
+
+
+@pytest.mark.parametrize("construction", ["recorder", "resources"])
+def test_failure_after_device_open_releases_reference(instrument, monkeypatch, construction):
+    error = RuntimeError("allocation failed")
+
+    def fail(*args, **kwargs):
+        raise error
+
+    monkeypatch.setattr(
+        capture,
+        "PackedGateRecorder" if construction == "recorder" else "_GatedCaptureResources",
+        fail,
+    )
+    with pytest.raises(RuntimeError) as raised:
+        instrument.run()
+    assert raised.value is error
+    assert instrument.events == [("device", "close", None)]
+
+
+def test_delayed_high_read_cannot_call_back_after_release(instrument, monkeypatch):
+    calls = []
+    error = LookupError("start failed")
+
+    def read(*_args):
+        instrument.read_entered.set()
+        assert instrument.release_read.wait(5)
+        return 1
+
+    def started(_wait):
+        assert instrument.read_entered.wait(5)
+        raise error
+
+    monkeypatch.setattr(capture, "_read_gpi_snapshot", read)
+    try:
+        with pytest.raises(LookupError) as raised:
+            instrument.run(
+                on_started=started,
+                on_gate_rise=lambda: calls.append("rise"),
+                phase_getter=lambda: calls.append("phase") or "go_signaled",
+            )
+        assert raised.value is error
+        before = list(calls)
+        assert instrument.events[-1] == ("device", "close", None)
+    finally:
+        instrument.release_read.set()
+        for thread in instrument.threads:
+            thread.join(5)
+            assert not thread.is_alive()
+    assert calls == before
+
+
+def test_late_stream_callbacks_cannot_mutate_returned_evidence(instrument):
+    result = instrument.run()
+    packet_count = len(result.statistics)
+    frame_count = len(result.gate_frames)
+    for topic, callback in instrument.deliveries.items():
+        value = (
+            _StatsPackets._millisecond_packet(7)
+            if topic.endswith("stats/value")
+            else _packed_gpi_frame([0, 1, 0], 7)
+        )
+        callback(topic, value)
+    assert len(result.statistics) == packet_count
+    assert len(result.gate_frames) == frame_count
+
+
+@pytest.mark.parametrize("callback_kind", ["phase", "rise", "stream"])
+def test_shutdown_drains_inflight_processing_before_device_release(
+    instrument, monkeypatch, callback_kind
+):
+    entered = threading.Event()
+    release = threading.Event()
+    stopping = threading.Event()
+    returned = threading.Event()
+    error = LookupError("start failed during callback")
+    outcome = []
+    callbacks = []
+    original_stop = capture._GatedCaptureResources.stop
+
+    def stop(self, event):
+        stopping.set()
+        original_stop(self, event)
+
+    def blocked_callback():
+        entered.set()
+        assert release.wait(5)
+        callbacks.append("finished")
+        return "go_signaled"
+
+    monkeypatch.setattr(capture._GatedCaptureResources, "stop", stop)
+    if callback_kind == "stream":
+        original_append = capture.PackedGateRecorder.append
+
+        def append(self, *args, **kwargs):
+            blocked_callback()
+            return original_append(self, *args, **kwargs)
+
+        monkeypatch.setattr(capture.PackedGateRecorder, "append", append)
+
+    stream_worker = None
+
+    def started(_wait):
+        nonlocal stream_worker
+        instrument.release_read.set()
+        if callback_kind == "stream":
+            topic = instrument.path + "/s/gpi/0/!data"
+            stream_worker = threading.Thread(
+                target=instrument.callbacks[topic], args=(topic, _packed_gpi_frame([0, 1, 0], 0))
+            )
+            stream_worker.start()
+        assert entered.wait(5)
+        raise error
+
+    def run():
+        try:
+            kwargs = (
+                {"phase_getter": blocked_callback}
+                if callback_kind == "phase"
+                else {"on_gate_rise": blocked_callback}
+                if callback_kind == "rise"
+                else {}
+            )
+            instrument.run(on_started=started, **kwargs)
+        except Exception as exc:
+            outcome.append(exc)
+        finally:
+            returned.set()
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert stopping.wait(5)
+        assert not returned.is_set()
+        assert ("device", "close", None) not in instrument.events
+    finally:
+        release.set()
+        instrument.release_read.set()
+        worker.join(5)
+        if stream_worker is not None:
+            stream_worker.join(5)
+            assert not stream_worker.is_alive()
+        assert not worker.is_alive()
+    assert outcome == [error]
+    assert callbacks == ["finished"]
+    assert instrument.events[-1] == ("device", "close", None)
+
+
+@pytest.mark.parametrize("cleanup_fails", [False, True])
+def test_synchronous_teardown_deliveries_are_ignored(instrument, monkeypatch, cleanup_fails):
+    original_unsubscribe = instrument.unsubscribe
+    instrument.cleanup_fails = cleanup_fails
+
+    def unsubscribe(topic, callback):
+        value = (
+            _StatsPackets._millisecond_packet(7)
+            if topic.endswith("stats/value")
+            else _packed_gpi_frame([0, 1, 0], 7)
+        )
+        callback(topic, value)
+        original_unsubscribe(topic, callback)
+
+    monkeypatch.setattr(instrument, "unsubscribe", unsubscribe)
+    result = instrument.run()
+    assert len(result.statistics) == 6
+    assert len(result.gate_frames) == 1
+
+
+def test_late_required_state_delivery_is_ignored(instrument):
+    result = instrument.run(duration_s=0, require_done_state=True)
+    assert result.state_frames == []
+    topic = instrument.path + "/s/gpi/1/!data"
+    frame = _packed_gpi_frame([0, 1, 0], 0)
+    frame["index"] = 1
+    instrument.deliveries[topic](topic, frame)
+    assert result.state_frames == []
+
+
+def test_gate_callback_can_wait_for_delivery_on_another_driver_thread(instrument):
+    delivered = threading.Event()
+
+    def release_go():
+        topic = instrument.path + "/s/stats/value"
+
+        def deliver():
+            instrument.callbacks[topic](topic, _StatsPackets._millisecond_packet(7))
+            delivered.set()
+
+        worker = threading.Thread(target=deliver)
+        instrument.threads.append(worker)
+        worker.start()
+        assert delivered.wait(5), "GO publish was blocked by a stream callback"
+        worker.join(5)
+        assert not worker.is_alive()
+
+    result = instrument.run(on_gate_rise=release_go)
+    assert delivered.is_set()
+    assert len(result.statistics) == 7
