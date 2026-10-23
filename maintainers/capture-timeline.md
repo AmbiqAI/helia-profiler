@@ -175,7 +175,7 @@ plans keep the legacy deadline; the external post-observation wait is unchanged.
 | INA228 accumulation (dedicated with INA228) | from after the accumulator reset to just before the register reads | the reads, which latch a few I2C transactions later | `power.on_device_summary.duration_us` |
 | Firmware whole window (dedicated) | from after the STIMER settle to after the INA228 reads: setup, gate and reads | settle, calibration, warm-up, READY/GO | `power.terminal.elapsed_us` |
 | Instrument gate | sum of stats-packet durations whose time falls within the chosen rise and fall. Edges come from the GPI stream, taking the last qualifying segment, with snapshot polling as the fallback. | anything outside the gate. Packet-quantized: about 1 ms at 1 kHz. | `summary.json` `power.capture_duration_s` and `profile_results.json` `power.duration_s`, for a valid gated result only (C-I3) |
-| Capture window | host monotonic, from after the instrument is opened to the result | nothing: includes reset, READY, GO, the wait and teardown | `power.capture_window_s` (`summary.json`) |
+| Capture window | host monotonic, from after recorder/callback setup to the captured-duration reading during reduction | includes stream setup, reset, READY, GO, the wait and stream teardown; excludes outer device release and subsequent result assembly | `power.capture_window_s` (`summary.json`) |
 | Gate bound | the value of `F` | n/a | `power.observation.observation_deadline_s` (`profile_results.json` only) |
 | READY wait | host time from after the grace to READY qualified | reset and grace | `power.sync.ready_wait_s` (`summary.json`) |
 | Reset | duration of the reset primitive and any power cycle | n/a | `power.target_lifecycle.timings_s` (`summary.json`; keys `reset`, `power_cycle`) |
@@ -210,10 +210,27 @@ what they mean.
   any error the capture would otherwise raise;
 - a replaced capture error is hidden as context.
 
+The driver skips its duration wait on a start-hook failure, but teardown still
+sets stop and joins the poller for up to 1 s before disabling/unsubscribing
+streams. The join does not cancel a blocked vendor operation: stream teardown
+and device release can proceed while that poller remains alive. Starting the
+thread before the hook also does not guarantee a first snapshot has arrived.
+These are source behavior, not physical timing guarantees.
+
+Mandatory stats setup precedes the stream-cleanup block. A failure there releases
+the logical device reference without explicitly disabling/unsubscribing stats.
+Optional gate/state cleanup covers successful subscriptions only; full-rate
+cleanup instead tracks every attempted subscription. Ordinary vendor cleanup
+exceptions are suppressed. These partial-setup and shutdown limits are retained
+by the C1 extraction (#582), rather than corrected by this draft.
+
 **C-E2.** The capture stage passes any heliaPROFILER error through unchanged:
 a `PowerError`, and the `CaptureError` from a failed J-Link reset or USB CDC
 port open, keep their own message and hint. It wraps any other exception in a
-`PowerError` whose hint names the instrument.
+`PowerError` whose hint names the instrument. At the lower-level Joulescope
+driver boundary, only `PowerError` and the original start-hook/poller-callback
+exceptions pass through unchanged. A start-hook error wins over a recorded
+poller-callback error; snapshot read errors are counted and polling continues.
 
 **C-E3.** No usable window, but stats packets arrived: the capture returns a
 degraded result carrying a `gate_failure` classification, with no
