@@ -179,6 +179,7 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     import sys
     import types
 
+    from helia_profiler.power.joulescope import _gated_resources as resources
     from helia_profiler.power.joulescope import capture_gated as module
 
     clock = _FakeCaptureClock()
@@ -188,6 +189,8 @@ def _install_fake_capture_clock(monkeypatch: pytest.MonkeyPatch) -> _FakeCapture
     monkeypatch.setitem(sys.modules, "pyjoulescope_driver.time64", time64)
     monkeypatch.setattr(module, "time", clock.time)
     monkeypatch.setattr(module, "threading", clock.threading)
+    monkeypatch.setattr(resources, "time", clock.time)
+    monkeypatch.setattr(resources, "threading", clock.threading)
     return clock
 
 
@@ -1331,8 +1334,10 @@ class TestStreamedGateSelection:
             elif fullrate_case.startswith("setup_"):
                 expected_reason = "stream_setup_failed"
                 assert "u/js320/test/s/i/!data" in fake.unsubscribed
-                assert ("u/js320/test/s/i/ctrl", 0) in fake.controls
-                assert ("u/js320/test/s/v/ctrl", 0) in fake.controls
+                for channel in ("i", "v"):
+                    assert ((f"u/js320/test/s/{channel}/ctrl", 0) in fake.controls) == (
+                        fullrate_case == "setup_control_failure"
+                    )
                 assert fake._cb("/s/i/!data") is None
                 assert fake._cb("/s/v/!data") is None
             assert diagnostics["fullrate_xcheck_unavailable_reason"] == expected_reason

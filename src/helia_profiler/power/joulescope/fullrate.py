@@ -30,6 +30,7 @@ class FullRateRecorder:
         self._stopped = False
         self._current_count = 0
         self._subscriptions: list[tuple[str, Any]] = []
+        self._controls: list[str] = []
 
     def _on_current(self, _topic: str, value: Any) -> None:
         with self._callback_lock:
@@ -65,8 +66,9 @@ class FullRateRecorder:
                 topic = f"{self.device_path}/s/{channel}/!data"
                 self._subscriptions.append((topic, callback))
                 self.driver.subscribe(topic, ["pub"], callback)
-            self.driver.publish(f"{self.device_path}/s/i/ctrl", 1, timeout=0)
-            self.driver.publish(f"{self.device_path}/s/v/ctrl", 1, timeout=0)
+            for channel in ("i", "v"):
+                self._controls.append(channel)
+                self.driver.publish(f"{self.device_path}/s/{channel}/ctrl", 1, timeout=0)
             log.info("Joulescope full-rate energy cross-check enabled (s/i + s/v streaming)")
             return True
         except Exception:
@@ -75,12 +77,13 @@ class FullRateRecorder:
             return False
 
     def stop(self) -> None:
-        """Best-effort stop both channels and every attempted subscription."""
+        """Best-effort release of attempted controls and subscriptions."""
         with self._callback_lock:
             self._stopped = True
-        for channel in ("i", "v"):
+        for channel in list(self._controls):
             try:
                 self.driver.publish(f"{self.device_path}/s/{channel}/ctrl", 0, timeout=0)
+                self._controls.remove(channel)
             except Exception:
                 log.debug("Failed to stop full-rate %s stream", channel, exc_info=True)
         for topic, callback in list(self._subscriptions):

@@ -21,8 +21,16 @@ class MemoryDriver:
 
     def publish(self, topic, value, **kwargs):
         self.controls.append((topic, value))
-        if self.failure == "enable" and topic.endswith("/v/ctrl") and value == 1:
+        if value == 1 and (
+            self.failure == "enable"
+            and topic.endswith("/v/ctrl")
+            or self.failure == "enable_current"
+            and topic.endswith("/i/ctrl")
+        ):
             raise RuntimeError("during enable")
+        if self.failure == "disable_once" and value == 0:
+            self.failure = None
+            raise RuntimeError("temporary control teardown error")
 
     def unsubscribe(self, topic, callback):
         if self.failure == "unsubscribe_once":
@@ -31,13 +39,23 @@ class MemoryDriver:
         self.subscriptions.pop(topic, None)
 
 
-@pytest.mark.parametrize("failure", ["before_subscribe", "after_subscribe", "enable"])
-def test_partial_setup_stops_both_channels_and_removes_callbacks(failure):
+@pytest.mark.parametrize(
+    ("failure", "disabled"),
+    [
+        ("before_subscribe", []),
+        ("after_subscribe", []),
+        ("enable_current", ["i"]),
+        ("enable", ["i", "v"]),
+    ],
+)
+def test_partial_setup_stops_only_attempted_controls_and_removes_callbacks(failure, disabled):
     driver = MemoryDriver(failure)
     recorder = FullRateRecorder(driver, "memory")
     assert recorder.start() is False
     assert driver.subscriptions == {}
-    assert driver.controls[-2:] == [("memory/s/i/ctrl", 0), ("memory/s/v/ctrl", 0)]
+    assert [topic for topic, value in driver.controls if value == 0] == [
+        f"memory/s/{channel}/ctrl" for channel in disabled
+    ]
 
 
 def test_successful_streams_copy_owned_buffers_and_stop():
@@ -107,3 +125,21 @@ def test_late_deliveries_after_stop_do_not_change_recording():
     assert not recorder.current
     assert not recorder.voltage
     assert not recorder.anchors
+
+
+def test_stop_before_start_does_not_touch_raw_controls():
+    driver = MemoryDriver()
+    recorder = FullRateRecorder(driver, "memory")
+    recorder.stop()
+    assert not driver.controls
+    assert not driver.subscriptions
+
+
+def test_cleanup_retries_only_control_that_could_not_be_disabled():
+    driver = MemoryDriver("disable_once")
+    recorder = FullRateRecorder(driver, "memory")
+    assert recorder.start()
+    recorder.stop()
+    driver.controls.clear()
+    recorder.stop()
+    assert driver.controls == [("memory/s/i/ctrl", 0)]

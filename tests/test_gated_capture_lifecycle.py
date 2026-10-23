@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from helia_profiler.errors import PowerError
+from helia_profiler.power.joulescope import _gated_resources as resources
 from helia_profiler.power.joulescope import capture_gated as capture
 from helia_profiler.power.joulescope.driver import JoulescopeDriver
 from tests.test_power import TestGatedStatsProcessing as _StatsPackets
@@ -122,7 +123,7 @@ def instrument(monkeypatch):
     monkeypatch.setattr(capture, "_close_device", fake.close)
     monkeypatch.setattr(capture, "_read_gpi_snapshot", fake.read)
     monkeypatch.setattr(
-        capture,
+        resources,
         "threading",
         SimpleNamespace(Thread=fake.thread, Event=threading.Event, Condition=threading.Condition),
     )
@@ -242,6 +243,11 @@ def test_partial_optional_stream_setup_cleans_successful_subscriptions(instrumen
         instrument.run(require_done_state=True, on_started=started)
     assert raised.value is error
     assert not instrument.callbacks
+    for channel in (0, 1):
+        topic = f"s/gpi/{channel}/ctrl"
+        assert (("publish", topic, 0) in instrument.events) == (
+            ("publish", topic, 1) in instrument.events
+        )
     assert instrument.events[-1] == ("device", "close", None)
 
 
@@ -279,6 +285,8 @@ def test_subscribe_that_registers_then_fails_is_unsubscribed(instrument, topic):
         instrument.run(require_done_state=True, on_started=started)
     assert not instrument.callbacks
     assert ("unsubscribe", topic, None) in instrument.events
+    if topic.startswith("s/gpi/"):
+        assert ("publish", topic.replace("!data", "ctrl"), 0) not in instrument.events
 
 
 @pytest.mark.parametrize("construction", ["recorder", "resources"])
@@ -352,24 +360,34 @@ def test_shutdown_drains_inflight_processing_before_device_release(
 ):
     entered = threading.Event()
     release = threading.Event()
-    stopping = threading.Event()
+    waiting = threading.Event()
+    conditions = []
     returned = threading.Event()
     error = LookupError("start failed during callback")
     outcome = []
     callbacks = []
-    original_stop = capture._GatedCaptureResources.stop
+    original_init = resources._GatedCaptureResources.__init__
 
-    def stop(self, event):
-        stopping.set()
-        original_stop(self, event)
+    def initialize(self, *args, **kwargs):
+        original_init(self, *args, **kwargs)
+        owner = self
+
+        class ObservedCondition(threading.Condition):
+            def wait(self, timeout=None):
+                assert owner._processing_count > 0
+                waiting.set()
+                return super().wait(timeout)
+
+        self._processing_condition = ObservedCondition()
+        conditions.append(self._processing_condition)
 
     def blocked_callback():
         entered.set()
-        assert release.wait(5)
+        assert release.wait(10)
         callbacks.append("finished")
         return "go_signaled"
 
-    monkeypatch.setattr(capture._GatedCaptureResources, "stop", stop)
+    monkeypatch.setattr(resources._GatedCaptureResources, "__init__", initialize)
     if callback_kind == "stream":
         original_append = capture.PackedGateRecorder.append
 
@@ -411,9 +429,17 @@ def test_shutdown_drains_inflight_processing_before_device_release(
     worker = threading.Thread(target=run)
     worker.start()
     try:
-        assert stopping.wait(5)
-        assert not returned.is_set()
-        assert ("device", "close", None) not in instrument.events
+        assert waiting.wait(5), "shutdown never waited for active processing"
+        # Acquiring the condition proves wait() actually released it, rather
+        # than merely observing the event immediately before wait().
+        condition = conditions[0]
+        assert condition.acquire(timeout=5), "drain wait did not release the condition"
+        try:
+            assert not returned.is_set()
+            assert ("device", "close", None) not in instrument.events
+            release.set()
+        finally:
+            condition.release()
     finally:
         release.set()
         instrument.release_read.set()
@@ -477,3 +503,19 @@ def test_gate_callback_can_wait_for_delivery_on_another_driver_thread(instrument
     result = instrument.run(on_gate_rise=release_go)
     assert delivered.is_set()
     assert len(result.statistics) == 7
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ("publish", "s/stats/scnt", 1000),
+        ("publish", "s/stats/ctrl", 1),
+        ("subscribe", "s/stats/value", None),
+    ],
+)
+def test_fullrate_request_does_not_own_raw_controls_before_start(instrument, monkeypatch, failure):
+    monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
+    instrument.fail_at = failure
+    with pytest.raises(PowerError):
+        instrument.run()
+    assert not any(event[1] in {"s/i/ctrl", "s/v/ctrl"} for event in instrument.events)

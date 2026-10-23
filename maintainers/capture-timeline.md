@@ -41,6 +41,7 @@ A bench run turns [E] and [U] into [M], or revises the number.
 **Host code:**
 - `capture/__init__.py` (`capture_power`, `_release`);
 - `power/joulescope/capture_gated.py` (`capture_gated`);
+- `power/joulescope/_gated_resources.py` (stream attempts, poller and processing drain);
 - `power/diagnostics.py`;
 - `power/joulescope/sync.py`, `power/sync.py`;
 - `power/joulescope/device.py`, `power/joulescope/diagnostics.py`;
@@ -227,11 +228,14 @@ that drain. Starting the thread before the hook does not guarantee a first
 snapshot has arrived. These are host ownership rules, not physical timing or
 vendor-call cancellation guarantees.
 
-Cleanup covers partial setup: stats control and every stats/gate/state
-subscription attempt are tracked before calling the vendor, so registration
-followed by an exception still gets an unsubscribe attempt. Full-rate cleanup
-also tracks attempted subscriptions. Ordinary vendor cleanup exceptions are
-suppressed to preserve the initiating failure. The logical device reference is
+Cleanup covers partial setup: each stats/gate/state control-enable attempt and
+subscription attempt is tracked separately before calling the vendor. Registration
+followed by an exception still gets an unsubscribe attempt, but a control whose
+enable was never attempted is left untouched. A full-rate request alone does not
+authorize raw teardown: raw startup must have been attempted. The full-rate
+recorder also tracks control-enable attempts separately from subscriptions and
+retries failed releases without repeating successful ones. Ordinary vendor cleanup
+exceptions are suppressed to preserve the initiating failure. The logical device reference is
 protected immediately after open, including recorder and resource construction
 failures. No reset of the prior current range is implied.
 
