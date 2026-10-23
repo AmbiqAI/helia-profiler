@@ -111,6 +111,42 @@ models:
         assert loaded["kws-pruned"].decision_group == "kws"
         assert loaded["kws-pruned"].arena_size == 65536
 
+    def test_yaml_models_carry_family_precision_and_source(self, tmp_path):
+        model = tmp_path / "kws.tflite"
+        model.write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(
+            """
+models:
+  mlperf-tiny-kws-a8w8:
+    path: kws.tflite
+    family: mlperf-tiny-kws
+    precision: " a8w8 "
+    source: zoo://mlperf-tiny-kws/a8w8@abc
+"""
+        )
+
+        spec = load_model_file(registry)["mlperf-tiny-kws-a8w8"]
+
+        assert (spec.family, spec.precision, spec.source) == (
+            "mlperf-tiny-kws",
+            "a8w8",
+            "zoo://mlperf-tiny-kws/a8w8@abc",
+        )
+        assert spec.decision_group == "mlperf-tiny-kws-a8w8"
+
+    @pytest.mark.parametrize("value", ['""', "8", "[a8w8]"])
+    def test_yaml_models_reject_invalid_precision(self, tmp_path, value):
+        (tmp_path / "kws.tflite").write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(f"models:\n  kws-x:\n    path: kws.tflite\n    precision: {value}\n")
+
+        with pytest.raises(ValueError, match="precision for model 'kws-x'"):
+            load_model_file(registry)
+
+    def test_builtin_models_have_no_zoo_metadata(self):
+        assert all((m.family, m.precision, m.source) == (None, None, None) for m in MODELS.values())
+
     def test_command_line_paths_share_the_requested_comparison_group(self, tmp_path):
         first = tmp_path / "KWS Base.tflite"
         second = tmp_path / "KWS Pruned.tflite"

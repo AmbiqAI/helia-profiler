@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from io import StringIO
 from pathlib import Path
@@ -451,3 +452,38 @@ def test_failed_case_with_malformed_summary_keeps_aggregate_report(tmp_path, con
     assert [case["status"] for case in report["cases"]] == ["fail", "pass"]
     assert not report["cases"][0].get("resources")
     assert report["cases"][1]["resources"]["binary_sections"]["total"] == 87
+
+
+@pytest.mark.usefixtures("missing_git_metadata")
+def test_custom_model_metadata_and_clock_reach_manifest(tmp_path: Path) -> None:
+    result = dataclasses.replace(
+        _case(tmp_path),
+        model_id="mlperf-tiny-kws-a8w8",
+        family="mlperf-tiny-kws",
+        precision="a8w8",
+        source="zoo://mlperf-tiny-kws/a8w8@abc",
+    )
+    assert result.output_dir is not None
+    case_dir = Path(result.output_dir)
+    case_dir.mkdir(parents=True)
+    (case_dir / "run_metadata.json").write_text(
+        json.dumps({"platform": {"cpu_clock_name": "lp", "cpu_clock_mhz": 96}})
+    )
+
+    case = build_manifest([result], tmp_path)["cases"][0]
+
+    assert case["model"] == {
+        "family": "mlperf-tiny-kws",
+        "precision": "a8w8",
+        "source": "zoo://mlperf-tiny-kws/a8w8@abc",
+    }
+    assert case["provenance"]["cpu_clock_name"] == "lp"
+    assert case["provenance"]["cpu_clock_mhz"] == 96
+
+
+@pytest.mark.usefixtures("missing_git_metadata")
+def test_builtin_model_manifest_omits_model_object(tmp_path: Path) -> None:
+    case = build_manifest([_case(tmp_path)], tmp_path)["cases"][0]
+
+    assert "model" not in case
+    assert "cpu_clock_name" not in case["provenance"]

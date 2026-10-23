@@ -81,6 +81,9 @@ class ModelSpec:
     arena_size: int  # tensor arena in bytes (RT / LiteRT)
     description: str = ""
     comparison_group: str | None = None
+    family: str | None = None  # groups precisions of one model
+    precision: str | None = None
+    source: str | None = None  # where the model came from
     executorch: ExecuTorchModelSpec | None = None
 
     @property
@@ -388,8 +391,20 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
             arena_size=arena_size,
             description=str(raw_spec.get("description", "")),
             comparison_group=comparison_group,
+            family=_optional_label(raw_spec, "family", model_id),
+            precision=_optional_label(raw_spec, "precision", model_id),
+            source=_optional_label(raw_spec, "source", model_id),
         )
     return models
+
+
+def _optional_label(raw_spec: dict[str, Any], key: str, model_id: str) -> str | None:
+    value = raw_spec.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{key} for model {model_id!r} must be a non-empty string")
+    return value.strip()
 
 
 def models_from_paths(

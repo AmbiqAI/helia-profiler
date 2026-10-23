@@ -144,8 +144,14 @@ consumer plan-vs-measured verdicts and per-region deltas), absent whenever
 the symbol table is.
 
 Each case also carries cross-machine provenance when available: model SHA-256,
-HPX version, compiler name/version, firmware-reported `system_clock_hz`, and
-the summary/metadata schema versions. These values are not folded into case
+HPX version, compiler name/version, firmware-reported `system_clock_hz`, the
+resolved CPU clock profile (`cpu_clock_name`, `cpu_clock_mhz`, from
+`run_metadata.json` `platform`), and the summary/metadata schema versions.
+A custom model whose `--models-file` entry sets `family`, `precision`, or
+`source` also gets an additive per-case `model` object within schema v6 (for
+example `{"family": "mlperf-tiny-kws", "precision": "a8w8", "source":
+"zoo://mlperf-tiny-kws/a8w8@<rev>"}`), so a dashboard can group precisions of
+one model; built-in models omit it. These values are not folded into case
 identity because doing so would prevent useful pairing; comparison and
 regression profiles surface differences and can require exact matches.
 

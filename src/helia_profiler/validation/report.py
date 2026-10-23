@@ -269,6 +269,10 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
         "status": result.status,
         "duration_s": result.duration_s,
         "identity": identity,
+        "model": strip_none(
+            {"family": result.family, "precision": result.precision, "source": result.source}
+        )
+        or None,
         "repeat": {"attempt": result.attempt, "total": result.repeat_total},
         "health_issues": list(result.health_issues),
         "provenance": strip_none(
@@ -280,6 +284,8 @@ def _case_manifest(result: CaseResult, output_dir: Path) -> dict[str, Any]:
                 "compiler": nested_get(metadata, "toolchain", "compiler"),
                 "compiler_version": nested_get(metadata, "toolchain", "compiler_version"),
                 "system_clock_hz": nested_get(metadata, "firmware", "system_clock_hz"),
+                "cpu_clock_name": nested_get(metadata, "platform", "cpu_clock_name") or None,
+                "cpu_clock_mhz": nested_get(metadata, "platform", "cpu_clock_mhz") or None,
                 "run_metadata_schema_version": metadata.get("schema_version"),
                 "run_summary_schema_version": summary.get("schema_version"),
                 "runtime": _runtime_provenance(metadata) or None,
