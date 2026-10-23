@@ -188,6 +188,34 @@ def test_loader_reads_the_current_manifest_schema(tmp_path: Path) -> None:
     assert loaded.cases[0].identity.comparison_group == "kws"
 
 
+def test_loader_reads_optional_model_metadata(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    assert "model" not in manifest["cases"][0]
+    assert load_validation_bundle(bundle).cases[0].model == ()
+    manifest["cases"][0]["model"] = {"family": "mlperf-tiny-kws", "precision": "fp32"}
+    manifest_path.write_text(json.dumps(manifest))
+
+    loaded = load_validation_bundle(bundle)
+
+    assert dict(loaded.cases[0].model) == {"family": "mlperf-tiny-kws", "precision": "fp32"}
+
+
+@pytest.mark.parametrize("model", [["fp32"], {"precision": 32}])
+def test_loader_rejects_invalid_model_metadata(tmp_path: Path, model: object) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["model"] = model
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="invalid model"):
+        load_validation_bundle(bundle)
+
+
 @pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5])
 def test_loader_refuses_a_previous_manifest_schema(tmp_path: Path, schema_version: int) -> None:
     bundle = tmp_path / "bundle"

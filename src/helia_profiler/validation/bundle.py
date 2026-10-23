@@ -70,6 +70,7 @@ class ValidationBundleCase:
     artifacts: tuple[tuple[str, ArtifactRef], ...]
     provenance: tuple[tuple[str, Any], ...]
     resources: tuple[tuple[str, Any], ...]
+    model: tuple[tuple[str, str], ...] = ()
 
     def artifact(self, name: str) -> ArtifactRef | None:
         return dict(self.artifacts).get(name)
@@ -190,6 +191,7 @@ def _load_case(raw: dict[str, Any], *, root: Path, index: int) -> ValidationBund
     health = raw.get("health_issues", [])
     provenance = raw.get("provenance", {})
     resources = raw.get("resources", {})
+    model = raw.get("model", {})
     comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
     repeat = raw.get("repeat")
     if not isinstance(repeat, dict):
@@ -220,6 +222,8 @@ def _load_case(raw: dict[str, Any], *, root: Path, index: int) -> ValidationBund
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid provenance")
     if not isinstance(resources, dict):
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid resources")
+    if not isinstance(model, dict) or not all(isinstance(v, str) for v in model.values()):
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid model")
     if isinstance(comparison_group, str):
         comparison_group = comparison_group.strip()
     if not isinstance(comparison_group, str) or not comparison_group:
@@ -270,6 +274,7 @@ def _load_case(raw: dict[str, Any], *, root: Path, index: int) -> ValidationBund
         artifacts=tuple(sorted(artifacts)),
         provenance=tuple(sorted(provenance.items())),
         resources=tuple(sorted(resources.items())),
+        model=tuple(sorted(model.items())),
     )
 
 

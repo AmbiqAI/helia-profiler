@@ -62,6 +62,9 @@ class CaseResult:
     backend: str | None = None
     cmsis_nn_provider: str | None = None
     comparison_group: str | None = None
+    family: str | None = None
+    precision: str | None = None
+    source: str | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
     attempt: int = 1
@@ -466,6 +469,9 @@ def run_case(
                 engine=case.engine,
                 model_id=case.model.id,
                 comparison_group=case.model.decision_group,
+                family=case.model.family,
+                precision=case.model.precision,
+                source=case.model.source,
                 board=case.board.id,
                 power=case.power,
                 toolchain=case.toolchain.value,
@@ -526,6 +532,9 @@ def run_case(
             engine=case.engine,
             model_id=case.model.id,
             comparison_group=case.model.decision_group,
+            family=case.model.family,
+            precision=case.model.precision,
+            source=case.model.source,
             board=case.board.id,
             power=case.power,
             toolchain=case.toolchain.value,
@@ -551,6 +560,9 @@ def run_case(
         engine=case.engine,
         model_id=case.model.id,
         comparison_group=case.model.decision_group,
+        family=case.model.family,
+        precision=case.model.precision,
+        source=case.model.source,
         board=case.board.id,
         power=case.power,
         toolchain=case.toolchain.value,
