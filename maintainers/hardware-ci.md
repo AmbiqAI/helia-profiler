@@ -230,8 +230,9 @@ look like a READY/GATE timeout.
 
 ## GitHub Actions workflow
 
-The `Hardware Validation` workflow runs nightly and on manual dispatch. It runs
-one job per board. Each self-hosted runner owns exactly one board, is confined
+The `Hardware Validation` workflow runs two nightlies and on manual dispatch:
+the 09:00 UTC nightly runs `suite=complete` and the 12:00 UTC nightly runs
+`suite=zoo` (see "Zoo nightly" below). It runs one job per board. Each self-hosted runner owns exactly one board, is confined
 to that board's probes, and advertises three labels:
 
 ```text
@@ -272,7 +273,7 @@ The workflow exposes the validation axes as manual inputs. Leave an optional
 axis empty to use the selected suite's defaults; set it explicitly to override
 only that axis.
 
-- `suite`: `smoke`, `models-rt`, `models-aot`, or `complete`
+- `suite`: `smoke`, `models-rt`, `models-aot`, `complete`, or `zoo`
 - `boards`: comma-separated board IDs, default
   `apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb`; each becomes
   one job on that board's runner. A board with no online runner leaves its job
@@ -391,7 +392,8 @@ The upload excludes per-case `work/` directories to avoid storing generated NSX
 build trees in every run artifact.
 
 Each board job uploads its own artifact, named
-`hardware-validation-<run_id>-<board>`. A run therefore has one artifact per
+`hardware-validation-<run_id>-<board>` (`zoo-validation-<run_id>-<board>` for
+`suite=zoo`). A run therefore has one artifact per
 board. Consumers such as the dashboard group a run's artifacts by the GitHub run
 ID recorded in each `validation_manifest.json` under `run.github.run_id`; there
 is no merge step in the workflow. The upload runs whether or not validation
@@ -429,6 +431,45 @@ Two runs that select the same board queue behind each other on that board's
 concurrency group; runs for different boards proceed independently. Baseline
 comparison, threshold enforcement, and dashboards should consume
 `validation_manifest.json` rather than infer paths from the artifact layout.
+
+## Zoo nightly
+
+`suite=zoo` profiles the models pinned in `tools/zoo_models.yaml` (see "Zoo
+model registry" above). It is not an `hpx validate` suite: the workflow swaps
+its two validation steps for three Zoo steps and keeps every other step (runner
+guard, board lock, `hpx probes match`, ns-cmsis-nn resolution, power gating,
+caches, compile gate). A scheduled run selects it by its cron, `0 12 * * *`;
+a manual run sets `suite=zoo`. Both crons record `run.origin: nightly`.
+
+Per board, the job:
+
+1. builds the registry into `results/validation/zoo-models.yaml`, with the
+   Zoo download cache in `zoo-cache` next to `hpx-cache` so warm runs skip
+   the downloads. uv's Python looks for a CA bundle where NixOS has none,
+   so the step sets `SSL_CERT_FILE` to the NixOS bundle unless the runner
+   sets one.
+2. runs the registry's models over the `complete` axes for `helia-rt`,
+   `helia-aot` and `litert` into `results/validation/zoo/`.
+3. runs the built-in MLPerf models on `executorch` only, as `complete` does,
+   into `results/validation/executorch/`. Boards without ExecuTorch support
+   (anything but Cortex-M55) select no case and skip this run.
+
+Steps 2 and 3 are two `hpx validate` invocations because one invocation is
+the full models × engines product (it would rerun the built-in models on the
+other engines) and each invocation rewrites its output's
+`validation_manifest.json`. Both bundles go in the board's one
+`zoo-validation-<run_id>-<board>` artifact; a reader finds them by searching
+the artifact for `validation_manifest.json`. A failure in step 2 still runs
+step 3, then fails the job.
+
+The `models` and `engines` inputs must stay empty for `suite=zoo`; the plan
+job rejects them. Other axis inputs apply to both invocations. The 12:00 UTC
+slot starts after the 09:00 nightly typically finishes (under two hours
+warm); a board whose 09:00 job still runs makes the Zoo job wait for its
+runner.
+
+The dashboard's MLPerf view reads only `hardware-validation-*` artifacts and
+skips scheduled runs without one, so Zoo runs do not displace its nightlies.
 
 ## Board lock
 

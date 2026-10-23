@@ -11,6 +11,8 @@ on:
   schedule:
     # 09:00 UTC nightly (01:00 PDT / 00:00 PST).
     - cron: "0 9 * * *"
+    # Zoo nightly, after the 09:00 one.
+    - cron: "0 12 * * *"
   workflow_dispatch:
     inputs:
       suite:
@@ -23,6 +25,7 @@ on:
           - models-rt
           - models-aot
           - complete
+          - zoo
       boards:
         description: "Comma-separated board IDs; each becomes one job on that board's runner"
         required: true
@@ -106,6 +109,9 @@ env:
   # configured build trees instead of cold-building every case. Each board
   # runner has its own work directory, so this cache is per board.
   HPX_CACHE_DIR: ${{ github.workspace }}/../hpx-cache
+  # Zoo downloads, kept warm like hpx-cache.
+  HPX_ZOO_CACHE_DIR: ${{ github.workspace }}/../zoo-cache
+  HPX_ZOO_REGISTRY: results/validation/zoo-models.yaml
   # ccache: the runner exports a per-board CCACHE_DIR; hpx's
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
@@ -113,7 +119,7 @@ env:
   HPX_NSX_EXECUTORCH_REF: 5514ac1ea8439b3fe615d180bf68c75a9dabb48e
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
-  HPX_VALIDATION_SUITE: ${{ inputs.suite || 'complete' }}
+  HPX_VALIDATION_SUITE: ${{ inputs.suite || (github.event.schedule == '0 12 * * *' && 'zoo') || 'complete' }}
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
@@ -145,6 +151,10 @@ jobs:
             '$csv | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))')"
           if [[ "${boards}" == "[]" ]]; then
             echo "::error::boards input selected no boards" >&2
+            exit 2
+          fi
+          if [[ "${HPX_VALIDATION_SUITE}" == zoo && -n "${HPX_VALIDATION_MODELS}${HPX_VALIDATION_ENGINES}" ]]; then
+            echo "::error::the zoo suite sets its own models and engines" >&2
             exit 2
           fi
           echo "boards=${boards}" >> "${GITHUB_OUTPUT}"
@@ -321,7 +331,8 @@ jobs:
         if: >-
           contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
           contains(env.HPX_VALIDATION_ENGINES, 'et') ||
-          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '') ||
+          env.HPX_VALIDATION_SUITE == 'zoo'
         with:
           repository: AmbiqAI/nsx-executorch
           ref: ${{ env.HPX_NSX_EXECUTORCH_REF }}
@@ -333,7 +344,8 @@ jobs:
         if: >-
           contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
           contains(env.HPX_VALIDATION_ENGINES, 'et') ||
-          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '') ||
+          env.HPX_VALIDATION_SUITE == 'zoo'
         run: |
           checkout_path="${GITHUB_WORKSPACE}/.dependencies/nsx-executorch"
 
@@ -404,6 +416,7 @@ jobs:
         run: uv run hpx probes match --board "${HPX_VALIDATION_BOARD}" --jlink-serial "${HPX_JLINK_SERIAL}"
 
       - name: Preview validation cases
+        if: env.HPX_VALIDATION_SUITE != 'zoo'
         run: |
           args=(
             --list
@@ -449,6 +462,7 @@ jobs:
           fi
 
       - name: Run hardware validation
+        if: env.HPX_VALIDATION_SUITE != 'zoo'
         run: |
           mkdir -p results/validation
           args=(
@@ -488,6 +502,105 @@ jobs:
           fi
           uv run hpx validate "${args[@]}"
 
+      # Zoo mode: two bundles, one artifact.
+      - name: Build the Zoo model registry
+        if: env.HPX_VALIDATION_SUITE == 'zoo'
+        run: |
+          # uv's Python lacks the NixOS CA path.
+          if [[ -z "${SSL_CERT_FILE:-}" && -f /etc/ssl/certs/ca-certificates.crt ]]; then
+            export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+          fi
+          mkdir -p results/validation
+          uv run --python 3.12 tools/zoo_registry.py \
+            --output "${HPX_ZOO_REGISTRY}" --cache "${HPX_ZOO_CACHE_DIR}"
+
+      - name: Preview Zoo validation cases
+        if: env.HPX_VALIDATION_SUITE == 'zoo'
+        run: |
+          args=(
+            --suite complete
+            --boards "${HPX_VALIDATION_BOARD}"
+            --power "${HPX_VALIDATION_POWER}"
+            --repeat "${HPX_VALIDATION_REPEAT}"
+            --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
+            --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
+          )
+          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
+            args+=(--ns-cmsis-nn-ref "${NS_CMSIS_NN_RESOLVED_COMMIT}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TOOLCHAINS}" ]]; then
+            args+=(--toolchains "${HPX_VALIDATION_TOOLCHAINS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TRANSPORTS}" ]]; then
+            args+=(--transports "${HPX_VALIDATION_TRANSPORTS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
+            args+=(--memories "${HPX_VALIDATION_MEMORIES}")
+          fi
+          if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
+            args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
+            args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
+          fi
+          zoo=(--models-file "${HPX_ZOO_REGISTRY}" --engines "helia-rt,helia-aot,litert")
+          et=(--engines executorch)
+          case_count() { sed -n 's/^\([0-9][0-9]*\) case(s) would run:$/\1/p' <<< "$1"; }
+          preview="$(uv run hpx validate --list "${args[@]}" "${zoo[@]}")"
+          printf '%s\n' "${preview}"
+          if [[ "$(case_count "${preview}")" == 0 ]]; then
+            echo "::error::the zoo suite selects no cases on ${HPX_VALIDATION_BOARD}" >&2
+            exit 2
+          fi
+          # Boards without ExecuTorch list none.
+          preview="$(uv run hpx validate --list "${args[@]}" "${et[@]}")"
+          printf '%s\n' "${preview}"
+          echo "HPX_ZOO_EXECUTORCH_CASES=$(case_count "${preview}")" >> "${GITHUB_ENV}"
+
+      - name: Run Zoo validation
+        if: env.HPX_VALIDATION_SUITE == 'zoo'
+        run: |
+          args=(
+            --suite complete
+            --boards "${HPX_VALIDATION_BOARD}"
+            --power "${HPX_VALIDATION_POWER}"
+            --repeat "${HPX_VALIDATION_REPEAT}"
+            --timeout "${HPX_VALIDATION_TIMEOUT}"
+            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
+            --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
+          )
+          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
+            args+=(--ns-cmsis-nn-ref "${NS_CMSIS_NN_RESOLVED_COMMIT}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TOOLCHAINS}" ]]; then
+            args+=(--toolchains "${HPX_VALIDATION_TOOLCHAINS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_TRANSPORTS}" ]]; then
+            args+=(--transports "${HPX_VALIDATION_TRANSPORTS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
+            args+=(--memories "${HPX_VALIDATION_MEMORIES}")
+          fi
+          if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
+            args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
+          fi
+          if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
+            args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
+          fi
+          zoo=(--models-file "${HPX_ZOO_REGISTRY}" --engines "helia-rt,helia-aot,litert")
+          et=(--engines executorch)
+          status=0
+          uv run hpx validate "${args[@]}" "${zoo[@]}" \
+            --output-dir results/validation/zoo \
+            --junit-xml results/validation/zoo/junit.xml || status=$?
+          if [[ "${HPX_ZOO_EXECUTORCH_CASES}" != 0 ]]; then
+            uv run hpx validate "${args[@]}" "${et[@]}" \
+              --output-dir results/validation/executorch \
+              --junit-xml results/validation/executorch/junit.xml || status=$?
+          fi
+          exit "${status}"
+
       # Free the board before the hardware-free steps.
       - name: Release the board lock
         if: always() && steps.lock.outcome == 'success'
@@ -520,7 +633,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hardware-validation-${{ github.run_id }}-${{ matrix.board }}
+          name: ${{ env.HPX_VALIDATION_SUITE == 'zoo' && 'zoo' || 'hardware' }}-validation-${{ github.run_id }}-${{ matrix.board }}
           overwrite: true
           path: |
             results/validation/
