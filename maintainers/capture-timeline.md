@@ -213,7 +213,8 @@ what they mean.
 
 The driver skips its duration wait on a start-hook failure. Shutdown first
 requests stop, closes admission to evidence processing and application callbacks,
-and drains work already admitted. It then joins the poller for up to 1 s before
+and drains work already admitted. Poll-cadence waits, before and after GO, wake
+on that stop request rather than waiting out the configured interval. It then joins the poller for up to 1 s before
 disabling/unsubscribing streams. No processing lock is held while application
 callbacks or vendor operations run: a GO-release callback may publish to the
 driver and wait for another thread's stream delivery.

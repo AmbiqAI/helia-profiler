@@ -325,7 +325,7 @@ def capture_gated(
                             first_high_at = None
                             first_low_after_high_at = None
                             prev_level = level
-                            time.sleep(poll_interval_s)
+                            stop.wait(timeout=poll_interval_s)
                             continue
                         # GO may be asserted between poll iterations.  In that case
                         # the first retained post-GO sample is already high, while
@@ -457,7 +457,7 @@ def capture_gated(
                         early_stopped = True
                         stop.set()
                         break
-                time.sleep(poll_interval_s)
+                stop.wait(timeout=poll_interval_s)
 
         capture_start = time.monotonic()
         wait_ended_at: float | None = None

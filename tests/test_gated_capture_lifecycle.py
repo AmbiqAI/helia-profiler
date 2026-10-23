@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -105,7 +106,7 @@ class _Instrument:
             io_voltage=1.8,
             sync_input_index=0,
             guard_s=0,
-            poll_interval_s=0,
+            poll_interval_s=kwargs.pop("poll_interval_s", 0),
             on_started=kwargs.pop("on_started", self.started),
             **kwargs,
         )
@@ -519,3 +520,72 @@ def test_fullrate_request_does_not_own_raw_controls_before_start(instrument, mon
     with pytest.raises(PowerError):
         instrument.run()
     assert not any(event[1] in {"s/i/ctrl", "s/v/ctrl"} for event in instrument.events)
+
+
+@pytest.mark.parametrize("phase", ["waiting_ready", "go_signaled"])
+def test_shutdown_wakes_idle_poller_without_waiting_for_cadence(instrument, monkeypatch, phase):
+    idle_entered = threading.Event()
+    idle_woken = threading.Event()
+    stop_requested = threading.Event()
+    release_sleep = threading.Event()
+    interval = 600.0
+    error = LookupError("start failed while poller idle")
+    outcome = []
+
+    class StopEvent(threading.Event):
+        def set(self):
+            super().set()
+            stop_requested.set()
+
+        def wait(self, timeout=None):
+            if timeout == interval:
+                idle_entered.set()
+                signaled = super().wait(10)
+                assert signaled, "test did not stop the idle poller"
+                idle_woken.set()
+                return signaled
+            return super().wait(timeout)
+
+    def uninterruptible_sleep(seconds):
+        assert seconds == interval
+        idle_entered.set()
+        assert release_sleep.wait(10), "test did not release the legacy sleep"
+
+    monkeypatch.setattr(
+        capture, "threading", SimpleNamespace(Event=StopEvent, Condition=threading.Condition)
+    )
+    monkeypatch.setattr(
+        capture,
+        "time",
+        SimpleNamespace(
+            monotonic=time.monotonic,
+            monotonic_ns=time.monotonic_ns,
+            time=time.time,
+            sleep=uninterruptible_sleep,
+        ),
+    )
+
+    def started(_wait):
+        instrument.release_read.set()
+        assert idle_entered.wait(5)
+        raise error
+
+    def run():
+        try:
+            instrument.run(on_started=started, phase_getter=lambda: phase, poll_interval_s=interval)
+        except Exception as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert stop_requested.wait(5)
+        assert idle_woken.wait(5), "idle delay was not interrupted by stop"
+    finally:
+        release_sleep.set()
+        instrument.release_read.set()
+        worker.join(5)
+        assert not worker.is_alive()
+    assert outcome == [error]
+    assert instrument.poller_exited.is_set()
+    assert instrument.events[-1] == ("device", "close", None)
