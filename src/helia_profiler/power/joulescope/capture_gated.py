@@ -149,9 +149,7 @@ def capture_gated(
     driver, device_path, family = _open_device(self._serial)
     log.debug("gate-race timeline: _open_device() done t=%.3f", time.time())
 
-    cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
     native_rate = _NATIVE_SAMPLE_RATE[family]
-    scnt_topic, sctrl_topic, sval_topic = _HOST_STATS[family]
     scnt = max(1, round(native_rate / max(1, int(stats_rate_hz))))
 
     packets: list[dict[str, Any]] = []
@@ -253,8 +251,8 @@ def capture_gated(
     # instrument's native rate and integrate energy over the GPI windows,
     # logged alongside the 1 kHz stats-sum for direct comparison.
     fr_requested = os.environ.get("HPX_POWER_FULLRATE_XCHECK") == "1"
-    fr_xcheck = fr_requested
-    fullrate = FullRateRecorder(driver, device_path)
+    resources = _GatedCaptureResources(driver, device_path, family)
+    fullrate = resources.fullrate
 
     callback_errors: list[Exception] = []
 
@@ -435,9 +433,6 @@ def capture_gated(
     capture_start = time.monotonic()
     wait_ended_at: float | None = None
     hook_error: Exception | None = None
-    state_subscribed = False
-    state_data_topic = f"{device_path}/s/gpi/{state_input_index}/!data"
-    state_ctrl_topic = f"{device_path}/s/gpi/{state_input_index}/ctrl"
     try:
         if family in ("js220", "js320"):
             mode = driver.query(f"{device_path}/s/gpi/+/dwnN/mode")
@@ -447,47 +442,25 @@ def capture_gated(
             if gate_recorder.sample_mode is None:
                 raise PowerError("GPI decimation mode does not preserve sampled gate levels")
             state_recorder.sample_mode = gate_recorder.sample_mode
+        # Mandatory setup historically releases only the device on failure;
+        # stream cleanup begins at the poller block (see #582).
+        resources.start_streams(
+            scnt=scnt,
+            sync_input_index=sync_input_index,
+            state_input_index=state_input_index,
+            require_done_state=require_done_state,
+            on_stats=_on_stats,
+            on_gpi_data=_on_gpi_data,
+            on_state_data=_on_state_data,
+            state_recorder=state_recorder,
+            fullrate_requested=fr_requested,
+        )
+        gpi_stream_enabled = resources.gpi_stream_enabled
+        fr_xcheck = resources.fr_xcheck
         try:
-            driver.publish(f"{device_path}/{cycle_topic}", on_value)
-        except Exception:
-            pass
-
-        driver.publish(f"{device_path}/{scnt_topic}", scnt)
-        driver.publish(f"{device_path}/{sctrl_topic}", 1)
-        driver.subscribe(f"{device_path}/{sval_topic}", "pub", _on_stats)
-        gpi_stream_enabled = False
-        gpi_subscribed = False
-        gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
-        gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
-        if family in ("js220", "js320"):
-            try:
-                driver.subscribe(gpi_data_topic, "pub", _on_gpi_data)
-                gpi_subscribed = True
-                driver.publish(gpi_ctrl_topic, 1)
-                gpi_stream_enabled = True
-                if require_done_state:
-                    driver.subscribe(state_data_topic, "pub", _on_state_data)
-                    state_subscribed = True
-                    driver.publish(state_ctrl_topic, 1)
-            except Exception:
-                if require_done_state:
-                    state_recorder.error = "Required state stream could not be enabled"
-                log.warning(
-                    "GPI edge streaming unavailable on %s; gate edges fall "
-                    "back to snapshot polling",
-                    device_path,
-                    exc_info=True,
-                )
-        if fr_xcheck:
-            fr_xcheck = fullrate.start()
-        try:
-            thread = threading.Thread(target=_poller, daemon=True)
-            thread.start()
-            log.debug("gate-race timeline: GPI poller thread started t=%.3f", time.time())
-            # The poller is now sampling GPI.  For transports whose firmware
-            # blocks until the host attaches (USB CDC waits on DTR), release
-            # it now — *after* the poller is watching — so the gated GPIO
-            # window cannot fire before we are ready to see it.
+            resources.start_poller(_poller)
+            # USB CDC firmware can wait on DTR. Start the poller before the
+            # hook releases it; this does not wait for the first GPI sample.
             if on_started is not None:
                 try:
                     on_started(_wait_gpi_state)
@@ -498,39 +471,7 @@ def capture_gated(
             stop.wait(timeout=duration_s)
             wait_ended_at = time.monotonic()
         finally:
-            stop.set()
-            try:
-                thread.join(timeout=1.0)
-            except Exception:
-                pass
-            try:
-                driver.publish(f"{device_path}/{sctrl_topic}", 0)
-            except Exception:
-                pass
-            try:
-                driver.unsubscribe(f"{device_path}/{sval_topic}", _on_stats)
-            except Exception:
-                pass
-            if gpi_subscribed:
-                try:
-                    driver.publish(gpi_ctrl_topic, 0)
-                except Exception:
-                    pass
-                try:
-                    driver.unsubscribe(gpi_data_topic, _on_gpi_data)
-                except Exception:
-                    pass
-            if state_subscribed:
-                try:
-                    driver.publish(state_ctrl_topic, 0)
-                except Exception:
-                    pass
-                try:
-                    driver.unsubscribe(state_data_topic, _on_state_data)
-                except Exception:
-                    pass
-            if fr_requested:
-                fullrate.stop()
+            resources.stop(stop)
 
         if callback_errors:
             hook_error = callback_errors[0]
@@ -936,4 +877,119 @@ def capture_gated(
             hint="Check USB connection, sync wiring, and that no other software is using the device.",
         ) from exc
     finally:
-        _close_device(driver, device_path)
+        resources.close()
+
+
+class _GatedCaptureResources:
+    """Own subscriptions and the poller; release the caller's device reference."""
+
+    def __init__(self, driver: Any, device_path: str, family: str) -> None:
+        self.driver = driver
+        self.device_path = device_path
+        self.family = family
+        self.fullrate = FullRateRecorder(driver, device_path)
+        self.thread: threading.Thread | None = None
+        self.gpi_subscribed = False
+        self.state_subscribed = False
+        self.gpi_stream_enabled = False
+        self.fr_xcheck = False
+
+    def start_streams(
+        self,
+        *,
+        scnt: int,
+        sync_input_index: int,
+        state_input_index: int,
+        require_done_state: bool,
+        on_stats: Callable[[str, Any], None],
+        on_gpi_data: Callable[[str, Any], None],
+        on_state_data: Callable[[str, Any], None],
+        state_recorder: PackedGateRecorder,
+        fullrate_requested: bool,
+    ) -> None:
+        driver, device_path, family = self.driver, self.device_path, self.family
+        cycle_topic, _off_value, on_value = _POWER_CYCLE[family]
+        scnt_topic, sctrl_topic, sval_topic = _HOST_STATS[family]
+        self.on_stats = on_stats
+        self.on_gpi_data = on_gpi_data
+        self.on_state_data = on_state_data
+        self.fr_requested = fullrate_requested
+        self.stats_ctrl_topic = f"{device_path}/{sctrl_topic}"
+        self.stats_data_topic = f"{device_path}/{sval_topic}"
+        self.gpi_data_topic = f"{device_path}/s/gpi/{sync_input_index}/!data"
+        self.gpi_ctrl_topic = f"{device_path}/s/gpi/{sync_input_index}/ctrl"
+        self.state_data_topic = f"{device_path}/s/gpi/{state_input_index}/!data"
+        self.state_ctrl_topic = f"{device_path}/s/gpi/{state_input_index}/ctrl"
+        try:
+            driver.publish(f"{device_path}/{cycle_topic}", on_value)
+        except Exception:
+            pass
+
+        driver.publish(f"{device_path}/{scnt_topic}", scnt)
+        driver.publish(self.stats_ctrl_topic, 1)
+        driver.subscribe(self.stats_data_topic, "pub", self.on_stats)
+        if family in ("js220", "js320"):
+            try:
+                driver.subscribe(self.gpi_data_topic, "pub", self.on_gpi_data)
+                self.gpi_subscribed = True
+                driver.publish(self.gpi_ctrl_topic, 1)
+                self.gpi_stream_enabled = True
+                if require_done_state:
+                    driver.subscribe(self.state_data_topic, "pub", self.on_state_data)
+                    self.state_subscribed = True
+                    driver.publish(self.state_ctrl_topic, 1)
+            except Exception:
+                if require_done_state:
+                    state_recorder.error = "Required state stream could not be enabled"
+                log.warning(
+                    "GPI edge streaming unavailable on %s; gate edges fall "
+                    "back to snapshot polling",
+                    device_path,
+                    exc_info=True,
+                )
+        if fullrate_requested:
+            self.fr_xcheck = self.fullrate.start()
+
+    def start_poller(self, poller: Callable[[], None]) -> None:
+        self.thread = threading.Thread(target=poller, daemon=True)
+        self.thread.start()
+        log.debug("gate-race timeline: GPI poller thread started t=%.3f", time.time())
+
+    def stop(self, stop: threading.Event) -> None:
+        stop.set()
+        try:
+            if self.thread is not None:
+                self.thread.join(timeout=1.0)
+        except Exception:
+            pass
+        try:
+            self.driver.publish(self.stats_ctrl_topic, 0)
+        except Exception:
+            pass
+        try:
+            self.driver.unsubscribe(self.stats_data_topic, self.on_stats)
+        except Exception:
+            pass
+        if self.gpi_subscribed:
+            try:
+                self.driver.publish(self.gpi_ctrl_topic, 0)
+            except Exception:
+                pass
+            try:
+                self.driver.unsubscribe(self.gpi_data_topic, self.on_gpi_data)
+            except Exception:
+                pass
+        if self.state_subscribed:
+            try:
+                self.driver.publish(self.state_ctrl_topic, 0)
+            except Exception:
+                pass
+            try:
+                self.driver.unsubscribe(self.state_data_topic, self.on_state_data)
+            except Exception:
+                pass
+        if self.fr_requested:
+            self.fullrate.stop()
+
+    def close(self) -> None:
+        _close_device(self.driver, self.device_path)
