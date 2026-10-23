@@ -164,6 +164,34 @@ Scheduled GitHub Actions runs record `run.origin: nightly`; user-triggered
 attempt, and a direct run URL. Dashboards can therefore separate nightly and
 ad hoc validation without inferring intent from timestamps or branch names.
 
+## Zoo model registry
+
+`tools/zoo_models.yaml` pins the helia-model-zoo models that
+validation runs as custom models: per entry the Zoo ID, precision, Zoo
+commit (`rev`), model sha256 and arena size. `tools/zoo_registry.py` turns
+it into a `--models-file`:
+
+```bash
+uv run tools/zoo_registry.py --output build/zoo/models.yaml
+uv run hpx validate --list --models-file build/zoo/models.yaml \
+  --models mlperf-tiny-kws-a8w8,mlperf-tiny-kws-fp32 --boards apollo510_evb
+```
+
+The script declares its dependencies inline (PEP 723), so `uv run` installs
+the Zoo client in an isolated environment. HPX does not depend on the Zoo
+client: it is a git dependency, which a PyPI release cannot carry. The
+builder fetches each model into the Zoo cache (`--cache`, else
+`HELIA_ZOO_CACHE`, else `~/.cache/helia-model-zoo`), refuses a file whose
+sha256 differs from its pin, and writes IDs `<zoo>-<precision>` with
+`family`, `precision`, `source: zoo://<zoo>/<precision>@<rev>`, the arena
+size and the cached model path. The entries mirror helia-benchmark's
+portfolio selections; nothing here reads that repository.
+
+To add a model, add an entry with the sha256 from the Zoo record at that
+commit and an arena size sized like the built-in models: the measured or
+estimated allocated arena plus about 10% headroom, rounded up to a power
+of two.
+
 ## Dependency source pinning
 
 The `ns_cmsis_nn_ref` workflow input is blank by default. In that normal mode,

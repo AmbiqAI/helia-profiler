@@ -1,0 +1,13 @@
+# Zoo models for hpx validate.
+# Build: uv run tools/zoo_registry.py --output <models.yaml>
+models:
+  - zoo: mlperf-tiny-kws
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: aeea436800704fce17b17292e4412630ad856e9d777c044c64ef748a880bd0ae
+    arena_size: 32768
+  - zoo: mlperf-tiny-kws
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 56118080c1451eedd82b0989ee3b7f81ac8ecf7eec0ea744564762127160075c
+    arena_size: 131072
