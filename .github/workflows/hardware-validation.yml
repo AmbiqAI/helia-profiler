@@ -514,7 +514,7 @@ jobs:
           uv run --python 3.12 tools/zoo_registry.py \
             --output "${HPX_ZOO_REGISTRY}" --cache "${HPX_ZOO_CACHE_DIR}"
 
-      - name: Preview Zoo validation cases
+      - name: Run Zoo validation
         if: env.HPX_VALIDATION_SUITE == 'zoo'
         run: |
           args=(
@@ -556,45 +556,12 @@ jobs:
           # Boards without ExecuTorch list none.
           preview="$(uv run hpx validate --list "${args[@]}" "${et[@]}")"
           printf '%s\n' "${preview}"
-          echo "HPX_ZOO_EXECUTORCH_CASES=$(case_count "${preview}")" >> "${GITHUB_ENV}"
-
-      - name: Run Zoo validation
-        if: env.HPX_VALIDATION_SUITE == 'zoo'
-        run: |
-          args=(
-            --suite complete
-            --boards "${HPX_VALIDATION_BOARD}"
-            --power "${HPX_VALIDATION_POWER}"
-            --repeat "${HPX_VALIDATION_REPEAT}"
-            --timeout "${HPX_VALIDATION_TIMEOUT}"
-            --executorch-backends "${HPX_VALIDATION_EXECUTORCH_BACKENDS}"
-            --jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"
-          )
-          if [[ -n "${HPX_NS_CMSIS_NN_REF}" ]]; then
-            args+=(--ns-cmsis-nn-ref "${NS_CMSIS_NN_RESOLVED_COMMIT}")
-          fi
-          if [[ -n "${HPX_VALIDATION_TOOLCHAINS}" ]]; then
-            args+=(--toolchains "${HPX_VALIDATION_TOOLCHAINS}")
-          fi
-          if [[ -n "${HPX_VALIDATION_TRANSPORTS}" ]]; then
-            args+=(--transports "${HPX_VALIDATION_TRANSPORTS}")
-          fi
-          if [[ -n "${HPX_VALIDATION_MEMORIES}" ]]; then
-            args+=(--memories "${HPX_VALIDATION_MEMORIES}")
-          fi
-          if [[ -n "${HPX_VALIDATION_POWER_BOARDS}" ]]; then
-            args+=(--power-boards "${HPX_VALIDATION_POWER_BOARDS}")
-          fi
-          if [[ -n "${HPX_VALIDATION_POWER_SERIALS}" ]]; then
-            args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
-          fi
-          zoo=(--models-file "${HPX_ZOO_REGISTRY}" --engines "helia-rt,helia-aot,litert")
-          et=(--engines executorch)
+          et_cases="$(case_count "${preview}")"
           status=0
           uv run hpx validate "${args[@]}" "${zoo[@]}" \
             --output-dir results/validation/zoo \
             --junit-xml results/validation/zoo/junit.xml || status=$?
-          if [[ "${HPX_ZOO_EXECUTORCH_CASES}" != 0 ]]; then
+          if [[ "${et_cases}" != 0 ]]; then
             uv run hpx validate "${args[@]}" "${et[@]}" \
               --output-dir results/validation/executorch \
               --junit-xml results/validation/executorch/junit.xml || status=$?

@@ -14,7 +14,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "hardware-validation.yml"
 
 ZOO_CRON = "0 12 * * *"
-ZOO_STEPS = ("Preview Zoo validation cases", "Run Zoo validation")
 
 # Inputs the runner now answers from its own environment. They must not come
 # back as workflow inputs: a job cannot know which probe it may open.
@@ -83,6 +82,22 @@ def _run_bash(script: str, env: dict[str, str], cwd: Path) -> str:
     ).stdout
 
 
+def _validate_env(workflow: dict[Any, Any], **overrides: str) -> dict[str, str]:
+    """Env a validate step sees, minus the runner."""
+    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
+    env.update(
+        HPX_VALIDATION_BOARD="apollo510_evb",
+        HPX_VALIDATION_JLINK_SERIALS="",
+        HPX_VALIDATION_POWER="off",
+        HPX_VALIDATION_POWER_BOARDS="",
+        HPX_VALIDATION_POWER_SERIALS="",
+        HPX_VALIDATION_EXECUTORCH_BACKENDS="ns",
+        HPX_NS_CMSIS_NN_REF="",
+    )
+    env.update(overrides)
+    return env
+
+
 @pytest.mark.parametrize("step_name", ["Preview validation cases", "Run hardware validation"])
 @pytest.mark.parametrize("requested_ref", ["", "candidate-branch", "a" * 40])
 @pytest.mark.parametrize("provider", ["ns", "arm", "both"])
@@ -95,15 +110,8 @@ def test_ns_cmsis_nn_flag_only_passed_for_explicit_input(
     requested_ref: str,
     provider: str,
 ) -> None:
-    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
-    env.update(
-        HPX_VALIDATION_BOARD="apollo510_evb",
-        HPX_VALIDATION_JLINK_SERIALS="",
-        HPX_VALIDATION_POWER="off",
-        HPX_VALIDATION_POWER_BOARDS="",
-        HPX_VALIDATION_POWER_SERIALS="",
-        HPX_VALIDATION_EXECUTORCH_BACKENDS=provider,
-        HPX_NS_CMSIS_NN_REF=requested_ref,
+    env = _validate_env(
+        workflow, HPX_VALIDATION_EXECUTORCH_BACKENDS=provider, HPX_NS_CMSIS_NN_REF=requested_ref
     )
     if requested_ref:
         env["NS_CMSIS_NN_RESOLVED_COMMIT"] = "b" * 40
@@ -262,7 +270,7 @@ def test_board_and_probes_come_from_the_runner(validate_job: dict[str, Any]) -> 
     assert '--board "${HPX_VALIDATION_BOARD}"' in probe_check["run"]
     assert '--jlink-serial "${HPX_JLINK_SERIAL}"' in probe_check["run"]
 
-    for name in ("Preview validation cases", "Run hardware validation", *ZOO_STEPS):
+    for name in ("Preview validation cases", "Run hardware validation", "Run Zoo validation"):
         script = _step(validate_job, name)["run"]
         assert '--boards "${HPX_VALIDATION_BOARD}"' in script
         assert '--jlink-serials "${HPX_VALIDATION_JLINK_SERIALS}"' in script
@@ -365,15 +373,8 @@ def test_preview_fails_when_no_case_is_selected(
     workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
 ) -> None:
     """An empty selection must not pass as a green job with no bundle."""
-    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
-    env.update(
-        HPX_VALIDATION_BOARD="apollo3p_evb",
-        HPX_VALIDATION_JLINK_SERIALS="",
-        HPX_VALIDATION_POWER="off",
-        HPX_VALIDATION_POWER_BOARDS="",
-        HPX_VALIDATION_POWER_SERIALS="",
-        HPX_VALIDATION_EXECUTORCH_BACKENDS="both",
-        HPX_NS_CMSIS_NN_REF="",
+    env = _validate_env(
+        workflow, HPX_VALIDATION_BOARD="apollo3p_evb", HPX_VALIDATION_EXECUTORCH_BACKENDS="both"
     )
     script = _step(validate_job, "Preview validation cases")["run"]
     empty = 'uv() { printf "Registered models: kws\n\n0 case(s) would run:\n"; }\n' + script
@@ -412,7 +413,7 @@ def test_zoo_nightly_has_its_own_cron(workflow: dict[Any, Any]) -> None:
 def test_zoo_mode_swaps_only_the_validation_steps(validate_job: dict[str, Any]) -> None:
     for name in ("Preview validation cases", "Run hardware validation"):
         assert _step(validate_job, name)["if"] == "env.HPX_VALIDATION_SUITE != 'zoo'"
-    for name in ("Build the Zoo model registry", *ZOO_STEPS):
+    for name in ("Build the Zoo model registry", "Run Zoo validation"):
         assert _step(validate_job, name)["if"] == "env.HPX_VALIDATION_SUITE == 'zoo'"
     for name in (
         "Checkout qualified nsx-executorch",
@@ -444,99 +445,94 @@ def test_plan_rejects_zoo_model_overrides(workflow: dict[Any, Any], tmp_path: Pa
         assert "zoo suite sets its own models and engines" in failure.value.stderr
 
 
-def _zoo_env(workflow: dict[Any, Any], tmp_path: Path, **extra: str) -> dict[str, str]:
-    env = {key: "" for key in workflow["env"] if key.startswith("HPX_VALIDATION_")}
-    env.update(
-        HPX_VALIDATION_BOARD="apollo510_evb",
-        HPX_VALIDATION_JLINK_SERIALS="apollo510_evb=1",
-        HPX_VALIDATION_POWER="off",
-        HPX_VALIDATION_POWER_BOARDS="",
-        HPX_VALIDATION_POWER_SERIALS="",
-        HPX_VALIDATION_EXECUTORCH_BACKENDS="ns",
-        HPX_NS_CMSIS_NN_REF="",
-        HPX_ZOO_REGISTRY=workflow["env"]["HPX_ZOO_REGISTRY"],
-        GITHUB_ENV=str(tmp_path / "env"),
-    )
-    env.update(extra)
-    return env
-
-
-def _invocations(stdout: str) -> list[list[str]]:
-    calls = [call.split("\n") for call in stdout.split("\x1e\n") if call]
-    return [call for call in calls if call[:3] == ["run", "hpx", "validate"]]
-
-
-# Prints each call's args, then a record separator.
-_RECORD_UV = 'uv() { printf "%s\\n" "$@"; printf "\\x1e\\n"; }\n'
-
-
-@pytest.mark.parametrize("et_count", ["0", "10"])
-@pytest.mark.host_integration
-def test_zoo_preview_lists_both_selections(
-    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, et_count: str
-) -> None:
-    script = _step(validate_job, "Preview Zoo validation cases")["run"]
+def _zoo_run(
+    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, et_count: str, fail: str
+) -> tuple[list[list[str]], subprocess.CompletedProcess[str]]:
+    """Run the Zoo step against a fake hpx."""
+    # A listing prints counts; a run fails on demand.
     fake = f"""
 uv() {{
-  if [[ " $* " == *" --models-file "* ]]; then
-    printf "12 case(s) would run:\\n"
-  else
-    printf "{et_count} case(s) would run:\\n"
+  printf "%s\\n" "$@" "--" >> calls
+  if [[ " $* " == *" --list "* ]]; then
+    if [[ " $* " == *" --models-file "* ]]; then echo "12 case(s) would run:"; else echo "{et_count} case(s) would run:"; fi
+  elif [[ -n "{fail}" && " $* " == *" {fail} "* ]]; then
+    return 1
   fi
 }}
 """
-    _run_bash(fake + script, _zoo_env(workflow, tmp_path), tmp_path)
-    assert (tmp_path / "env").read_text() == f"HPX_ZOO_EXECUTORCH_CASES={et_count}\n"
+    script = fake + _step(validate_job, "Run Zoo validation")["run"]
+    env = _validate_env(
+        workflow,
+        PATH=os.environ["PATH"],
+        HPX_VALIDATION_JLINK_SERIALS="apollo510_evb=1",
+        HPX_ZOO_REGISTRY=workflow["env"]["HPX_ZOO_REGISTRY"],
+    )
+    bash = shutil.which("bash")
+    if bash is None:
+        pytest.skip("workflow script tests require bash")
+    proc = subprocess.run(
+        [bash, "--noprofile", "--norc", "-eo", "pipefail", "-c", script],
+        env=env,
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+    raw = (tmp_path / "calls").read_text().split("\n--\n")
+    return [call.split("\n") for call in raw if call], proc
 
-    calls = _invocations(_run_bash(_RECORD_UV + script, _zoo_env(workflow, tmp_path), tmp_path))
-    zoo, et = calls
-    for call in calls:
-        assert call[3] == "--list"
-        assert call[call.index("--suite") + 1] == "complete"
-        assert "--models" not in call
-    assert zoo[zoo.index("--models-file") + 1] == "results/validation/zoo-models.yaml"
-    assert zoo[zoo.index("--engines") + 1] == "helia-rt,helia-aot,litert"
-    assert "--models-file" not in et
-    assert et[et.index("--engines") + 1] == "executorch"
 
-
+@pytest.mark.parametrize("et_count", ["0", "8", "10"])
 @pytest.mark.host_integration
-def test_zoo_preview_fails_without_zoo_cases(
-    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
-) -> None:
-    script = _step(validate_job, "Preview Zoo validation cases")["run"]
-    fake = 'uv() { printf "0 case(s) would run:\\n"; }\n'
-    with pytest.raises(subprocess.CalledProcessError) as failure:
-        _run_bash(fake + script, _zoo_env(workflow, tmp_path), tmp_path)
-    assert failure.value.returncode == 2
-    assert "zoo suite selects no cases on apollo510_evb" in failure.value.stderr
-
-
-@pytest.mark.parametrize("et_count", ["0", "8"])
-@pytest.mark.host_integration
-def test_zoo_run_writes_one_bundle_per_selection(
+def test_zoo_step_runs_each_listed_selection(
     workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, et_count: str
 ) -> None:
-    script = _step(validate_job, "Run Zoo validation")["run"]
-    env = _zoo_env(workflow, tmp_path, HPX_ZOO_EXECUTORCH_CASES=et_count)
-    calls = _invocations(_run_bash(_RECORD_UV + script, env, tmp_path))
-    outputs = [call[call.index("--output-dir") + 1] for call in calls]
+    calls, proc = _zoo_run(workflow, validate_job, tmp_path, et_count, fail="")
+    assert proc.returncode == 0, proc.stderr
+    for call in calls:
+        assert call[:3] == ["run", "hpx", "validate"]
+        assert call[call.index("--suite") + 1] == "complete"
+        assert "--models" not in call
+    zoo_list, et_list, zoo, *et = calls
+    assert "--list" in zoo_list and "--list" in et_list
+    for call in (zoo_list, zoo):
+        assert call[call.index("--models-file") + 1] == "results/validation/zoo-models.yaml"
+        assert call[call.index("--engines") + 1] == "helia-rt,helia-aot,litert"
+    assert "--models-file" not in et_list
+    assert et_list[et_list.index("--engines") + 1] == "executorch"
+    runs = [zoo, *et]
+    outputs = [call[call.index("--output-dir") + 1] for call in runs]
+    # "10" must not read as zero.
     expected = ["results/validation/zoo"]
     if et_count != "0":
         expected.append("results/validation/executorch")
+        assert et[0][et[0].index("--engines") + 1] == "executorch"
     assert outputs == expected
-    for call, output in zip(calls, outputs, strict=True):
+    for call, output in zip(runs, outputs, strict=True):
         assert call[call.index("--junit-xml") + 1] == f"{output}/junit.xml"
 
 
 @pytest.mark.host_integration
-def test_zoo_run_fails_after_both_selections(
+def test_zoo_step_fails_without_zoo_cases(
     workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
 ) -> None:
     script = _step(validate_job, "Run Zoo validation")["run"]
-    env = _zoo_env(workflow, tmp_path, HPX_ZOO_EXECUTORCH_CASES="8")
-    fake = 'uv() { echo "ran $*" >> calls; [[ " $* " != *" --models-file "* ]]; }\n'
+    fake = 'uv() { printf "0 case(s) would run:\\n"; }\n'
+    env = _validate_env(workflow, HPX_ZOO_REGISTRY="zoo.yaml")
     with pytest.raises(subprocess.CalledProcessError) as failure:
         _run_bash(fake + script, env, tmp_path)
-    assert failure.value.returncode == 1
-    assert len((tmp_path / "calls").read_text().splitlines()) == 2
+    assert failure.value.returncode == 2
+    assert "zoo suite selects no cases on apollo510_evb" in failure.value.stderr
+
+
+@pytest.mark.host_integration
+def test_zoo_failure_still_runs_executorch(
+    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
+) -> None:
+    calls, proc = _zoo_run(workflow, validate_job, tmp_path, "8", fail="--models-file")
+    assert proc.returncode == 1
+    assert [call for call in calls if "--list" not in call][-1][-3:] == [
+        "results/validation/executorch",
+        "--junit-xml",
+        "results/validation/executorch/junit.xml",
+    ]

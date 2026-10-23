@@ -12,7 +12,8 @@ decide whether to rerun, file, or dig.
    `legs.sh <run_id>` for one. Same board red on two different runners →
    code. Red on one runner while its sibling bench passes → bench. Note the
    first night each leg went red; compare against `git log origin/main` for
-   that day.
+   that day. Scheduled runs created near 12:00 UTC are the Zoo nightly
+   (`suite=zoo`), so five runs cover about two and a half nights.
 2. Read only the failed step: fetch the job log with
    `gh api repos/AmbiqAI/helia-profiler/actions/jobs/<job_id>/logs`, then
    cut between the `##[group]Run` marker of the failed step and its
@@ -23,9 +24,10 @@ decide whether to rerun, file, or dig.
    - Real-toolchain compile gate (compile_hw) → code or template context;
      the host Tier 1 gate does not cover the same render inputs, so a
      template variable can slip through to here.
-   - Run hardware validation → open the bundle (step 3).
+   - Run hardware validation / Run Zoo validation → open the bundle (step 3).
 3. Bundles are small (≈1 MB, `work/` is excluded). `gh run download <run_id>
-   -n hardware-validation-<run_id>-<board>`. Group failed cases by the first
+   -n hardware-validation-<run_id>-<board>` (`zoo-validation-…` for a Zoo
+   run, which holds `zoo/` and `executorch/` bundles). Group failed cases by the first
    `Error:` line of `<case>/hpx_stderr.log`; the pattern across cases is the
    verdict (every `-power` case failing at `ensure_board_powered` = Joulescope,
    not firmware).
