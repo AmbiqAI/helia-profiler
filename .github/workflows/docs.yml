@@ -130,6 +130,9 @@ jobs:
         working-directory: astro-site
         run: npm run prepare:docs
 
+      - name: Check source and runtime API tier agreement
+        run: uv run --isolated --no-dev python tools/docs/check_api_tiers.py astro-site/.generated/api-tiers.json
+
       - name: Build the documentation artifact
         working-directory: astro-site
         env:

@@ -56,6 +56,21 @@ content-route overflow, example filtering, keyboard tabs, site search and the
 example index without JavaScript. Review representative screenshots in light and
 dark themes as well; these checks do not establish hardware correctness.
 
+## Package-root API declarations
+
+When exposing a root symbol, add its relative module, attribute (or `None` for a
+module export), and stability tier together in `_EXPORTS` in
+`src/helia_profiler/__init__.py`. Keep the explicit `TYPE_CHECKING` import and
+literal `__all__` entry in sync; these serve static type tools and public export
+ordering. Runtime stability metadata is derived from the catalog.
+
+`tests/test_api_stability.py` checks the exact tier contract and duplicate names.
+Change its tier fixture only for an intentional API change. The docs reader
+parses the literal catalog without importing HPX. After `npm run prepare:docs`,
+run `uv run python tools/docs/check_api_tiers.py astro-site/.generated/api-tiers.json`
+from the repository root to compare that source-derived map with runtime metadata;
+the docs workflow runs the same check.
+
 ## Publish
 
 `.github/workflows/docs.yml` builds and validates on pull requests. After merge,

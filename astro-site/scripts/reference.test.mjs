@@ -189,50 +189,42 @@ test('a page missing from llms-full.txt is a failure, not an empty file', () => 
   );
 });
 
-/* `__api_stability__` as griffe dumps it: a dict of comprehensions, one per
- * tier, each over a literal set of names. */
-const stabilityDump = (tiers) => ({
-  helia_profiler: {
-    members: {
-      __all__: {
-        value: {
-          cls: 'ExprList',
-          elements: Object.values(tiers).flat().map((name) => `'${name}'`),
-        },
-      },
-      ...Object.fromEntries(
-        Object.entries(tiers).map(([tier, names]) => [
-          `_${tier.toUpperCase()}_API`,
-          { value: { cls: 'ExprSet', elements: names.map((name) => `'${name}'`) } },
-        ]),
-      ),
-      __api_stability__: {
-        value: {
-          cls: 'ExprDict',
-          values: Object.keys(tiers).map((tier) => ({
-            cls: 'ExprDictComp',
-            generators: [{ iterable: { name: `_${tier.toUpperCase()}_API` } }],
-            value: `'${tier}'`,
-          })),
-        },
-      },
-    },
-  },
-});
+/* Literal catalog entries in the pinned Griffe dictionary/tuple format. */
+const stabilityDump = (tiers) => {
+  const entries = Object.entries(tiers).flatMap(([tier, names]) => names.map((name) => [name, tier]));
+  return { helia_profiler: { members: {
+    __all__: { value: { cls: 'ExprList', elements: entries.map(([name]) => `'${name}'`) } },
+    _EXPORTS: { value: {
+      cls: 'ExprDict', keys: entries.map(([name]) => `'${name}'`),
+      values: entries.map(([name, tier]) => ({
+        cls: 'ExprTuple', elements: ["'.module'", `'${name}'`, `'${tier}'`],
+      })),
+    } },
+  } } };
+};
 
-test('the tier map is read from the definition of __api_stability__', () => {
-  const tiers = tierMap(stabilityDump({ stable: ['A', 'B'], experimental: ['C'] }));
-
+test('tier map reads the literal catalog and preserves export order', () => {
+  const dump = stabilityDump({ stable: ['A', 'B'], experimental: ['C'] });
+  dump.helia_profiler.members._EXPORTS.value.values[0].elements[1] = 'None';
+  const tiers = tierMap(dump);
   assert.deepEqual(tiers.tiers, { stable: 2, experimental: 1 });
   assert.deepEqual(tiers.stability, { A: 'stable', B: 'stable', C: 'experimental' });
   assert.deepEqual(tiers.all, ['A', 'B', 'C']);
 });
 
-test('a name in two tiers, or in none, stops the dump', () => {
-  const twice = stabilityDump({ stable: ['A'], experimental: ['A'] });
-  assert.throws(() => tierMap(twice), /in both the stable and experimental tiers/);
-
-  const untiered = stabilityDump({ stable: ['A'] });
-  untiered.helia_profiler.members.__all__.value.elements.push("'B'");
-  assert.throws(() => tierMap(untiered), /without a stability tier: B/);
-});
+for (const [fault, alter, message] of [
+  ['duplicate key', (m) => { m._EXPORTS.value.keys[1] = "'A'"; }, /duplicate name/],
+  ['duplicate export', (m) => { m.__all__.value.elements[1] = "'A'"; }, /duplicate names/],
+  ['missing target', (m) => { m.__all__.value.elements.push("'C'"); }, /without a stability tier/],
+  ['extra target', (m) => { m.__all__.value.elements.pop(); }, /not in.*__all__/],
+  ['unknown tier', (m) => { m._EXPORTS.value.values[0].elements[2] = "'unknown'"; }, /invalid module, attribute or stability tier/],
+  ['short tuple', (m) => { m._EXPORTS.value.values[0].elements.pop(); }, /expected a literal/],
+  ['dynamic attribute', (m) => { m._EXPORTS.value.values[0].elements[1] = {cls: 'ExprName', name: 'target'}; }, /invalid module/],
+  ['dynamic catalog', (m) => { m._EXPORTS.value = {cls: 'ExprCall'}; }, /literal dictionary/],
+]) {
+  test(`tier map refuses ${fault}`, () => {
+    const dump = stabilityDump({ stable: ['A'], experimental: ['B'] });
+    alter(dump.helia_profiler.members);
+    assert.throws(() => tierMap(dump), message);
+  });
+}
