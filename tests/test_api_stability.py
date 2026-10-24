@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
-from itertools import combinations
+import json
+from pathlib import Path
 
 import pytest
 
@@ -18,29 +20,12 @@ def test_every_package_export_has_one_stability_tier() -> None:
     }
 
 
-def test_stability_tiers_partition_the_public_surface() -> None:
-    """The docs pipeline scopes the rendered Python reference to the stable
-    and experimental tiers and badges each symbol with its tier (#330), so a
-    name in two tiers or in none would silently change what ships. The three
-    private sets are the source; ``__api_stability__`` is built from them."""
-    tiers = {
-        "stable": helia_profiler._STABLE_API,
-        "experimental": helia_profiler._EXPERIMENTAL_API,
-        "implementation": helia_profiler._IMPLEMENTATION_API,
-    }
-    sizes = {name: len(members) for name, members in tiers.items()}
-
-    assert sizes == {"stable": 45, "experimental": 135, "implementation": 13}
-    assert sum(sizes.values()) == 193 == len(helia_profiler.__all__)
-
-    for left, right in combinations(tiers, 2):
-        assert not tiers[left] & tiers[right], (
-            f"{sorted(tiers[left] & tiers[right])} is in both {left} and {right}"
-        )
-    untiered = set(helia_profiler.__all__) - set().union(*tiers.values())
-    assert not untiered, f"{sorted(untiered)} is in __all__ but in no tier"
-
-    # __all__ may repeat a name without any set noticing.
+def test_stability_tiers_match_the_published_contract() -> None:
+    expected = json.loads(
+        (Path(__file__).parent / "fixtures/api_stability.json").read_text(encoding="utf-8")
+    )
+    assert helia_profiler.__api_stability__ == expected
+    assert set(helia_profiler._EXPORTS) == set(helia_profiler.__all__)
     assert len(helia_profiler.__all__) == len(set(helia_profiler.__all__))
 
 
@@ -285,3 +270,17 @@ def test_the_section_inventory_is_exported_from_the_package_root() -> None:
     for name in ("section_inventory", "SectionInventory", "ElfSection", "LoadSegment"):
         assert getattr(helia_profiler, name) is getattr(elf_inventory, name)
         assert helia_profiler.__api_stability__[name] == "experimental"
+
+
+def test_export_catalog_keys_are_literal_and_unique() -> None:
+    tree = ast.parse(Path(helia_profiler.__file__).read_text(encoding="utf-8"))
+    catalog = next(
+        node.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "_EXPORTS" for target in node.targets)
+    )
+    assert isinstance(catalog, ast.Dict)
+    keys = [ast.literal_eval(key) for key in catalog.keys if key is not None]
+    assert len(keys) == len(catalog.keys) == len(set(keys))
+    assert set(keys) == set(helia_profiler.__all__)
