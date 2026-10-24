@@ -3,8 +3,8 @@
 * :class:`IssueCode` declares run-validity codes emitted by
   ``evaluation.validity.evaluate_run``.
 * :class:`ComparabilityCode` declares fixed comparability codes.
-* :class:`ComparabilityCodeFamily` describes parameterized codes whose
-  suffix identifies a :class:`ComparisonDimension`.
+* :class:`ComparabilityCodeFamily` describes parameterized codes that
+  embed a :class:`ComparisonDimension`.
 
 The enums type codes at emission and serialize as strings. Reader-side
 ``ResultIssue.code`` remains ``str`` so it can retain codes absent from this
