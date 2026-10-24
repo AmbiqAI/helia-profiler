@@ -141,6 +141,50 @@ engines: tuple[EngineType, ...] = ()
 
 Source: `src/helia_profiler/_fixture_facts.py:37`
 
+## helia_profiler.FixtureCapability
+
+`class` · `python`
+
+```python
+FixtureCapability()
+```
+
+Producer-declared status of one engine and IO dtype for fixed fixtures.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_fixture_io.py:25`
+
+### helia_profiler.FixtureCapability.QUALIFIED
+
+`constant` · `python`
+
+```python
+QUALIFIED = 'qualified'
+```
+
+Source: `src/helia_profiler/_fixture_io.py:28`
+
+### helia_profiler.FixtureCapability.SUPPORTED
+
+`constant` · `python`
+
+```python
+SUPPORTED = 'supported'
+```
+
+Source: `src/helia_profiler/_fixture_io.py:29`
+
+### helia_profiler.FixtureCapability.UNSUPPORTED
+
+`constant` · `python`
+
+```python
+UNSUPPORTED = 'unsupported'
+```
+
+Source: `src/helia_profiler/_fixture_io.py:30`
+
 ## helia_profiler.EngineDTypeCapability
 
 `class` · `python`
@@ -236,47 +280,3 @@ readback_budget: int
 ```
 
 Source: `src/helia_profiler/_fixture_facts.py:55`
-
-## helia_profiler.FixtureCapability
-
-`class` · `python`
-
-```python
-FixtureCapability()
-```
-
-Producer-declared status of one engine and IO dtype for fixed fixtures.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:143`
-
-### helia_profiler.FixtureCapability.QUALIFIED
-
-`constant` · `python`
-
-```python
-QUALIFIED = 'qualified'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:146`
-
-### helia_profiler.FixtureCapability.SUPPORTED
-
-`constant` · `python`
-
-```python
-SUPPORTED = 'supported'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:147`
-
-### helia_profiler.FixtureCapability.UNSUPPORTED
-
-`constant` · `python`
-
-```python
-UNSUPPORTED = 'unsupported'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:148`

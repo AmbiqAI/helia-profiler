@@ -503,3 +503,74 @@ def test_run_contract_guard_rejects_reverse_and_device_dependencies(source):
 )
 def test_run_contract_guard_allows_values_and_type_only_references(source):
     assert _run_contract_import_offenders(source) == []
+
+
+def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list[str]:
+    policy_names = {
+        "FixtureDType",
+        "FixtureCapability",
+        "FIXTURE_CAPABILITIES",
+        "FIXTURE_READBACK_BUDGET",
+        "_io_capabilities",
+    }
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                base = resolve_name("." * node.level + base, "helia_profiler")
+            targets = [f"{base}.{alias.name}" for alias in node.names]
+        else:
+            continue
+        for target in targets:
+            parts = target.split(".")
+            if len(parts) < 2 or parts[0] != "helia_profiler":
+                continue
+            forbidden = (
+                parts[1] == "_fixture_build" and parts[-1] in policy_names
+                if consumer
+                else parts[1]
+                in {
+                    "_fixture_build",
+                    "_fixture_record",
+                    "_fixture_facts",
+                    "compiled_build",
+                    "run_record",
+                    "fixture_capture",
+                    "pipeline",
+                    "target",
+                    "capture",
+                }
+            )
+            if forbidden:
+                offenders.append(f"{node.lineno}: {target}")
+    return offenders
+
+
+def test_fixture_io_policy_sits_below_its_consumers():
+    root = Path(__file__).resolve().parent.parent / "src/helia_profiler"
+    assert not _fixture_io_import_offenders((root / "_fixture_io.py").read_text(encoding="utf-8"))
+    for name in ("_fixture_record.py", "_fixture_facts.py"):
+        assert not _fixture_io_import_offenders(
+            (root / name).read_text(encoding="utf-8"), consumer=True
+        )
+
+
+@pytest.mark.parametrize(
+    ("source", "consumer", "bad"),
+    [
+        ("def lazy():\n    from ._fixture_build import FixtureDType", False, True),
+        ("from . import _fixture_record", False, True),
+        ("import helia_profiler.fixture_capture", False, True),
+        ("from .fixture_analysis import FixtureTensor", False, False),
+        ("from .engines import EngineType", False, False),
+        ("from ._fixture_build import FIXTURE_CAPABILITIES", True, True),
+        ("from helia_profiler._fixture_build import _io_capabilities", True, True),
+        ("from ._fixture_build import FixtureBuild", True, False),
+        ("from ._fixture_io import FixtureCapability", True, False),
+    ],
+)
+def test_fixture_io_guard_covers_reverse_edges_and_allowed_values(source, consumer, bad):
+    assert bool(_fixture_io_import_offenders(source, consumer=consumer)) is bad

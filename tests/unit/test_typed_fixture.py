@@ -389,7 +389,15 @@ def test_arena_observation_changes_intent_and_binds_the_work_dir(tmp_path, monke
     assert observed.intent_identity != plain.intent_identity
 
 
-def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, monkeypatch):
+@pytest.mark.parametrize("capability", [FixtureCapability.SUPPORTED, FixtureCapability.UNSUPPORTED])
+def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(
+    tmp_path, monkeypatch, capability
+):
+    monkeypatch.setitem(
+        FIXTURE_CAPABILITIES,
+        EngineType.HELIA_AOT,
+        dict(FIXTURE_CAPABILITIES[EngineType.HELIA_AOT], int8=capability),
+    )
     t_in, t_out = Int8Tensor((1, 4), 0.25, -3, 0), Int8Tensor((1, 4), 0.5, 2, 1)
     f = FixedFixture(
         pin(tmp_path, "model.tflite", b"fixture-model"),
@@ -414,7 +422,7 @@ def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, m
         == hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     )
     assert r.outputs == (f.expected,)
-    assert r.capabilities == (("int8", FixtureCapability.SUPPORTED),)
+    assert r.capabilities == (("int8", capability),)
 
 
 def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):

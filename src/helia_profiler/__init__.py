@@ -9,8 +9,6 @@ if TYPE_CHECKING:
     from . import examples
     from ._fixture_build import (
         FixtureBuild,
-        FixtureCapability,
-        FixtureDType,
         FixtureIO,
         FixtureMethod,
         FixtureOutput,
@@ -20,6 +18,7 @@ if TYPE_CHECKING:
         TypedFixture,
     )
     from ._fixture_facts import EngineDTypeCapability, FixtureCapabilities, QualifiedFixtureTarget
+    from ._fixture_io import FixtureCapability, FixtureDType
     from ._semantic_hash import SemanticHash
     from ._version import __version__
     from .api import profile
@@ -353,8 +352,8 @@ _EXPORTS = {
     "QualifiedFixtureTarget": ("._fixture_facts", "QualifiedFixtureTarget"),
     "EngineDTypeCapability": ("._fixture_facts", "EngineDTypeCapability"),
     "FixtureBuild": ("._fixture_build", "FixtureBuild"),
-    "FixtureCapability": ("._fixture_build", "FixtureCapability"),
-    "FixtureDType": ("._fixture_build", "FixtureDType"),
+    "FixtureCapability": ("._fixture_io", "FixtureCapability"),
+    "FixtureDType": ("._fixture_io", "FixtureDType"),
     "FixtureStatePolicy": ("._fixture_build", "FixtureStatePolicy"),
     "PerTensorQuantization": (".fixture_analysis", "PerTensorQuantization"),
     "PerAxisQuantization": (".fixture_analysis", "PerAxisQuantization"),
