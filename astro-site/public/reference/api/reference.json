@@ -6436,9 +6436,9 @@
                   "returns": [],
                   "signature": "BLOCKING = 'blocking'",
                   "source": {
-                    "line": 328,
+                    "line": 316,
                     "path": "src/helia_profiler/results/issues.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L328"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L316"
                   },
                   "summary": ""
                 },
@@ -6455,9 +6455,9 @@
                   "returns": [],
                   "signature": "LAYER_BLOCKING = 'layer_blocking'",
                   "source": {
-                    "line": 329,
+                    "line": 317,
                     "path": "src/helia_profiler/results/issues.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L329"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L317"
                   },
                   "summary": ""
                 },
@@ -6474,9 +6474,9 @@
                   "returns": [],
                   "signature": "METRIC_BLOCKING = 'metric_blocking'",
                   "source": {
-                    "line": 330,
+                    "line": 318,
                     "path": "src/helia_profiler/results/issues.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L330"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L318"
                   },
                   "summary": ""
                 },
@@ -6493,9 +6493,9 @@
                   "returns": [],
                   "signature": "INFORMATIVE = 'informative'",
                   "source": {
-                    "line": 331,
+                    "line": 319,
                     "path": "src/helia_profiler/results/issues.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L331"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L319"
                   },
                   "summary": ""
                 }
@@ -6506,9 +6506,9 @@
               "returns": [],
               "signature": "ComparabilitySeverity()",
               "source": {
-                "line": 320,
+                "line": 308,
                 "path": "src/helia_profiler/results/issues.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L320"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/issues.py#L308"
               },
               "summary": "Effect of one comparability issue on comparison output."
             }

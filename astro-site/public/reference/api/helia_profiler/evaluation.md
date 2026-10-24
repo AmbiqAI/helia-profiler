@@ -932,7 +932,7 @@ re-exports it, which remains the canonical public import path.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/issues.py:320`
+Source: `src/helia_profiler/results/issues.py:308`
 
 ### helia_profiler.ComparabilitySeverity.BLOCKING
 
@@ -942,7 +942,7 @@ Source: `src/helia_profiler/results/issues.py:320`
 BLOCKING = 'blocking'
 ```
 
-Source: `src/helia_profiler/results/issues.py:328`
+Source: `src/helia_profiler/results/issues.py:316`
 
 ### helia_profiler.ComparabilitySeverity.LAYER_BLOCKING
 
@@ -952,7 +952,7 @@ Source: `src/helia_profiler/results/issues.py:328`
 LAYER_BLOCKING = 'layer_blocking'
 ```
 
-Source: `src/helia_profiler/results/issues.py:329`
+Source: `src/helia_profiler/results/issues.py:317`
 
 ### helia_profiler.ComparabilitySeverity.METRIC_BLOCKING
 
@@ -962,7 +962,7 @@ Source: `src/helia_profiler/results/issues.py:329`
 METRIC_BLOCKING = 'metric_blocking'
 ```
 
-Source: `src/helia_profiler/results/issues.py:330`
+Source: `src/helia_profiler/results/issues.py:318`
 
 ### helia_profiler.ComparabilitySeverity.INFORMATIVE
 
@@ -972,4 +972,4 @@ Source: `src/helia_profiler/results/issues.py:330`
 INFORMATIVE = 'informative'
 ```
 
-Source: `src/helia_profiler/results/issues.py:331`
+Source: `src/helia_profiler/results/issues.py:319`
