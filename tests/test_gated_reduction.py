@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 
 from helia_profiler.errors import PowerError
+from helia_profiler.power.joulescope import _gated_result as reduction
 from helia_profiler.power.joulescope import capture_gated as capture
+from helia_profiler.power.joulescope.driver import JoulescopeDriver
 from helia_profiler.power.joulescope.fullrate import FullRateRecorder
 from tests.test_power import TestImplausibleGateRejection as _CaptureCases
 from tests.test_power import _install_fake_capture_clock, _packed_gpi_frame
@@ -16,12 +18,12 @@ class _Instrument(_CaptureCases._LiveInstrument):
         super().__init__([(2, 4)])
         self.failure = failure
 
-    def subscribe(self, topic, flags, callback):
+    def subscribe(self, topic, _flags, callback):
         if self.failure == "gate_setup" and "/s/gpi/0/" in topic:
             raise RuntimeError("gate setup failed")
         if self.failure == "state_setup" and "/s/gpi/1/" in topic:
             raise RuntimeError("state setup failed")
-        return super().subscribe(topic, flags, callback)
+        return super().subscribe(topic, _flags, callback)
 
     def poll(self):
         t = self.now_ms
@@ -49,7 +51,7 @@ def measurement(monkeypatch):
         monkeypatch.setattr(capture, "_close_device", lambda *_args: events.append("close"))
         monkeypatch.setattr(capture, "_read_gpi_snapshot", lambda *_args: fake.poll())
         return capture.capture_gated(
-            type("Driver", (), {"_serial": None})(),
+            JoulescopeDriver(),
             duration_s=0.020,
             io_voltage=1.8,
             sync_input_index=0,
@@ -85,7 +87,7 @@ def test_required_done_keeps_stream_setup_and_validation_outcomes_distinct(measu
 
 def test_capture_duration_includes_reduction_but_excludes_fullrate(measurement, monkeypatch):
     run, clock, events = measurement
-    original = capture._process_gated_stats
+    original = reduction._process_gated_stats
 
     def reduce(**kwargs):
         events.append("reduce")
@@ -98,7 +100,7 @@ def test_capture_duration_includes_reduction_but_excludes_fullrate(measurement, 
         clock.now_us += 3000
         return None, "no_integrable_gate_samples"
 
-    monkeypatch.setattr(capture, "_process_gated_stats", reduce)
+    monkeypatch.setattr(reduction, "_process_gated_stats", reduce)
     monkeypatch.setenv("HPX_POWER_FULLRATE_XCHECK", "1")
     monkeypatch.setattr(FullRateRecorder, "start", lambda self: True)
     monkeypatch.setattr(FullRateRecorder, "integrate", integrate)
@@ -118,7 +120,7 @@ def test_debug_dump_precedes_reduction_error_and_device_release(measurement, mon
 
     monkeypatch.setenv("HPX_GATE_DEBUG_DUMP", "unused-by-fake")
     monkeypatch.setattr(capture, "_write_gate_dump", lambda *args, **kwargs: events.append("dump"))
-    monkeypatch.setattr(capture, "_process_gated_stats", reduce)
+    monkeypatch.setattr(reduction, "_process_gated_stats", reduce)
     with pytest.raises(PowerError) as raised:
         run()
     assert raised.value is error

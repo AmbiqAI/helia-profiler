@@ -964,7 +964,7 @@ class TestGatedStatsProcessing:
         self, saw_rise: bool, saw_fall: bool, failure_kind: str
     ):
         from helia_profiler.power.diagnostics import classify_gate_failure
-        from helia_profiler.power.joulescope.capture_gated import (
+        from helia_profiler.power.joulescope.diagnostics import (
             _degraded_observation_result,
         )
 
@@ -1009,7 +1009,7 @@ class TestGatedStatsProcessing:
         log line (issue #114).
         """
         from helia_profiler.power.diagnostics import classify_gate_failure
-        from helia_profiler.power.joulescope.capture_gated import (
+        from helia_profiler.power.joulescope.diagnostics import (
             _degraded_observation_result,
         )
 
@@ -1273,7 +1273,9 @@ class TestStreamedGateSelection:
         def unexpected_mapping(**_kwargs):
             pytest.fail("Streamed gate edges must not depend on snapshot timestamp coverage")
 
-        monkeypatch.setattr(module, "_map_poll_samples_to_packet_time", unexpected_mapping)
+        from helia_profiler.power.joulescope import _gated_selection as selection
+
+        monkeypatch.setattr(selection, "_map_poll_samples_to_packet_time", unexpected_mapping)
 
         # Snapshot poller sees one plain rise/fall so the capture completes:
         # ten 1 ms polls high clear the 8 ms minimum gate on the fake clock.
@@ -1513,7 +1515,9 @@ class TestMissedGateWarningNamesTheFix:
         fake = self._FakeJoulescopeDriver(empty_frames=empty_frames)
         monkeypatch.setattr(module, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
         if boot_settle_s is not None:
-            monkeypatch.setattr(module, "BOOT_SETTLE_S", boot_settle_s)
+            from helia_profiler.power.joulescope import _gated_result as reduction
+
+            monkeypatch.setattr(reduction, "BOOT_SETTLE_S", boot_settle_s)
         clock = self.clock = _install_fake_capture_clock(monkeypatch)
 
         # GPI never goes high by default: the gate was missed entirely. A
@@ -1731,7 +1735,7 @@ class TestMissedGateWarningNamesTheFix:
     def test_missed_fall_threshold_uses_the_probe_tolerance(self, monkeypatch, probe):
         """A busy_loop window is accepted over a wider band than a counted one."""
         from helia_profiler.power.diagnostics import gate_relative_tolerance_for
-        from helia_profiler.power.joulescope import capture_gated as module
+        from helia_profiler.power.joulescope import _gated_result as module
 
         tolerance = gate_relative_tolerance_for(probe)
 

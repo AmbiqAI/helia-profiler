@@ -12,22 +12,17 @@ import os
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
-from ..completion import resolve_counter_completion
-from ..counter_gate import PackedGateRecorder, counter_gate_trace
+from ..counter_gate import PackedGateRecorder
 from ..diagnostics import (
-    BOOT_SETTLE_S,
     GATE_EDGE_POLL_INTERVAL_S,
-    GateTransitionTiming,
-    classify_gate_failure,
-    longest_accepted_window_s,
 )
-from ..metadata import MeasurementScope, PowerMetadata
 from ._gated_resources import _GatedCaptureResources
+from ._gated_result import _CaptureInfo, _MeasurementPlan, assemble_result, reduce_measurement
+from ._gated_selection import completed_gate_trace, select_gate
 from ._gated_state import _GatedCaptureState
 from .device import (
     _NATIVE_SAMPLE_RATE,
@@ -36,21 +31,10 @@ from .device import (
     _read_gpi_snapshot,
 )
 from .diagnostics import (
-    _attach_capture_diagnostics,
-    _degraded_observation_result,
-    _gated_stats_diagnostics,
-    _poll_edge_uncertainty_s,
-    _with_gpi_poll_failures,
     _write_gate_dump,
 )
 from .stats import (
-    _counter_rate_ratio,
-    _map_poll_samples_to_packet_time,
     _plan_gate_floor_s,
-    _plan_ranked_candidates,
-    _process_gated_stats,
-    _segment_gpi_windows,
-    _select_streamed_window,
 )
 
 if TYPE_CHECKING:
@@ -158,16 +142,15 @@ def capture_gated(
         gpi_poll_failures = 0
 
         def _completed_trace():
-            if gate_recorder.error or state_recorder.error:
-                raise ValueError("Invalid retained completion stream")
-            captured_packets = list(packets)
-            gate = counter_gate_trace(
-                list(gpi_stream_frames), captured_packets, channel=sync_input_index
+            return completed_gate_trace(
+                packets=packets,
+                gate_frames=gpi_stream_frames,
+                state_frames=state_recorder.frames,
+                sync_input_index=sync_input_index,
+                state_input_index=state_input_index,
+                gate_error=gate_recorder.error,
+                state_error=state_recorder.error,
             )
-            state = counter_gate_trace(
-                list(state_recorder.frames), captured_packets, channel=state_input_index
-            )
-            return gate, resolve_counter_completion(gate, state)
 
         def _wait_gpi_state(index: int, high: bool, timeout_s: float) -> bool:
             bit_mask = 1 << index
@@ -397,107 +380,29 @@ def capture_gated(
                 raise hook_error
 
             evidence = control.snapshot()
-            poll_samples = list(evidence.poll_samples)
-            poll_reads = list(evidence.poll_reads)
-            first_high_at = evidence.first_high_at
-            first_low_after_high_at = evidence.first_low_after_high_at
-            saw_any_gate_rise = evidence.saw_any_gate_rise
-            saw_any_gate_fall = evidence.saw_any_gate_fall
-            short_pulses_ignored = evidence.short_pulses_ignored
-            short_pulse_phases = dict(evidence.short_pulse_phases)
-            short_pulse_first_s = evidence.short_pulse_first_s
-            short_pulse_last_s = evidence.short_pulse_last_s
-            below_plan_highs = evidence.below_plan_highs
-            below_plan_rise_at = evidence.below_plan_rise_at
-            below_plan_fall_at = evidence.below_plan_fall_at
-            early_stopped = evidence.early_stopped
-
-            aligned_poll_samples = poll_samples
-            use_device_time_axis = family in ("js220", "js320")
-
-            # Prefer instrument-clock gate edges from the GPI stream whenever it
-            # produced at least one window that clears the minimum gate.  The
-            # snapshot-poll segmentation stays authoritative otherwise — including
-            # the degraded no-usable-window path, whose classification must keep
-            # seeing exactly what the poller saw.
-            # A high open at the stop is the window the bound cut short: with a plan,
-            # no shorter high stands in for it and it degrades as no_gate_fall.
-            open_high = (
-                first_high_at is not None
-                and first_low_after_high_at is None
-                and time.monotonic() - first_high_at >= minimum_gate_s
+            elapsed_high_s = (
+                time.monotonic() - evidence.first_high_at
+                if evidence.first_high_at is not None and evidence.first_low_after_high_at is None
+                else None
             )
-            allow_fallback = not (open_high and plan_floor_s > minimum_gate_s)
-            fall_seen = saw_any_gate_fall and allow_fallback
-            streamed_gate_windows: list[tuple[float, float]] | None = None
-            raw_streamed: list[tuple[float, float]] = []
-            gate_edge_source = "gpi_snapshot_poll"
-            counter_origin = None
-            counter_trace = None
-            counter_evidence = []
-            if gpi_stream_enabled:
-                try:
-                    if gate_recorder.error:
-                        raise ValueError(gate_recorder.error)
-                    # These sensors supply statistics and all signal sample IDs
-                    # from the same native counter. Do not infer another origin via UTC.
-                    if family not in ("js220", "js320"):
-                        raise ValueError("Shared GPI/statistics counter contract unavailable")
-                    counter_trace = counter_gate_trace(
-                        gpi_stream_frames, packets, channel=sync_input_index
-                    )
-                    counter_origin = (counter_trace.origin, counter_trace.rate)
-                    raw_streamed = [
-                        (
-                            (a - counter_trace.origin) * time64.SECOND / counter_trace.rate,
-                            (b - counter_trace.origin) * time64.SECOND / counter_trace.rate,
-                        )
-                        for a, b in counter_trace.windows
-                    ]
-                    if require_done_state:
-                        counter_trace, completed = _completed_trace()
-                        index = counter_trace.windows.index((completed.rise, completed.fall))
-                    else:
-                        selected = _select_streamed_window(
-                            raw_streamed,
-                            minimum_gate_s=minimum_gate_s,
-                            plan_floor_s=plan_floor_s,
-                            allow_fallback=allow_fallback,
-                        )
-                        if selected is None:
-                            raise ValueError("No complete qualifying packed GPI gate")
-                        index = raw_streamed.index(selected[0])
-                    streamed_gate_windows = [raw_streamed[index]]
-                    counter_evidence.append(
-                        counter_trace.window_evidence(*counter_trace.windows[index])
-                    )
-                    gate_edge_source = "gpi_stream_sample_counter"
-                except (KeyError, TypeError, ValueError, OverflowError) as exc:
-                    gate_recorder.error = str(exc)
-                    counter_origin = None
-                    streamed_gate_windows = []
-
-            if use_device_time_axis and streamed_gate_windows is None:
-                aligned_poll_samples = _map_poll_samples_to_packet_time(
-                    packets=packets,
-                    poll_samples=poll_samples,
-                    minimum_window_s=minimum_gate_s,
-                )
-
-            selected_windows = streamed_gate_windows
-            if selected_windows is None and plan_floor_s > minimum_gate_s:
-                # The poll samples can hold a high the plan rejected as well as the
-                # real window: select by the stream's rule instead of summing both.
-                polled = _plan_ranked_candidates(
-                    _segment_gpi_windows(aligned_poll_samples),
-                    minimum_gate_s=minimum_gate_s,
-                    plan_floor_s=plan_floor_s,
-                    allow_fallback=allow_fallback,
-                )
-                # An empty override forces the degraded path when an open window
-                # withheld the fallback; otherwise no candidate keeps the legacy one.
-                selected_windows = polled[-1:] if polled or not allow_fallback else None
-
+            selection = select_gate(
+                packets=packets,
+                gpi_stream_frames=gpi_stream_frames,
+                state_frames=state_recorder.frames,
+                poll_samples=list(evidence.poll_samples),
+                family=family,
+                sync_input_index=sync_input_index,
+                state_input_index=state_input_index,
+                statistics_timebase_hz=int(time64.SECOND),
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+                elapsed_high_s=elapsed_high_s,
+                saw_any_gate_fall=evidence.saw_any_gate_fall,
+                gpi_stream_enabled=gpi_stream_enabled,
+                require_done_state=require_done_state,
+                gate_error=gate_recorder.error,
+                state_error=state_recorder.error,
+            )
             dump_dir = os.environ.get("HPX_GATE_DEBUG_DUMP")
             if dump_dir:
                 _write_gate_dump(
@@ -506,299 +411,74 @@ def capture_gated(
                     gpi_stream_frames=gpi_stream_frames,
                     capture_start=capture_start,
                     go_release_at=go_release_at,
-                    first_high_at=first_high_at,
-                    first_low_after_high_at=first_low_after_high_at,
-                    poll_samples=poll_samples,
-                    aligned_poll_samples=aligned_poll_samples,
-                    gate_edge_source=gate_edge_source,
-                    raw_streamed=raw_streamed,
-                    streamed_gate_windows=streamed_gate_windows,
+                    first_high_at=evidence.first_high_at,
+                    first_low_after_high_at=evidence.first_low_after_high_at,
+                    poll_samples=list(evidence.poll_samples),
+                    aligned_poll_samples=selection.aligned_poll_samples,
+                    gate_edge_source=selection.gate_edge_source,
+                    raw_streamed=selection.raw_streamed,
+                    streamed_gate_windows=selection.streamed_gate_windows,
                 )
-
-            gating_diagnostics = _gated_stats_diagnostics(
-                packets=packets,
-                poll_samples=aligned_poll_samples,
-                prefer_device_time=use_device_time_axis,
-                windows_override=selected_windows,
-                gate_edge_source=gate_edge_source,
-                stream_segment_count=len(raw_streamed) if gpi_stream_enabled else None,
-                counter_origin=counter_origin,
-            )
-            if fr_requested and not fr_xcheck:
-                gating_diagnostics["fullrate_xcheck_unavailable_reason"] = "stream_setup_failed"
-            if gpi_poll_failures:
-                gating_diagnostics["gpi_poll_failures"] = gpi_poll_failures
-            if below_plan_highs:
-                gating_diagnostics["below_plan_highs"] = below_plan_highs
-            if gate_edge_source == "gpi_snapshot_poll":
-                gating_diagnostics["poll_edge_uncertainty_s"] = _poll_edge_uncertainty_s(
-                    poll_reads, minimum_window_s=minimum_gate_s, plan_floor_s=plan_floor_s
-                )
-
-            gating_diagnostics["packed_gpi_retained_bytes"] = gate_recorder.retained_bytes
-            gating_diagnostics["packed_gpi_error"] = gate_recorder.error
-            gating_diagnostics["counter_gate_evidence"] = counter_evidence
-            if counter_trace is not None:
-                gating_diagnostics["counter_clock_mapping"] = counter_trace.clock_diagnostics
-            # The filter that scales utc, read straight from the packets (#249).
-            counter_rate = _counter_rate_ratio(packets)
-            if counter_rate is not None:
-                gating_diagnostics["instrument_time_map"] = counter_rate
-
-            windows, gated_summary = _process_gated_stats(
-                packets=packets,
-                poll_samples=aligned_poll_samples,
+            info = _CaptureInfo(
+                family=family,
+                device_path=device_path,
                 io_voltage=io_voltage,
-                prefer_device_time=use_device_time_axis,
-                minimum_window_s=minimum_gate_s,
-                windows_override=selected_windows,
-                counter_origin=counter_origin,
-            )
-            if not windows:
-                if fr_requested:
-                    gating_diagnostics.setdefault(
-                        "fullrate_xcheck_unavailable_reason", "no_integrable_gate_samples"
-                    )
-                planned_window_s = (
-                    clean_infer_count * clean_infer_avg_us / 1_000_000
-                    if clean_infer_count and clean_infer_avg_us
-                    else None
-                )
-                longest_window_s = (
-                    longest_accepted_window_s(
-                        clean_infer_count=clean_infer_count,
-                        clean_infer_avg_us=clean_infer_avg_us,
-                        stats_rate_hz=stats_rate_hz,
-                        relative_tolerance=gate_relative_tolerance,
-                    )
-                    if clean_infer_count and clean_infer_avg_us
-                    else None
-                )
-                gate_high_s = (
-                    max(0.0, wait_ended_at - first_high_at)
-                    if wait_ended_at is not None and first_high_at is not None
-                    else None
-                )
-                # Without lock-step the wait starts at reset, so the window opens
-                # only after boot and warm-up.
-                rise_due_s = BOOT_SETTLE_S + pre_window_s if lockstep is False else None
-                failure = classify_gate_failure(
-                    saw_gate_rise=saw_any_gate_rise,
-                    saw_gate_fall=fall_seen,
-                    duration_s=duration_s,
-                    lockstep=lockstep,
-                    lockstep_wiring_available=lockstep_wiring_available,
-                    planned_window_s=planned_window_s,
-                    gate_high_s=gate_high_s,
-                    longest_window_s=longest_window_s,
-                    rise_due_s=rise_due_s,
-                )
-                failure = _with_gpi_poll_failures(failure, gpi_poll_failures)
-                if not packets:
-                    raise PowerError(failure.message, hint=failure.hint)
-                captured_s = time.monotonic() - capture_start
-                result = _degraded_observation_result(
-                    packets=packets,
-                    family=family,
-                    device_path=device_path,
-                    io_voltage=io_voltage,
-                    sync_input_index=sync_input_index,
-                    stats_rate_hz=stats_rate_hz,
-                    scnt=scnt,
-                    poll_count=len(poll_samples),
-                    duration_s=duration_s,
-                    captured_s=captured_s,
-                    saw_gate_rise=saw_any_gate_rise,
-                    saw_gate_fall=fall_seen,
-                    short_pulses_ignored=short_pulses_ignored,
-                    failure=failure,
-                    gating_diagnostics=gating_diagnostics,
-                )
-                # The hint is logged, not just stored in metadata: on the degraded
-                # path there is no PowerError to carry it, so the terminal warning
-                # is the only place the user is told what to change (issue #114).
-                log.warning(
-                    "%s; retaining %.3fs free-form capture for post-run diagnostics. %s",
-                    failure.message,
-                    result.summary.duration_s,
-                    failure.hint,
-                )
-                return replace(
-                    result,
-                    gate_frames=gpi_stream_frames,
-                    gate_stream_error=gate_recorder.error,
-                    gate_samples=aligned_poll_samples,
-                    statistics_timebase_hz=int(time64.SECOND),
-                    statistics_device_time=use_device_time_axis,
-                    state_frames=state_recorder.frames,
-                    state_stream_error=state_recorder.error,
-                )
-            if short_pulses_ignored:
-                log.warning(
-                    "Ignored %d GPIO-high pulse(s) shorter than the %.3fs minimum "
-                    "before the valid power gate (phases=%s, first=%.3fs, last=%.3fs)",
-                    short_pulses_ignored,
-                    minimum_gate_s,
-                    short_pulse_phases,
-                    short_pulse_first_s or 0.0,
-                    short_pulse_last_s or 0.0,
-                )
-
-            gate_integrity = None
-            if (
-                clean_infer_count is not None
-                and clean_infer_count > 0
-                and clean_infer_avg_us is not None
-                and clean_infer_avg_us > 0
-            ):
-                from ..diagnostics import assess_gate_duration
-
-                gate_integrity = assess_gate_duration(
-                    measured_s=gated_summary.duration_s,
-                    clean_infer_count=clean_infer_count,
-                    clean_infer_avg_us=clean_infer_avg_us,
-                    stats_rate_hz=stats_rate_hz,
-                    minimum_s=minimum_gate_s,
-                    relative_tolerance=gate_relative_tolerance,
-                )
-                if not gate_integrity.valid:
-                    # Deliberately NOT a raise (#142/#181): the est*count
-                    # expectation straddles boots and thermal states, so a healthy
-                    # cold boot can undershoot it. evaluation.validity arbitrates
-                    # with the firmware's own STIMER window (same boot, same
-                    # physical window); raising here would discard the capture
-                    # before its best evidence arrives and leave no artifact.
-                    log.warning(
-                        "Gated window duration %.6fs differs from the planned "
-                        "%d %s at %dus each (expected %.6fs, band %.6fs, "
-                        "minimum %.3fs). Recording for validity evaluation; the "
-                        "power-terminal envelope arbitrates whether this is "
-                        "clock drift or a broken gate.",
-                        gate_integrity.measured_s,
-                        clean_infer_count,
-                        work_noun,
-                        clean_infer_avg_us,
-                        gate_integrity.expected_s,
-                        gate_integrity.tolerance_s,
-                        minimum_gate_s,
-                    )
-
-            captured_s = time.monotonic() - capture_start
-            metadata = PowerMetadata(
-                driver=f"joulescope-{family}",
-                device=device_path,
-                io_voltage=io_voltage,
-                measurement_scope=MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
-                gating_method=f"{gate_edge_source}+host_stats_integral",
                 sync_input_index=sync_input_index,
                 stats_rate_hz=stats_rate_hz,
-                stats_scnt=scnt,
-                window_count=len(windows),
-                gpi_poll_count=len(poll_samples),
-                stat_packets=len(packets),
-                early_stopped=early_stopped,
-                capture_window_s=round(captured_s, 4),
-                capture_safety_bound_s=duration_s,
-                short_gate_pulses_ignored=short_pulses_ignored,
+                scnt=scnt,
+                duration_s=duration_s,
             )
-            if short_pulses_ignored:
-                metadata.short_gate_pulse_diagnostics = {
-                    "by_phase": dict(short_pulse_phases),
-                    "first_rise_s": round(short_pulse_first_s or 0.0, 6),
-                    "last_rise_s": round(short_pulse_last_s or 0.0, 6),
-                }
-            if first_high_at is None and below_plan_rise_at is not None:
-                # No high reached the plan, so the fallback kept the last shorter
-                # one: report its edges.
-                first_high_at, first_low_after_high_at = below_plan_rise_at, below_plan_fall_at
-            gate_timing = GateTransitionTiming(
-                capture_to_gate_rise_s=(
-                    round(first_high_at - capture_start, 6) if first_high_at is not None else None
-                ),
-                capture_to_gate_fall_s=(
-                    round(first_low_after_high_at - capture_start, 6)
-                    if first_low_after_high_at is not None
-                    else None
-                ),
-                go_release_to_gate_rise_s=(
-                    round(first_high_at - go_release_at, 6)
-                    if go_release_at is not None and first_high_at is not None
-                    else None
-                ),
+            plan = _MeasurementPlan(
+                minimum_gate_s=minimum_gate_s,
+                plan_floor_s=plan_floor_s,
+                clean_infer_count=clean_infer_count,
+                clean_infer_avg_us=clean_infer_avg_us,
+                gate_relative_tolerance=gate_relative_tolerance,
+                work_noun=work_noun,
+                lockstep=lockstep,
+                lockstep_wiring_available=lockstep_wiring_available,
+                pre_window_s=pre_window_s,
             )
-            if gate_timing.to_metadata():
-                metadata.sync_timing_s = gate_timing
-            if clean_infer_count is not None:
-                metadata.clean_infer_count = clean_infer_count
-            if gate_integrity is not None:
-                metadata.gate_duration_integrity = replace(
-                    gate_integrity, relative_tolerance=gate_relative_tolerance
-                )
-            if fr_xcheck:
+            reduced = reduce_measurement(
+                packets=packets,
+                selection=selection,
+                evidence=evidence,
+                info=info,
+                plan=plan,
+                gpi_stream_enabled=gpi_stream_enabled,
+                gate_retained_bytes=gate_recorder.retained_bytes,
+                gpi_poll_failures=gpi_poll_failures,
+                wait_ended_at=wait_ended_at,
+                fr_requested=fr_requested,
+                fr_xcheck=fr_xcheck,
+            )
+            captured_s = time.monotonic() - capture_start
+            fr, reason = None, None
+            if reduced.windows and fr_xcheck:
                 fr, reason = fullrate.integrate(
-                    poll_samples=aligned_poll_samples,
-                    windows=selected_windows,
-                    counter_origin=counter_origin,
+                    poll_samples=selection.aligned_poll_samples,
+                    windows=selection.selected_windows,
+                    counter_origin=selection.counter_origin,
                 )
-                if reason is not None:
-                    gating_diagnostics["fullrate_xcheck_unavailable_reason"] = reason
-                if fr:
-                    metadata.fullrate_xcheck = fr
-                    stats_energy_per = gated_summary.energy_j / len(windows) if windows else 0.0
-                    fr_energy_per = fr["energy_per_window_j"]
-                    log.info(
-                        "Joulescope FULL-RATE xcheck: mean=%.3f mA, power=%.3f mW, "
-                        "energy/window=%.1f uJ over %.2f ms @ %.0f Hz (%d samples) | "
-                        "stats-sum: mean=%.3f mA, energy/window=%.1f uJ | ratio(full/stats)=%.2fx",
-                        fr["mean_current_a"] * 1000.0,
-                        fr["mean_power_w"] * 1000.0,
-                        fr_energy_per * 1e6,
-                        fr["duration_s"] / max(1, fr["window_count"]) * 1000.0,
-                        fr["sample_rate_hz"],
-                        fr["sample_count"],
-                        gated_summary.avg_current_a * 1000.0,
-                        stats_energy_per * 1e6,
-                        (fr_energy_per / stats_energy_per) if stats_energy_per else float("nan"),
-                    )
-                else:
-                    gating_diagnostics.setdefault(
-                        "fullrate_xcheck_unavailable_reason", "no_integrable_gate_samples"
-                    )
-                    log.warning(
-                        "Full-rate cross-check requested but produced no result "
-                        "(chunks=%d, anchors=%d)",
-                        len(fullrate.current),
-                        len(fullrate.anchors),
-                    )
-            _attach_capture_diagnostics(
-                metadata, packets, gated_summary, gating_diagnostics, stats_rate_hz
-            )
-
-            log.info(
-                "Joulescope gated: windows=%d, gated_dur=%.3f ms, energy=%.6f J, "
-                "%d stat packets @ ~%d Hz (%s)",
-                len(windows),
-                gated_summary.duration_s * 1000.0,
-                gated_summary.energy_j,
-                len(packets),
-                stats_rate_hz,
-                family.upper(),
-            )
-
-            return PowerResult(
-                summary=gated_summary,
-                gated_windows=windows,
-                metadata=metadata,
+            return assemble_result(
+                packets=packets,
+                gpi_stream_frames=gpi_stream_frames,
                 state_frames=state_recorder.frames,
-                state_stream_error=state_recorder.error,
-                statistics=packets,
-                gate_samples=aligned_poll_samples,
+                state_error=state_recorder.error,
+                selection=selection,
+                reduced=reduced,
+                evidence=evidence,
+                info=info,
+                plan=plan,
+                capture_start=capture_start,
+                go_release_at=go_release_at,
+                captured_s=captured_s,
                 statistics_timebase_hz=int(time64.SECOND),
-                statistics_device_time=use_device_time_axis,
-                gate_frames=gpi_stream_frames,
-                gate_stream_error=gate_recorder.error,
-                counter_gate_evidence=counter_evidence,
-                counter_domain="joulescope_sensor_sample_id" if counter_evidence else None,
+                fr_xcheck=fr_xcheck,
+                fr=fr,
+                reason=reason,
+                fullrate_chunks=len(fullrate.current),
+                fullrate_anchors=len(fullrate.anchors),
             )
         except PowerError:
             raise

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from helia_profiler.power.joulescope import _gated_selection as selection
 from helia_profiler.power.joulescope import capture_gated as capture
 from helia_profiler.power.joulescope.driver import JoulescopeDriver
 from tests import test_gated_capture_lifecycle as _lifecycle
@@ -41,7 +42,7 @@ def test_completion_guard_restarts_after_invalid_retained_evidence(
     monkeypatch.setattr(capture, "_open_device", lambda _serial: (fake, "u/js320/test", "js320"))
     monkeypatch.setattr(capture, "_close_device", lambda *_args: None)
     monkeypatch.setattr(capture, "_read_gpi_snapshot", lambda *_args: fake.poll())
-    resolve = capture.resolve_counter_completion
+    resolve = selection.resolve_counter_completion
     validations = []
 
     def validate(gate, state):
@@ -51,7 +52,7 @@ def test_completion_guard_restarts_after_invalid_retained_evidence(
             raise ValueError("retained evidence temporarily invalid")
         return resolve(gate, state)
 
-    monkeypatch.setattr(capture, "resolve_counter_completion", validate)
+    monkeypatch.setattr(selection, "resolve_counter_completion", validate)
     result = JoulescopeDriver().capture_gated(
         duration_s=0.030,
         io_voltage=1.8,
