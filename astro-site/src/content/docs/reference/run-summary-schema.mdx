@@ -63,9 +63,10 @@ Measured `memory_regions` owns region facts; `memory_plan` records placement dec
 ### Version 5
 
 Gated duration prefers driver `time.delta`, then sample span, then fitted `utc` as
-fallback. `duration_s`, `avg_current_a`, `avg_power_w` and TOPS can change by up to the
-fit error; `energy_j` and TOPS-per-watt do not. A v4 and v5 summary are not comparable
-on the affected fields. [#249](https://github.com/AmbiqAI/helia-profiler/issues/249).
+fallback. The published `power.capture_duration_s` (the model's `duration_s`),
+`power.avg_current_a`, `power.avg_power_w` and TOPS can change by up to the fit error;
+`power.energy_j` and TOPS-per-watt do not. A v4 and v5 summary are not comparable on
+the affected fields. [#249](https://github.com/AmbiqAI/helia-profiler/issues/249).
 
 ### Version 6
 
