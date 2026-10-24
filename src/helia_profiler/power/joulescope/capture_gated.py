@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...errors import PowerError
 from ..base import PowerResult
-from ..completion import GatedCompletion, resolve_counter_completion
+from ..completion import resolve_counter_completion
 from ..counter_gate import PackedGateRecorder, counter_gate_trace
 from ..diagnostics import (
     BOOT_SETTLE_S,
@@ -28,6 +28,7 @@ from ..diagnostics import (
 )
 from ..metadata import MeasurementScope, PowerMetadata
 from ._gated_resources import _GatedCaptureResources
+from ._gated_state import _GatedCaptureState
 from .device import (
     _NATIVE_SAMPLE_RATE,
     _close_device,
@@ -130,10 +131,6 @@ def capture_gated(
         stats_rate_hz=stats_rate_hz,
         relative_tolerance=gate_relative_tolerance,
     )
-    below_plan_highs = 0
-    # Edges of the last high the plan rejected, published if it is the one kept.
-    below_plan_rise_at: float | None = None
-    below_plan_fall_at: float | None = None
 
     try:
         from pyjoulescope_driver import time64
@@ -153,25 +150,12 @@ def capture_gated(
 
         packets: list[dict[str, Any]] = []
         stop = threading.Event()
-        poll_samples: list[tuple[int, int]] = []
-        poll_reads: list[tuple[int, int, int]] = []
         bit = 1 << sync_input_index
-        windows_done = 0
-        first_high_at: float | None = None
-        first_low_after_high_at: float | None = None
-        saw_any_gate_rise = False
-        saw_any_gate_fall = False
         go_release_at: float | None = None
-        short_pulses_ignored = 0
-        short_pulse_phases: dict[str, int] = {}
-        short_pulse_first_s: float | None = None
-        short_pulse_last_s: float | None = None
         gpi_condition = threading.Condition()
         latest_gpi_value: int | None = None
         gpi_sample_sequence = 0
         gpi_poll_failures = 0
-        completion = GatedCompletion()
-        early_stopped = False
 
         def _completed_trace():
             if gate_recorder.error or state_recorder.error:
@@ -281,16 +265,7 @@ def capture_gated(
                     return None
 
         def _poller() -> None:
-            nonlocal first_high_at, first_low_after_high_at, short_pulse_first_s
-            nonlocal saw_any_gate_rise, saw_any_gate_fall
-            nonlocal gpi_sample_sequence, latest_gpi_value, short_pulse_last_s
-            nonlocal short_pulses_ignored, windows_done, gpi_poll_failures, below_plan_highs
-            nonlocal below_plan_rise_at, below_plan_fall_at
-            nonlocal early_stopped
-            prev_level = 0
-            high_seen = False
-            high_phase = "unknown"
-            complete_at: float | None = None
+            nonlocal gpi_sample_sequence, latest_gpi_value, gpi_poll_failures
             while not stop.is_set():
                 if _phase() is None:
                     return
@@ -310,131 +285,38 @@ def capture_gated(
                         phase = _phase()
                         if phase is None:
                             return
-                        done = completion.observe(
+                        rose = control.observe(
+                            read_start=read_start,
+                            sample_tick=sample_tick,
+                            level=level,
                             state_high=bool(gpi_value & (1 << state_input_index)),
-                            gate_high=bool(level),
-                            go_signaled=phase == "go_signaled",
+                            phase=phase,
                         )
                         if phase != "go_signaled":
-                            # Flash/reset pin levels are not protocol events. Keep the
-                            # latest bitfield for READY qualification, but establish a
-                            # fresh low/high gate history only after GO is sent.
-                            poll_samples.clear()
-                            poll_reads[:] = [(read_start, sample_tick, level)]
-                            high_seen = False
-                            first_high_at = None
-                            first_low_after_high_at = None
-                            prev_level = level
                             stop.wait(timeout=poll_interval_s)
                             continue
-                        # GO may be asserted between poll iterations.  In that case
-                        # the first retained post-GO sample is already high, while
-                        # ``prev_level`` correctly carries the known pre-GO low
-                        # state.  Preserve that state in the segmenter input so the
-                        # real falling edge can close a complete window.
-                        if not poll_samples and not prev_level and level:
-                            prior_tick = poll_reads[-1][1] if poll_reads else read_start
-                            poll_samples.append((prior_tick, 0))
-                            if not poll_reads:
-                                poll_reads.append((read_start, read_start, 0))
-                        poll_samples.append((sample_tick, level))
-                        poll_reads.append((read_start, sample_tick, level))
-                        if level and not prev_level:
-                            high_seen = True
-                            saw_any_gate_rise = True
-                            high_phase = phase
-                            if first_high_at is None:
-                                first_high_at = time.monotonic()
+                        # Drop GO promptly: holding it high can backfeed the target
+                        # around the shunt (see power.sync.release_go).
+                        if rose and on_gate_rise is not None:
+                            try:
+                                on_gate_rise()
                                 log.debug(
-                                    "gate-race timeline: GPI rise detected t=%.3f (first poll sample=%s)",
+                                    "gate-race timeline: on_gate_rise (GO drop) done t=%.3f",
                                     time.time(),
-                                    len(poll_samples) == 1,
                                 )
-                                # Drop GO the moment the gate is observed high: a GPO
-                                # held high through the window backfeeds the target
-                                # around the shunt (see power.sync.release_go).
-                                if on_gate_rise is not None:
-                                    try:
-                                        on_gate_rise()
-                                        log.debug(
-                                            "gate-race timeline: on_gate_rise (GO drop) done t=%.3f",
-                                            time.time(),
-                                        )
-                                    except Exception as exc:
-                                        _abort_callback(exc)
-                                        return
-                        elif prev_level and not level and high_seen:
-                            saw_any_gate_fall = True
-                            if first_low_after_high_at is None:
-                                first_low_after_high_at = time.monotonic()
-                                log.debug(
-                                    "gate-race timeline: GPI fall detected t=%.3f", time.time()
-                                )
-                            high_duration_s = (
-                                time.monotonic() - first_high_at
-                                if first_high_at is not None
-                                else 0.0
-                            )
-                            if high_duration_s >= plan_floor_s:
-                                windows_done += 1
-                                if (
-                                    not require_done_state
-                                    and windows_done >= min_high_windows
-                                    and complete_at is None
-                                ):
-                                    complete_at = time.monotonic()
-                            elif high_duration_s >= minimum_gate_s:
-                                # Too short for the plan: keep waiting for the real
-                                # window, but keep this high as the fallback candidate.
-                                below_plan_highs += 1
-                                below_plan_rise_at = first_high_at
-                                below_plan_fall_at = first_low_after_high_at
-                                log.debug(
-                                    "GPIO-high of %.6fs is short of the plan; waiting",
-                                    high_duration_s,
-                                )
-                                first_high_at = None
-                                first_low_after_high_at = None
-                                high_seen = False
-                            else:
-                                short_pulses_ignored += 1
-                                short_pulse_phases[high_phase] = (
-                                    short_pulse_phases.get(high_phase, 0) + 1
-                                )
-                                pulse_start_s = (
-                                    first_high_at - capture_start
-                                    if first_high_at is not None
-                                    else 0.0
-                                )
-                                short_pulse_first_s = (
-                                    pulse_start_s
-                                    if short_pulse_first_s is None
-                                    else min(short_pulse_first_s, pulse_start_s)
-                                )
-                                short_pulse_last_s = max(short_pulse_last_s or 0.0, pulse_start_s)
-                                log.debug(
-                                    "Ignoring %.6fs GPIO-high pulse shorter than the %.3fs "
-                                    "minimum power gate",
-                                    high_duration_s,
-                                    minimum_gate_s,
-                                )
-                                first_high_at = None
-                                first_low_after_high_at = None
-                                high_seen = False
-                        prev_level = level
+                            except Exception as exc:
+                                _abort_callback(exc)
+                                return
                         if require_done_state:
-                            # Snapshot levels only trigger a check. Delayed callbacks,
-                            # a false fall, or a second transaction cannot close capture.
-                            if not done:
-                                complete_at = None
-                            else:
+                            valid = False
+                            if control.completion_pending:
                                 try:
                                     _completed_trace()
                                 except (KeyError, TypeError, ValueError, OverflowError):
-                                    complete_at = None
+                                    pass
                                 else:
-                                    if complete_at is None:
-                                        complete_at = time.monotonic()
+                                    valid = True
+                            control.confirm_completion(valid)
                 except Exception:
                     with resources.processing() as active:
                         if not active or stop.is_set():
@@ -453,13 +335,20 @@ def capture_gated(
                 with resources.processing() as active:
                     if not active or stop.is_set():
                         return
-                    if complete_at is not None and (time.monotonic() - complete_at) >= guard_s:
-                        early_stopped = True
+                    if control.guard_elapsed(guard_s):
                         stop.set()
                         break
                 stop.wait(timeout=poll_interval_s)
 
         capture_start = time.monotonic()
+        control = _GatedCaptureState(
+            minimum_gate_s=minimum_gate_s,
+            plan_floor_s=plan_floor_s,
+            require_done_state=require_done_state,
+            capture_start=capture_start,
+            monotonic=time.monotonic,
+            wall_time=time.time,
+        )
         wait_ended_at: float | None = None
         hook_error: Exception | None = None
         try:
@@ -506,6 +395,22 @@ def capture_gated(
             if callback_errors:
                 hook_error = callback_errors[0]
                 raise hook_error
+
+            evidence = control.snapshot()
+            poll_samples = list(evidence.poll_samples)
+            poll_reads = list(evidence.poll_reads)
+            first_high_at = evidence.first_high_at
+            first_low_after_high_at = evidence.first_low_after_high_at
+            saw_any_gate_rise = evidence.saw_any_gate_rise
+            saw_any_gate_fall = evidence.saw_any_gate_fall
+            short_pulses_ignored = evidence.short_pulses_ignored
+            short_pulse_phases = dict(evidence.short_pulse_phases)
+            short_pulse_first_s = evidence.short_pulse_first_s
+            short_pulse_last_s = evidence.short_pulse_last_s
+            below_plan_highs = evidence.below_plan_highs
+            below_plan_rise_at = evidence.below_plan_rise_at
+            below_plan_fall_at = evidence.below_plan_fall_at
+            early_stopped = evidence.early_stopped
 
             aligned_poll_samples = poll_samples
             use_device_time_axis = family in ("js220", "js320")

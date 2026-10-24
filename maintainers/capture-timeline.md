@@ -42,6 +42,7 @@ A bench run turns [E] and [U] into [M], or revises the number.
 - `capture/__init__.py` (`capture_power`, `_release`);
 - `power/joulescope/capture_gated.py` (`capture_gated`);
 - `power/joulescope/_gated_resources.py` (stream attempts, poller and processing drain);
+- `power/joulescope/_gated_state.py` (poller-owned transitions and completion guard);
 - `power/diagnostics.py`;
 - `power/joulescope/sync.py`, `power/sync.py`;
 - `power/joulescope/device.py`, `power/joulescope/diagnostics.py`;
