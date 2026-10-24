@@ -36,11 +36,18 @@ engine adapter or firmware module, and check both callers.
 | Build binding and retained files | `compiled_build.py` checks plan/build agreement; `_fixture_record.py` verifies pinned build evidence; `fixture_runtime.py` verifies prepared-runtime declarations and link proof | `tests/test_compiled_build.py`, `tests/test_compiled_build_runtime.py`, `tests/unit/test_fixture_record.py` |
 | Semantic identity | `identity.py` defines facts; `frozen_run.py` owns intent identity; `fixture_identity.py` derives build/capture identity; `profile_identity.py` derives profile identity; `_identity_hash.py` shares hash rules | `tests/test_identity.py`, `tests/unit/test_fixture_identity.py`, `tests/test_profile_identity.py` |
 | Output comparison | `expect.py` owns `Expect`, references, tolerances and `Verification`; `compiled_build.py` applies the requested comparison after a successful capture | `tests/test_expect.py`, `tests/test_compiled_build.py` |
+| Shared run rules | `_run_contracts.py` owns capture-count agreement, power admission (including build-time route checks) and lifecycle/intent/rail identity enrichment. `compiled_build.py` and `run_record.py` supply existing fixture values; the rules do not depend on those callers. | `tests/test_run_power.py`, `tests/test_run_record.py`, `tests/test_package_layout.py` |
 | Saved run evidence | `run_record.py` reloads the build, checks pinned capture files, recomputes identity and output comparison; `records.py` verifies profile manifests | `tests/test_run_record.py`, `tests/test_result_view_contract.py` |
 | Gated Joulescope resources | `power/joulescope/_gated_resources.py` private `_GatedCaptureResources` owns stream attempts, the poller thread and processing admission/drain; `capture_gated` releases the device in its outer finally and retains callback evidence, READY synchronization, hook error precedence and post-drain effect ordering | `tests/test_gated_capture_lifecycle.py` (real threads), `tests/test_power.py` (deterministic numerical timelines), `tests/test_fullrate_recorder.py` |
 | Gated Joulescope control | `power/joulescope/_gated_state.py` owns poller-only gate history, pulse classification and completion guard timing; orchestration performs callback effects and retained-counter validation, then reads stable control evidence after drain. READY retains its condition-protected latest-sample semantics. | `tests/test_gated_capture_control.py`, `tests/test_power.py`, `tests/unit/test_fixture_completion.py` |
 | Gated Joulescope measurement | `power/joulescope/_gated_selection.py` selects retained windows and shares completion validation; `_gated_result.py` composes numerical helpers, classifies outcomes and assembles results. Orchestration retains debug output, elapsed-time reads and full-rate recorder calls. | `tests/test_gated_reduction.py`, `tests/test_gated_measurement_analysis.py`, `tests/test_power.py` |
 | Portable observations | `_result_view.py`, `_run_view.py` map verified native records and preserve measurement scope | `tests/test_result_view_contract.py` |
+
+Execution retains guard/settling checks and translates count failures to `CaptureError`.
+Persistence retains file verification, retained-energy/completion checks, identity-document
+comparison and `RunResultError` classification. Sharing admission rules does not make
+these caller-specific checks interchangeable. Public build and result definitions
+remain in `compiled_build.py`.
 
 A successful capture and numerical acceptance are separate facts. Build/file
 verification establishes agreement with retained bytes; `Expect` supplies the

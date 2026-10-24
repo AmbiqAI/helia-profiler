@@ -142,8 +142,9 @@ def save_run(
     result: RunResult, path: str | Path, *, roots: Mapping[str, Path], build: str | Path
 ) -> Path:
     """Write *result* as a run result; see :meth:`RunResult.save`."""
+    from ._run_contracts import check_capture_counts
     from ._version import __version__
-    from .compiled_build import _check_capture_counts, load_build
+    from .compiled_build import load_build
 
     target = Path(path).expanduser()
     build_path = Path(build).expanduser()
@@ -159,7 +160,7 @@ def save_run(
             f"{build_path} is not the compiled build this run captured from",
             hint="Name the build.json the run's CompiledBuild was saved to.",
         )
-    _check_capture_counts(result.compiled, result.capture)
+    check_capture_counts(result.compiled.build, result.capture)
     _check_power(result.compiled, result.capture, result.power)
     recomputed = _identity(result.compiled, result.capture, result.power)
     _check_identity(recomputed, result.identity.to_dict())
@@ -205,7 +206,8 @@ def save_run(
 
 
 def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecord:
-    from .compiled_build import RunResult, _check_capture_counts, load_build, missing_runtime_hint
+    from ._run_contracts import check_capture_counts
+    from .compiled_build import RunResult, load_build, missing_runtime_hint
 
     data = _document(raw)
     files = _Files(roots)
@@ -234,7 +236,7 @@ def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecor
     except (TypeError, ValueError) as exc:
         raise RunResultError("invalid_evidence", f"Malformed run result: {exc}") from exc
     try:
-        _check_capture_counts(compiled, capture)
+        check_capture_counts(compiled.build, capture)
         _check_power(compiled, capture, power)
     except ConfigError as exc:
         raise RunResultError("invalid_evidence", str(exc), hint=_HINT) from exc
@@ -454,11 +456,17 @@ def _identity(
     power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
 ) -> RunIdentity:
     """The identity :meth:`CompiledBuild.run` gives *capture* under *power*."""
+    from ._run_contracts import enrich_identity
     from .fixture_identity import fixture_run_identity
     from .fixture_power import FixtureRailPowerRequest
 
     rail = power.rail if isinstance(power, FixtureRailPowerRequest) else None
-    return compiled._identity(fixture_run_identity(compiled.build, capture), rail)
+    return enrich_identity(
+        fixture_run_identity(compiled.build, capture),
+        compiled.lifecycle,
+        compiled.plan.intent_hash,
+        rail,
+    )
 
 
 def _check_identity(recomputed: RunIdentity, stated: Any) -> None:
@@ -502,10 +510,10 @@ def _check_power(
     capture: FixtureCaptureResult,
     power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
 ) -> None:
-    from .compiled_build import _check_power_request
+    from ._run_contracts import check_power_request
     from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
 
-    _check_power_request(compiled, power)
+    check_power_request(compiled.build, compiled.lifecycle, power)
     try:
         _check_capture_error(capture)
     except ValueError as exc:
