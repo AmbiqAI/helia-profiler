@@ -19,13 +19,12 @@ if TYPE_CHECKING:
 from ._files import RootedPaths, read_json
 from ._fixture_build import (
     FixtureBuild,
-    FixtureCapability,
     FixtureIO,
     FixtureRole,
     FixtureStatePolicy,
     FixtureTimingScope,
-    _io_capabilities,
 )
+from ._fixture_io import FixtureCapability, io_capabilities
 from .engines import EngineType
 from .engines.base import EngineSource
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
@@ -292,7 +291,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError("Incomplete fixture input/state bytes")
     for tensor in build.output_tensors:
         _tensor(asdict(tensor))
-    capabilities = _io_capabilities(
+    capabilities = io_capabilities(
         tuple(io.tensor for io in build.inputs), build.output_tensors, build.engine
     )
     if build.capabilities != capabilities:

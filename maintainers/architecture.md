@@ -16,6 +16,10 @@ Paths below are relative to `src/helia_profiler/`; tests are relative to the rep
 | Save/load | `FrozenRun.save/load` owns plan JSON; `CompiledBuild.save/load` owns build JSON and delegates pinned files to `_fixture_record.py`; `RunResult.save` and `load_run` delegate to `run_record.py` | Local file I/O. Build/run records resolve paths through caller-provided roots and verify retained evidence. `Session.save/load` stores reusable intent, a different document from a frozen plan. |
 | `api.load_result`, `api.observations` | `records.py` dispatches native profile/run loading; `_result_view.py` and `_run_view.py` map loaded facts into portable observations | Offline reading and mapping. Observations do not perform a new capture or establish verification merely by conforming to a schema. |
 
+The public `FixtureDType` and `FixtureCapability` enums are defined in `_fixture_io.py`;
+package-root and existing `_fixture_build` imports resolve to the same class objects.
+Their values and saved JSON representation are unchanged.
+
 The public Python surface is the package root's `__all__`, pinned by
 `tests/test_api_stability.py`. Internal `fixture_*` and `_fixture_*` module names
 remain implementation details; root-exported `Fixture*` types are public.
@@ -33,6 +37,7 @@ engine adapter or firmware module, and check both callers.
 | --- | --- | --- |
 | Intent resolution and frozen plan | `session.py`, `config/`, `frozen_run.py` | `tests/test_session.py`, `tests/test_frozen_run.py` |
 | Engine preparation and ownership | `engines/__init__.py` dispatches; `litert.py`, `executorch.py`, `helia_rt/`, `helia_aot/` own adapters; `base.py`, `cmsis_nn.py`, `ethos_u.py`, `semver.py` are shared | `tests/test_package_layout.py`, `tests/contracts/test_engine_artifact_types.py`, engine-specific tests |
+| Fixture IO declarations and admission | `_fixture_io.py` owns dtype/capability enums, engine IO declarations, the readback budget and typed IO admission; construction, retained verification and capability reporting consume it. Legacy fixed-input construction retains its direct int8 table selection. | `tests/unit/test_fixture_io.py`, `tests/unit/test_typed_fixture.py`, `tests/unit/test_fixture_record.py` |
 | Build binding and retained files | `compiled_build.py` checks plan/build agreement; `_fixture_record.py` verifies pinned build evidence; `fixture_runtime.py` verifies prepared-runtime declarations and link proof | `tests/test_compiled_build.py`, `tests/test_compiled_build_runtime.py`, `tests/unit/test_fixture_record.py` |
 | Semantic identity | `identity.py` defines facts; `frozen_run.py` owns intent identity; `fixture_identity.py` derives build/capture identity; `profile_identity.py` derives profile identity; `_identity_hash.py` shares hash rules | `tests/test_identity.py`, `tests/unit/test_fixture_identity.py`, `tests/test_profile_identity.py` |
 | Output comparison | `expect.py` owns `Expect`, references, tolerances and `Verification`; `compiled_build.py` applies the requested comparison after a successful capture | `tests/test_expect.py`, `tests/test_compiled_build.py` |

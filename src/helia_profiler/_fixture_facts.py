@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ._fixture_build import (
+from ._fixture_io import (
     FIXTURE_CAPABILITIES,
     FIXTURE_READBACK_BUDGET,
     FixtureCapability,
