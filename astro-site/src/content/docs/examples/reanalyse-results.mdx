@@ -21,7 +21,9 @@ examples below, `baseline` and `candidate` are their result directories.
 Both must contain a published result manifest and a current `hpx.run-summary`
 summary. Older bundles require the HPX release that wrote them; current
 readers, including `load_run_summary` and `hpx compare`, refuse older versions.
-Do not change a bundle's version field to make it load.
+Do not change a bundle's version field to make it load. The
+[Run-summary schema reference](../../reference/run-summary-schema/) explains
+reader boundaries and historical changes to field meaning.
 
 ## Config file
 

@@ -3,6 +3,9 @@
 Start with the published [Concepts](../astro-site/src/content/docs/guide/concepts/index.mdx)
 for subsystem responsibilities and [Pipeline](../astro-site/src/content/docs/guide/concepts/pipeline.mdx)
 for the profile stage list. This map locates the retained-run path beside it.
+The [Run-summary schema reference](../astro-site/src/content/docs/reference/run-summary-schema.mdx)
+records ordinary profile summary reader/writer boundaries and version history.
+
 Paths below are relative to `src/helia_profiler/`; tests are relative to the repo.
 
 ## Entry points and boundaries
