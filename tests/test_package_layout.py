@@ -436,3 +436,70 @@ def test_modelcost_closure_is_sibling_only() -> None:
     outside. This is the wall a future shared package ships behind."""
     offenders = _closure_offenders("modelcost", {"modelcost"})
     assert not offenders, f"modelcost/ gained hpx imports: {offenders}"
+
+
+def _run_contract_import_offenders(source: str) -> list[str]:
+    tree = ast.parse(source)
+    type_only = {
+        id(child)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id == "TYPE_CHECKING"
+        for statement in node.body
+        for child in ast.walk(statement)
+    }
+    offenders = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                base = resolve_name("." * node.level + base, "helia_profiler")
+            targets = [base, *(f"{base}.{alias.name}" for alias in node.names)]
+        else:
+            continue
+        for target in targets:
+            parts = target.split(".")
+            if len(parts) < 2 or parts[0] != "helia_profiler":
+                continue
+            if parts[1] in {"compiled_build", "run_record"} or (
+                id(node) not in type_only
+                and parts[1] in {"fixture_capture", "_fixture_build", "target", "capture"}
+            ):
+                offenders.append(f"{node.lineno}: {target}")
+    return offenders
+
+
+def test_shared_run_rules_do_not_depend_on_their_callers_or_device_orchestration():
+    path = Path(__file__).resolve().parent.parent / "src/helia_profiler/_run_contracts.py"
+    assert not _run_contract_import_offenders(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .compiled_build import CompiledBuild",
+        "from . import run_record",
+        "if TYPE_CHECKING:\n    from .compiled_build import CompiledBuild",
+        "def lazy():\n    from .fixture_capture import capture_fixture",
+        "import helia_profiler.target.probe",
+        "from ._fixture_build import build_fixed_fixture",
+    ],
+)
+def test_run_contract_guard_rejects_reverse_and_device_dependencies(source):
+    assert _run_contract_import_offenders(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .fixture_power import FixtureRailPowerRequest",
+        "from .identity import EnergyFacts",
+        "if TYPE_CHECKING:\n    from .fixture_capture import FixtureCaptureResult",
+        "if TYPE_CHECKING:\n    from ._fixture_build import FixtureBuild",
+    ],
+)
+def test_run_contract_guard_allows_values_and_type_only_references(source):
+    assert _run_contract_import_offenders(source) == []

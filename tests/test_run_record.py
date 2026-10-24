@@ -1157,3 +1157,31 @@ def test_cpu_timing_source_has_no_duplicate_clock_roles(record, root):
         ("cpu", "configured"),
         ("cpu", "reported"),
     ]
+
+
+@pytest.mark.parametrize("field", ["missing", "iterations", "warmups"])
+def test_live_and_saved_count_errors_keep_their_caller_context(root, record, monkeypatch, field):
+    from helia_profiler.errors import CaptureError
+    from tests.test_run_power import _Authority
+
+    result = _run(record, verified=False)
+    timing = result.capture.timing
+    assert timing is not None
+    timing = None if field == "missing" else replace(timing, **{field: getattr(timing, field) + 1})
+    capture = replace(result.capture, timing=timing)
+    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", lambda *a, **kw: capture)
+    with pytest.raises(CaptureError) as live:
+        record.run(
+            jlink_serial="1160002255",
+            evidence_dir=root / "evidence-1",
+            guard=_Authority("board", []),
+            settle_seconds=30.0,
+        )
+    with pytest.raises(ConfigError) as saved:
+        _save(replace(result, capture=capture))
+    assert live.value.args[0] == saved.value.args[0]
+    assert "timed iterations and warmups" in live.value.args[0]
+    assert live.value.hint is not None
+    assert str(root / "evidence-1") in live.value.hint
+    assert isinstance(live.value.__cause__, ConfigError)
+    assert type(saved.value) is ConfigError

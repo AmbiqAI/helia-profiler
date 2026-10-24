@@ -400,6 +400,11 @@ arena of explicit size, MRAM weights), the build works under the host's
 and the saved build names the HPX cache as a second root. Its
 `PlaceholderGuard` refuses every capture; a harness passes its own guard.
 
+Shared run admission and identity rules live in `_run_contracts.py`; execution and
+saved-run readers use the same count, route and identity enrichment policy. See
+[the contributor map](architecture.md#shared-work-and-verification-owners) for
+the separate owners of execution authority and retained-evidence verification.
+
 ### Power through the run API
 
 The run API takes exactly the power routes BENCH measures (BENCH #111,
