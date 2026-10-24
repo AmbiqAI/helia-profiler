@@ -112,52 +112,6 @@ sink_size: int
 
 Source: `src/helia_profiler/fixture_psram.py:68`
 
-## helia_profiler.ToolchainInfo
-
-`class` · `python`
-
-```python
-ToolchainInfo(compiler: str = '', compiler_version: str = '', cmake_version: str = '') -> None
-```
-
-`dataclass`
-
-Build toolchain versions (populated by stage 4).
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/results/models.py:253`
-
-### helia_profiler.ToolchainInfo.compiler
-
-`attribute` · `python`
-
-```python
-compiler: str = ''
-```
-
-Source: `src/helia_profiler/results/models.py:257`
-
-### helia_profiler.ToolchainInfo.compiler_version
-
-`attribute` · `python`
-
-```python
-compiler_version: str = ''
-```
-
-Source: `src/helia_profiler/results/models.py:258`
-
-### helia_profiler.ToolchainInfo.cmake_version
-
-`attribute` · `python`
-
-```python
-cmake_version: str = ''
-```
-
-Source: `src/helia_profiler/results/models.py:259`
-
 ## helia_profiler.FixtureBuild
 
 `class` · `python`
@@ -214,7 +168,7 @@ FixtureBuild(
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_build.py:281`
+Source: `src/helia_profiler/_fixture_build.py:232`
 
 ### helia_profiler.FixtureBuild.fixture_identity
 
@@ -224,7 +178,7 @@ Source: `src/helia_profiler/_fixture_build.py:281`
 fixture_identity: str
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:283`
+Source: `src/helia_profiler/_fixture_build.py:234`
 
 ### helia_profiler.FixtureBuild.app_dir
 
@@ -234,7 +188,7 @@ Source: `src/helia_profiler/_fixture_build.py:283`
 app_dir: Path
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:284`
+Source: `src/helia_profiler/_fixture_build.py:235`
 
 ### helia_profiler.FixtureBuild.binary
 
@@ -244,7 +198,7 @@ Source: `src/helia_profiler/_fixture_build.py:284`
 binary: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:285`
+Source: `src/helia_profiler/_fixture_build.py:236`
 
 ### helia_profiler.FixtureBuild.generated_sources
 
@@ -254,7 +208,7 @@ Source: `src/helia_profiler/_fixture_build.py:285`
 generated_sources: tuple[FixtureFile, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:286`
+Source: `src/helia_profiler/_fixture_build.py:237`
 
 ### helia_profiler.FixtureBuild.expected
 
@@ -264,7 +218,7 @@ Source: `src/helia_profiler/_fixture_build.py:286`
 expected: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:287`
+Source: `src/helia_profiler/_fixture_build.py:238`
 
 ### helia_profiler.FixtureBuild.built
 
@@ -274,7 +228,7 @@ Source: `src/helia_profiler/_fixture_build.py:287`
 built: bool
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:288`
+Source: `src/helia_profiler/_fixture_build.py:239`
 
 ### helia_profiler.FixtureBuild.runtime_manifest
 
@@ -284,7 +238,7 @@ Source: `src/helia_profiler/_fixture_build.py:288`
 runtime_manifest: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:289`
+Source: `src/helia_profiler/_fixture_build.py:240`
 
 ### helia_profiler.FixtureBuild.flat_binary
 
@@ -294,7 +248,7 @@ Source: `src/helia_profiler/_fixture_build.py:289`
 flat_binary: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:290`
+Source: `src/helia_profiler/_fixture_build.py:241`
 
 ### helia_profiler.FixtureBuild.dependency_lock
 
@@ -304,7 +258,7 @@ Source: `src/helia_profiler/_fixture_build.py:290`
 dependency_lock: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:291`
+Source: `src/helia_profiler/_fixture_build.py:242`
 
 ### helia_profiler.FixtureBuild.link_map
 
@@ -314,7 +268,7 @@ Source: `src/helia_profiler/_fixture_build.py:291`
 link_map: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:292`
+Source: `src/helia_profiler/_fixture_build.py:243`
 
 ### helia_profiler.FixtureBuild.timing_scope
 
@@ -324,7 +278,7 @@ Source: `src/helia_profiler/_fixture_build.py:292`
 timing_scope: FixtureTimingScope
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:293`
+Source: `src/helia_profiler/_fixture_build.py:244`
 
 ### helia_profiler.FixtureBuild.engine
 
@@ -334,7 +288,7 @@ Source: `src/helia_profiler/_fixture_build.py:293`
 engine: EngineType
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:294`
+Source: `src/helia_profiler/_fixture_build.py:245`
 
 ### helia_profiler.FixtureBuild.build_identity
 
@@ -344,7 +298,7 @@ Source: `src/helia_profiler/_fixture_build.py:294`
 build_identity: str | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:295`
+Source: `src/helia_profiler/_fixture_build.py:246`
 
 ### helia_profiler.FixtureBuild.iterations
 
@@ -354,7 +308,7 @@ Source: `src/helia_profiler/_fixture_build.py:295`
 iterations: int
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:296`
+Source: `src/helia_profiler/_fixture_build.py:247`
 
 ### helia_profiler.FixtureBuild.warmups
 
@@ -364,7 +318,7 @@ Source: `src/helia_profiler/_fixture_build.py:296`
 warmups: int
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:297`
+Source: `src/helia_profiler/_fixture_build.py:248`
 
 ### helia_profiler.FixtureBuild.intent_identity
 
@@ -374,7 +328,7 @@ Source: `src/helia_profiler/_fixture_build.py:297`
 intent_identity: str
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:298`
+Source: `src/helia_profiler/_fixture_build.py:249`
 
 ### helia_profiler.FixtureBuild.target
 
@@ -384,7 +338,7 @@ Source: `src/helia_profiler/_fixture_build.py:298`
 target: FixtureTarget
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:299`
+Source: `src/helia_profiler/_fixture_build.py:250`
 
 ### helia_profiler.FixtureBuild.toolchain
 
@@ -394,7 +348,7 @@ Source: `src/helia_profiler/_fixture_build.py:299`
 toolchain: ToolchainInfo | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:300`
+Source: `src/helia_profiler/_fixture_build.py:251`
 
 ### helia_profiler.FixtureBuild.provider_provenance
 
@@ -404,7 +358,7 @@ Source: `src/helia_profiler/_fixture_build.py:300`
 provider_provenance: str = 'manifest-declared; independently audit the pinned build/source record'
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:301`
+Source: `src/helia_profiler/_fixture_build.py:252`
 
 ### helia_profiler.FixtureBuild.planned_memory
 
@@ -414,7 +368,7 @@ Source: `src/helia_profiler/_fixture_build.py:301`
 planned_memory: MemoryPlan | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:304`
+Source: `src/helia_profiler/_fixture_build.py:255`
 
 ### helia_profiler.FixtureBuild.planned_memory_reason
 
@@ -424,7 +378,7 @@ Source: `src/helia_profiler/_fixture_build.py:304`
 planned_memory_reason: str | None = 'not_recorded'
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:305`
+Source: `src/helia_profiler/_fixture_build.py:256`
 
 ### helia_profiler.FixtureBuild.outputs
 
@@ -434,7 +388,7 @@ Source: `src/helia_profiler/_fixture_build.py:305`
 outputs: tuple[FixtureFile, ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:307`
+Source: `src/helia_profiler/_fixture_build.py:258`
 
 ### helia_profiler.FixtureBuild.capabilities
 
@@ -444,7 +398,7 @@ Source: `src/helia_profiler/_fixture_build.py:307`
 capabilities: tuple[tuple[str, FixtureCapability], ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:309`
+Source: `src/helia_profiler/_fixture_build.py:260`
 
 ### helia_profiler.FixtureBuild.aot_arena_scan
 
@@ -454,7 +408,7 @@ Source: `src/helia_profiler/_fixture_build.py:309`
 aot_arena_scan: tuple[tuple[int, int], ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:311`
+Source: `src/helia_profiler/_fixture_build.py:262`
 
 ### helia_profiler.FixtureBuild.aot_outputs
 
@@ -464,7 +418,7 @@ Source: `src/helia_profiler/_fixture_build.py:311`
 aot_outputs: tuple[FixtureFile, ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:314`
+Source: `src/helia_profiler/_fixture_build.py:265`
 
 ### helia_profiler.FixtureBuild.engine_source
 
@@ -474,7 +428,7 @@ Source: `src/helia_profiler/_fixture_build.py:314`
 engine_source: EngineSource | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:316`
+Source: `src/helia_profiler/_fixture_build.py:267`
 
 ### helia_profiler.FixtureBuild.dependency_state
 
@@ -484,7 +438,7 @@ Source: `src/helia_profiler/_fixture_build.py:316`
 dependency_state: FixtureFile | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:318`
+Source: `src/helia_profiler/_fixture_build.py:269`
 
 ### helia_profiler.FixtureBuild.state_policy
 
@@ -494,7 +448,7 @@ Source: `src/helia_profiler/_fixture_build.py:318`
 state_policy: FixtureStatePolicy | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:319`
+Source: `src/helia_profiler/_fixture_build.py:270`
 
 ### helia_profiler.FixtureBuild.source_initializer_present
 
@@ -504,7 +458,7 @@ Source: `src/helia_profiler/_fixture_build.py:319`
 source_initializer_present: bool = False
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:320`
+Source: `src/helia_profiler/_fixture_build.py:271`
 
 ### helia_profiler.FixtureBuild.psram_weights
 
@@ -514,7 +468,7 @@ Source: `src/helia_profiler/_fixture_build.py:320`
 psram_weights: FixturePsramWeights | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:322`
+Source: `src/helia_profiler/_fixture_build.py:273`
 
 ### helia_profiler.FixtureBuild.arena_location
 
@@ -524,7 +478,7 @@ Source: `src/helia_profiler/_fixture_build.py:322`
 arena_location: Placement | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:324`
+Source: `src/helia_profiler/_fixture_build.py:275`
 
 ### helia_profiler.FixtureBuild.weights_location
 
@@ -534,7 +488,7 @@ Source: `src/helia_profiler/_fixture_build.py:324`
 weights_location: Placement | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:325`
+Source: `src/helia_profiler/_fixture_build.py:276`
 
 ### helia_profiler.FixtureBuild.model
 
@@ -544,7 +498,7 @@ Source: `src/helia_profiler/_fixture_build.py:325`
 model: FixtureFile | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:327`
+Source: `src/helia_profiler/_fixture_build.py:278`
 
 ### helia_profiler.FixtureBuild.inputs
 
@@ -554,7 +508,7 @@ Source: `src/helia_profiler/_fixture_build.py:327`
 inputs: tuple[FixtureIO, ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:328`
+Source: `src/helia_profiler/_fixture_build.py:279`
 
 ### helia_profiler.FixtureBuild.output_tensors
 
@@ -564,7 +518,7 @@ Source: `src/helia_profiler/_fixture_build.py:328`
 output_tensors: tuple[FixtureTensor, ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:329`
+Source: `src/helia_profiler/_fixture_build.py:280`
 
 ### helia_profiler.FixtureBuild.arena_capacity
 
@@ -574,7 +528,7 @@ Source: `src/helia_profiler/_fixture_build.py:329`
 arena_capacity: int | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:330`
+Source: `src/helia_profiler/_fixture_build.py:281`
 
 ### helia_profiler.FixtureBuild.clock_profile
 
@@ -584,7 +538,7 @@ Source: `src/helia_profiler/_fixture_build.py:330`
 clock_profile: str | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:331`
+Source: `src/helia_profiler/_fixture_build.py:282`
 
 ### helia_profiler.FixtureBuild.cpu_hz
 
@@ -594,7 +548,7 @@ Source: `src/helia_profiler/_fixture_build.py:331`
 cpu_hz: int | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:332`
+Source: `src/helia_profiler/_fixture_build.py:283`
 
 ### helia_profiler.FixtureBuild.timer_hz
 
@@ -604,7 +558,7 @@ Source: `src/helia_profiler/_fixture_build.py:332`
 timer_hz: int | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:333`
+Source: `src/helia_profiler/_fixture_build.py:284`
 
 ### helia_profiler.FixtureBuild.power_sync
 
@@ -614,7 +568,7 @@ Source: `src/helia_profiler/_fixture_build.py:333`
 power_sync: FixturePowerSync | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:334`
+Source: `src/helia_profiler/_fixture_build.py:285`
 
 ### helia_profiler.FixtureBuild.observe_ram
 
@@ -624,7 +578,7 @@ Source: `src/helia_profiler/_fixture_build.py:334`
 observe_ram: bool = False
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:335`
+Source: `src/helia_profiler/_fixture_build.py:286`
 
 ### helia_profiler.FixtureBuild.kernel_source
 
@@ -634,7 +588,7 @@ Source: `src/helia_profiler/_fixture_build.py:335`
 kernel_source: FixtureKernelSource | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:338`
+Source: `src/helia_profiler/_fixture_build.py:289`
 
 ### helia_profiler.FixtureBuild.runtime_source
 
@@ -644,7 +598,53 @@ Source: `src/helia_profiler/_fixture_build.py:338`
 runtime_source: FixtureRuntimeSource | None = None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:340`
+Source: `src/helia_profiler/_fixture_build.py:291`
+
+## helia_profiler.ToolchainInfo
+
+`class` · `python`
+
+```python
+ToolchainInfo(compiler: str = '', compiler_version: str = '', cmake_version: str = '') -> None
+```
+
+`dataclass`
+
+Build toolchain versions (populated by stage 4).
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/results/models.py:253`
+
+### helia_profiler.ToolchainInfo.compiler
+
+`attribute` · `python`
+
+```python
+compiler: str = ''
+```
+
+Source: `src/helia_profiler/results/models.py:257`
+
+### helia_profiler.ToolchainInfo.compiler_version
+
+`attribute` · `python`
+
+```python
+compiler_version: str = ''
+```
+
+Source: `src/helia_profiler/results/models.py:258`
+
+### helia_profiler.ToolchainInfo.cmake_version
+
+`attribute` · `python`
+
+```python
+cmake_version: str = ''
+```
+
+Source: `src/helia_profiler/results/models.py:259`
 
 ## helia_profiler.MemoryPlan
 
