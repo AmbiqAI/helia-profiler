@@ -9,6 +9,7 @@ import pytest
 
 from helia_profiler.power.joulescope import capture_gated as capture
 from helia_profiler.power.joulescope.driver import JoulescopeDriver
+from tests import test_gated_capture_lifecycle as _lifecycle
 from tests.test_power import (
     TestImplausibleGateRejection as _CaptureCases,
 )
@@ -17,7 +18,7 @@ from tests.test_power import (
     _packed_gpi_frame,
 )
 
-pytest_plugins = ("tests.test_gated_capture_lifecycle",)
+instrument = _lifecycle.instrument
 
 
 @pytest.mark.parametrize("invalid_at,expected_stop_ms", [(None, 10), (9, 14)])
