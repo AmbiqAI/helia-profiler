@@ -17,6 +17,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import pytest
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 from packaging.version import Version
@@ -76,6 +77,8 @@ def test_security_floors_are_declared() -> None:
     for name, last_vulnerable, first_patched in (
         ("idna", "3.14", "3.15"),
         ("certifi", "2026.4.22", "2026.10.19"),
+        ("urllib3", "2.7.0", "2.8.0"),
+        ("tornado", "6.5.8", "6.5.9"),
     ):
         assert name in floors, (
             f"security floor for {name!r} is gone from [tool.uv] constraint-dependencies; "
@@ -113,17 +116,34 @@ def test_every_security_floor_is_still_load_bearing() -> None:
     )
 
 
-def test_certificate_floor_protects_published_installations() -> None:
+@pytest.mark.parametrize(
+    ("name", "first_patched", "last_vulnerable"),
+    [("certifi", "2026.10.19", "2026.10.18"), ("urllib3", "2.8.0", "2.7.0")],
+)
+def test_runtime_floors_protect_published_installations(
+    name: str, first_patched: str, last_vulnerable: str
+) -> None:
     manifest = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
     requirements = {
         canonicalize_name(req.name): req
         for req in map(Requirement, manifest["project"]["dependencies"])
     }
-    certifi = requirements[canonicalize_name("certifi")]
-    assert certifi.marker is None
-    assert certifi.specifier.contains("2026.10.19")
-    assert not certifi.specifier.contains("2026.10.18")
-    assert not certifi.specifier.contains("2026.4.22")
+    requirement = requirements[canonicalize_name(name)]
+    assert requirement.marker is None
+    assert requirement.specifier.contains(first_patched)
+    assert not requirement.specifier.contains(last_vulnerable)
+    assert canonicalize_name("tornado") not in requirements
+
+
+def test_standalone_zoo_environment_has_runtime_security_floors() -> None:
+    source = (REPO_ROOT / "tools" / "zoo_registry.py").read_text(encoding="utf-8")
+    metadata = source.split("# /// script\n", 1)[1].split("# ///", 1)[0]
+    manifest = tomllib.loads("\n".join(line.removeprefix("# ") for line in metadata.splitlines()))
+    requirements = {
+        canonicalize_name(req.name): req for req in map(Requirement, manifest["dependencies"])
+    }
+    for name in ("certifi", "urllib3"):
+        assert requirements[canonicalize_name(name)].specifier == _security_floors()[name].specifier
 
 
 def test_ci_installers_require_patched_certificate_trust() -> None:
