@@ -6,6 +6,10 @@
       "slug": "reference/api/helia_profiler"
     },
     {
+      "label": "compiled_build",
+      "slug": "reference/api/helia_profiler/compiled_build"
+    },
+    {
       "label": "config",
       "collapsed": true,
       "items": [
@@ -28,6 +32,10 @@
       "slug": "reference/api/helia_profiler/diagnostics"
     },
     {
+      "label": "elf_inventory",
+      "slug": "reference/api/helia_profiler/elf_inventory"
+    },
+    {
       "label": "errors",
       "slug": "reference/api/helia_profiler/errors"
     },
@@ -42,6 +50,18 @@
     {
       "label": "expect",
       "slug": "reference/api/helia_profiler/expect"
+    },
+    {
+      "label": "fixture_analysis",
+      "slug": "reference/api/helia_profiler/fixture_analysis"
+    },
+    {
+      "label": "fixture_capture",
+      "slug": "reference/api/helia_profiler/fixture_capture"
+    },
+    {
+      "label": "fixture_runtime",
+      "slug": "reference/api/helia_profiler/fixture_runtime"
     },
     {
       "label": "frozen_run",
@@ -70,6 +90,10 @@
       ]
     },
     {
+      "label": "prepared_runtimes",
+      "slug": "reference/api/helia_profiler/prepared_runtimes"
+    },
+    {
       "label": "results",
       "collapsed": true,
       "items": [
@@ -82,6 +106,14 @@
           "slug": "reference/api/helia_profiler/results/manifest"
         }
       ]
+    },
+    {
+      "label": "run_guard",
+      "slug": "reference/api/helia_profiler/run_guard"
+    },
+    {
+      "label": "run_inputs",
+      "slug": "reference/api/helia_profiler/run_inputs"
     },
     {
       "label": "runtime_records",

@@ -25,15 +25,6 @@ from ..wire import (
 
 log = logging.getLogger("hpx")
 
-POWER_TERMINAL_START = POWER_TERMINAL_START_SENTINEL
-POWER_TERMINAL_END = POWER_TERMINAL_END_SENTINEL
-
-# The schema is *derived* from the wire registry rather than restated: which
-# fields are required and which belong to the all-or-none measurement payload
-# is a property of the protocol, declared once in ``helia_profiler.wire``.
-_REQUIRED_KEYS = POWER_TERMINAL_REQUIRED_KEYS
-_OPTIONAL_KEYS = POWER_TERMINAL_OPTIONAL_KEYS
-
 
 def _parse_int(fields: dict[str, str], key: str) -> int:
     try:
@@ -59,12 +50,12 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
 
     for raw_line in lines:
         line = raw_line.strip()
-        if line == POWER_TERMINAL_START:
+        if line == POWER_TERMINAL_START_SENTINEL:
             if in_record or complete:
                 raise PowerError("Duplicate power terminal start marker.")
             in_record = True
             continue
-        if line == POWER_TERMINAL_END:
+        if line == POWER_TERMINAL_END_SENTINEL:
             if not in_record:
                 raise PowerError("Power terminal end marker appeared before start.")
             in_record = False
@@ -81,10 +72,10 @@ def parse_power_terminal_envelope(lines: Iterable[str]) -> PowerTerminalEnvelope
 
     if in_record or not complete:
         raise PowerError("Power terminal record is incomplete or missing.")
-    missing = sorted(_REQUIRED_KEYS - fields.keys())
+    missing = sorted(POWER_TERMINAL_REQUIRED_KEYS - fields.keys())
     if missing:
         raise PowerError(f"Power terminal record is missing fields: {', '.join(missing)}.")
-    unknown = sorted(fields.keys() - _REQUIRED_KEYS - _OPTIONAL_KEYS)
+    unknown = sorted(fields.keys() - POWER_TERMINAL_REQUIRED_KEYS - POWER_TERMINAL_OPTIONAL_KEYS)
     if unknown:
         raise PowerError(f"Power terminal record has unknown fields: {', '.join(unknown)}.")
 
@@ -255,8 +246,8 @@ def collect_power_terminal_envelope_from_chunks(
     (START without its END) cannot span into — and discard — a subsequent
     valid frame.
     """
-    start_marker = POWER_TERMINAL_START.encode("ascii")
-    end_marker = POWER_TERMINAL_END.encode("ascii")
+    start_marker = POWER_TERMINAL_START_SENTINEL.encode("ascii")
+    end_marker = POWER_TERMINAL_END_SENTINEL.encode("ascii")
     deadline = time.monotonic() + timeout_s
     buffer = bytearray()
     last_error: PowerError | None = None
@@ -344,8 +335,6 @@ def collect_power_terminal_envelope_rtt(
 
 
 __all__ = [
-    "POWER_TERMINAL_END",
-    "POWER_TERMINAL_START",
     "POWER_TERMINAL_VERSION",
     "collect_power_terminal_envelope_from_chunks",
     "collect_power_terminal_envelope_rtt",

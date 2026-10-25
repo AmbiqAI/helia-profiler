@@ -62,11 +62,11 @@ def test_the_walk_finds_every_group_and_leaf(cli_payload):
     regresses the counts collapse and this is where it shows.
     """
     counts = cli_payload["counts"]
-    assert counts["groups"] == 7, counts["group_names"]
-    assert counts["leaf_commands"] == 20, counts["leaf_command_names"]
-    assert counts["top_level_entries"] == 14
-    assert counts["options"] == 103
-    assert counts["arguments"] == 11
+    assert counts["groups"] == 8, counts["group_names"]
+    assert counts["leaf_commands"] == 23, counts["leaf_command_names"]
+    assert counts["top_level_entries"] == 17
+    assert counts["options"] == 134
+    assert counts["arguments"] == 15
     assert {"results inspect", "results show", "results export"} <= set(
         counts["leaf_command_names"]
     )
@@ -159,7 +159,7 @@ def test_the_issue_families_are_published_as_their_wire_codes():
     """
     payload = extract_issues.build()
     assert payload["counts"]["issues"] == 27
-    assert payload["counts"]["comparability"] == 8
+    assert payload["counts"]["comparability"] == 7
     assert payload["counts"]["families"] == 3
     power = next(
         family for family in payload["families"] if family["pattern"].startswith("metric.power_")

@@ -192,7 +192,7 @@ def _stage(tmp_path, rt):
         from dataclasses import replace
 
         ctx.config = replace(
-            ctx.config, engine=EngineConfig(type=EngineType.TFLM, backend="cmsis_nn")
+            ctx.config, engine=EngineConfig(type=EngineType.LITERT, backend="cmsis_nn")
         )
     stage = PrepareEngineStage(runtime=rt.verify())
     stage.run(ctx)
@@ -444,7 +444,7 @@ def test_heliart_proof_reads_inputs_below_the_app_not_above_it(
         (EngineType.HELIA_RT, None, 2, "helia-rt prepared runtime and helia backend"),
         (EngineType.HELIA_RT, "ethos_u", 2, "helia-rt prepared runtime and helia backend"),
         (EngineType.HELIA_RT, "helia", 1, "stack is not helia-rt"),
-        (EngineType.TFLM, "cmsis_nn", 2, "stack is not upstream"),
+        (EngineType.LITERT, "cmsis_nn", 2, "stack is not upstream"),
         (EngineType.HELIA_AOT, None, 2, "cannot consume"),
     ],
 )
@@ -464,7 +464,7 @@ def test_engine_and_prepared_stack_must_agree(
 def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
     f, analysis = _fixture(tmp_path)
     rt = runtime(tmp_path / "rt", schema=1)
-    _mock_analysis(monkeypatch, f, analysis, EngineType.TFLM)
+    _mock_analysis(monkeypatch, f, analysis, EngineType.LITERT)
 
     class Runner:
         def __init__(self, stages):
@@ -499,11 +499,11 @@ def test_upstream_build_still_refuses_a_heliart_module(tmp_path, monkeypatch):
     monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     with pytest.raises(ConfigError, match="dependency lock"):
         build_fixed_fixture(
-            _config(tmp_path, f, EngineType.TFLM, "cmsis_nn"), f, method=METHOD, runtime=rt
+            _config(tmp_path, f, EngineType.LITERT, "cmsis_nn"), f, method=METHOD, runtime=rt
         )
 
 
-def test_heliart_accepts_float16_models_that_tflm_refuses(tmp_path):
+def test_heliart_accepts_float16_models_that_litert_refuses(tmp_path):
     from helia_profiler._fixture_build import FixtureIO, TypedFixture, _check_typed_fixture
     from helia_profiler.fixture_analysis import FixtureTensor, TypedFixtureModelAnalysis
 
@@ -521,7 +521,7 @@ def test_heliart_accepts_float16_models_that_tflm_refuses(tmp_path):
         ("float32", FixtureCapability.SUPPORTED),
     )
     with pytest.raises(ConfigError, match="float16"):
-        _check_typed_fixture(fixture, model, EngineType.TFLM)
+        _check_typed_fixture(fixture, model, EngineType.LITERT)
 
 
 @pytest.mark.parametrize("sep", ["/", "\\"])

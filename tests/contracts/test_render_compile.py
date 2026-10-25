@@ -227,7 +227,7 @@ def test_compile_matrix_covers_every_snapshot_case():
 #: firmware/op_resolver.py _ALL_REGISTRATIONS line rendered into
 #: get_resolver().  The stub resolver declares each Add* explicitly, so a
 #: renamed production entry fails the gate (no catch-all).
-_FULL_RESOLVER_ID = "apollo510|rtt|tflm|full-resolver"
+_FULL_RESOLVER_ID = "apollo510|rtt|litert|full-resolver"
 
 
 def _build_cases() -> list[_CompileCase]:
@@ -258,7 +258,7 @@ def _build_cases() -> list[_CompileCase]:
     # below, as production builds it.
     for render in _CENSUS_MATRIX:
         text = render.text
-        if render.engine.value in ("tflm", "helia-rt"):
+        if render.engine.value in ("litert", "helia-rt"):
             cc = _render_pmu_profiler_cc(render.vars)
             assert text.endswith(cc), (
                 f"[{render.label}] census text does not end with the "
@@ -277,7 +277,7 @@ def _build_cases() -> list[_CompileCase]:
             text=_render(
                 "apollo510",
                 "rtt",
-                "tflm",
+                "litert",
                 overrides={
                     "resolver_registrations": registrations,
                     "resolver_max_ops": len(registrations),
@@ -562,7 +562,7 @@ def test_every_rendered_firmware_tu_compiles(tmp_path):
 
 # Self-tests: each doctors ONE rendered TU at string level and asserts the
 # identical harness invocation fails with the expected diagnostic.
-# apollo510|rtt|tflm is an arbitrary representative case.
+# apollo510|rtt|litert is an arbitrary representative case.
 
 _SELFTEST_SOC = "apollo510"
 # The boot call sequence in every render — a stable, code-context anchor for
@@ -572,7 +572,7 @@ _INJECT_ANCHOR = "\n    hpx_sync_init();"
 
 
 def _compile_doctored(tmp_path: Path, doctor) -> subprocess.CompletedProcess[str]:
-    rendered = _render(_SELFTEST_SOC, "rtt", "tflm")
+    rendered = _render(_SELFTEST_SOC, "rtt", "litert")
     doctored = doctor(rendered)
     assert doctored != rendered, "self-test injection did not change the TU"
     case = _CompileCase(

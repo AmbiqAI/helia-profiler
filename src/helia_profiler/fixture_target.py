@@ -18,6 +18,8 @@ FIXTURE_CLOCK_PROFILE = "lp"
 
 @dataclass(frozen=True)
 class FixtureTarget:
+    """The board a fixture image runs on, its J-Link device and the image's load address."""
+
     board: str
     device: str
     load_address: int
@@ -80,7 +82,7 @@ def fixture_app_region(region: MemoryRegion, board: str = FIXTURE_BOARD) -> tupl
 def fixture_engines_for_board(board: str) -> tuple[EngineType, ...]:
     """Engines implemented by the fixture target."""
     _fixture_soc(board)
-    engines = (EngineType.HELIA_AOT, EngineType.TFLM)
+    engines = (EngineType.HELIA_AOT, EngineType.LITERT)
     return engines if board == "apollo510b_evb" else (*engines, EngineType.HELIA_RT)
 
 
@@ -97,7 +99,7 @@ def validate_fixture_placement(
         engine not in fixture_engines_for_board(board)
         or weights not in (Placement.MRAM, Placement.TCM)
     ):
-        raise ConfigError("AP510B fixtures implement AOT/TFLM with MRAM or TCM weights")
+        raise ConfigError("AP510B fixtures implement heliaAOT/LiteRT with MRAM or TCM weights")
     if arena not in (Placement.SRAM, Placement.TCM):
         raise ConfigError("Fixture arena placement requires writable static SRAM or DTCM")
     if not isinstance(weights, Placement):

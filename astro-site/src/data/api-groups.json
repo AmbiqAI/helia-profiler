@@ -41,12 +41,119 @@
       ]
     },
     {
-      "path": "helia_profiler.identity",
-      "summary": "Shared identity vocabulary: canonical engine and kernel names with today's spellings as aliases, and unknown facts that carry their reason.",
+      "path": "helia_profiler.compiled_build",
+      "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, each run saved as a verifiable result that loads back on any host, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.",
       "members": [
+        "build",
+        "load_build",
+        "run_build",
+        "load_run",
+        "hpx_cache_root",
+        "CompiledBuild",
+        "RunResult",
+        "RunResultRecord",
+        "RunResultError",
+        "Lifecycle"
+      ]
+    },
+    {
+      "path": "helia_profiler.run_inputs",
+      "summary": "What a run is built for and captured under: the typed fixture that pins a model's input bytes and declares its outputs, the tensors' element types and quantization, how the run is timed, the prepared runtime a build links, the board guard a capture answers to, the model analysis that lists a model's inputs and outputs, and the targets and IO types this heliaPROFILER builds.",
+      "members": [
+        "TypedFixture",
+        "FixtureIO",
+        "FixtureOutput",
+        "FixtureRole",
+        "FixtureFile",
+        "FixtureTensor",
+        "PerTensorQuantization",
+        "PerAxisQuantization",
+        "FixtureDType",
+        "FixtureMethod",
+        "FixtureTimingScope",
+        "FixtureStatePolicy",
+        "analyze_run_model",
+        "analyze_run_model_for_engine",
+        "TypedFixtureModelAnalysis"
+      ]
+    },
+    {
+      "path": "helia_profiler.run_guard",
+      "summary": "Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command line uses, and the rail and supply requests a power run selects.",
+      "members": [
+        "FixtureCaptureGuard",
+        "OperatorGuard",
+        "FixtureTarget",
+        "FixturePowerGuard",
+        "FixtureRailPowerRequest",
+        "FixtureBoardPowerRequest"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_capture",
+      "summary": "What a run captures from the board: the capture result, its timing and memory, and the power and PSRAM observations a capture can carry.",
+      "members": [
+        "FixtureCaptureResult",
+        "FixtureTiming",
+        "FixtureMemory",
+        "FixturePowerSync",
+        "FixtureRailEnergy",
+        "FixtureBatchCompletion",
+        "FixturePsramObservation"
+      ]
+    },
+    {
+      "path": "helia_profiler.prepared_runtimes",
+      "summary": "The runtimes a build links and how they are identified: prepared upstream archives, their verified manifests, and the kernel, runtime and engine sources a build records.",
+      "members": [
+        "PreparedUpstreamRuntime",
+        "VerifiedPreparedRuntime",
+        "PreparedRuntimeManifest",
+        "RuntimeABI",
+        "RuntimeHeader",
+        "RuntimeProvider",
+        "ResolverPlan",
+        "FixtureKernelSource",
+        "FixtureRuntimeSource",
+        "EngineSource"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_runtime",
+      "summary": "The compiled firmware a build produces and what it recorded: the build record, its memory plan, toolchain and PSRAM weight placement.",
+      "members": [
+        "FixtureBuild",
+        "MemoryPlan",
+        "ToolchainInfo",
+        "FixturePsramWeights",
+        "FixturePsramPayload"
+      ]
+    },
+    {
+      "path": "helia_profiler.fixture_analysis",
+      "summary": "What this HPX can run: engines, data types and qualified targets.",
+      "members": [
+        "capabilities",
+        "FixtureCapabilities",
+        "QualifiedFixtureTarget",
+        "EngineDTypeCapability",
+        "FixtureCapability"
+      ]
+    },
+    {
+      "path": "helia_profiler.identity",
+      "summary": "Shared identity vocabulary: the identity of a captured run and the build, run, energy, runtime and kernel facts it names, canonical engine and kernel names with today's spellings as aliases, unknown facts that carry their reason, and the semantic hashes that name their kind and basis version.",
+      "members": [
+        "RunIdentity",
+        "RunFacts",
+        "EnergyFacts",
+        "BuildFacts",
+        "RuntimeIdentity",
+        "KernelIdentity",
         "CanonicalEngine",
         "CanonicalKernel",
         "Unknown",
+        "SemanticHash",
         "canonical_engine",
         "canonical_kernel"
       ]
@@ -180,6 +287,16 @@
       "summary": "The static cost model of a network, read from the model file before anything is built or run.",
       "members": [
         "ModelAnalysis"
+      ]
+    },
+    {
+      "path": "helia_profiler.elf_inventory",
+      "summary": "The measured memory inventory of a linked image, read with the toolchain's own tools: every section with its address and size, the load segments, and how many rows could not be parsed.",
+      "members": [
+        "section_inventory",
+        "SectionInventory",
+        "ElfSection",
+        "LoadSegment"
       ]
     },
     {

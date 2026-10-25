@@ -1,4 +1,4 @@
-"""Verified offline reading of native profiler result bundles.
+"""Verified offline reading of native profiler result bundles and saved run results.
 
 These readers never run a model or acquire hardware. Verification establishes
 consistency of retained evidence, not authenticity or numerical correctness.
@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from .errors import ReportError
+from ._semantic_hash import Kind, require
+from .errors import ConfigError, ReportError
 from .results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from .results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
@@ -22,8 +23,12 @@ from .results.manifest import (
     ResultManifest,
     RunStatus,
 )
-from .results.run_summary import RUN_SUMMARY_SCHEMA, RunSummary
+from .results.run_summary import RunSummary, _require_current_summary
 from .results.serde import nested_get
+from .run_record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
+
+_MANIFEST_FILE = "result_manifest.json"
+_RUN_RESULT_FILE = "result.json"
 
 
 class ResultReadError(ReportError):
@@ -51,7 +56,7 @@ class ProfileResultRecord:
 class ResultInspection:
     """Inspection does not promote an invalid bundle into a trusted result."""
 
-    result: ProfileResultRecord | None
+    result: ProfileResultRecord | RunResultRecord | None
     code: str | None = None
     message: str | None = None
 
@@ -143,6 +148,45 @@ def _document(root: Path, artifact: ResultArtifact) -> dict[str, Any]:
     return data
 
 
+#: Each identity hash, its kind, and the non-hash value it may take instead.
+_IDENTITY_HASHES: tuple[tuple[str, Kind, str], ...] = (
+    ("build_hash", "build", "unknown"),
+    ("inputs_hash", "inputs", "unknown"),
+    ("observation_hash", "observation", "null"),
+    ("intent_hash", "intent", "null"),
+)
+
+
+def _identity_hashes(summary: dict[str, Any]) -> None:
+    """Refuse a summary identity whose hashes are not semantic hashes of their kind.
+
+    It agrees with the packaged summary schema: an identity, when present, is
+    an object stating every hash, and an unknown hash is ``{"unknown": reason}``.
+    """
+    if "identity" not in summary:
+        return
+    identity = summary["identity"]
+    if not isinstance(identity, dict):
+        raise ResultReadError("invalid_summary", "Summary identity must be an object")
+    for name, kind, absent in _IDENTITY_HASHES:
+        if name not in identity:
+            raise ResultReadError("invalid_summary", f"Summary identity states no {name}")
+        value = identity[name]
+        if absent == "null" and value is None:
+            continue
+        if absent == "unknown" and isinstance(value, dict):
+            if value.keys() != {"unknown"} or not isinstance(value["unknown"], str):
+                raise ResultReadError(
+                    "invalid_summary",
+                    f'Summary identity.{name} must be a hash or {{"unknown": "<reason>"}}',
+                )
+            continue
+        try:
+            require(value, kind)
+        except ValueError as exc:
+            raise ResultReadError("invalid_summary", f"Summary identity.{name}: {exc}") from exc
+
+
 def _reconcile_identities(
     manifest: ResultManifest, summary: RunSummary | None, metadata: dict[str, Any] | None
 ) -> None:
@@ -166,13 +210,22 @@ def _reconcile_identities(
             raise ResultReadError("identity_mismatch", f"Native identities differ for {dimension}")
 
 
-def load_result(location: str | Path) -> ProfileResultRecord:
-    """Strictly load an ordinary profile manifest or its containing directory.
+def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
+    """Strictly load an ordinary profile manifest, a saved run result, or the directory of either.
+
+    The file's ``schema`` decides how it is read: ``hpx.result-manifest``
+    gives a :class:`ProfileResultRecord`, ``hpx.run-result`` a
+    :class:`~helia_profiler.RunResultRecord`, verified as
+    :func:`~helia_profiler.load_run` verifies it under the root it records
+    itself under and this host's HPX cache. A directory is read through its
+    ``result_manifest.json`` or its ``result.json``; one holding both is
+    refused as ``ambiguous_location``, since only a file states its schema.
 
     Failed native runs remain failed records. Missing manifests and interrupted
-    publication are refusals, not legacy fallbacks. Summary versions 11 to 15
-    retain the timing/memory fields read here; other versions remain available
-    to native readers without receiving this verification guarantee.
+    publication are refusals, not legacy fallbacks. Only the current run
+    summary version is read, and its identity's hashes must be ``hpx``
+    semantic hashes; a summary of another version is refused, naming the
+    version, and is read with the HPX release that wrote it.
     """
     try:
         return _load_result(Path(location))
@@ -182,14 +235,25 @@ def load_result(location: str | Path) -> ProfileResultRecord:
         raise ResultReadError("invalid_evidence", str(exc)) from exc
 
 
-def _load_result(location: Path) -> ProfileResultRecord:
-    path = location / "result_manifest.json" if location.is_dir() else location
+def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
+    path = location
+    if location.is_dir():
+        path = location / _MANIFEST_FILE
+        if (location / _RUN_RESULT_FILE).exists():
+            if path.exists():
+                raise ResultReadError(
+                    "ambiguous_location",
+                    f"{location} holds both {_MANIFEST_FILE} and {_RUN_RESULT_FILE}; name the file",
+                )
+            path = location / _RUN_RESULT_FILE
     root = path.parent.resolve()
     marker = root / RESULT_PUBLICATION_INCOMPLETE
     if marker.exists() or marker.is_symlink():
         raise ResultReadError("incomplete_publication", "Native publication is incomplete")
     raw = path.read_bytes()
     data = _object(raw)
+    if data.get("schema") == RUN_RESULT_SCHEMA:
+        return _load_run(path, raw)
     _schema(data, "hpx.result-manifest", 1)
     manifest = ResultManifest.from_dict(data)
     if manifest.bundle_type != "profile":
@@ -205,12 +269,11 @@ def _load_result(location: Path) -> ProfileResultRecord:
     )
     summary = None
     if summary_data is not None:
-        version = summary_data.get("schema_version")
-        if type(version) is not int or version not in (11, 12, 13, 14, 15):
-            raise ResultReadError(
-                "unsupported_schema", "Supported summary versions: 11, 12, 13, 14, 15"
-            )
-        _schema(summary_data, RUN_SUMMARY_SCHEMA, version)
+        try:
+            _require_current_summary(summary_data)
+        except ValueError as exc:
+            raise ResultReadError("unsupported_schema", str(exc)) from exc
+        _identity_hashes(summary_data)
         if (
             summary_data.get("validity") is not None
             and summary_data["validity"] != manifest.validity.value
@@ -278,6 +341,18 @@ def _load_result(location: Path) -> ProfileResultRecord:
     return ProfileResultRecord(
         root, path.resolve(), len(raw), hashlib.sha256(raw).hexdigest(), manifest, summary, metadata
     )
+
+
+def _load_run(path: Path, raw: bytes) -> RunResultRecord:
+    try:
+        record = read_run(path, raw)
+    except RunResultError as exc:
+        raise ResultReadError(exc.code, str(exc)) from exc
+    except ConfigError as exc:
+        raise ResultReadError("invalid_evidence", str(exc)) from exc
+    if path.read_bytes() != raw:
+        raise ResultReadError("publication_changed", "Run result changed during read")
+    return record
 
 
 def inspect_result(location: str | Path) -> ResultInspection:

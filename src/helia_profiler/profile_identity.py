@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._identity_hash import build_hash, digest, measured_facts
+from ._identity_hash import build_hash, measured_facts
+from ._semantic_hash import semantic_hash
 from .config import CleanWindowProbe
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
-from .engines import EngineType
+from .engines import EngineType, get_adapter
 from .identity import (
     BuildFacts,
     CanonicalKernel,
@@ -26,14 +27,14 @@ from .identity import (
     canonical_engine,
     canonical_kernel,
 )
+from .lifecycle import InstanceBoundary, Lifecycle, first_invoke_window
 from .results.dependencies import DependencyModule, DependencyProvenance
 from .runtime_records import runtime
+from .wire import STIMER_HZ
 
 if TYPE_CHECKING:
     from .pipeline import PipelineContext
-
-#: Profile firmware initializes the engine once and keeps its state across invocations.
-PROFILE_LIFECYCLE = "carry"
+    from .results import PmuResult
 
 _NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 
@@ -41,7 +42,7 @@ _NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 #: TFLM's interpreter and reference kernels live in helia-rt-source, which the
 #: nsx-tflite-micro wrapper requires.
 _RUNTIME_MODULES = {
-    EngineType.TFLM: ("helia-rt-source", "nsx-tflite-micro"),
+    EngineType.LITERT: ("helia-rt-source", "nsx-tflite-micro"),
     EngineType.HELIA_RT: ("nsx-helia-rt",),
 }
 
@@ -60,19 +61,18 @@ def profile_run_identity(ctx: PipelineContext) -> RunIdentity:
         baseline_id=provenance.workspace.baseline_id if provenance else _NO_PROVENANCE,
         dependency_lock_sha256=provenance.lock.sha256.value if provenance else _NO_PROVENANCE,
         model_sha256=model_sha256,
-        inputs_sha256=Unknown("profile firmware feeds zero-filled inputs and pins no input data"),
-        run=RunFacts(
-            lifecycle=PROFILE_LIFECYCLE,
-            iterations=ctx.config.profiling.iterations,
-            warmups=ctx.config.profiling.warmup,
-            timing_scope=_timing_scope(ctx),
-        ),
+        inputs_hash=Unknown("profile firmware feeds zero-filled inputs and pins no input data"),
+        run=_run_facts(ctx),
         producer=_producer(provenance),
         build_hash=_build_hash(ctx, model_sha256),
         observation_hash=(
-            digest(measured_facts(ctx.pmu_result)) if ctx.pmu_result is not None else None
+            _observation_hash(ctx.pmu_result) if ctx.pmu_result is not None else None
         ),
     )
+
+
+def _observation_hash(pmu: PmuResult) -> str:
+    return semantic_hash("observation", measured_facts(pmu))
 
 
 def _module(provenance: DependencyProvenance, name: str) -> DependencyModule | None:
@@ -190,7 +190,7 @@ def _prebuilt_heliart(ctx: PipelineContext) -> bool:
 
 def _links_reference_kernels(ctx: PipelineContext) -> bool:
     config = ctx.config.engine
-    return config.type is EngineType.TFLM and (config.backend or "reference") == "reference"
+    return config.type is EngineType.LITERT and (config.backend or "reference") == "reference"
 
 
 def _build_facts(ctx: PipelineContext) -> BuildFacts:
@@ -233,6 +233,63 @@ def _arena_bytes(ctx: PipelineContext) -> int | Unknown:
     if isinstance(reported, int) and not isinstance(reported, bool):
         return reported
     return Unknown("neither the configuration nor the firmware states an arena size")
+
+
+def _run_facts(ctx: PipelineContext) -> RunFacts:
+    adapter = get_adapter(ctx.config.engine.type)
+    boundary = adapter.instance_boundary
+    # Mirrors firmware/context.py: the clean window always warms up at least once.
+    clean_warmups = max(1, ctx.config.profiling.warmup)
+    clock, clock_hz = _timing_clock(ctx, boundary)
+    return RunFacts(
+        lifecycle=(
+            Lifecycle.SINGLE if adapter.lifecycles == {Lifecycle.SINGLE} else Lifecycle.CARRY
+        ).value,
+        iterations=ctx.config.profiling.iterations,
+        warmups=ctx.config.profiling.warmup,
+        timing_scope=_timing_scope(ctx),
+        instance_boundary=boundary.value,
+        first_invoke_initializer=adapter.first_invoke_initializer(_model_initializer(ctx)),
+        first_invoke_window=first_invoke_window(boundary, clean_warmups),
+        timing_clock=clock,
+        timing_clock_hz=clock_hz,
+        timing_statistic="mean",
+        energy=(
+            Unknown("a profile does not state how its energy is measured")
+            if ctx.config.power.enabled
+            else None
+        ),
+    )
+
+
+def _model_initializer(ctx: PipelineContext) -> bool | Unknown:
+    analysis = ctx.model_analysis
+    if analysis is None or analysis.index_space != "source":
+        return Unknown("the run recorded no analysis of the source model's operators")
+    return any(layer.op == "CALL_ONCE" for layer in analysis.layers)
+
+
+def _timing_clock(
+    ctx: PipelineContext, boundary: InstanceBoundary
+) -> tuple[str | Unknown, int | Unknown]:
+    """The clock the clean window is timed with, as firmware/context.py resolves it."""
+    platform = ctx.run_metadata.platform
+    cpu_hz: int | Unknown = (
+        platform.cpu_clock_mhz * 1_000_000
+        if platform and platform.cpu_clock_mhz
+        else Unknown("the run resolved no CPU clock")
+    )
+    if ctx.config.profiling.clean_window_probe is CleanWindowProbe.BUSY_LOOP:
+        return "stimer", STIMER_HZ
+    if boundary is InstanceBoundary.INVOCATION:
+        # The ExecuTorch window sums the runtime's own execute-cycle counts.
+        return "cpu", cpu_hz
+    if ctx.soc is None:
+        reason = Unknown("the run resolved no SoC")
+        return reason, reason
+    if ctx.soc.capabilities.clock.clean_window_timer == "stimer":
+        return "stimer", STIMER_HZ
+    return "cpu", cpu_hz
 
 
 def _timing_scope(ctx: PipelineContext) -> str:

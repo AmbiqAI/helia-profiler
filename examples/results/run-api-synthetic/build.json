@@ -1,0 +1,248 @@
+{
+  "binding": "hpx.binding/1:sha256:5f8e121b65e5ec79ae5c098fe004a4fe9e1e0d31c771f87f6edd60650fe8389a",
+  "build": {
+    "build": {
+      "aot_arena_scan": [],
+      "aot_outputs": [],
+      "app_dir": {
+        "path": "build/app",
+        "root": "run"
+      },
+      "arena_capacity": 131072,
+      "arena_location": "sram",
+      "binary": {
+        "path": "build/app/main.elf",
+        "root": "run",
+        "sha256": "780d84b20d7ae7e6292919399348bdbf96025270136198083fc8a4da398b5ca9"
+      },
+      "build_identity": "b68d4afdda0f891744f94153a658b627e2c10e7167706eb477eea90ec27ecef3",
+      "built": true,
+      "capabilities": [
+        [
+          "int8",
+          "supported"
+        ]
+      ],
+      "clock_profile": "lp",
+      "cpu_hz": 96000000,
+      "dependency_lock": {
+        "path": "build/evidence/nsx.lock",
+        "root": "run",
+        "sha256": "0c030586945fe504b604ecc2e875c38ede400cd5cd73da9730302162e6b02c6f"
+      },
+      "dependency_state": {
+        "path": "build/evidence/state.json",
+        "root": "run",
+        "sha256": "829e1bfe741e76c53761793cd883330ac5d93ce477a47598c4ae964a4266c4dc"
+      },
+      "engine": "helia-aot",
+      "engine_source": null,
+      "expected": null,
+      "fixture_identity": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "flat_binary": {
+        "path": "build/app/main.bin",
+        "root": "run",
+        "sha256": "6105d6cc76af400325e94d588ce511be5bfdbb73b437dc51eca43917d7a43e3d"
+      },
+      "generated_sources": [
+        {
+          "path": "build/app/main.cc",
+          "root": "run",
+          "sha256": "41cf6794ba4200b839c53531555f0f3998df4cbb01a4d5cb0b94e3ca5e23947d"
+        }
+      ],
+      "inputs": [
+        {
+          "data": {
+            "path": "inputs/input.bin",
+            "root": "run",
+            "sha256": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b"
+          },
+          "role": "signal",
+          "tensor": {
+            "dtype": "int8",
+            "index": 0,
+            "name": "input",
+            "quantization": {
+              "scale": 0.10000000149011612,
+              "zero_point": 0
+            },
+            "shape": [
+              1,
+              8,
+              8,
+              1
+            ]
+          }
+        }
+      ],
+      "intent_identity": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "iterations": 100,
+      "link_map": {
+        "path": "build/app/main.map",
+        "root": "run",
+        "sha256": "60be9861750facbfad8758254a2f76c0cfe78d54459a3bc187d49b1401fcd8e8"
+      },
+      "model": {
+        "path": "inputs/tiny_cnn.tflite",
+        "root": "run",
+        "sha256": "4419dfff1e15e9479ad90b81c7997c4a2db274c87f6433e06cd34698108ac26f"
+      },
+      "output_tensors": [
+        {
+          "dtype": "int8",
+          "index": 13,
+          "name": "probabilities",
+          "quantization": {
+            "scale": 0.00390625,
+            "zero_point": -128
+          },
+          "shape": [
+            1,
+            4
+          ]
+        }
+      ],
+      "outputs": [],
+      "planned_memory": null,
+      "planned_memory_reason": "not_recorded",
+      "provider_provenance": "manifest-declared; independently audit the pinned build/source record",
+      "psram_weights": null,
+      "runtime_manifest": null,
+      "source_initializer_present": false,
+      "state_policy": null,
+      "target": {
+        "board": "apollo510_evb",
+        "device": "AP510NFA-CBR",
+        "load_address": 4259840
+      },
+      "timer_hz": 32768,
+      "timing_scope": "invoke_only",
+      "toolchain": {
+        "cmake_version": "3.31",
+        "compiler": "atfe",
+        "compiler_version": "clang version 22.1.0"
+      },
+      "warmups": 5,
+      "weights_location": "mram"
+    },
+    "fixture_api": [
+      7,
+      0
+    ],
+    "schema_version": 1
+  },
+  "lifecycle": "carry",
+  "plan": {
+    "baseline": {
+      "fingerprint": "be0055f2e94024a186387e3897646530981455ba79517b3aebfb4747288e9f2c",
+      "id": "hpx-neuralspotx-0.8.1-2026-10-19.2"
+    },
+    "environment": {},
+    "hpx_version": "0.3.0",
+    "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+    "local_inputs": [],
+    "model": {
+      "path": "inputs/tiny_cnn.tflite",
+      "sha256": "4419dfff1e15e9479ad90b81c7997c4a2db274c87f6433e06cd34698108ac26f",
+      "size_bytes": 2480
+    },
+    "overrides": [],
+    "qualification": "qualified",
+    "runtime": {
+      "kernels_commit": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
+      "kernels_module": "nsx-cmsis-nn",
+      "name": "helia-aot",
+      "source_commit": null,
+      "unavailable_reason": null,
+      "version": "0.33.0"
+    },
+    "schema": "hpx.frozen-run",
+    "schema_version": 2,
+    "settings": {
+      "build": {
+        "channel": null,
+        "nsx_modules": {},
+        "update_dependencies": false
+      },
+      "engine": {
+        "allow_unsupported_version": false,
+        "backend": null,
+        "config": {},
+        "config_path": null,
+        "type": "helia-aot"
+      },
+      "model": {
+        "arena_location": "sram",
+        "arena_size": 131072,
+        "path": "inputs/tiny_cnn.tflite",
+        "weights_location": "mram"
+      },
+      "power": {
+        "driver": "joulescope",
+        "duration_s": null,
+        "enabled": false,
+        "firmware": "dedicated",
+        "go_gpio_pin": 14,
+        "go_output_index": 0,
+        "ina228": null,
+        "io_voltage": 1.8,
+        "lockstep": null,
+        "mode": "external",
+        "reset_strategy": "auto",
+        "state_gpio_pin": 36,
+        "state_input_index": 1,
+        "stats_rate_hz": 1000,
+        "sync_gpio_pin": 29,
+        "sync_input_index": 0
+      },
+      "profiling": {
+        "aggregation": "median",
+        "clean_window_probe": "infer",
+        "clean_window_trace": false,
+        "extreme_mode": false,
+        "force_shared_sram": false,
+        "iterations": 100,
+        "per_layer": true,
+        "pmu_counters": {
+          "cpu": "default"
+        },
+        "warmup": 5,
+        "window_max": 500000,
+        "window_min": 10,
+        "window_mode": "auto",
+        "window_target_ms": 1000
+      },
+      "target": {
+        "board": "apollo510_evb",
+        "clock": {
+          "cpu": "lp"
+        },
+        "custom_boards": null,
+        "custom_socs": null,
+        "ensure_board_powered": false,
+        "heartbeat": {
+          "enabled": true,
+          "every_ms": 2000,
+          "every_n_ops": 8,
+          "host_timeout_s": 30,
+          "overall_timeout_s": null
+        },
+        "psram": {
+          "clock_hz": 48000000
+        },
+        "rtt_buffer_size_up": null,
+        "segger_rtt_path": null,
+        "toolchain": "atfe",
+        "transport": "rtt"
+      }
+    },
+    "toolchain": {
+      "name": "atfe",
+      "unavailable_reason": null,
+      "version": "clang version 22.1.0"
+    }
+  },
+  "schema": "hpx.compiled-build",
+  "schema_version": 3
+}

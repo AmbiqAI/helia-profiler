@@ -9,12 +9,14 @@ import yaml
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.matrix import (
     BOARDS,
     MODELS,
     CaseSpec,
     ExecuTorchBackend,
     MemoryProfile,
+    load_model_file,
 )
 from helia_profiler.validation.runner import (
     CaseResult,
@@ -61,6 +63,7 @@ def test_power_health_rejects_invalid_gate_integrity():
         total_cycles=123456,
         energy_uj=100.0,
         gate_duration_integrity_valid=False,
+        gate_duration_unarbitrated_failure=True,
     )
 
     assert validation_health_issues(result) == (
@@ -93,6 +96,7 @@ def test_power_health_accepts_arbitrated_drift():
             "window ran 11.8% short of the profile-phase expectation but "
             "agrees with the firmware's own STIMER window time"
         ),
+        gate_duration_unarbitrated_failure=False,
     )
 
     assert validation_health_issues(result) == ()
@@ -253,20 +257,20 @@ def test_build_config_aot_discovers_neuralspotx_monorepo_checkout(tmp_path: Path
     assert cfg["engine"]["config"]["cmsis_nn_path"] == str(cmsis_nn)
 
 
-def test_build_config_tflm_selects_upstream_cmsis_nn_backend(tmp_path: Path):
+def test_build_config_litert_selects_upstream_cmsis_nn_backend(tmp_path: Path):
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     output_dir = tmp_path / "out"
     case = CaseSpec(
         model=MODELS["kws"],
-        engine=EngineType.TFLM,
+        engine=EngineType.LITERT,
         power=False,
         board=BOARDS["apollo510_evb"],
     )
 
     cfg = _build_config(case, repo_root=repo_root, output_dir=output_dir)
 
-    assert cfg["engine"] == {"type": "tflm", "backend": "cmsis_nn"}
+    assert cfg["engine"] == {"type": "litert", "backend": "cmsis_nn"}
 
 
 @pytest.mark.parametrize("backend", [ExecuTorchBackend.ARM, ExecuTorchBackend.NS])
@@ -370,6 +374,8 @@ def test_run_case_retries_once_on_transient_joulescope_lock(tmp_path: Path, monk
         (case_dir / "summary.json").write_text(
             json.dumps(
                 {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                     "layers": 13,
                     "total_cycles": 123456,
                     "power": {
@@ -430,6 +436,8 @@ def test_run_case_uses_current_python_for_subprocess(tmp_path: Path, monkeypatch
         (case_dir / "summary.json").write_text(
             json.dumps(
                 {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                     "layers": 13,
                     "total_cycles": 123456,
                     "latency": {
@@ -486,7 +494,16 @@ def test_run_case_writes_full_child_log(tmp_path: Path, monkeypatch):
         config_path = Path(cmd[-1])
         case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
         return subprocess.CompletedProcess(
             cmd, 0, stdout="child stdout marker\n", stderr="child stderr marker\n"
         )
@@ -525,7 +542,16 @@ def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
         config_path = Path(cmd[cmd.index("--config") + 1])
         case_dir = Path(yaml.safe_load(config_path.read_text())["output"]["dir"])
         case_dir.mkdir(parents=True, exist_ok=True)
-        (case_dir / "summary.json").write_text(json.dumps({"layers": 13, "total_cycles": 123456}))
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
         return subprocess.CompletedProcess(cmd, 0, stdout="ok\n", stderr="")
 
     monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
@@ -536,3 +562,49 @@ def test_run_case_verbose_appends_v_flag(tmp_path: Path, monkeypatch):
 
     assert result.status == "pass"
     assert seen["cmd"][-1] == "-v"
+
+
+def test_run_case_carries_model_labels_on_every_path(tmp_path: Path, monkeypatch):
+    (tmp_path / "kws.tflite").write_bytes(b"model")
+    registry = tmp_path / "zoo.yml"
+    registry.write_text(
+        "models:\n"
+        "  mlperf-tiny-kws-a8w8:\n"
+        "    path: kws.tflite\n"
+        "    family: mlperf-tiny-kws\n"
+        "    precision: a8w8\n"
+        "    source: zoo://mlperf-tiny-kws/a8w8@abc\n"
+    )
+    case = CaseSpec(
+        model=load_model_file(registry)["mlperf-tiny-kws-a8w8"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo510_evb"],
+    )
+    labels = ("mlperf-tiny-kws", "a8w8", "zoo://mlperf-tiny-kws/a8w8@abc")
+
+    def passing_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, timeout, check, env
+        config = yaml.safe_load(Path(cmd[-1]).read_text(encoding="utf-8"))
+        case_dir = Path(config["output"]["dir"])
+        (case_dir / "summary.json").write_text(
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "layers": 13,
+                    "total_cycles": 123456,
+                }
+            )
+        )
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def hung_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, check, env
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    for fake_run, status in ((passing_run, "pass"), (hung_run, "fail")):
+        monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+        result = run_case(case=case, repo_root=tmp_path, output_root=tmp_path / status, timeout_s=1)
+        assert result.status == status
+        assert (result.family, result.precision, result.source) == labels

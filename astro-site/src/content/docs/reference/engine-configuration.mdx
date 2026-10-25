@@ -72,7 +72,7 @@ Prepared runtime records also describe an already-built archive. Prepared
 heliaRT rejects explicit `variant`, `core_override` and
 `cmsis_nn_requantize_inline_asm`, including explicit default or false values,
 as well as the ineffective CMSIS-NN selectors. Choose a suitable prepared
-runtime or build from source instead. Both prepared and ordinary heliaRT/TFLM
+runtime or build from source instead. Both prepared and ordinary heliaRT/LiteRT
 reject `engine.config_path`; these engines do not read that file. Supported
 settings belong inline in `engine.config`.
 
@@ -147,9 +147,10 @@ at AOT compilation with the operator name.
 | `aot_args` | `{}` | Pass-through arguments to the compiler, including the per-tensor memory rules described on [Memory placement](../../guide/memory/#heliaaot-per-tensor-placement). |
 | `platform_name` | from the board | Override the board to AOT platform mapping. |
 
-### TFLM
+### LiteRT
 
-`tflm` is the upstream interpreter baseline. It uses the separate
+`litert` is the upstream interpreter baseline, LiteRT for Microcontrollers
+(TensorFlow Lite Micro). It uses the separate
 `nsx-tflite-micro` port and selects either reference kernels or upstream
 CMSIS-NN; it does not enable heliaRT's HELIA backend. Use it to measure
 what heliaRT's kernels buy on your model.

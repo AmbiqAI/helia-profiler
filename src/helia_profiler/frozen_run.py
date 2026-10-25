@@ -6,8 +6,8 @@ and its override classification, the model's hash, the toolchain's identity,
 the engine identity a profile build uses, and every local file or directory
 the build reads. Host-local settings (probe serials, ports, output and work
 directories, timeouts) are not stored; :meth:`FrozenRun.config` takes them
-for the replaying host. ``intent_hash`` identifies what the plan asks for and
-excludes the HPX release.
+for the replaying host. ``intent_hash``, an ``hpx.intent`` semantic hash,
+identifies what the plan asks for and excludes the HPX release.
 """
 
 from __future__ import annotations
@@ -21,14 +21,18 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
+from ._files import write_text_atomically
+from ._semantic_hash import require, semantic_hash
 from .errors import ConfigError
 
 if TYPE_CHECKING:
+    from ._fixture_build import TypedFixture
+    from .compiled_build import CompiledBuild
     from .config import ProfileConfig
     from .deps.compatibility import CompatibilityResolution
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
-FROZEN_RUN_SCHEMA_VERSION = 1
+FROZEN_RUN_SCHEMA_VERSION = 2
 
 _T = TypeVar("_T")
 
@@ -106,6 +110,9 @@ class FrozenModel:
     size_bytes: int
 
 
+_VERSION_SEPARATOR = " | "
+
+
 @dataclass(frozen=True)
 class ToolchainIdentity:
     """The compiler a plan expects: name and exact version, never a path.
@@ -118,6 +125,11 @@ class ToolchainIdentity:
     name: str
     version: str | None
     unavailable_reason: str | None = None
+
+    @property
+    def lines(self) -> tuple[str, ...]:
+        """The version-bearing lines ``version`` joins, or none when it is unknown."""
+        return tuple(self.version.split(_VERSION_SEPARATOR)) if self.version else ()
 
 
 @dataclass(frozen=True)
@@ -185,7 +197,7 @@ class FrozenRun:
 
     @property
     def intent_hash(self) -> str:
-        """SHA-256 of what this plan asks for; the HPX release is not part of it."""
+        """The ``hpx.intent`` hash of what this plan asks for; the HPX release is not part of it."""
         return self._intent
 
     @property
@@ -228,7 +240,18 @@ class FrozenRun:
             raise ConfigError(f"Not a frozen run plan: schema {data.get('schema')!r}")
         version = data.get("schema_version")
         if type(version) is not int or version != FROZEN_RUN_SCHEMA_VERSION:
-            raise ConfigError(f"Unsupported frozen run plan version: {version!r}")
+            raise ConfigError(
+                f"Unsupported frozen run plan version: {version!r}",
+                hint=f"This heliaPROFILER reads version {FROZEN_RUN_SCHEMA_VERSION}; "
+                "freeze the plan again.",
+            )
+        try:
+            require(data.get("intent_hash"), "intent")
+        except ValueError as exc:
+            raise ConfigError(
+                f"Frozen run plan's intent hash is malformed: {exc}",
+                hint="The plan was saved by another heliaPROFILER or edited; freeze the plan again.",
+            ) from exc
         try:
             settings = data["settings"]
             if not isinstance(settings, Mapping) or not isinstance(settings.get("model"), Mapping):
@@ -272,10 +295,11 @@ class FrozenRun:
     def save(self, path: str | Path) -> Path:
         """Write the plan as JSON and return its path."""
         target = Path(path).expanduser()
-        target.parent.mkdir(parents=True, exist_ok=True)
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
-        with target.open("w", encoding="utf-8", newline="\n") as stream:
-            stream.write(text)
+        try:
+            write_text_atomically(target, text)
+        except OSError as exc:
+            raise ConfigError(f"Cannot save frozen run plan to {target}: {exc}") from exc
         return target
 
     @classmethod
@@ -340,6 +364,12 @@ class FrozenRun:
         replayed = load_config(None, settings)
         _check_replay(self, freeze_config(replayed))
         return replayed
+
+    def build(self, fixture: TypedFixture, **options: Any) -> CompiledBuild:
+        """Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`."""
+        from .compiled_build import build
+
+        return build(self, fixture, **options)
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:
@@ -424,7 +454,7 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     effective: dict[str, str] = {}
     if config.target.segger_rtt_path is None and _uses_rtt(config):
         effective["SEGGER_RTT_PATH"] = environment["SEGGER_RTT_PATH"]
-    if engine is not EngineType.TFLM:
+    if engine is not EngineType.LITERT:
         provider = cmsis_nn_provider_module(engine.value, _effective_backend(config))
         selected = select_cmsis_nn_override(engine_config, provider_module=provider)
         if selected is not None and selected.selector == "env.CMSIS_NN_PATH":
@@ -608,14 +638,14 @@ def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
     ]
     if not lines:
         return ToolchainIdentity(name, None, f"{command} --version reported no version")
-    return ToolchainIdentity(name, " | ".join(lines))
+    return ToolchainIdentity(name, _VERSION_SEPARATOR.join(lines))
 
 
 def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     from .engines import EngineType
     from .engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
     from .engines.helia_rt.artifacts import HELIART_MODULE
-    from .engines.tflm import TFLITE_MICRO_MODULE
+    from .engines.litert import TFLITE_MICRO_MODULE
     from .runtime_records import runtime
 
     baseline = config.compatibility_baseline
@@ -632,11 +662,11 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
 
     engine = config.engine.type
     backend = config.engine.backend
-    if engine is EngineType.TFLM:
-        # TFLM's modules take no build.nsx_modules override or CMSIS-NN selector.
+    if engine is EngineType.LITERT:
+        # LiteRT's modules take no build.nsx_modules override or CMSIS-NN selector.
         module = None if (backend or "reference") == "reference" else ARM_CMSIS_NN_MODULE
         return FrozenRuntime(
-            "tflm",
+            "litert",
             None,
             baseline.module(TFLITE_MICRO_MODULE).ref,
             module,
@@ -722,8 +752,13 @@ def _intent_hash(plan: FrozenRun) -> str:
         "environment": _thaw(plan.environment),
         "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    try:
+        return semantic_hash("intent", payload)
+    except ValueError as exc:
+        raise ConfigError(
+            "A frozen run plan cannot hold a non-finite number",
+            hint="Set a finite value, or leave the setting at its default.",
+        ) from exc
 
 
 def _setting_path(setting: str) -> tuple[str, ...]:

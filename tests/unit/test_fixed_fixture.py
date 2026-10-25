@@ -56,7 +56,7 @@ def fixture(tmp_path):
             arena_location=Placement.SRAM,
             weights_location=Placement.MRAM,
         ),
-        engine=EngineConfig(type=EngineType.TFLM, backend="cmsis_nn"),
+        engine=EngineConfig(type=EngineType.LITERT, backend="cmsis_nn"),
         target=TargetConfig(
             board="apollo510_evb", toolchain=Toolchain.ATFE, clock=ClockSelection(cpu="lp")
         ),
@@ -118,7 +118,7 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
         pytest.fail("pipeline reached")
 
     monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", forbidden)
-    with pytest.raises(Exception, match="upstream"):
+    with pytest.raises(Exception, match="LiteRT"):
         build_fixed_fixture(
             replace(c, engine=EngineConfig(type=EngineType.EXECUTORCH)),
             f,
@@ -130,7 +130,7 @@ def test_hash_or_unsupported_config_stops_before_pipeline(tmp_path, monkeypatch)
         build_fixed_fixture(c, f, method=METHOD, runtime=rt)
 
 
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 @pytest.mark.parametrize("aot_plan_available", [False, True])
 def test_host_only_stage_selection_and_source_receipt(
     tmp_path, monkeypatch, engine, aot_plan_available
@@ -139,7 +139,7 @@ def test_host_only_stage_selection_and_source_receipt(
     rt = runtime(tmp_path)
     mock_analysis(monkeypatch, f, engine)
     c = replace(c, engine=EngineConfig(type=engine, backend="cmsis_nn"))
-    selected_runtime = rt if engine is EngineType.TFLM else None
+    selected_runtime = rt if engine is EngineType.LITERT else None
     calls = []
     elf_bytes = b"elf"
     compiler_version = "qualified-compiler"
@@ -272,8 +272,8 @@ def test_host_only_stage_selection_and_source_receipt(
 
     assert r.engine is engine
     assert r.psram_weights is None
-    assert (r.runtime_manifest is not None) == (engine is EngineType.TFLM)
-    if engine is EngineType.TFLM:
+    assert (r.runtime_manifest is not None) == (engine is EngineType.LITERT)
+    if engine is EngineType.LITERT:
         declared = json.loads(rt.manifest.read())["providers"]
         assert r.kernel_source == FixtureKernelSource(
             "arm-cmsis-nn", declared["cmsis-nn"]["url"], None, declared["cmsis-nn"]["revision"]
@@ -535,7 +535,7 @@ def test_build_refuses_a_flat_image_capture_cannot_flash(tmp_path, monkeypatch, 
 def test_power_build_validates_linked_terminal_before_returning_receipt(
     tmp_path, monkeypatch, sink_size
 ):
-    from helia_profiler.fixture import FixturePowerSync
+    from helia_profiler import FixturePowerSync
     from tests.unit.test_fixture_capture import image_files
 
     c, f = fixture(tmp_path)

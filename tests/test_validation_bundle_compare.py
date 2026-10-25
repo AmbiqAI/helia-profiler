@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.errors import ReportError, ValidationBundleError
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.bundle import SCHEMA_VERSION, load_validation_bundle
 from helia_profiler.validation.compare import (
     CaseOutcome,
@@ -15,6 +16,7 @@ from helia_profiler.validation.compare import (
 )
 from helia_profiler.validation.report import write_validation_reports
 from helia_profiler.validation.runner import CaseResult
+from tests.result_bundles import publish_manifest
 
 pytestmark = pytest.mark.usefixtures("missing_git_metadata")
 
@@ -27,7 +29,13 @@ def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: in
     case_dir.mkdir(parents=True)
     (case_dir / "summary.json").write_text(
         json.dumps(
-            {"total_cycles": cycles, "layers": 1, "latency": {"device_profiled_infer_avg_us": 10}}
+            {
+                "schema": "hpx.run-summary",
+                "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                "total_cycles": cycles,
+                "layers": 1,
+                "latency": {"device_profiled_infer_avg_us": 10},
+            }
         )
     )
     (case_dir / "run_metadata.json").write_text(
@@ -52,6 +60,7 @@ def _write_bundle(root: Path, cycles: int, *, attempt: int = 1, repeat_total: in
         writer.writeheader()
         writer.writerow({"id": 0, "op": "CONV_2D", "cycles": cycles, "overflow": False})
     (case_dir / "config.yml").write_text("model: {}\n")
+    publish_manifest(case_dir)
     write_validation_reports(
         [
             CaseResult(
@@ -168,42 +177,63 @@ def test_loader_exposes_run_origin_metadata(tmp_path: Path) -> None:
     assert metadata.github_run_url.endswith("/actions/runs/31033041861")
 
 
-@pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5, 6])
-def test_loader_supports_all_manifest_schemas(tmp_path: Path, schema_version: int) -> None:
-    bundle = tmp_path / f"bundle-v{schema_version}"
+def test_loader_reads_the_current_manifest_schema(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+
+    loaded = load_validation_bundle(bundle)
+
+    assert loaded.schema_version == SCHEMA_VERSION == 6
+    assert loaded.warnings == ()
+    assert loaded.cases[0].identity.comparison_group == "kws"
+
+
+def test_loader_reads_optional_model_metadata(tmp_path: Path) -> None:
+    bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    manifest["schema_version"] = schema_version
-    if schema_version < 5:
-        manifest["cases"][0]["identity"].pop("cmsis_nn_provider")
-    if schema_version in (4, 5):
-        manifest["validation"] = {"suite": "smoke"}
-        manifest["cases"][0]["identity"]["comparison_group"] = "kws"
-        manifest["cases"][0]["repeat"] = {"attempt": 1, "total": 1}
-    elif schema_version in (2, 3):
-        manifest["cases"][0]["identity"].pop("comparison_group", None)
-    elif schema_version == 1:
-        case = manifest["cases"][0]
-        identity = case.pop("identity")
-        case.update(
-            {
-                **identity,
-                "memory": "auto",
-                "power": False,
-                "artifacts": {name: value["path"] for name, value in case["artifacts"].items()},
-            }
-        )
+    assert "model" not in manifest["cases"][0]
+    assert load_validation_bundle(bundle).cases[0].model == ()
+    manifest["cases"][0]["model"] = {"family": "mlperf-tiny-kws", "precision": "fp32"}
     manifest_path.write_text(json.dumps(manifest))
 
     loaded = load_validation_bundle(bundle)
 
-    assert loaded.schema_version == schema_version
-    assert loaded.cases[0].identity.comparison_group == "kws"
-    assert dict(loaded.cases[0].resources) == {}
+    assert dict(loaded.cases[0].model) == {"family": "mlperf-tiny-kws", "precision": "fp32"}
 
 
-def test_schema_v4_comparison_group_controls_matching(tmp_path: Path) -> None:
+@pytest.mark.parametrize("model", [["fp32"], {"precision": 32}])
+def test_loader_rejects_invalid_model_metadata(tmp_path: Path, model: object) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["model"] = model
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError, match="invalid model"):
+        load_validation_bundle(bundle)
+
+
+@pytest.mark.parametrize("schema_version", [1, 2, 3, 4, 5])
+def test_loader_refuses_a_previous_manifest_schema(tmp_path: Path, schema_version: int) -> None:
+    bundle = tmp_path / "bundle"
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["schema_version"] = schema_version
+    manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValidationBundleError) as refused:
+        load_validation_bundle(bundle)
+    assert str(refused.value) == (
+        f"Unsupported validation manifest schema_version: {schema_version}; this "
+        "heliaPROFILER reads version 6, so read the bundle with the HPX release that wrote it"
+    )
+
+
+def test_comparison_group_controls_matching(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline"
     candidate = tmp_path / "candidate"
     _write_bundle(baseline, 100)
@@ -330,7 +360,7 @@ def test_loader_distinguishes_cmsis_nn_providers(tmp_path: Path) -> None:
     ("engine", "backend", "provider"),
     [
         ("executorch", "arm", "ns"),
-        ("tflm", "cmsis_nn", "ns"),
+        ("litert", "cmsis_nn", "ns"),
         ("helia-rt", None, "arm"),
         ("helia-aot", None, "arm"),
     ],
@@ -351,7 +381,7 @@ def test_loader_rejects_contradictory_provider_identity(
         load_validation_bundle(bundle)
 
 
-def test_loader_requires_provider_in_schema_v5(tmp_path: Path) -> None:
+def test_loader_requires_the_cmsis_nn_provider(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
     _write_bundle(bundle, 100)
     manifest_path = bundle / "validation_manifest.json"
@@ -365,65 +395,14 @@ def test_loader_requires_provider_in_schema_v5(tmp_path: Path) -> None:
 
 def test_loader_rejects_unsafe_artifact_path(tmp_path: Path) -> None:
     bundle = tmp_path / "bundle"
-    bundle.mkdir()
-    manifest = {
-        "schema_version": 2,
-        "cases": [
-            {
-                "case_id": "bad",
-                "status": "pass",
-                "identity": {
-                    "model_id": "kws",
-                    "engine": "helia-rt",
-                    "board": "apollo510_evb",
-                    "toolchain": "arm-none-eabi-gcc",
-                    "transport": "rtt",
-                    "requested_memory": {"preset": "auto"},
-                    "requested_power": {"enabled": False},
-                    "attempt": 1,
-                },
-                "health_issues": [],
-                "provenance": {},
-                "artifacts": {"case_dir": {"path": "../escape", "available": True}},
-            }
-        ],
-    }
-    (bundle / "validation_manifest.json").write_text(json.dumps(manifest))
+    _write_bundle(bundle, 100)
+    manifest_path = bundle / "validation_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["cases"][0]["artifacts"]["case_dir"] = {"path": "../escape", "available": True}
+    manifest_path.write_text(json.dumps(manifest))
 
     with pytest.raises(ValidationBundleError, match="Unsafe artifact path"):
         load_validation_bundle(bundle)
-
-
-def test_loader_accepts_v1_and_infers_terminal_repeat_suffix(tmp_path: Path) -> None:
-    bundle = tmp_path / "bundle"
-    case_dir = bundle / "board-model-rt-gcc-rtt-auto-run02"
-    case_dir.mkdir(parents=True)
-    manifest = {
-        "schema_version": 1,
-        "cases": [
-            {
-                "case_id": case_dir.name,
-                "status": "pass",
-                "model_id": "model",
-                "engine": "helia-rt",
-                "board": "board",
-                "toolchain": "gcc",
-                "transport": "rtt",
-                "memory": "auto",
-                "power": False,
-                "artifacts": {"case_dir": case_dir.name},
-            }
-        ],
-    }
-    (bundle / "validation_manifest.json").write_text(json.dumps(manifest))
-
-    loaded = load_validation_bundle(bundle)
-
-    assert loaded.cases[0].identity.attempt == 2
-    case_dir_artifact = loaded.cases[0].artifact("case_dir")
-    assert case_dir_artifact is not None
-    assert case_dir_artifact.available is True
-    assert "schema v1" in loaded.warnings[0]
 
 
 def test_validation_output_directory_must_be_empty(tmp_path: Path) -> None:

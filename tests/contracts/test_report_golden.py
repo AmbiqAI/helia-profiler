@@ -358,7 +358,7 @@ def _sample_run_metadata() -> RunMetadata:
         hpx_version="0.1.0",
         run_id="fixed-run-id",
         timestamp="2026-06-10T00:00:00+00:00",
-        config_snapshot={"model": {"path": "test.tflite"}, "engine": {"type": "tflm"}},
+        config_snapshot={"model": {"path": "test.tflite"}, "engine": {"type": "litert"}},
         platform=PlatformInfo(
             board="apollo510_evb",
             soc="apollo510",

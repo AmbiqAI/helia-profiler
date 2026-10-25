@@ -3,6 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Keep trust-tool updates independent of the firmware compiler baseline.
+    nixpkgs-trust.url = "github:NixOS/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504";
     pyproject-nix = {
       url = "github:pyproject-nix/pyproject.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -34,6 +36,7 @@
     {
       self,
       nixpkgs,
+      nixpkgs-trust,
       pyproject-nix,
       uv2nix,
       pyproject-build-systems,
@@ -61,10 +64,23 @@
       baseline = lib.importJSON ./src/helia_profiler/data/compatibility-baseline-v1.json;
       compat = import ./nix/compat.nix { inherit lib baseline heliaAot; };
 
+      certificateTools = forAllSystems (
+        system:
+        import ./nix/certificate-tools.nix {
+          pkgs = import nixpkgs { inherit system; };
+        }
+      );
+
       mkPkgs =
         system:
         import nixpkgs {
           inherit system;
+          overlays = [
+            (final: prev: {
+              inherit (import nixpkgs-trust { inherit system; }) uv;
+              inherit (certificateTools.${system}) python312;
+            })
+          ];
           config.allowUnfreePredicate =
             pkg:
             builtins.elem (lib.getName pkg) [
@@ -121,6 +137,7 @@
               rev = self.rev or self.dirtyRev or null;
               narHash = self.narHash or null;
               nixpkgs = nixpkgs.rev or nixpkgs.narHash or null;
+              nixpkgs-trust = nixpkgs-trust.rev or nixpkgs-trust.narHash or null;
             };
             helia-aot = {
               inherit (heliaAot) version lockedVersion;
@@ -265,15 +282,7 @@
           c = components.${system};
           editablePythonSet = c.pythonSet.overrideScope editableOverlay;
           devEnv = editablePythonSet.mkVirtualEnv "helia-profiler-dev-env" workspace.deps.all;
-          contributorPreCommit = c.pkgs.pre-commit.overridePythonAttrs (_: rec {
-            version = "4.6.0";
-            src = c.pkgs.fetchFromGitHub {
-              owner = "pre-commit";
-              repo = "pre-commit";
-              tag = "v${version}";
-              hash = "sha256-WfajnE1PktzNs0Tand51/qUWEULGZqSNH48Ivu67kA8=";
-            };
-          });
+          contributorPreCommit = certificateTools.${system}.preCommit;
         in
         rec {
           default = c.pkgs.mkShell {
@@ -287,6 +296,7 @@
             env = {
               ATFE_ROOT = "${c.atfe}";
               HPX_JLINK_DLL = c.jlinkLibrary;
+              SSL_CERT_FILE = "${(import nixpkgs-trust { inherit system; }).cacert}/etc/ssl/certs/ca-bundle.crt";
               UV_NO_SYNC = "1";
               UV_PYTHON = editablePythonSet.python.interpreter;
               UV_PYTHON_DOWNLOADS = "never";
@@ -342,6 +352,19 @@
             ) (throw "uv.lock has no helia-aot entry") (lib.importTOML ./uv.lock).package).sdist.url;
         in
         {
+          certificate-tools =
+            assert lib.assertMsg (lib.versionAtLeast c.pkgs.uv.version "0.13.4")
+              "Nix uv must have patched certificate trust";
+            c.pkgs.runCommand "helia-profiler-certificate-tools" { } ''
+              ${c.pkgs.uv}/bin/uv --version
+              ${c.pkgs.python312}/bin/python -c 'import ensurepip; assert ensurepip.version() == "26.2.2"'
+              ${
+                certificateTools.${system}.virtualenv
+              }/bin/virtualenv --no-periodic-update --no-download --app-data "$TMPDIR/app-data" --python ${c.pkgs.python312}/bin/python "$TMPDIR/seeded"
+              "$TMPDIR/seeded/bin/python" -c 'import pip; assert pip.__version__ == "26.2.2"'
+              ${certificateTools.${system}.preCommit}/bin/pre-commit --version
+              touch "$out"
+            '';
           # The real baseline commit is mapped to a release in nix/compat.nix.
           compat-baseline =
             assert lib.assertMsg compat.baselineMapped compat.unmappedMessage;

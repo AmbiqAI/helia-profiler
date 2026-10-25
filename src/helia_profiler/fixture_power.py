@@ -16,6 +16,11 @@ from .power.sync import SyncWiring
 if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest, FixtureTiming
 
+#: The only rail-energy scope a fixture capture measures: the whole rail over
+#: the timed restore-and-invoke loop, with nothing subtracted.
+GROSS_RAIL_SCOPE = "gross_rail_restore_and_invoke"
+NO_SUBTRACTION = "none"
+
 
 @dataclass(frozen=True)
 class FixturePowerSync:
@@ -30,7 +35,7 @@ class FixturePowerSync:
         pins = (self.sync_gpio_pin, self.state_gpio_pin, self.go_gpio_pin)
         if any(type(p) is not int or not 0 <= p <= 255 for p in pins) or len(set(pins)) != 3:
             raise ValueError("Three distinct GPIO numbers required")
-        if type(self.protocol_version) is not int or self.protocol_version not in (1, 2):
+        if type(self.protocol_version) is not int or self.protocol_version != 2:
             raise ValueError("Unsupported fixture power protocol")
 
 
@@ -276,10 +281,10 @@ def fixture_rail_energy(
     raw.read()
     return FixtureRailEnergy(
         timing.iterations,
-        "gross_rail_restore_and_invoke",
+        GROSS_RAIL_SCOPE,
         request.rail,
         request.serial,
-        "none",
+        NO_SUBTRACTION,
         window.duration_s,
         window.avg_power_w,
         window.avg_current_a,

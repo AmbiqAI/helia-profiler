@@ -94,7 +94,7 @@ def test_auto_mode_falls_back_without_analysis():
 
 def test_non_rt_engines_ignore_auto_mode():
     plan = build_resolver_plan(
-        engine_type=EngineType.TFLM,
+        engine_type=EngineType.LITERT,
         engine_config={"resolver_ops": "auto"},
         model_analysis=_analysis("CONV_2D"),
     )

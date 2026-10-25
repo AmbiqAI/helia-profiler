@@ -12,6 +12,8 @@ if TYPE_CHECKING:
     from ..modelcost import ModelAnalysis
 
 from ..config import ProfileConfig
+from ..identity import Unknown
+from ..lifecycle import InstanceBoundary, Lifecycle
 from ..placement import ArenaRole, Placement
 from ..results import MemoryPlan, NsxModuleRef
 from . import EngineType
@@ -29,7 +31,7 @@ class PsramWeightsSource(StrEnum):
 
     #: Firmware initialises PSRAM, emits ``HPX_PSRAM_READY``, and waits for
     #: the host to write the model image over J-Link and answer ``HPX_GO``.
-    #: The interpreter engines (TFLM, heliaRT) work this way: their weights
+    #: The interpreter engines (LiteRT, heliaRT) work this way: their weights
     #: are a host-side flatbuffer the firmware cannot embed.
     HOST_UPLOAD = "host_upload"
 
@@ -92,7 +94,7 @@ class EngineSource:
 class EngineArtifacts:
     """Common core of the outputs produced by an engine adapter's prepare step.
 
-    Every adapter returns a per-engine subclass (:class:`TflmArtifacts`,
+    Every adapter returns a per-engine subclass (:class:`LiteRtArtifacts`,
     :class:`HeliaRtArtifacts`, :class:`HeliaAotArtifacts`,
     :class:`ExecutorchArtifacts`).  This base carries what *every* engine
     produces plus the preparation facts any engine may report (``source``,
@@ -146,7 +148,7 @@ class EngineArtifacts:
             # exists to make loud).
             raise TypeError(
                 "EngineArtifacts is abstract - construct the engine's artifact "
-                "type (TflmArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
+                "type (LiteRtArtifacts, HeliaRtArtifacts, HeliaAotArtifacts, "
                 "ExecutorchArtifacts) instead."
             )
         pinned = type(self)._PINNED_ENGINE_TYPE
@@ -181,12 +183,12 @@ class EngineArtifacts:
 
 
 @dataclass(frozen=True, kw_only=True)
-class TflmArtifacts(EngineArtifacts):
-    """Stock TFLM adapter outputs — the common core, nothing more."""
+class LiteRtArtifacts(EngineArtifacts):
+    """LiteRT adapter outputs — the common core, nothing more."""
 
-    engine_type: EngineType = EngineType.TFLM
+    engine_type: EngineType = EngineType.LITERT
 
-    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.TFLM
+    _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.LITERT
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -382,6 +384,40 @@ class EngineAdapter(Protocol):
         """
         ...
 
+    @property
+    def lifecycles(self) -> frozenset[Lifecycle]:
+        """The state lifecycles this engine's own firmware implements.
+
+        Consulted by :func:`~helia_profiler.lifecycle.require_lifecycle`,
+        which refuses any other lifecycle with :meth:`lifecycle_refusal`.
+        Declared per adapter, never inferred from the model graph.
+        """
+        ...
+
+    def lifecycle_refusal(self, lifecycle: Lifecycle) -> str:
+        """Why this engine's firmware cannot run *lifecycle*.
+
+        Called only for a lifecycle outside :attr:`lifecycles`; the message
+        names the engine and the firmware behaviour that rules it out.
+        """
+        ...
+
+    @property
+    def instance_boundary(self) -> InstanceBoundary:
+        """Whether this engine's firmware keeps one model instance per boot or per invocation."""
+        ...
+
+    def first_invoke_initializer(self, model_initializer: bool | Unknown) -> bool | Unknown:
+        """Whether the first invocation of an instance runs the model's one-time initializer.
+
+        *model_initializer* is whether the source model declares one (a
+        LiteRT ``CALL_ONCE``), or why that is unknown. An engine that runs
+        the initializer before the first invocation answers ``False``
+        whatever the model declares; ``Unknown`` carries the reason HPX
+        cannot tell.
+        """
+        ...
+
     def placement_config(self, config: ProfileConfig) -> ProfileConfig:
         """Return ``config`` with the engine settings its requested placement implies.
 
@@ -421,7 +457,7 @@ class EngineAdapter(Protocol):
 class SingleArenaPlacementMixin:
     """No-op capability-hook defaults for single-arena engines.
 
-    Engines whose firmware template manages one arena (TFLM, heliaRT,
+    Engines whose firmware template manages one arena (LiteRT, heliaRT,
     ExecuTorch) share these identity implementations; AOT-style engines
     override these hooks with real placement logic.
     """
@@ -440,7 +476,7 @@ class SingleArenaPlacementMixin:
     def check_psram_placement(self, config: ProfileConfig) -> None:
         # Single-arena engines have no engine-specific PSRAM config to
         # validate: either the shared host-upload path serves them
-        # (TFLM, heliaRT) or preflight already refused the placement via
+        # (LiteRT, heliaRT) or preflight already refused the placement via
         # ``psram_weights_source`` (ExecuTorch).  Each adapter still
         # declares that property itself — this mixin deliberately does
         # not, so a new engine cannot inherit a PSRAM story by accident.

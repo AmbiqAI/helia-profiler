@@ -6,16 +6,18 @@ from dataclasses import replace
 
 import pytest
 from test_fixture_record import _build
-from test_fixture_request import _request
 from test_typed_fixture import METHOD, analysis_of, config_for, typed
 
 from helia_profiler._fixture_build import FixtureRenderSpec
 from helia_profiler._fixture_ram import decode_ram
-from helia_profiler._fixture_record import compiled_fixture_identity
+from helia_profiler._fixture_record import (
+    compiled_fixture_identity,
+    dump_fixture_build,
+    load_fixture_build,
+)
 from helia_profiler.engines import EngineType
 from helia_profiler.firmware.fixture import fixture_template_vars
 from helia_profiler.firmware.render import _jinja_env
-from helia_profiler.fixture import dump_fixture_build, load_fixture_build
 from helia_profiler.fixture_image import ContractError, fixture_sink_sizes
 from helia_profiler.pipeline import PipelineContext
 
@@ -72,8 +74,6 @@ def test_stack_checksum_and_absent_image_bounds_refused():
 
 
 def test_ram_option_is_identity_bound_and_round_trips(tmp_path):
-    request = _request(tmp_path)
-    assert replace(request, observe_ram=True).intent_identity != request.intent_identity
     build = _build(tmp_path)
     changed = replace(build, observe_ram=True)
     changed = replace(changed, build_identity=compiled_fixture_identity(changed))
@@ -81,14 +81,12 @@ def test_ram_option_is_identity_bound_and_round_trips(tmp_path):
     record = dump_fixture_build(changed, roots={"run": tmp_path})
     assert load_fixture_build(record, roots={"run": tmp_path}) == changed
     body = json.loads(record)
-    body["fixture_api"] = [5, 4]
-    assert load_fixture_build(json.dumps(body), roots={"run": tmp_path}) == changed
-    body["fixture_api"] = [5, 3]
-    with pytest.raises(ValueError, match="RAM diagnostic"):
+    body["build"]["observe_ram"] = False
+    with pytest.raises(ValueError, match="identity mismatch"):
         load_fixture_build(json.dumps(body), roots={"run": tmp_path})
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_stack_diagnostic_wraps_initialization_and_invokes_only_when_selected(tmp_path, engine):
     fixture = typed(tmp_path)
     ctx = PipelineContext(config=config_for(tmp_path, fixture, engine), work_dir=tmp_path)
@@ -178,36 +176,3 @@ def test_ram_image_binds_stack_and_optional_heap_symbols(tmp_path):
     struct.pack_into("<I", raw, table_at + 4 * 40 + 8, 0)
     with pytest.raises(ContractError, match="stack extent"):
         inspect_elf(bytes(raw), binary.read(), 0x410000, {"deployment_ram": 32})
-
-
-@pytest.mark.parametrize("observe", [False, True])
-def test_public_config_wrapper_preserves_config_and_ram_option(tmp_path, monkeypatch, observe):
-    from test_typed_fixture import runtime as prepared_runtime
-
-    from helia_profiler import _fixture_build as module
-    from helia_profiler.fixture import build_fixed_fixture
-
-    fixture = typed(tmp_path)
-    config = config_for(tmp_path, fixture)
-    runtime = prepared_runtime(tmp_path)
-    expected = object()
-    received = {}
-
-    def build(actual_config, actual_fixture, **kwargs):
-        assert actual_config is config and actual_fixture is fixture
-        received.update(kwargs)
-        return expected
-
-    monkeypatch.setattr(module, "_build", build)
-    options = {"observe_ram": True} if observe else {}
-    assert (
-        build_fixed_fixture(
-            config, fixture, method=METHOD, runtime=runtime, compile=False, **options
-        )
-        is expected
-    )
-    assert received["observe_ram"] is observe
-    assert received["runtime"] is runtime
-    assert received["method"] is METHOD
-    assert received["compile"] is False
-    assert received["observe_aot_arenas"] is False

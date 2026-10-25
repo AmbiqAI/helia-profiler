@@ -51,12 +51,8 @@ class JoulescopeDriver:
     def mode(self) -> PowerMode:
         return PowerMode.EXTERNAL
 
-    @property
-    def has_gpo(self) -> bool:
-        return True
-
     def make_sync_controller(self, wiring: SyncWiring) -> SyncController:
-        if not wiring.lockstep or not self.has_gpo:
+        if not wiring.lockstep:
             return NullSyncController()
         return JoulescopeSyncController(serial=self._serial, wiring=wiring)
 

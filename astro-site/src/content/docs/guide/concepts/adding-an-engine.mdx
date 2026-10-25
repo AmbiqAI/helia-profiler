@@ -92,7 +92,9 @@ and the placement hooks (`apply_arena_placement_override()` and
 `placement_config()` as the identity unless the engine emits arena regions
 or placement implies engine settings, `check_psram_placement()` for
 engine-specific PSRAM constraints; `SingleArenaPlacementMixin` supplies the
-identity versions). `prepare()` validates
+identity versions), and the [state lifecycles](../engine-adapters/#state-lifecycles)
+its firmware implements (`lifecycles`, `lifecycle_refusal()`, `instance_boundary`
+and `first_invoke_initializer()`). `prepare()` validates
 `config.engine.*`, creates any local NSX module under `work_dir`, and
 returns the artifact type fully populated:
 
@@ -148,7 +150,7 @@ optional seam only where its default is wrong for the engine.
 (per-layer storage in shared SSRAM, the default) or `false` (storage in
 TCM); any other value is a render error. `engine_clean_window` deserves
 the most thought: its default brackets `engine_invoke()` with the window
-clock, which is right whenever the invoke is the inference (heliaRT, TFLM).
+clock, which is right whenever the invoke is the inference (heliaRT, LiteRT).
 ExecuTorch overrides it because its profiled call reloads the model and
 reports an execute-only cycle count, and heliaAOT enables input
 restoration inside the window. Whoever overrides it owns everything nested
@@ -180,7 +182,7 @@ Selection lives in `_main_template()` in `firmware/__init__.py`, which
 ### 7. Adapter tests
 
 Create `tests/test_your_engine.py` on the pattern of
-`tests/test_tflm_adapter.py`: `prepare()` returns the artifact type with
+`tests/test_litert_adapter.py`: `prepare()` returns the artifact type with
 the pinned `engine_type` and the expected module names, and creates any
 local module directory it promises.
 

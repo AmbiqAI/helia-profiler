@@ -10,12 +10,15 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from ._identity_hash import build_hash, digest, measured_facts
+from ._identity_hash import build_hash, measured_facts
+from ._semantic_hash import semantic_hash
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
+from .engines import get_adapter
 from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .identity import (
     BuildFacts,
+    EnergyFacts,
     KernelIdentity,
     RunFacts,
     RunIdentity,
@@ -24,6 +27,7 @@ from .identity import (
     canonical_engine,
     canonical_kernel,
 )
+from .lifecycle import first_invoke_window
 from .runtime_records import runtime
 
 if TYPE_CHECKING:
@@ -50,17 +54,52 @@ def fixture_run_identity(
         baseline_id=_workspace_fact(workspace, "baseline_id"),
         dependency_lock_sha256=_sha(build.dependency_lock),
         model_sha256=_sha(build.model, Unknown("the record predates pinned models")),
-        inputs_sha256=_inputs_sha256(build),
-        run=RunFacts(
-            lifecycle=(build.state_policy.value if build.state_policy else "stateless"),
-            iterations=build.iterations,
-            warmups=build.warmups,
-            timing_scope=build.timing_scope.value,
-        ),
+        inputs_hash=_inputs_hash(build),
+        run=_run_facts(build, capture),
         producer=_workspace_fact(_inputs(workspace), "hpx_version"),
         build_hash=_build_hash(build, archive),
         observation_hash=_observation_hash(capture) if capture is not None else None,
     )
+
+
+def _run_facts(build: FixtureBuild, capture: FixtureCaptureResult | None) -> RunFacts:
+    adapter = get_adapter(build.engine)
+    boundary = adapter.instance_boundary
+    return RunFacts(
+        lifecycle=(build.state_policy.value if build.state_policy else "stateless"),
+        iterations=build.iterations,
+        warmups=build.warmups,
+        timing_scope=build.timing_scope.value,
+        instance_boundary=boundary.value,
+        first_invoke_initializer=adapter.first_invoke_initializer(build.source_initializer_present),
+        first_invoke_window=first_invoke_window(boundary, build.warmups),
+        timing_clock="stimer",
+        timing_clock_hz=(
+            build.timer_hz
+            if build.timer_hz is not None
+            else Unknown("the record predates this fact")
+        ),
+        # fixed_fixture.cc.j2 reports one tick count over every timed invocation.
+        timing_statistic="total",
+        energy=_energy(build, capture),
+    )
+
+
+def _energy(build: FixtureBuild, capture: FixtureCaptureResult | None) -> EnergyFacts | None:
+    """The rail-energy method of a power build: its wiring fixes all but the rail.
+
+    The rail comes from the measurement; without one, only the power request names it.
+    """
+    from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION
+
+    wiring = build.power_sync
+    if wiring is None:
+        return None
+    measured = capture.rail_energy if capture is not None else None
+    rail = (
+        measured.rail if measured is not None else Unknown("the run's power request names the rail")
+    )
+    return EnergyFacts(GROSS_RAIL_SCOPE, rail, NO_SUBTRACTION, wiring.protocol_version)
 
 
 def _workspace(build: FixtureBuild) -> dict[str, Any] | Unknown:
@@ -174,10 +213,10 @@ def _sha(file: FixtureFile | None, absent: Unknown = _NOT_COMPILED) -> str | Unk
     return file.sha256 if file is not None else absent
 
 
-def _inputs_sha256(build: FixtureBuild) -> str | Unknown:
+def _inputs_hash(build: FixtureBuild) -> str | Unknown:
     if not build.inputs:
         return Unknown("the record predates pinned inputs")
-    return digest([[io.tensor.name, io.data.sha256] for io in build.inputs])
+    return semantic_hash("inputs", [[io.tensor.name, io.data.sha256] for io in build.inputs])
 
 
 def _build_hash(build: FixtureBuild, archive: str | None) -> str | Unknown:
@@ -204,7 +243,7 @@ def _observation_hash(capture: FixtureCaptureResult) -> str:
     )
     # An error's text can name host paths; the state and status carry the outcome.
     facts["error"] = capture.error is not None
-    return digest(facts)
+    return semantic_hash("observation", facts)
 
 
 def _file_hash(value: Any) -> Any:

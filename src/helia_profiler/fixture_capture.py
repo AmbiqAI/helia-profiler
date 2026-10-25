@@ -67,6 +67,9 @@ _ATTACH_TIMEOUT_S = 15
 _FIRST_POLL_S = 1.0
 _POLL_INTERVAL_S = 0.25
 _EXPECTED_MARGIN = 1.25
+#: The longest wait for READY and for completion, and the shorter one while a rail is measured.
+_SETTLE_LIMIT_S = 300
+_RAIL_SETTLE_LIMIT_S = 60
 _MEMORY_MAGIC = (0x4D454D31, 1)
 _FAILED_STAGES = {int(stage): stage.description for stage in FixtureStage}
 
@@ -214,10 +217,8 @@ def capture_fixture(
         "PSRAM expectation is not bound to the capture image",
     )
     require(
-        request.power_sync is None
-        or isinstance(request.power_sync, FixturePowerSync)
-        and request.power_sync.protocol_version == 2,
-        "Power capture requires protocol 2 firmware with DONE; rebuild the instrumented image",
+        request.power_sync is None or isinstance(request.power_sync, FixturePowerSync),
+        "Power capture requires the firmware's power wiring",
     )
     require(
         (request.power_sync is None) == (request.rail_power is None)
@@ -262,10 +263,11 @@ def capture_fixture(
     output_names = ["deployment_output"] + [
         f"deployment_output_{k}" for k in range(1, len(output_sizes))
     ]
+    settle_limit = _RAIL_SETTLE_LIMIT_S if request.rail_power is not None else _SETTLE_LIMIT_S
     require(
         type(request.settle_seconds) in (int, float)
         and math.isfinite(request.settle_seconds)
-        and 0 < request.settle_seconds <= (60 if request.rail_power is not None else 300),
+        and 0 < request.settle_seconds <= settle_limit,
         "Unbounded settle time",
     )
     require(

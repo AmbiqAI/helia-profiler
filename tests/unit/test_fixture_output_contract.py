@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from helia_profiler.fixture import (
+from helia_profiler import (
     FixtureFile,
     FixtureIO,
     FixtureOutput,

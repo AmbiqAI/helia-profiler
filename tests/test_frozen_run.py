@@ -59,6 +59,27 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+def test_saving_a_plan_replaces_its_name_and_leaves_other_links_alone(session, tmp_path):
+    other = tmp_path / "other"
+    other.write_bytes(b"other")
+    target = tmp_path / "run.json"
+    target.hardlink_to(other)
+
+    FrozenRun.load(session.freeze().save(target))
+
+    assert other.read_bytes() == b"other"
+    assert [p.name for p in tmp_path.iterdir() if p.name.endswith(".partial")] == []
+
+
+def test_a_saved_plan_gets_the_mode_of_any_new_file(session, tmp_path):
+    reference = tmp_path / "reference"
+    reference.write_text("")
+
+    saved = session.freeze().save(tmp_path / "run.json")
+
+    assert saved.stat().st_mode == reference.stat().st_mode
+
+
 def test_host_local_settings_are_not_stored_and_come_from_the_replaying_host(session, tmp_path):
     local = (
         session.with_target(jlink_serial="1160002255")
@@ -132,11 +153,11 @@ def test_the_engine_identity_is_what_a_profile_build_uses(session):
     from helia_profiler.deps.compatibility import load_compatibility_baseline
 
     baseline = load_compatibility_baseline()
-    tflm = session.with_engine("tflm", backend="cmsis_nn").freeze().runtime
+    litert = session.with_engine("litert", backend="cmsis_nn").freeze().runtime
     heliart = session.freeze().runtime
 
-    assert tflm == hpx.FrozenRuntime(
-        "tflm",
+    assert litert == hpx.FrozenRuntime(
+        "litert",
         None,
         baseline.module("nsx-tflite-micro").ref,
         "arm-cmsis-nn",
@@ -174,6 +195,41 @@ def test_an_edited_or_malformed_plan_file_is_refused(session, tmp_path):
         FrozenRun.load(path)
 
 
+def test_the_intent_hash_is_a_semantic_hash(session):
+    parsed = hpx.SemanticHash.parse(session.freeze().intent_hash)
+    assert (parsed.producer, parsed.kind, parsed.version) == ("hpx", "intent", 1)
+
+
+@pytest.mark.parametrize(
+    "intent",
+    [
+        lambda good: good.rsplit(":", 1)[1],
+        lambda good: good.replace("hpx.intent/", "hpx.build/"),
+        lambda good: good.replace("/1:", "/2:"),
+        lambda good: None,
+    ],
+)
+def test_a_plan_whose_intent_hash_is_not_an_intent_hash_is_refused(session, tmp_path, intent):
+    path = session.freeze().save(tmp_path / "run.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["intent_hash"] = intent(data["intent_hash"])
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ConfigError, match="intent hash is malformed") as caught:
+        FrozenRun.load(path)
+    assert "freeze the plan again" in str(caught.value)
+
+
+def test_a_plan_saved_in_the_previous_format_is_refused(session, tmp_path):
+    path = session.freeze().save(tmp_path / "run.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["schema_version"] = 1
+    data["intent_hash"] = data["intent_hash"].rsplit(":", 1)[1]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ConfigError, match="Unsupported frozen run plan version: 1") as caught:
+        FrozenRun.load(path)
+    assert "freeze the plan again" in str(caught.value)
+
+
 def test_to_dict_is_a_copy(session):
     plan = session.freeze()
     data = plan.to_dict()
@@ -190,8 +246,8 @@ def test_the_hpx_release_is_recorded_but_not_part_of_the_intent(session):
     assert replace(plan, hpx_version="9.9.9").intent_hash == plan.intent_hash
 
 
-def test_default_tflm_links_no_kernel_library(session):
-    runtime = session.with_engine("tflm").freeze().runtime
+def test_default_litert_links_no_kernel_library(session):
+    runtime = session.with_engine("litert").freeze().runtime
     assert runtime is not None and runtime.kernels_module is None and runtime.kernels_commit is None
 
 
@@ -218,7 +274,7 @@ def test_an_overridden_kernel_provider_has_no_pinned_commit(session, tmp_path, m
 
 def test_source_variables_count_only_for_engines_that_read_them(session, tmp_path, monkeypatch):
     monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
-    assert session.with_engine("tflm").freeze().local_inputs == ()
+    assert session.with_engine("litert").freeze().local_inputs == ()
     assert [i.setting for i in session.freeze().local_inputs] == ["env.HELIART_DIST_PATH"]
 
 
@@ -249,12 +305,12 @@ def test_a_non_utf8_plan_file_is_refused(tmp_path):
         FrozenRun.load(path)
 
 
-def test_tflm_modules_ignore_overrides_the_build_does_not_apply(session, tmp_path):
+def test_litert_modules_ignore_overrides_the_build_does_not_apply(session, tmp_path):
     from helia_profiler.deps.compatibility import load_compatibility_baseline
 
     module_dir = tmp_path / "nsx-tflite-micro"
     module_dir.mkdir()
-    overridden = session.with_engine("tflm").with_build(
+    overridden = session.with_engine("litert").with_build(
         nsx_modules={"nsx-tflite-micro": {"path": str(module_dir)}}
     )
     runtime = overridden.freeze().runtime
@@ -442,10 +498,10 @@ def test_a_heliart_variable_other_engines_ignore_does_not_block_replay(
     session, tmp_path, monkeypatch
 ):
     monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
-    tflm = session.with_engine("tflm").freeze()
-    assert tflm.qualification == "qualified" and tflm.overrides == ()
+    litert = session.with_engine("litert").freeze()
+    assert litert.qualification == "qualified" and litert.overrides == ()
     monkeypatch.delenv("HELIART_DIST_PATH")
-    assert tflm.config().engine.type.value == "tflm"
+    assert litert.config().engine.type.value == "litert"
 
 
 def test_a_prebuilt_heliart_links_no_separate_kernel_module(session, tmp_path, monkeypatch):
@@ -572,3 +628,8 @@ def test_an_unavailable_compiler_is_not_reported_as_drift(session, compiler, mon
 )
 def test_a_custom_heliart_release_is_not_portable(session, source):
     assert not session.with_engine("helia-rt", config={"source": source}).freeze().portable
+
+
+def test_a_non_finite_setting_is_refused_at_freeze(session):
+    with pytest.raises(ConfigError, match="cannot hold a non-finite number"):
+        session.with_power(io_voltage=float("nan")).freeze()

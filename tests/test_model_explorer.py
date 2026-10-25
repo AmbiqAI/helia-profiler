@@ -110,7 +110,7 @@ def _layer(layer_id: int, op: str, cycles: float, **kwargs: Any) -> LayerResult:
             [_layer(0, "CONV_2D", 10), _layer(1, "CONV_2D", 20)],
             None,
             {"0": 10, "1": 20},
-            id="tflm-plain-labels-use-execution-order",
+            id="litert-plain-labels-use-execution-order",
         ),
         pytest.param(
             [_layer(0, "DEPTHWISE_CONV_2D", 10), _layer(1, "FULLY_CONNECTED", 20)],

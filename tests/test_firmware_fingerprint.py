@@ -9,7 +9,7 @@ from helia_profiler.firmware.fingerprint import (
     firmware_code_fingerprint,
     measured_power_fingerprint,
 )
-from tests.test_template_render import _render_tflm
+from tests.test_template_render import _render_litert
 
 
 class TestCanonicalCode:
@@ -71,7 +71,7 @@ class TestFingerprintStability:
     shifts the fingerprint."""
 
     def _render(self) -> str:
-        return _render_tflm(
+        return _render_litert(
             transport="rtt",
             power_only=True,
             window_mode="fixed",

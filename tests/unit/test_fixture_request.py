@@ -1,4 +1,4 @@
-"""Typed fixture build requests: validation, path-free intent identity, and build results."""
+"""Fixture builds from a test request: targets, capabilities and the work directory."""
 
 from __future__ import annotations
 
@@ -9,29 +9,28 @@ from pathlib import Path
 import pytest
 
 import helia_profiler
-from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
-from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
+from helia_profiler import (
     EngineType,
-    FixtureBackend,
-    FixtureBuildRequest,
     FixtureFile,
     FixtureIO,
     FixtureMethod,
-    FixturePlacement,
     FixtureTensor,
     FixtureTimingScope,
-    HeliaAotOptions,
     PerTensorQuantization,
     Placement,
-    PreparedUpstreamRuntime,
     TypedFixture,
-    build_fixed_fixture,
-    build_fixture,
-    fixture_capabilities,
-    supported_fixture_target,
 )
+from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
+from helia_profiler._fixture_facts import fixture_capabilities
+from helia_profiler.errors import ConfigError
 from helia_profiler.fixture_capture import FIXTURE_CPU_HZ, FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
+from helia_profiler.fixture_target import supported_fixture_target
+from tests.fixture_requests import (
+    FixtureBackend,
+    FixtureBuildRequest,
+    FixturePlacement,
+    build_fixture,
+)
 
 PACKAGE = Path(helia_profiler.__file__).resolve().parent
 
@@ -64,103 +63,6 @@ def _request(root: Path, **changes: object) -> FixtureBuildRequest:
     return replace(request, **changes) if changes else request
 
 
-def test_intent_identity_ignores_where_files_and_work_live(tmp_path: Path) -> None:
-    first = _request(tmp_path / "a")
-    second = _request(tmp_path / "b" / "elsewhere")
-    assert first.intent_identity == second.intent_identity
-
-
-@pytest.mark.parametrize(
-    "changes",
-    [
-        {"arena_size": 32768},
-        {"iterations": 4},
-        {"warmup": 2},
-        {"method": FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE)},
-        {"aot": HeliaAotOptions(convert_args_json='{"memory": {"planner": "greedy"}}')},
-        {"aot": HeliaAotOptions(cmsis_nn_requantize_inline_asm=False)},
-        {"observe_aot_arenas": True},
-    ],
-)
-def test_intent_identity_moves_with_every_build_input(
-    tmp_path: Path, changes: dict[str, object]
-) -> None:
-    assert _request(tmp_path, **changes).intent_identity != _request(tmp_path).intent_identity
-
-
-def test_intent_identity_moves_with_fixture_content(tmp_path: Path) -> None:
-    request = _request(tmp_path / "a")
-    other = _request(tmp_path / "b")
-    changed = _pin(tmp_path / "b" / "in.bin", b"\x01\x02\x03\x04")
-    assert isinstance(other.fixture, TypedFixture)
-    fixture = replace(other.fixture, inputs=(replace(other.fixture.inputs[0], data=changed),))
-    assert replace(other, fixture=fixture).intent_identity != request.intent_identity
-
-
-def test_convert_arguments_are_stored_canonically() -> None:
-    assert (
-        HeliaAotOptions(convert_args_json='{ "b": 1, "a": {"y": 2, "x": 1} }').convert_args_json
-        == HeliaAotOptions(convert_args_json='{"a":{"x":1,"y":2},"b":1}').convert_args_json
-        == '{"a":{"x":1,"y":2},"b":1}'
-    )
-
-
-@pytest.mark.parametrize("text", ["[1, 2]", "not json", '"text"'])
-def test_convert_arguments_must_be_a_json_object(text: str) -> None:
-    with pytest.raises(ConfigError, match="convert arguments"):
-        HeliaAotOptions(convert_args_json=text)
-
-
-@pytest.mark.parametrize(
-    ("changes", "message"),
-    [
-        ({"backend": FixtureBackend.CMSIS_NN}, "backend none"),
-        ({"engine": EngineType.TFLM}, "backend cmsis_nn"),
-        (
-            {
-                "engine": EngineType.TFLM,
-                "backend": FixtureBackend.CMSIS_NN,
-                "aot": HeliaAotOptions(),
-            },
-            "heliaAOT fixtures only",
-        ),
-        ({"placement": FixturePlacement(arena=Placement.MRAM)}, "writable static SRAM or DTCM"),
-        ({"placement": FixturePlacement(arena=Placement.PSRAM)}, "writable static SRAM or DTCM"),
-        ({"engine": EngineType.EXECUTORCH}, "no fixed-fixture build"),
-    ],
-)
-def test_requests_outside_the_qualified_contract_are_refused(
-    tmp_path: Path, changes: dict[str, object], message: str
-) -> None:
-    with pytest.raises(ConfigError, match=message):
-        _request(tmp_path, **changes)
-
-
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
-@pytest.mark.parametrize(
-    "placement",
-    [
-        FixturePlacement(arena=Placement.TCM),
-        FixturePlacement(weights=Placement.TCM),
-        FixturePlacement(arena=Placement.TCM, weights=Placement.PSRAM),
-    ],
-)
-def test_requests_forward_independent_supported_banks(tmp_path, engine, placement):
-    changes = {"engine": engine, "placement": placement}
-    if engine is EngineType.TFLM:
-        changes.update(
-            backend=FixtureBackend.CMSIS_NN,
-            runtime=_runtime(tmp_path / "runtime", b"{}"),
-        )
-    request = _request(tmp_path, **changes)
-    config = request.to_config()
-    assert request.placement == placement
-    assert config.engine.type is engine
-    assert config.model.arena_location is placement.arena
-    assert config.model.weights_location is placement.weights
-    assert request.intent_identity != replace(request, placement=FixturePlacement()).intent_identity
-
-
 def test_heliart_requests_accept_psram_weights(tmp_path):
     _request(
         tmp_path,
@@ -170,34 +72,11 @@ def test_heliart_requests_accept_psram_weights(tmp_path):
     )
 
 
-def test_request_config_carries_every_setting(tmp_path: Path) -> None:
-    aot = HeliaAotOptions(
-        prefix="m",
-        linker_profile="lp",
-        cmsis_nn_requantize_inline_asm=False,
-        convert_args_json='{"memory": {"planner": "greedy"}}',
-    )
-    config = _request(tmp_path, aot=aot).to_config()
-    assert config.engine.type is EngineType.HELIA_AOT
-    assert config.engine.config == {
-        "prefix": "m",
-        "linker_profile": "lp",
-        "cmsis_nn_requantize_inline_asm": False,
-        "aot_args": {"memory": {"planner": "greedy"}},
-    }
-    assert (config.model.arena_location, config.model.weights_location) == (
-        Placement.SRAM,
-        Placement.MRAM,
-    )
-    assert (config.profiling.iterations, config.profiling.warmup) == (3, 1)
-    assert config.work_dir == tmp_path / "work"
-
-
 def test_capabilities_report_the_qualified_contract() -> None:
     facts = fixture_capabilities()
     target, ap510b = facts.targets
-    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.TFLM}
-    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.TFLM, EngineType.HELIA_RT}
+    assert set(ap510b.engines) == {EngineType.HELIA_AOT, EngineType.LITERT}
+    assert set(target.engines) == {EngineType.HELIA_AOT, EngineType.LITERT, EngineType.HELIA_RT}
     assert ap510b.board == "apollo510b_evb"
     assert ap510b.device == "AP510BFA-CBR"
     assert (target.board, target.clock_profile) == ("apollo510_evb", "lp")
@@ -213,108 +92,10 @@ def test_capabilities_report_the_qualified_contract() -> None:
     }
 
 
-def test_request_build_matches_the_config_build_and_keeps_its_identity(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A host-only heliaAOT build from a request renders what the equivalent config build renders."""
-    pytest.importorskip("helia_aot")
-    pytest.importorskip("ai_edge_litert")
-    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
-
-    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
-    model_bytes = (PACKAGE / "data" / "models" / "tiny_cnn.tflite").read_bytes()
-
-    def request_in(root: Path) -> FixtureBuildRequest:
-        model = _pin(root / "tiny_cnn.tflite", model_bytes)
-        analysis = analyze_typed_fixture_model(model.path)
-        fixture = TypedFixture(
-            model,
-            tuple(
-                FixtureIO(t, _pin(root / f"in{i}.bin", bytes(t.size_bytes)))
-                for i, t in enumerate(analysis.inputs)
-            ),
-            tuple(
-                FixtureIO(t, _pin(root / f"out{i}.bin", bytes(t.size_bytes)))
-                for i, t in enumerate(analysis.outputs)
-            ),
-        )
-        return replace(_request(root), fixture=fixture)
-
-    request = request_in(tmp_path / "request")
-    built = build_fixture(request, compile=False)
-    config_request = request_in(tmp_path / "config")
-    by_config = build_fixed_fixture(
-        config_request.to_config(),
-        config_request.fixture,
-        method=config_request.method,
-        compile=False,
-    )
-    assert built.intent_identity == request.intent_identity == config_request.intent_identity
-    assert by_config.intent_identity != built.intent_identity
-    assert [(f.path.name, f.sha256) for f in built.generated_sources] == [
-        (f.path.name, f.sha256) for f in by_config.generated_sources
-    ]
-    assert built.engine_source is not None and built.engine_source.package == "helia-aot"
-
-
-def _runtime(root: Path, manifest: bytes) -> PreparedUpstreamRuntime:
-    return PreparedUpstreamRuntime(
-        _pin(root / "runtime.a", b"!<arch>\n"), root, _pin(root / "runtime.json", manifest)
-    )
-
-
-@pytest.mark.parametrize(
-    "aot",
-    [
-        HeliaAotOptions(prefix="m"),
-        HeliaAotOptions(module_name="m"),
-        HeliaAotOptions(linker_profile="lp"),
-        HeliaAotOptions(platform_name="apollo510_evb"),
-    ],
-)
-def test_intent_identity_moves_with_each_heliaaot_option(
-    tmp_path: Path, aot: HeliaAotOptions
-) -> None:
-    plain = _request(tmp_path, aot=HeliaAotOptions())
-    assert _request(tmp_path, aot=aot).intent_identity != plain.intent_identity
-
-
-def test_intent_identity_moves_with_engine_and_runtime(tmp_path: Path) -> None:
-    tflm = _request(
-        tmp_path,
-        engine=EngineType.TFLM,
-        backend=FixtureBackend.CMSIS_NN,
-        runtime=_runtime(tmp_path / "rt1", b'{"a": 1}'),
-    )
-    other_runtime = replace(tflm, runtime=_runtime(tmp_path / "rt2", b'{"a": 2}'))
-    helia_rt = replace(tflm, engine=EngineType.HELIA_RT, backend=FixtureBackend.HELIA)
-    identities = {r.intent_identity for r in (_request(tmp_path), tflm, other_runtime, helia_rt)}
-    assert len(identities) == 4
-
-
-def test_default_heliaaot_options_hash_like_none(tmp_path: Path) -> None:
-    assert (
-        _request(tmp_path).intent_identity
-        == _request(tmp_path, aot=HeliaAotOptions()).intent_identity
-    )
-
-
 def test_an_unqualified_target_is_refused(tmp_path: Path) -> None:
     target = replace(supported_fixture_target(), board="apollo4p_evb")
     with pytest.raises(ConfigError, match="Unsupported fixture target"):
         _request(tmp_path, target=target)
-
-
-def test_request_config_carries_every_heliaaot_option(tmp_path: Path) -> None:
-    aot = HeliaAotOptions(prefix="p", module_name="mod", linker_profile="lp", platform_name="plat")
-    config = _request(tmp_path, aot=aot).to_config()
-    assert config.engine.config == {
-        "prefix": "p",
-        "module_name": "mod",
-        "linker_profile": "lp",
-        "platform_name": "plat",
-        "cmsis_nn_requantize_inline_asm": True,
-    }
 
 
 def _tiny_request(root: Path) -> FixtureBuildRequest:
@@ -375,7 +156,6 @@ def test_ap510b_request_preserves_actual_target(tmp_path):
     request = replace(default, target=target)
     assert target.device == "AP510BFA-CBR"
     assert target.device != default.target.device
-    assert request.intent_identity != default.intent_identity
     assert request.to_config().target.board == "apollo510b_evb"
     _validate(request.to_config(), request.fixture)
     with pytest.raises(ValueError, match="Unsupported fixture target"):

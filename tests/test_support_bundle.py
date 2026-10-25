@@ -20,7 +20,7 @@ from helia_profiler.diagnostics.support_bundle import (
     write_support_bundle,
 )
 from helia_profiler.engines import TFLM_ENGINE_HEADER
-from helia_profiler.engines.base import TflmArtifacts
+from helia_profiler.engines.base import LiteRtArtifacts
 from helia_profiler.errors import ReportError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import ResultArtifact
@@ -53,14 +53,14 @@ def _prepared_workspace(
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "litert"},
             "target": {"board": "apollo510_evb"},
             "work_dir": str(tmp_path / "work"),
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    ctx.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
     ctx.dependency_workspace = create_workspace(ctx)
     ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
     ctx.firmware_dir.mkdir(parents=True, exist_ok=True)
@@ -247,7 +247,7 @@ def test_collect_support_bundle_redacts_nested_secret_in_free_form_engine_config
         "target:\n"
         "  board: apollo510_evb\n"
         "engine:\n"
-        "  type: tflm\n"
+        "  type: litert\n"
         "  config:\n"
         "    credentials:\n"
         "      user: alice\n"

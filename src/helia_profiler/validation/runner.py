@@ -1,18 +1,13 @@
-"""Runner for a single validation case.
+"""Execute one validation case and read its result artifacts.
 
-Builds a temporary YAML config for one :class:`~helia_profiler.validation.CaseSpec`,
-invokes ``hpx profile`` as a subprocess, and parses the resulting artifacts
-into a structured :class:`CaseResult` dict.
+The default path writes a temporary YAML configuration for a
+:class:`~helia_profiler.validation.CaseSpec`, invokes ``hpx profile`` in a
+subprocess, and returns a structured :class:`CaseResult`. The subprocess
+isolates case state and exercises the user-facing CLI.
 
-The subprocess boundary is deliberate: it exercises the true user-facing
-code path (same as typing ``hpx profile --config foo.yml``), isolates state
-between cases, and maps 1:1 to what a GHA runner will eventually do.
-
-Set ``HPX_VALIDATE_INPROCESS=1`` (or pass ``in_process=True`` to
-:func:`run_case`) to bypass the subprocess and call
-:func:`helia_profiler.cli.main` directly instead.  This is faster, lets
-``coverage.py`` see the pipeline code, and surfaces live tracebacks.  The
-subprocess remains the default so CI still exercises the CLI surface.
+Set ``HPX_VALIDATE_INPROCESS=1`` or pass ``in_process=True`` to
+:func:`run_case` to call :func:`helia_profiler.cli.main` directly. This mode
+supports in-process coverage and tracebacks; the default remains a subprocess.
 """
 
 from __future__ import annotations
@@ -62,6 +57,9 @@ class CaseResult:
     backend: str | None = None
     cmsis_nn_provider: str | None = None
     comparison_group: str | None = None
+    family: str | None = None
+    precision: str | None = None
+    source: str | None = None
     jlink_serial: str | None = None
     power_serial: str | None = None
     attempt: int = 1
@@ -96,9 +94,7 @@ class CaseResult:
     gated_window_reference_drift: str | None = None
     #: The model's arbitration verdict (#202): captured at parse time from
     #: PowerSection.gate_duration_unarbitrated_failure so the health check
-    #: consults ONE interpretation. ``None`` = parsed by an older hpx that
-    #: did not record it; the health check falls back to the two-field
-    #: predicate for those legacy records only.
+    #: consults ONE interpretation. ``None`` when the run measured no power.
     gate_duration_unarbitrated_failure: bool | None = None
     power_observation_mode: str | None = None
     power_observation_integrity: str | None = None
@@ -276,7 +272,7 @@ def _build_config(
                 "module_name": "hpx_model",
                 "cmsis_nn_path": str(cmsis_nn_candidate),
             }
-    elif case.engine is EngineType.TFLM:
+    elif case.engine is EngineType.LITERT:
         # Validation exercises the optimized upstream CMSIS-NN baseline. The
         # reference-kernel backend remains available to ad-hoc profile runs.
         engine_cfg["backend"] = "cmsis_nn"
@@ -286,7 +282,7 @@ def _build_config(
 
 def _engine_backend(case: CaseSpec) -> str | None:
     """Return the engine-level backend value written to the profile config."""
-    if case.engine is EngineType.TFLM:
+    if case.engine is EngineType.LITERT:
         return "cmsis_nn"
     if case.engine is EngineType.EXECUTORCH:
         return case.cmsis_nn_provider.value
@@ -468,6 +464,9 @@ def run_case(
                 engine=case.engine,
                 model_id=case.model.id,
                 comparison_group=case.model.decision_group,
+                family=case.model.family,
+                precision=case.model.precision,
+                source=case.model.source,
                 board=case.board.id,
                 power=case.power,
                 toolchain=case.toolchain.value,
@@ -528,6 +527,9 @@ def run_case(
             engine=case.engine,
             model_id=case.model.id,
             comparison_group=case.model.decision_group,
+            family=case.model.family,
+            precision=case.model.precision,
+            source=case.model.source,
             board=case.board.id,
             power=case.power,
             toolchain=case.toolchain.value,
@@ -553,6 +555,9 @@ def run_case(
         engine=case.engine,
         model_id=case.model.id,
         comparison_group=case.model.decision_group,
+        family=case.model.family,
+        precision=case.model.precision,
+        source=case.model.source,
         board=case.board.id,
         power=case.power,
         toolchain=case.toolchain.value,
@@ -573,9 +578,6 @@ def run_case(
     summary_path = case_dir / "summary.json"
     if summary_path.exists():
         try:
-            # The typed, cross-version reader (#202): legacy key spellings
-            # and the drift-arbitration interpretation live on the model's
-            # properties, not re-derived here.
             summary = load_run_summary(summary_path)
             result.layers = summary.layers or None
             latency = summary.latency
@@ -682,17 +684,7 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
         issues.append("power enabled but zero energy captured")
     if result.power and result.gated_window_duration_suspect:
         issues.append("GPIO-gated power window duration is suspect")
-    unarbitrated = result.gate_duration_unarbitrated_failure
-    if unarbitrated is None:
-        # Legacy record (parsed before the verdict field existed): fall back
-        # to the two-field predicate. New records carry the model's own
-        # PowerSection.gate_duration_unarbitrated_failure, so the #142/#181
-        # interpretation lives in exactly one place (#205).
-        unarbitrated = (
-            result.gate_duration_integrity_valid is False
-            and result.gated_window_reference_drift is None
-        )
-    if result.power and unarbitrated:
+    if result.power and result.gate_duration_unarbitrated_failure:
         issues.append("GPIO-gated power window failed duration integrity")
     if result.power and result.power_observation_integrity not in {None, "valid"}:
         detail = result.power_gate_failure_kind or result.power_observation_mode or "unknown"

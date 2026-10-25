@@ -10,8 +10,14 @@ from pathlib import Path, PureWindowsPath
 import pytest
 
 from helia_profiler.api import inspect_result, load_result
-from helia_profiler.records import ResultReadError
+from helia_profiler.records import ProfileResultRecord, ResultReadError
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
+
+
+def _profile(location: Path) -> ProfileResultRecord:
+    record = load_result(location)
+    assert isinstance(record, ProfileResultRecord)
+    return record
 
 
 def test_public_reader_import_is_hardware_free(tmp_path):
@@ -46,7 +52,7 @@ def bundle(root: Path, *, status="complete") -> Path:
             {
                 "schema": "hpx.run-summary",
                 "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
-                "engine": "tflm",
+                "engine": "litert",
                 "layers": 1,
                 "total_cycles": 2**53 + 1,
                 "overflow_detected": False,
@@ -65,7 +71,7 @@ def bundle(root: Path, *, status="complete") -> Path:
                 "schema_version": 1,
                 "run_id": "synthetic-run",
                 "hpx_version": "synthetic",
-                "engine": {"type": "tflm"},
+                "engine": {"type": "litert"},
             },
         ),
         "layers.json": ("hpx.profile-layers", {"layers": [{"cycles": 2**53 + 1}]}),
@@ -125,9 +131,9 @@ def edit_document(path, name, edit):
 
 def test_complete_relocated_and_exact_integer(tmp_path):
     path = bundle(tmp_path / "first")
-    first = load_result(path)
+    first = _profile(path)
     shutil.copytree(path.parent, tmp_path / "moved")
-    moved = load_result(tmp_path / "moved")
+    moved = _profile(tmp_path / "moved")
     assert moved.manifest_sha256 == first.manifest_sha256
     assert moved.summary is not None
     assert moved.summary.latency is not None
@@ -151,7 +157,7 @@ def test_verified_failure_is_not_evidence_failure(tmp_path):
     )
     result = inspect_result(path)
     assert result.code is None
-    assert result.result is not None
+    assert isinstance(result.result, ProfileResultRecord)
     assert result.result.manifest.status.value == "failed"
     assert result.result.summary is None
 
@@ -237,18 +243,126 @@ def test_incomplete_status_is_not_a_verified_failure(tmp_path):
     assert inspect_result(bundle(tmp_path, status="incomplete")).code == "incomplete_result"
 
 
-@pytest.mark.parametrize("version", [True, 10, RUN_SUMMARY_SCHEMA_VERSION + 1])
+@pytest.mark.parametrize("version", [True, 10, 11, 18, RUN_SUMMARY_SCHEMA_VERSION + 1])
 def test_unsupported_summary_semantics_are_explicit(tmp_path, version):
     path = bundle(tmp_path)
     edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
     assert inspect_result(path).code == "unsupported_schema"
 
 
-@pytest.mark.parametrize("version", [13, RUN_SUMMARY_SCHEMA_VERSION])
-def test_summaries_before_and_with_identity_both_read(tmp_path, version):
+_HEX = "ab" * 32
+_DROP = object()
+
+
+def _identity(**changes):
+    identity = {
+        "runtime": {"engine": "litert"},
+        "kernels": {"library": "reference"},
+        "prepared_archive_sha256": None,
+        "build": {"board": "apollo510_evb"},
+        "baseline_id": "baseline",
+        "dependency_lock_sha256": _HEX,
+        "model_sha256": _HEX,
+        "inputs_hash": f"hpx.inputs/1:sha256:{_HEX}",
+        "run": {"lifecycle": "carry"},
+        "producer": "synthetic",
+        "build_hash": f"hpx.build/1:sha256:{_HEX}",
+        "observation_hash": f"hpx.observation/1:sha256:{_HEX}",
+        "intent_hash": f"hpx.intent/1:sha256:{_HEX}",
+        **changes,
+    }
+    return {key: value for key, value in identity.items() if value is not _DROP}
+
+
+_READABLE = [
+    _identity(),
+    _identity(build_hash={"unknown": "the run kept no dependency lock"}),
+    _identity(inputs_hash={"unknown": "profile firmware feeds zero-filled inputs"}),
+    _identity(observation_hash=None, intent_hash=None),
+]
+
+# Python's ``re.search`` lets ``$`` match before a final newline.
+_TRAILING = (
+    ("build_hash", "build"),
+    ("inputs_hash", "inputs"),
+    ("observation_hash", "observation"),
+    ("intent_hash", "intent"),
+)
+
+_REFUSED = [
+    _identity(build_hash=_HEX),
+    _identity(build_hash=None),
+    _identity(build_hash=_DROP),
+    _identity(build_hash={"unknown": "x", "extra": 1}),
+    _identity(build_hash={"unknown": 7}),
+    _identity(build_hash={"unknown": None}),
+    _identity(inputs_hash=_HEX),
+    _identity(inputs_hash=_DROP),
+    _identity(inputs_hash=f"hpx.build/1:sha256:{_HEX}"),
+    _identity(observation_hash=_HEX),
+    _identity(observation_hash=_DROP),
+    _identity(observation_hash={"unknown": "no capture"}),
+    _identity(intent_hash=_HEX),
+    _identity(intent_hash=_DROP),
+    _identity(intent_hash=f"hpx.build/1:sha256:{_HEX}"),
+    *(_identity(**{field: f"hpx.{kind}/1:sha256:{_HEX}\n"}) for field, kind in _TRAILING),
+    None,
+    "not an object",
+    [],
+]
+
+
+def _with_identity(path, identity):
+    def edit(summary):
+        summary.update(identity=identity, validity="valid", issues=[])
+
+    edit_document(path, "summary.json", edit)
+
+
+@pytest.mark.parametrize("identity", _READABLE)
+def test_a_summary_identity_with_semantic_hashes_reads(tmp_path, identity):
     path = bundle(tmp_path)
-    edit_document(path, "summary.json", lambda d: d.update(schema_version=version))
-    assert load_result(path).summary is not None
+    _with_identity(path, identity)
+    summary = _profile(path).summary
+    assert summary is not None and summary.identity == identity
+
+
+@pytest.mark.parametrize("identity", _REFUSED)
+def test_a_current_summary_identity_hash_of_the_wrong_form_is_refused(tmp_path, identity):
+    path = bundle(tmp_path)
+    _with_identity(path, identity)
+    assert inspect_result(path).code == "invalid_summary"
+
+
+@pytest.mark.parametrize(
+    "identity,readable",
+    [*((identity, True) for identity in _READABLE), *((identity, False) for identity in _REFUSED)],
+)
+def test_the_reader_and_the_packaged_schema_agree_on_identity_hashes(tmp_path, identity, readable):
+    from importlib.resources import files
+
+    from jsonschema import Draft202012Validator
+
+    schema = json.loads(
+        files("helia_profiler").joinpath("data/run_summary.schema.v1.json").read_text("utf-8")
+    )
+    path = bundle(tmp_path)
+    _with_identity(path, identity)
+    summary = json.loads((tmp_path / "summary.json").read_bytes())
+    assert Draft202012Validator(schema).is_valid(summary) is readable
+    assert (inspect_result(path).code is None) is readable
+
+
+def test_a_v18_summary_is_refused_naming_the_release_that_reads_it(tmp_path):
+    identity = _identity(build_hash=_HEX, observation_hash=_HEX, intent_hash=None, inputs_hash=_HEX)
+    path = bundle(tmp_path)
+    edit_document(path, "summary.json", lambda d: d.update(schema_version=18, identity=identity))
+    refused = inspect_result(path)
+    assert refused.result is None and refused.code == "unsupported_schema"
+    assert refused.message == (
+        "Unsupported run summary version: 18; this heliaPROFILER reads version "
+        f"{RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX release that wrote it"
+    )
 
 
 @pytest.mark.parametrize("value", [True, 0.5, -1])
@@ -484,7 +598,7 @@ def test_matching_normalized_issues_and_missing_summary_issues(tmp_path):
         "summary.json",
         lambda d: d.update(validity="degraded", issues=[dict(issue, context={})]),
     )
-    record = load_result(path)
+    record = _profile(path)
     assert observations(record)["outcome"]["reason"] == "retained warning"
     assert record.manifest.issues[0].extra == {"future": {"value": 7}}
 
@@ -492,7 +606,7 @@ def test_matching_normalized_issues_and_missing_summary_issues(tmp_path):
 @pytest.mark.parametrize(
     "field,section,key,value",
     [
-        ("engine", "engine", "type", "tflm"),
+        ("engine", "engine", "type", "litert"),
         ("model_sha256", "model", "sha256", "a" * 64),
         ("board", "platform", "board", "apollo510_evb"),
         ("engine_version", "engine", "version", "1.0"),

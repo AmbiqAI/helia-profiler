@@ -9,6 +9,21 @@ from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
+from ._fixture_io import (
+    FIXTURE_CAPABILITIES as FIXTURE_CAPABILITIES,
+)
+from ._fixture_io import (
+    FIXTURE_READBACK_BUDGET as FIXTURE_READBACK_BUDGET,
+)
+from ._fixture_io import (
+    FixtureCapability as FixtureCapability,
+)
+from ._fixture_io import (
+    FixtureDType as FixtureDType,
+)
+from ._fixture_io import (
+    io_capabilities,
+)
 from .config import ProfileConfig
 from .deps.compatibility import resolve_compatibility
 from .engines import EngineType, get_adapter
@@ -43,6 +58,13 @@ from .wire import STIMER_HZ
 
 
 class FixtureTimingScope(StrEnum):
+    """What the timed span covers.
+
+    ``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets
+    the timed loop, so restoring the fixed inputs before each invocation is
+    inside the span.
+    """
+
     INVOKE_ONLY = "invoke_only"
     RESTORE_AND_INVOKE = "restore_and_invoke"
 
@@ -58,23 +80,6 @@ class FixtureRole(StrEnum):
 
     SIGNAL = "signal"
     AUX = "aux"
-
-
-class FixtureDType(StrEnum):
-    """IO tensor element types a fixture can declare."""
-
-    INT8 = "int8"
-    INT16 = "int16"
-    INT32 = "int32"
-    FLOAT16 = "float16"
-    FLOAT32 = "float32"
-
-
-class FixtureBackend(StrEnum):
-    """Kernel backend a prepared-runtime fixture engine requires."""
-
-    CMSIS_NN = "cmsis_nn"
-    HELIA = "helia"
 
 
 @dataclass(frozen=True)
@@ -140,38 +145,6 @@ class FixedFixture:
         ).hexdigest()
 
 
-class FixtureCapability(StrEnum):
-    """Producer-declared status of one engine and IO dtype for fixed fixtures."""
-
-    QUALIFIED = "qualified"
-    SUPPORTED = "supported"
-    UNSUPPORTED = "unsupported"
-
-
-# Public IO types handled by the fixture renderer and each engine integration.
-# These declarations do not describe internal tensor or kernel support.
-_FIXTURE_IO_DTYPES = {
-    EngineType.TFLM: frozenset(
-        {FixtureDType.INT8, FixtureDType.INT16, FixtureDType.INT32, FixtureDType.FLOAT32}
-    ),
-    EngineType.HELIA_AOT: frozenset(FixtureDType),
-    EngineType.HELIA_RT: frozenset(FixtureDType),
-}
-
-#: Generic fixture IO support, independent of runtime qualification evidence.
-#: INT32 support is input-only. Selected-engine failures still propagate.
-FIXTURE_CAPABILITIES: dict[EngineType, dict[str, FixtureCapability]] = {
-    engine: {
-        dtype: (
-            FixtureCapability.SUPPORTED if dtype in supported else FixtureCapability.UNSUPPORTED
-        )
-        for dtype in FixtureDType
-    }
-    for engine, supported in _FIXTURE_IO_DTYPES.items()
-}
-
-#: Largest total output a fixture may expose for full readback.
-FIXTURE_READBACK_BUDGET = 128 * 1024
 _FIXTURE_ROLES = frozenset(FixtureRole)
 
 
@@ -253,29 +226,7 @@ def _check_typed_fixture(
         or tuple(io.tensor for io in fixture.outputs) != model.outputs
     ):
         raise ConfigError("Fixture tensor declarations differ from analyzed model")
-    return _io_capabilities(model.inputs, model.outputs, engine)
-
-
-def _io_capabilities(
-    inputs: tuple[FixtureTensor, ...], outputs: tuple[FixtureTensor, ...], engine: EngineType
-):
-    if any(t.dtype == "int32" for t in outputs):
-        raise ConfigError("INT32 fixture support is input-only")
-    output_bytes = sum(t.size_bytes for t in outputs)
-    if output_bytes > FIXTURE_READBACK_BUDGET:
-        raise ConfigError(
-            f"Fixture outputs total {output_bytes} B, above the "
-            f"{FIXTURE_READBACK_BUDGET} B readback budget"
-        )
-    table = FIXTURE_CAPABILITIES[engine]
-    tensors = (*inputs, *outputs)
-    capabilities = tuple(sorted({(t.dtype, table[t.dtype]) for t in tensors}))
-    unsupported = [
-        dtype for dtype, status in capabilities if status is FixtureCapability.UNSUPPORTED
-    ]
-    if unsupported:
-        raise ConfigError(f"{engine.value} fixtures do not support {', '.join(unsupported)} IO")
-    return capabilities
+    return io_capabilities(model.inputs, model.outputs, engine)
 
 
 @dataclass(frozen=True)
@@ -336,7 +287,7 @@ class FixtureBuild:
     #: Compiled builds only: the kernel library linked, as the pinned prepared-runtime
     #: manifest or dependency state states it.
     kernel_source: FixtureKernelSource | None = None
-    #: Compiled heliaRT and TFLM builds only: the prepared runtime archive linked.
+    #: Compiled heliaRT and LiteRT builds only: the prepared runtime archive linked.
     runtime_source: FixtureRuntimeSource | None = None
 
 
@@ -407,7 +358,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
     if config.model.path.resolve() != fixture.model.path.resolve():
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in FIXTURE_CAPABILITIES:
-        raise ConfigError("Fixture supports upstream TFLM, heliaRT or helia-AOT only")
+        raise ConfigError("Fixture supports LiteRT, heliaRT or heliaAOT only")
     if config.target.custom_socs or config.target.custom_boards:
         raise ConfigError("Fixed fixture does not support custom target declarations")
     try:
@@ -458,32 +409,8 @@ def build_fixed_fixture(
     observe_ram: bool = False,
 ) -> FixtureBuild:
     """Render or compile one fixed fixture through profiler's host-only stages."""
-    return _build(
-        config,
-        fixture,
-        method=method,
-        runtime=runtime,
-        compile=compile,
-        observe_aot_arenas=observe_aot_arenas,
-        observe_ram=observe_ram,
-    )
-
-
-def _build(
-    config: ProfileConfig,
-    fixture: FixedFixture | TypedFixture,
-    *,
-    method: FixtureMethod,
-    runtime: PreparedUpstreamRuntime | None,
-    compile: bool,
-    observe_aot_arenas: bool,
-    intent_identity: str | None = None,
-    observe_ram: bool = False,
-) -> FixtureBuild:
     if not isinstance(method, FixtureMethod):
         raise ConfigError("Explicit FixtureMethod required")
-    if method.power_sync is not None and method.power_sync.protocol_version != 2:
-        raise ConfigError("New power firmware requires completion protocol 2")
     _validate(config, fixture)
     if config.target.board == "apollo510b_evb" and method.power_sync is not None:
         raise ConfigError("AP510B fixture integration is timing-only")
@@ -629,8 +556,7 @@ def _build(
             raise ConfigError(
                 f"Flat image is {size} B; fixture capture accepts at most {MAX_IMAGE} B in MRAM"
             )
-    if intent_identity is None:
-        intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+    intent_identity = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     toolchain = ctx.run_metadata.toolchain if compile else None
     if compile and (toolchain is None or not toolchain.compiler_version):
         raise ConfigError("Compiled fixture requires recorded toolchain provenance")

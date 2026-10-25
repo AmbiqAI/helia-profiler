@@ -4,6 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from helia_profiler import FixturePowerSync
 from helia_profiler._fixture_build import (
     FixedFixture,
     FixtureFile,
@@ -22,7 +23,6 @@ from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.firmware.fixture import fixture_template_vars, write_fixture_headers
 from helia_profiler.firmware.op_resolver import ResolverPlan
 from helia_profiler.firmware.render import _jinja_env
-from helia_profiler.fixture import FixturePlacement, FixturePowerSync
 from helia_profiler.fixture_analysis import (
     FixtureModelAnalysis,
     FixtureTensor,
@@ -33,9 +33,10 @@ from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.results.models import NsxModuleRef
+from tests.fixture_requests import FixturePlacement
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
-FIXTURE_ENGINES = ("tflm", "helia-rt", "helia-aot")
+FIXTURE_ENGINES = ("litert", "helia-rt", "helia-aot")
 FIXTURE_SCOPES = ("restore_and_invoke", "invoke_only")
 FIXTURE_KIND_ENGINES = tuple(
     (kind, engine) for kind in FIXTURE_KINDS for engine in FIXTURE_ENGINES

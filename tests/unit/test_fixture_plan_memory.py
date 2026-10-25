@@ -83,7 +83,7 @@ def context(
 
 
 @pytest.mark.parametrize(
-    "engine,output_size", [(EngineType.TFLM, 952), (EngineType.HELIA_AOT, 984)]
+    "engine,output_size", [(EngineType.LITERT, 952), (EngineType.HELIA_AOT, 984)]
 )
 def test_fixture_statics_fit_at_boundary_and_overflow_one_byte_later(tmp_path, engine, output_size):
     ctx = context(tmp_path, engine, output_size)
@@ -97,7 +97,7 @@ def test_fixture_statics_fit_at_boundary_and_overflow_one_byte_later(tmp_path, e
 
 
 @pytest.mark.parametrize("transport", ["swo", "rtt", "usb_cdc"])
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_RT, EngineType.HELIA_AOT])
 def test_fixture_consumers_have_actual_regions_and_no_inactive_profiler_buffers(
     tmp_path, engine, transport
 ):

@@ -6,7 +6,7 @@ from dataclasses import asdict, replace
 import pytest
 from test_heliart_fixture import runtime
 
-from helia_profiler.fixture import FixtureKernelSource, FixtureRuntimeSource
+from helia_profiler import FixtureKernelSource, FixtureRuntimeSource
 from helia_profiler.fixture_sources import comparable, pinned_sources
 from helia_profiler.results.dependencies import ContentDigest, DependencyModule
 from helia_profiler.runtime_records import runtime as runtime_record
@@ -100,7 +100,7 @@ def _recorded(tmp_path, name, provider, kernel, schema):
 
 @pytest.mark.parametrize(
     "name,provider,kernel,schema",
-    [("helia-rt", "helia-rt", "ns-cmsis-nn", 2), ("tflm", "tflite-micro", "cmsis-nn", 1)],
+    [("helia-rt", "helia-rt", "ns-cmsis-nn", 2), ("litert", "tflite-micro", "cmsis-nn", 1)],
 )
 def test_runtime_version_is_the_record_built_from_both_commits(
     tmp_path, name, provider, kernel, schema

@@ -10,7 +10,7 @@ hpx profile [OPTIONS] [MODEL]
 
 Profile a model on target hardware
 
-Defined in `src/helia_profiler/cli/app.py` line 95.
+Defined in `src/helia_profiler/cli/app.py` line 87.
 
 ### Arguments
 
@@ -47,7 +47,7 @@ Defined in `src/helia_profiler/cli/app.py` line 95.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--engine` | `tflm \| helia-rt \| helia-aot \| executorch` |  | Inference engine (default: helia-rt) |
+| `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Inference engine (default: helia-rt) |
 | `--engine-config` | `Optional[Path]` |  | Engine-specific YAML config |
 | `--arena-size` | `Optional[int]` |  | Tensor arena size in bytes |
 | `--arena-location` | `tcm \| sram \| psram` |  | Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose. |

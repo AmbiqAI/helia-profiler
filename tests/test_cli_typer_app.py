@@ -81,7 +81,7 @@ def test_profile_forwards_fail_on_invalid(monkeypatch) -> None:
     assert seen["kwargs"]["fail_on_invalid"] is False
 
 
-def test_profile_accepts_tflm_engine(monkeypatch) -> None:
+def test_profile_accepts_litert_engine(monkeypatch) -> None:
     import helia_profiler.cli.profile_cmd as profile_cmd
 
     seen: dict[str, dict] = {}
@@ -91,10 +91,10 @@ def test_profile_accepts_tflm_engine(monkeypatch) -> None:
 
     monkeypatch.setattr(profile_cmd, "_cmd_profile", fake_cmd_profile)
 
-    result = runner.invoke(app, ["profile", "model.tflite", "--engine", "tflm"])
+    result = runner.invoke(app, ["profile", "model.tflite", "--engine", "litert"])
 
     assert result.exit_code == 0, result.output
-    assert seen["kwargs"]["engine"] == "tflm"
+    assert seen["kwargs"]["engine"] == "litert"
 
 
 def test_profile_uses_canonical_placement_options(monkeypatch) -> None:

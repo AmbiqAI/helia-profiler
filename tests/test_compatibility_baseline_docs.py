@@ -39,7 +39,7 @@ _JSON = _REPO / "src" / "helia_profiler" / "data" / "compatibility-baseline-v1.j
 _ENGINE_DOC_NAMES = {
     "helia-rt": "heliaRT",
     "helia-aot": "heliaAOT",
-    "tflm": "tflm",
+    "litert": "litert",
     "executorch": "executorch",
 }
 
@@ -87,14 +87,14 @@ def test_every_baseline_entry_has_a_doc_row_with_its_ref():
             None,
         )
         assert row is not None, f"runtime '{record.name}' has no doc row"
-        if record.name != "tflm":  # the tflm row documents the profile path's module refs
+        if record.name != "litert":  # the litert row documents the profile path's module refs
             assert f"`{record.version}`" in row, (
                 f"runtime record {record.name} {record.version} missing from the doc table"
             )
         if record.default and record.name in ("helia-rt", "executorch"):
             assert record.source.commit[:8] in row, f"{record.name} commit missing from the doc"
-    tflm_row = next(line for line in table.splitlines() if "| tflm |" in line)
-    assert "governed" in tflm_row, "the tflm row no longer states module governance"
+    litert_row = next(line for line in table.splitlines() if "| litert |" in line)
+    assert "governed" in litert_row, "the litert row no longer states module governance"
     aot_row = next(line for line in table.splitlines() if "| heliaAOT |" in line)
     assert f"`>={HELIAAOT_MIN_VERSION},<{HELIAAOT_MAX_VERSION_EXCLUSIVE}`" in aot_row
 

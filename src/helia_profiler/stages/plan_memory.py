@@ -144,7 +144,7 @@ class PlanMemoryStage:
         return self._synthesise_plan(ctx)
 
     def _synthesise_plan(self, ctx: PipelineContext) -> MemoryPlan:
-        """Build a single-arena plan for engines (tflm/heliaRT) that don't
+        """Build a single-arena plan for engines (litert/heliaRT) that don't
         expose per-region allocations themselves.
 
         Uses the resolved ``ctx.arena_region`` and ``ctx.weights_region``
@@ -368,7 +368,7 @@ class PlanMemoryStage:
 #:     (main_executorch.cc.j2:73-77; nsx_executorch.h OperatorEvent =
 #:     kind + chain_index + instruction_index + two const char* (#301))
 PMU_RECORD_SIZE_BYTES: dict[EngineType, int] = {
-    EngineType.TFLM: 24,
+    EngineType.LITERT: 24,
     EngineType.HELIA_RT: 24,
     EngineType.HELIA_AOT: 20,
     EngineType.EXECUTORCH: 40,
@@ -567,7 +567,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     record_size = PMU_RECORD_SIZE_BYTES.get(engine_type) if fixture is None else None
     if record_size is not None:
         records_bytes = int(soc.pmu_max_ops) * record_size
-        if engine_type in (EngineType.TFLM, EngineType.HELIA_RT):
+        if engine_type in (EngineType.LITERT, EngineType.HELIA_RT):
             # The records live inside g_profiler (NSX_MEM_SRAM); book the
             # whole object — both tier headers are derivable. NB the plan
             # describes the PROFILE binary (the power binary's records

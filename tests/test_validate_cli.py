@@ -347,7 +347,7 @@ class TestSuiteSmoke:
         )
 
         assert args[args.index("--mlperf-models") + 1] == "kws,vww,ic,ad"
-        assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot,tflm,executorch"
+        assert args[args.index("--mlperf-engines") + 1] == "helia-rt,helia-aot,litert,executorch"
         assert args[args.index("--mlperf-boards") + 1] == "apollo510_evb,apollo330mP_evb"
         assert args[args.index("--mlperf-toolchains") + 1] == "arm-none-eabi-gcc,atfe"
 

@@ -77,16 +77,6 @@ def _process_stats(
     return samples, summary
 
 
-def _sv(field: Any, default: float = 0.0) -> float:
-    """Extract a ``{'value': x, 'units': ...}`` scalar from a stats packet."""
-    if isinstance(field, dict):
-        try:
-            return float(field.get("value", default))
-        except (TypeError, ValueError):
-            return default
-    return default
-
-
 def _counter_duration_ticks(t: dict[str, Any], second: float) -> float | None:
     """Return positive driver delta or sample-span duration, or None for UTC fallback."""
     delta = (t.get("delta", {}) or {}).get("value")
@@ -211,12 +201,12 @@ def _stats_arrays(
             mid.append(((first - origin) + (last - origin)) * 0.5 * second / rate)
         host_time.append(float(host_tick) if host_tick is not None else np.nan)
         dur.append(_packet_duration_ticks(t, u0, u1, second))
-        cur_avg.append(_sv(cur.get("avg")))
-        cur_max.append(_sv(cur.get("max")))
-        cur_min.append(_sv(cur.get("min")))
-        cur_int.append(_sv(cur.get("integral")))
-        pwr_avg.append(_sv(pwr.get("avg")))
-        pwr_int.append(_sv(pwr.get("integral")))
+        cur_avg.append(_extract_scalar(cur.get("avg")))
+        cur_max.append(_extract_scalar(cur.get("max")))
+        cur_min.append(_extract_scalar(cur.get("min")))
+        cur_int.append(_extract_scalar(cur.get("integral")))
+        pwr_avg.append(_extract_scalar(pwr.get("avg")))
+        pwr_int.append(_extract_scalar(pwr.get("integral")))
     # Rectify each packet's net integral, not each full-rate sample.
     # Peak magnitude uses both signed extrema regardless of wiring polarity.
     abs_max = np.abs(np.asarray(cur_max, dtype=np.float64))
@@ -241,7 +231,7 @@ def _gated_mask_axis(a: dict[str, Any], *, prefer_device_time: bool = False) -> 
     if prefer_device_time:
         return a["mid"], "device_packet_midpoint_time64"
     host_time = a.get("host_time")
-    if host_time is not None and getattr(host_time, "size", 0) and not bool(host_time.size == 0):
+    if host_time is not None and getattr(host_time, "size", 0):
         import numpy as np
 
         if not np.isnan(host_time).any():

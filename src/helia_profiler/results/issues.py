@@ -1,30 +1,18 @@
-"""Registry of stable machine-readable issue codes.
+"""Registry of machine-readable validity and comparability codes.
 
-Every diagnostic code HPX can emit is declared here, in one of three forms:
+* :class:`IssueCode` declares run-validity codes emitted by
+  ``evaluation.validity.evaluate_run``.
+* :class:`ComparabilityCode` declares fixed comparability codes.
+* :class:`ComparabilityCodeFamily` describes parameterized codes that
+  embed a :class:`ComparisonDimension`.
 
-* :class:`IssueCode` — run-validity codes carried by
-  :class:`~helia_profiler.results.manifest.ResultIssue` (emitted only by
-  ``evaluation.validity.evaluate_run``).
-* :class:`ComparabilityCode` — static comparability codes carried by
-  ``evaluation.comparability.ComparabilityIssue``.
-* :class:`ComparabilityCodeFamily` — the two parameterized comparability
-  families whose concrete codes embed a :class:`ComparisonDimension`.
+The enums type codes at emission and serialize as strings. Reader-side
+``ResultIssue.code`` remains ``str`` so it can retain codes absent from this
+registry without rejecting an otherwise supported result bundle.
 
-The enums are ``StrEnum``, so a member serializes byte-identically to the
-string literal it replaced; ``summary.json``, ``result_manifest.json``, and
-compare artifacts are unchanged by construction (proven by the report golden
-digests). Reader-side fields (``ResultIssue.code``) deliberately stay ``str``:
-result bundles round-trip across HPX versions, so rehydration must tolerate
-codes this build does not know. The registry types a code at *emission*, not
-at load.
-
-The Reference issue-codes page is rendered from this module through
-``tools/docs/extract_issues.py`` and drift-tested by
-``tools/docs/check_reference.py`` like the configuration reference.
-
-CODEGEN-STABLE SURFACE (#229 D8): tools/docs/extract_issues.py
-generates the published issue-code reference from these registries —
-treat their names and structure as a stable surface for that generator.
+``tools/docs/extract_issues.py`` generates the published issue-code reference
+from these declarations; their names and structure are inputs to that
+extractor. ``tools/docs/check_reference.py`` checks reference drift.
 """
 
 from __future__ import annotations
@@ -336,7 +324,6 @@ class ComparabilityCode(StrEnum):
 
     RESULT_INCOMPLETE = "result.incomplete"
     RESULT_INVALID = "result.invalid"
-    RESULT_INVALID_PMU_OVERFLOW = "result.invalid_pmu_overflow"
     RESULT_DEGRADED = "result.degraded"
     IDENTITY_MODEL_MISMATCH = "identity.model_mismatch"
     METRIC_POWER_INTEGRITY_INVALID = "metric.power_integrity_invalid"
@@ -370,11 +357,6 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilityCode.RESULT_INVALID,
         ComparabilitySeverity.BLOCKING,
         "A result is invalid and cannot be compared.",
-    ),
-    ComparabilitySpec(
-        ComparabilityCode.RESULT_INVALID_PMU_OVERFLOW,
-        ComparabilitySeverity.BLOCKING,
-        "A legacy result without a manifest has PMU counter overflow.",
     ),
     ComparabilitySpec(
         ComparabilityCode.RESULT_DEGRADED,

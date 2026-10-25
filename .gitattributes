@@ -8,3 +8,6 @@ src/helia_profiler/vendor/segger_rtt/** text eol=lf
 
 # Manifest digests cover the captured bytes, including line endings.
 examples/results/** -text
+
+# ORIGIN.json pins BENCH's contract files by sha256 of their exact bytes.
+tests/fixtures/result_contract_v1/** -text

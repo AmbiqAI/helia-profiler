@@ -152,7 +152,7 @@ class LayerAttributor:
         elif suffix is not None:
             source = suffix
         elif ":" not in str(op):
-            # Sequential engines (TFLM, helia-rt): execution order is the
+            # Sequential engines (litert, helia-rt): execution order is the
             # original graph order, so the id IS the source index.
             source = position
             explicit = False

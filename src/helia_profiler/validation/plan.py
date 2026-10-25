@@ -20,7 +20,7 @@ from .matrix import CaseSpec, ModelSpec, build_matrix, load_model_file, models_f
 _ENGINE_ALIASES = {
     "rt": "helia-rt",
     "aot": "helia-aot",
-    "tflm": "tflm",
+    "litert": "litert",
     "et": "executorch",
     "executorch": "executorch",
     "helia-rt": "helia-rt",
@@ -79,7 +79,7 @@ def normalise_engines(raw: str) -> str:
         raw,
         aliases=_ENGINE_ALIASES,
         label="engine",
-        known="rt, aot, tflm, et, executorch, helia-rt, helia-aot",
+        known="rt, aot, litert, et, executorch, helia-rt, helia-aot",
     )
 
 
@@ -342,7 +342,7 @@ def _apply_suite_defaults(plan: ValidationPlan) -> ValidationPlan:
             updates["engines_csv"] = {
                 "models-rt": "helia-rt",
                 "models-aot": "helia-aot",
-                "complete": "helia-rt,helia-aot,tflm,executorch",
+                "complete": "helia-rt,helia-aot,litert,executorch",
             }[plan.suite]
         if not plan.boards_csv.strip():
             updates["boards_csv"] = "apollo510_evb,apollo330mP_evb"

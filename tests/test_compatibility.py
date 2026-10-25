@@ -313,7 +313,7 @@ def test_empty_source_override_values_do_not_change_qualification(
 
 
 def test_engine_backend_selection_does_not_affect_qualification(tmp_path: Path) -> None:
-    # Selecting the cmsis_nn TFLM backend still resolves exclusively to
+    # Selecting the cmsis_nn LiteRT backend still resolves exclusively to
     # baseline-qualified refs (arm-cmsis-nn is a required qualified
     # project), so it must not be classified as an override.
     config = _config(tmp_path, engine={"backend": "cmsis_nn"})
@@ -601,6 +601,6 @@ def test_version_override_preserves_positional_engine_config():
     from helia_profiler.config import EngineConfig
     from helia_profiler.engines import EngineType
 
-    config = EngineConfig(EngineType.TFLM, "cmsis_nn", {}, None)
+    config = EngineConfig(EngineType.LITERT, "cmsis_nn", {}, None)
     assert config.backend == "cmsis_nn"
     assert config.allow_unsupported_version is False

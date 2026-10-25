@@ -52,7 +52,6 @@ class ResetCapabilities:
     """
 
     default_power_reset_strategy: str
-    supports_swpoi: bool
 
 
 @dataclass(frozen=True)
@@ -65,8 +64,6 @@ class TransportCapabilities:
     has_usb: bool
     #: Fixed SWO/ITM trace reference clock (MHz) when the TPIU is NOT core-clocked.
     swo_trace_clock_mhz: int | None
-    #: True when the SWO baud follows the selected CPU clock (Apollo4/5).
-    swo_core_clocked: bool
 
 
 @dataclass(frozen=True)
@@ -74,7 +71,7 @@ class MemoryCapabilities:
     #: Cache-coherent Cortex-M55 (Apollo5) parts have a CPU D-cache and need
     #: explicit maintenance around host-shared RTT buffers.
     has_dcache: bool
-    #: Apollo5 parts expose the 3 MB shared SSRAM power domain that firmware
+    #: Apollo5 parts expose the shared SSRAM power domain that firmware
     #: powers on for SRAM-resident arenas.
     has_shared_ssram_power_domain: bool
     #: Physical base address of each arena/weights-eligible placement region.
@@ -353,13 +350,11 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
 
     reset = ResetCapabilities(
         default_power_reset_strategy=(_RESET_DEBUG_THEN_SWPOI if is_ap5 else _RESET_DEBUG),
-        supports_swpoi=is_ap5,
     )
     transport = TransportCapabilities(
         requires_attached_probe_for_cycles=is_cortex_m4f,
         has_usb=soc.has_usb,
         swo_trace_clock_mhz=soc.swo_trace_clock_mhz,
-        swo_core_clocked=soc.swo_trace_clock_mhz is None,
     )
     memory = MemoryCapabilities(
         has_dcache=is_ap5,

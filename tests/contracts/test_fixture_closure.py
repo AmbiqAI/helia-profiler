@@ -1,4 +1,4 @@
-"""The fixture source closure is current, recomputable, and covers every file a build loads."""
+"""The shipped-file listing is current and covers every package file a fixture build loads."""
 
 from __future__ import annotations
 
@@ -13,19 +13,15 @@ from pathlib import Path
 import pytest
 
 import helia_profiler
-from helia_profiler._fixture_closure import CLOSURE_LISTING, closure_digest, closure_paths
-from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
-    FIXTURE_API_VERSION,
+from helia_profiler import (
     FixtureFile,
     FixtureIO,
     FixtureMethod,
     FixtureTimingScope,
     PreparedUpstreamRuntime,
     TypedFixture,
-    build_fixed_fixture,
-    source_closure,
 )
+from helia_profiler._fixture_build import build_fixed_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = Path(helia_profiler.__file__).resolve().parent
@@ -65,7 +61,7 @@ def _clear_template_caches() -> None:
 
 
 def _listed() -> set[str]:
-    return set(closure_paths((PACKAGE / CLOSURE_LISTING).read_bytes()))
+    return set((PACKAGE / "fixture_closure.txt").read_text(encoding="utf-8").splitlines())
 
 
 @pytest.mark.host_integration
@@ -77,40 +73,6 @@ def test_listing_is_current() -> None:
         text=True,
     )
     assert result.returncode == 0, result.stderr
-
-
-def test_source_closure_matches_an_independent_recomputation() -> None:
-    closure = source_closure()
-    listing = (PACKAGE / CLOSURE_LISTING).read_bytes()
-    digest = hashlib.sha256(listing)
-    for path in listing.decode().splitlines():
-        digest.update(
-            f"{path}\0{hashlib.sha256((PACKAGE / path).read_bytes()).hexdigest()}\n".encode()
-        )
-    assert closure.digest == digest.hexdigest()
-    assert closure.api_version == FIXTURE_API_VERSION
-    assert [path for path, _ in closure.files] == listing.decode().splitlines()
-
-
-def test_digest_moves_with_any_listed_byte() -> None:
-    files = (("a.py", "0" * 64), ("b.j2", "1" * 64))
-    base = closure_digest(b"a.py\nb.j2\n", files)
-    assert closure_digest(b"a.py\nb.j2\n", (files[0], ("b.j2", "2" * 64))) != base
-    assert closure_digest(b"a.py\n", files[:1]) != base
-
-
-@pytest.mark.parametrize(
-    "listing", [b"", b"b.py\na.py\n", b"a.py\na.py\n", b"../x.py\n", b"/x.py\n"]
-)
-def test_malformed_listings_are_refused(listing: bytes) -> None:
-    with pytest.raises(ConfigError):
-        closure_paths(listing)
-
-
-def test_source_closure_refuses_a_missing_file(tmp_path: Path) -> None:
-    (tmp_path / CLOSURE_LISTING).write_bytes(b"gone.py\n")
-    with pytest.raises(ConfigError, match="gone.py"):
-        source_closure(tmp_path)
 
 
 def test_heliaaot_fixture_build_reads_only_closure_files(
@@ -202,10 +164,10 @@ def _prepared_upstream_runtime(directory: Path) -> PreparedUpstreamRuntime:
     )
 
 
-def test_tflm_fixture_build_reads_only_closure_files(
+def test_litert_fixture_build_reads_only_closure_files(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A host-only TFLM fixture build through the prepared upstream runtime reads only closure files."""
+    """A host-only LiteRT fixture build through the prepared upstream runtime reads only closure files."""
     pytest.importorskip("ai_edge_litert")
     from helia_profiler.config import load_config
     from helia_profiler.fixture_analysis import analyze_typed_fixture_model
@@ -239,7 +201,7 @@ def test_tflm_fixture_build_reads_only_closure_files(
                 "arena_location": "sram",
                 "weights_location": "mram",
             },
-            "engine": {"type": "tflm", "backend": "cmsis_nn"},
+            "engine": {"type": "litert", "backend": "cmsis_nn"},
             "profiling": {"iterations": 3, "warmup": 1},
             "target": {"toolchain": "atfe", "board": "apollo510_evb", "clock": {"cpu": "lp"}},
             "work_dir": str(tmp_path / "work"),

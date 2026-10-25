@@ -125,7 +125,7 @@ def test_success_report_passes_window_then_gate(soc, transport, engine, probe, i
 
 @pytest.mark.parametrize("ina228", [False, True], ids=["no-monitor", "ina228"])
 def test_envelope_orders_keys_and_values_alike(ina228):
-    rendered = _power_render("apollo510", "rtt", "tflm", "infer", ina228)
+    rendered = _power_render("apollo510", "rtt", "litert", "infer", ina228)
     body = rendered[rendered.index("static void hpx_power_terminal_report(") :]
     body = body[: body.index("static void hpx_power_terminal_fail(")]
     keys = re.findall(r'"HPX_POWER_(ELAPSED_US|GATE_ELAPSED_US)=%llu\\n"', body)
@@ -136,7 +136,7 @@ def test_envelope_orders_keys_and_values_alike(ina228):
 
 @pytest.mark.parametrize("ina228", [False, True], ids=["no-monitor", "ina228"])
 def test_failure_envelope_reports_zero_for_both_intervals(ina228):
-    rendered = _power_render("apollo510", "rtt", "tflm", "infer", ina228)
+    rendered = _power_render("apollo510", "rtt", "litert", "infer", ina228)
     fail = rendered[rendered.index("static void hpx_power_terminal_fail(") :]
     call = fail[fail.index("hpx_power_terminal_report(\n") :]
     call = call[: call.index(");")]
@@ -148,7 +148,7 @@ def test_failure_envelope_reports_zero_for_both_intervals(ina228):
 
 @pytest.mark.parametrize("ina228", [False, True], ids=["no-monitor", "ina228"])
 def test_envelope_version_is_the_parser_version(ina228):
-    rendered = _power_render("apollo510", "rtt", "tflm", "infer", ina228)
+    rendered = _power_render("apollo510", "rtt", "litert", "infer", ina228)
     assert re.findall(r"HPX_POWER_TERMINAL_VERSION=(\w+)\\n", rendered) == [
         str(POWER_TERMINAL_VERSION)
     ]
@@ -168,7 +168,7 @@ def test_power_render_refuses_a_non_stimer_window():
         _render(
             "apollo510",
             "rtt",
-            "tflm",
+            "litert",
             power_only=True,
             overrides={"power_window_timer": "dwt"},
         )

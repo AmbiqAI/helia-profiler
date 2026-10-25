@@ -1,4 +1,5 @@
-node_modules/
+# No trailing slash: also ignores a node_modules symlink.
+node_modules
 dist/
 .astro/
 .cache/

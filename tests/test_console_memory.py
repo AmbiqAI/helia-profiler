@@ -263,7 +263,7 @@ def test_compare_run_table_labels_region_rows_and_honours_direction():
 def test_compare_change_colour_follows_the_declared_direction():
     """#213: the label test above would pass under the old name hack;
     pin the colour -- free UP is green, used UP is red."""
-    from helia_profiler.console.compare import _format_compare_change_compact
+    from helia_profiler.console.compare import _format_compact_number, _format_compare_delta
     from helia_profiler.evaluation.compare import MetricDiff
 
     def diff(name: str, *, lower_is_better: bool) -> MetricDiff:
@@ -280,9 +280,9 @@ def test_compare_change_colour_follows_the_declared_direction():
 
     free = diff("memory_regions.DTCM.free", lower_is_better=False)
     used = diff("memory_regions.DTCM.used", lower_is_better=True)
-    assert _format_compare_change_compact(free, lower_is_better=free.lower_is_better).startswith(
-        "[green]"
-    )
-    assert _format_compare_change_compact(used, lower_is_better=used.lower_is_better).startswith(
-        "[red]"
-    )
+    assert _format_compare_delta(
+        free, lower_is_better=free.lower_is_better, fmt=_format_compact_number
+    ).startswith("[green]")
+    assert _format_compare_delta(
+        used, lower_is_better=used.lower_is_better, fmt=_format_compact_number
+    ).startswith("[red]")

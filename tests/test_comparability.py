@@ -27,7 +27,7 @@ def _run(
     if power is not None:
         summary["power"] = power
     # Matches report/metadata.py: a None version is FILTERED OUT of the JSON
-    # (tflm/executorch record no resolved version), so absence is the real
+    # (litert/executorch record no resolved version), so absence is the real
     # legacy/no-version shape, not a null.
     engine_block: dict = {"type": engine}
     if engine_version is not None:
@@ -88,7 +88,7 @@ def test_engine_version_difference_is_informative():
 
 
 def test_a_baseline_predating_engine_version_is_skipped_not_flagged():
-    """Old artifacts (and tflm/executorch runs, which record no resolved
+    """Old artifacts (and litert/executorch runs, which record no resolved
     version) omit the key entirely -- missing is unknown, not different."""
     assessment = assess_comparability(_run(engine_version=None), _run(engine_version="1.17.0"))
 
@@ -635,25 +635,6 @@ class TestLinkFamily:
         assessment = assess_comparability(self._run_with(None), self._run_with("armlink"))
 
         assert assessment.memory_metrics_comparable
-
-    def test_pre_206_artifacts_fall_back_to_the_measured_family(self):
-        """#213: every #133+ summary records the family the measurer
-        saw in memory_regions -- a pre-#206 gnu-vs-armlink pair must gate
-        exactly like a post-#206 one, not slip through the None-skip rule."""
-        base = self._run_with(None)
-        cand = self._run_with(None)
-        base.summary["memory_regions"] = {"link_family": "gnu", "regions": []}
-        cand.summary["memory_regions"] = {"link_family": "armlink", "regions": []}
-
-        assessment = assess_comparability(base, cand)
-
-        assert not assessment.memory_metrics_comparable
-        issue = next(
-            issue
-            for issue in assessment.issues
-            if issue.code == MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY)
-        )
-        assert (issue.context["baseline"], issue.context["candidate"]) == ("gnu", "armlink")
 
     def test_no_issue_when_neither_run_measured_regions(self):
         """#213 1: a cross-family pair whose memory measurement failed

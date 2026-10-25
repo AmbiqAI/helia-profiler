@@ -17,7 +17,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | File | Schema | Role | When present |
 |---|---|---|---|
 | `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
-| `summary.json` | `hpx.run-summary` v15 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
+| `summary.json` | `hpx.run-summary` v19 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
 | `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | always; one of the two per `output.format` |
 | `run_metadata.json` | `hpx.run-metadata` v1 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
@@ -25,6 +25,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
+| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`run_record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
@@ -65,13 +66,13 @@ nested memory and analysis tables described below:
 
 (the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-which retains schema version 5. New runs use schema version 15; use the
+which retains schema version 5. New runs use schema version 19; use the
 typed loader to read historical bundles without rewriting them). Top-level
 fields in new runs:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|
-| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 15 |
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 19 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
 | `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
@@ -172,13 +173,69 @@ guessed:
 | Field | What it states |
 |---|---|
 | `runtime` | `engine` (`litert`, `helia-rt`, `helia-aot` or `executorch`), `repository`, `version` and `commit`: the runtime module from the lock, the installed heliaAOT package, or the ExecuTorch runtime record |
-| `kernels` | `library` (`reference`, `cmsis-nn` or `helia-core`), `repository`, `version`, `commit`: the one CMSIS-NN module the lock resolved, never the backend label; `reference` only for TFLM's reference backend, which links none |
+| `kernels` | `library` (`reference`, `cmsis-nn` or `helia-core`), `repository`, `version`, `commit`: the one CMSIS-NN module the lock resolved, never the backend label; `reference` only for LiteRT's reference backend, which links none |
 | `build` | `toolchain`, `toolchain_version`, `board`, `cpu_hz`, `clock_profile`, `arena_location`, `weights_location`, `arena_bytes` |
 | `baseline_id`, `dependency_lock_sha256`, `producer` | the compatibility baseline, the lock's sha256 and the HPX release, from the dependency workspace |
-| `model_sha256`, `inputs_sha256` | the model file; profile firmware feeds zero-filled inputs, so `inputs_sha256` is unknown |
-| `run` | `lifecycle` (`carry`: the engine keeps its state across invocations), `iterations`, `warmups`, `timing_scope` (`restore_and_invoke` for heliaAOT's clean window, else `invoke_only`) |
-| `build_hash` | sha256 over the flashed `.bin` image, what the lock resolved, and the model; it ignores the HPX release and the lock's timestamps, so it changes only when what runs changes |
-| `observation_hash` | sha256 over the PMU and device timing results, without host paths; two captures of the same firmware can differ |
+| `model_sha256`, `inputs_hash` | the model file's sha256, and an `hpx.inputs` [semantic hash](#semantic-hashes) of each pinned input's tensor name and data sha256; profile firmware feeds zero-filled inputs, so `inputs_hash` is unknown |
+| `run` | how it ran and how the clean window was timed: the fields below |
+| `run.lifecycle`, `run.instance_boundary` | `carry` with `boot`: the engine initializes once and keeps its state across invocations; `single` with `invocation` for ExecuTorch, whose firmware reloads and initializes the program on every call |
+| `run.iterations`, `run.warmups` | the configured counts; the clean window always runs at least one warmup |
+| `run.first_invoke_initializer`, `run.first_invoke_window` | whether the first invocation of an instance runs the model's one-time initializer, and where it falls. LiteRT and heliaRT run a `CALL_ONCE` subgraph inside the first `Invoke()`, so this is whether the source model has one; heliaAOT runs it in `model_init()`, so `false`; unknown for ExecuTorch. The window is `warmup`, except `measured` for ExecuTorch, where every invocation is its instance's first |
+| `run.timing_scope` | `restore_and_invoke` for heliaAOT's clean window, else `invoke_only` |
+| `run.timing_clock`, `run.timing_clock_hz` | the clock that times the clean window and its configured rate: `stimer` at 32,768 Hz for the `busy_loop` probe; otherwise `cpu` cycles at the CPU clock for ExecuTorch (its execute-cycle count) on every SoC, `stimer` on Apollo5, and `cpu` (DWT) cycles elsewhere |
+| `run.timing_statistic` | `mean`: the clean window reports the mean per invocation (`latency.device_clean_infer_avg_us`); per-layer counters use `profiling.aggregation` |
+| `run.energy` | the method the run's energy is measured with: `null` for a profile without `power.enabled`, and unknown for one with it, since a profile does not state its energy method. A run-API rail capture states its `scope`, `rail`, `subtraction` and `completion_protocol` here, also when the capture failed |
+| `build_hash` | an `hpx.build` [semantic hash](#semantic-hashes) of the flashed `.bin` image, what the lock resolved, and the model; it ignores the HPX release and the lock's timestamps, so it changes only when what runs changes |
+| `observation_hash` | an `hpx.observation` semantic hash of the PMU and device timing results, without host paths; two captures of the same firmware can differ |
+| `intent_hash` | the frozen plan's `hpx.intent` semantic hash for a run built from one; `null` for an ordinary profile |
+
+#### Semantic hashes
+
+`build_hash`, `inputs_hash`, `observation_hash` and `intent_hash`, and a
+compiled build's `binding`, are semantic hashes:
+`hpx.<kind>/<version>:sha256:<hex>`, with 64 lowercase hex digits. The kind
+says what was hashed and the version says how. The identity's `*_sha256`
+fields stay bare hex: each is the sha256 of one file's bytes (the model, the
+dependency lock, the prepared runtime archive).
+
+The hashed bytes, the basis, are the value's JSON as Python's `json.dumps`
+writes it with `sort_keys=True`, `separators=(",", ":")` and
+`ensure_ascii=True`: keys sorted, no whitespace, every non-ASCII character
+escaped as `\uXXXX` (a surrogate pair beyond U+FFFF) so the bytes are
+ASCII, and each float in Python's shortest round-trip `repr` (`0.1`,
+`1e-05`). A non-finite float (NaN or an infinity) is refused, except in an
+`observation` basis, where a capture can report a NaN counter and it is
+written as the string `"nan"`, `"inf"` or `"-inf"`. Each kind has one basis:
+
+| Kind | Basis |
+|---|---|
+| `hpx.intent/1` | what a frozen plan asks for: its settings without host paths, the model hash, baseline, qualification, overrides, local inputs, toolchain, environment and engine runtime |
+| `hpx.build/1` | the flashed image's sha256, what the dependency lock resolved, the linked runtime archive's sha256 and the model's sha256 |
+| `hpx.observation/1` | one capture's measured facts, with files reduced to their sha256 and no host paths or error text |
+| `hpx.binding/1` | a compiled build's plan `intent_hash`, lifecycle, timing scope, state policy, power wiring, prepared runtime manifest and what it observes |
+| `hpx.inputs/1` | each pinned input's `[tensor name, data sha256]`, in model order |
+| `hpx.target-config/1` | retained board, probe device type, load address, configured clock profile/CPU rate and arena/weights placements; no workload or arena capacity |
+
+Changing what goes into a kind's basis bumps that kind's version. Compare two
+hashes only when their producer, kind and version all match.
+`helia_profiler.SemanticHash.parse` checks a string's form and returns its
+`producer`, `kind`, `version` and `hex`; it refuses bare hex, uppercase hex,
+a missing version and any algorithm but sha256.
+
+These examples pin the encoding:
+
+| Kind | Basis bytes | Hash |
+|---|---|---|
+| `intent` | `{"settings":{"engine":{"type":"helia-aot"}},"toolchain":["atfe","21.1.1"]}` | `hpx.intent/1:sha256:a74a43acef82134a3774a67959b8da1232a38fb88d7ea6f93e55e3e7662786c8` |
+| `build` | `{"image":"ab12","lock":{},"model":"cd34","runtime_archive":null}` | `hpx.build/1:sha256:6c416b863ba7e576075dca7ff677be4449aa90e879738cb4591dcb323d9583f5` |
+| `observation` | `{"cycles":[120,80],"error":false,"mean_us":"nan"}` | `hpx.observation/1:sha256:8f2796b5d85db5099f58b011ce8cb5c0b7c38f22d36d462cf80e6e9b77eba605` |
+| `binding` | `{"lifecycle":"carry","power_sync":null}` | `hpx.binding/1:sha256:7b9198891413a5779f01bb8aed3d0a68125d87cf983fddec759efbfcb58201ed` |
+| `inputs` | `[["input_1","cd34"],["input_2","ef56"]]` | `hpx.inputs/1:sha256:4a9320c8ecb5b4deede7d46e4dd9f2ad11ecf27e7626385dc7e7e03d84f2c9cc` |
+| `target-config` | `{"arena_location":"sram","board":"apollo510_evb","clock_profile":"lp","cpu_hz":96000000,"device":"AP510NFA-CBR","load_address":4259840,"weights_location":"mram"}` | `hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0` |
+| `intent` | `{"note":"\u00b5s \u2713","ratio":0.1,"scale":1e-05}` | `hpx.intent/1:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312` |
+
+The last example is `{"note": "µs ✓", "scale": 1e-05, "ratio": 0.1}`: its
+non-ASCII characters are escaped and its floats keep their shortest form.
 
 Four more top-level sections appear when the run produced them and are
 owned by other pages: `compatibility` and `dependencies` (the qualified
@@ -199,7 +256,27 @@ memory map.
 Fusions can change totals and derived rates; compare like analysis bases.
 
 Version 14 adds `identity`. The change is additive: no existing field changes
-meaning, and the typed loader reads version 13 summaries, which have none.
+meaning.
+
+Version 16 adds `identity.intent_hash` and the `run` fields from
+`instance_boundary` to `timing_statistic`. An ExecuTorch run's
+`run.lifecycle` becomes `single`; nothing else changes meaning.
+
+Version 17 renames the engine `tflm` to `litert` in `engine` and wherever
+else a summary names the engine; nothing else changes. Read a summary that
+says `tflm` with the HPX release that wrote it.
+
+Version 18 adds `identity.run.energy`; nothing else changes meaning.
+
+Version 19 writes `identity.build_hash`, `observation_hash` and `intent_hash`
+as [semantic hashes](#semantic-hashes) instead of bare hex, and renames
+`identity.inputs_sha256` to `inputs_hash`, also a semantic hash; the hex part
+of each is unchanged. The verified result reader refuses a version 19 summary
+whose identity is not an object, omits one of these four, or states one that
+is neither a hash of its kind nor, where allowed, `{"unknown": "<reason>"}`
+or `null`. It reads no other summary version: one is refused as
+`unsupported_schema`, naming its version, and is read with the HPX release
+that wrote it.
 
 ### 2. `profile_results.csv`
 
@@ -293,6 +370,102 @@ warning, or `INVALID` with the errors first. An invalid run still exits 0
 and writes its bundle unless `output.fail_on_invalid` (`--fail-on-invalid`)
 is set, in which case it exits 3.
 
+### 7. A saved run result
+
+`hpx run` saves each capture as `result.json` in its evidence directory.
+From Python, `RunResult.save(path, roots=..., build=...)` writes one and
+`helia_profiler.load_run(path, roots=...)` reads it back as a `RunResultRecord`
+(`path`, `size_bytes`, `sha256`, `hpx_version`, `result`, `document`). Paths are
+`{root, path}` under named roots, as in a saved compiled build, so the run
+directory moves as a unit.
+
+| Field | Holds |
+|---|---|
+| `location` | where the result itself sits, under its root |
+| `compiled_build` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
+| `capture` | the capture's facts (`state`, `timing`, `memory`, `rail_energy`, `error` and the rest); every file it references (outputs, terminal snapshots, the rail trace) as `root`, `path`, `sha256` and `size_bytes` |
+| `power` | `null`, or the request with `kind` `rail` or `supply` |
+| `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.<publication>.bin` |
+| `identity` | the run's `RunIdentity` |
+| `hpx_version` | the heliaPROFILER that wrote the result |
+
+Loading checks the evidence: every pinned file matches its sha256 and size,
+the compiled build is the one recorded and verifies, the identity and the
+output comparison recompute from the build and the capture, and the power
+request matches the build's GPIO wiring, protocol and supported power route.
+A successful capture must include timing whose iteration and warmup counts match
+the compiled build; both saving and loading enforce this check. Failed captures
+may retain no timing.
+Retained energy must agree with the request's instrument and rail, the build's
+iteration counts, and a valid batch completion record. Timing-only and
+supply-only runs cannot carry rail energy. An unknown identity fact matches an unknown fact
+whatever its reason text. Free text, such as a failed capture's `error`, is
+recorded, not verified. The checks catch accidents, such as an edited or
+mixed-up file, not tampering. A failed capture saves and loads too; its
+outcome is data. A failed rail capture may have no energy. Error text may be
+`null` or a string; its wording is not verified.
+
+Saving uses a new set of reference filenames for each publication. If a
+replacement save fails, the previous JSON and its reference files remain
+readable. Unreferenced files may remain after an interrupted save.
+
+A refusal is a `helia_profiler.RunResultError`, a `ConfigError` whose
+`code` names the failed check:
+
+| Code | Meaning |
+|---|---|
+| `invalid_json` | not strict JSON: unparsable, a repeated key or a non-finite number |
+| `unsupported_schema` | another schema, or another `hpx.run-result` version |
+| `invalid_path` | unusable roots, or a result that is not where it records itself |
+| `artifact_changed` | the build, an evidence file or a reference output is missing or changed |
+| `runtime_missing` | the build's prepared runtime is not in the HPX cache; the hint names the `hpx runtimes prepare` command |
+| `identity_mismatch` | the identity or the output comparison does not recompute |
+| `invalid_evidence` | anything else: an unreadable or malformed result, a build that does not verify, or a power request the build cannot take |
+
+`helia_profiler.api.load_result` takes a `result.json` or its evidence
+directory, dispatches on the file's `schema`, and verifies it under the root
+it records itself under and this host's HPX cache, raising a
+`ResultReadError` with the same codes. It adds `publication_changed` for a
+result that changed while it was read, and `ambiguous_location` for a
+directory holding both `result.json` and `result_manifest.json`; name the
+file instead. `observations(record)`
+maps it to the portable result view (`1.0-draft`, mapping `hpx-run-2`);
+`hpx results show` and `hpx results export` print and write it.
+
+| Metric | Unit | Scope | Statistic | Basis |
+|---|---|---|---|---|
+| `latency.invoke.v1` or `latency.restore_invoke.v1` | ms | the run's `timing_scope` | mean over the measured iterations (`sample_count`) | `ticks / timer_hz / iterations * 1000`; clocks are the configured `timing_clock_hz` and the reported `timer_hz`, domain `timer` for the STIMER |
+| `energy.per_inference.v1` | uJ | `gross_rail_restore_and_invoke` | mean per measured iteration | `energy_per_iteration_j * 1e6`; domain `system`, since the MCU rail feeds more than the CPU |
+| `power.mean.v1` | mW | `gross_rail_restore_and_invoke` | time mean over the gated window | `mean_power_w * 1e3` |
+| `memory.arena_capacity.v1` | B | `arena_capacity` | size | the capture's memory terminal |
+| `memory.arena_used_after_invoke.v1` | B | `allocator_after_invoke` | size | the capture's memory terminal |
+
+A timing-only or supply-only run states energy unavailable
+(`energy_not_measured_timing_only`, `energy_not_measured_supply_only`), and a
+failed capture states every measurement unavailable (`capture_failed`).
+`producer.version` is the `hpx_version` that wrote the result. `workload`
+holds the pinned model file's name, its sha256, the `inputs_hash` and the
+lifecycle. `verification.checks` names the output comparison only when the
+run compared its outputs; otherwise a limitation says they were not
+compared.
+`engine.version` follows the engine, and `extensions.helia-profiler` names
+its basis:
+
+| Engine | `engine.version` | `engine_version_basis` |
+|---|---|---|
+| `helia-aot` | the heliaAOT release that generated the module | `aot_provider_release` |
+| `helia-rt`, `litert`, `executorch` | the linked runtime release | `linked_runtime_release` |
+
+An unknown version stays `null`, with its reason in
+`engine_version_unavailable_reason`. `extensions.helia-profiler` also holds
+the build-time producer (`build_producer`), the output comparison, the
+semantic hashes and the run facts
+(`instance_boundary`, `first_invoke_initializer`, `first_invoke_window`,
+`timing_statistic`, `warmups`). The view does not qualify the engine
+numerically or authenticate the result.
+`examples/results/run-api-synthetic/` holds a synthetic saved result and
+its `portable.json`.
+
 ## Expected output
 
 A bundle whose manifest verifies, whose summary says `valid`, and whose
@@ -325,3 +498,32 @@ Schema v9 publishes `power.energy_per_inference_j` and `power.inferences_per_jou
 Schema v10 counts `SQRT`, `RSQRT`, `ABS`, and `SQUARED_DIFFERENCE` as one operation per output element in the heliaAOT analysis, matching the TFLite analysis. helia-aot models using these operators can have changed total operations and TOPS; MACs are unchanged.
 
 Schema v11 renames the firmware gate interval in the `power.window_observer_mismatch` and `power.window_clock_mismatch` issue contexts from `elapsed_us` / `elapsed_s` to `gate_elapsed_us` / `gate_elapsed_s`, so one key name no longer means two intervals. `elapsed_us` in `power.window_clock_ceiling` and `power.window_clock_frozen` remains the whole firmware window. Measured values are unchanged.
+
+### Retained target configuration and CPU clocks
+
+Saved-run mapping `hpx-run-2` exposes `target.identity` as
+`hpx.target-config/1:sha256:<hex>` when all seven retained facts are known:
+`board`, `device`, `load_address`, `clock_profile`, `cpu_hz`, `arena_location`
+and `weights_location`. The producer extension `target_config` exposes that flat
+hash basis, per-field artifact/JSON-pointer sources and unavailable reasons.
+Any unknown or invalid included fact makes the identity null; known fields stay
+visible, and reason text is never hashed. Values come from the verified saved
+result and compiled build, never current board definitions or installed pins.
+
+This is an HPX configuration identity, not a board serial, silicon qualification,
+or equivalence to a HELX simulation target. It excludes arena capacity, workload,
+runtime/kernel/toolchain, firmware image, lifecycle, measurements and host paths.
+Relocation does not change it. Equal identities describe only these seven facts;
+comparison eligibility remains the consumer's decision.
+
+Latency bases retain timing-source clocks and add CPU-domain configured and
+firmware-reported rates, with distinct sources. STIMER frequency is a timer fact,
+not CPU frequency. The `cpu_clocks` producer extension (`hpx.cpu-clocks`, version 1)
+preserves both rates and explicit reasons when unavailable; disagreements remain
+visible. Firmware reports an assigned `SystemCoreClock`, not an independently
+measured or calibrated frequency. If the timing source is CPU, its existing
+CPU-domain clock entries are kept without duplicates. Failed captures do not gain
+successful latency observations from these configuration facts.
+
+The native saved-result and compiled-build formats are unchanged. This mapping
+version applies to saved run results; the separate profile mapping is unchanged.

@@ -2,7 +2,7 @@
 title: "vocab"
 description: "The fixed vocabularies a configuration selects from: engines, toolchains, capture transports, memory placements and reset strategies."
 sidebar:
-  order: 14
+  order: 22
 ---
 
 import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
@@ -42,11 +42,11 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   **API tier:** `stable`
 
   <RefSymbol
-    id={"helia_profiler.EngineType.TFLM"}
-    name={"TFLM"}
+    id={"helia_profiler.EngineType.LITERT"}
+    name={"LITERT"}
     kind={"constant"}
     language={"python"}
-    signature={"TFLM = 'tflm'"}
+    signature={"LITERT = 'litert'"}
     level={3}
     source={{"path":"src/helia_profiler/engines/__init__.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/engines/__init__.py#L25"}}
   >
@@ -225,7 +225,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   Logical placement region for arenas / weights / model data.
 
   The four logical regions abstract over the SoC physical layout —
-  e.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.
+  e.g. ``Placement.TCM`` covers DTCM on AP5.
   Engine adapters that emit physical names (heliaAOT's ``DTCM``,
   ``ITCM``, …) normalise to this enum at the adapter boundary.
 

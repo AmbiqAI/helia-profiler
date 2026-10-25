@@ -88,12 +88,11 @@ class JoulescopeSyncController:
         # ``_close_device`` decrements the shared per-path refcount, so if
         # another caller (e.g. an in-flight ``capture_gated``) still holds
         # the same device path open, the underlying handle stays alive.
-        if self._driver is not None:
-            driver, path = self._driver, self._path
-            self._driver = None
-            self._path = None
-            self._family = None
-            try:
-                _close_device(driver, str(path))
-            except Exception:  # pragma: no cover - defensive
-                pass
+        driver, path = self._driver, self._path
+        self._driver = None
+        self._path = None
+        self._family = None
+        try:
+            _close_device(driver, str(path))
+        except Exception:  # pragma: no cover - defensive
+            pass

@@ -251,7 +251,7 @@ class EngineConfig:
     """Inference engine selection and passthrough config."""
 
     type: EngineType = EngineType.HELIA_RT
-    backend: str | None = None  # TFLM: reference/cmsis_nn; ExecuTorch: arm/ns
+    backend: str | None = None  # LiteRT: reference/cmsis_nn; ExecuTorch: arm/ns
     config: dict[str, Any] = field(default_factory=dict)
     config_path: Path | None = None  # path to engine-specific YAML
     allow_unsupported_version: StrictBool = field(default=False, kw_only=True)

@@ -17,7 +17,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from ..hostenv.toolchain_probe import SymbolEntry
     from ..pipeline import PipelineContext
-    from ..results import LayerResult, MeasuredMemoryRegions, MemoryPlan, MemoryReconciliation
+    from ..results import (
+        BinarySections,
+        LayerResult,
+        MeasuredMemoryRegions,
+        MemoryPlan,
+        MemoryReconciliation,
+    )
 
 log = logging.getLogger("hpx")
 
@@ -63,6 +69,14 @@ def _cache_totals(layers: list[LayerResult]) -> dict[str, float]:
             totals["l1d_hit_rate_pct"] = round((1 - miss_count / access_count) * 100, 2)
             break
     return totals
+
+
+def _serialise_binary_sections(bs: BinarySections) -> dict[str, int]:
+    """Serialise ``BinarySections``; ``reserved`` only when nonzero."""
+    out = {"text": bs.text, "data": bs.data, "bss": bs.bss, "total": bs.total}
+    if bs.reserved:
+        out["reserved"] = bs.reserved
+    return out
 
 
 def _serialise_memory_plan(plan: MemoryPlan) -> dict[str, Any]:
@@ -157,8 +171,7 @@ def _serialise_memory_reconciliation(rec: MemoryReconciliation) -> dict[str, Any
 
 
 #: Per-region symbol rows emitted into detailed/memory.json -- a bounded,
-#: size-sorted view (the aggregates-vs-enumerations convention in
-#: report/__init__.py).
+#: size-sorted view.
 _SYMBOLS_PER_REGION = 32
 
 
@@ -219,21 +232,7 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     data: dict[str, Any] = {}
 
     if ctx.binary_sections is not None:
-        bs = ctx.binary_sections
-        data["binary_sections"] = {
-            "text": bs.text,
-            "data": bs.data,
-            "bss": bs.bss,
-            "total": bs.total,
-        }
-        if bs.reserved:
-            # The linker's .heap reservation: sized to whatever remained in
-            # the region rather than to a requirement, so it states leftover
-            # space, not need. Excluded from bss above and reported here so
-            # the footprint stays reconcilable against `size`'s own Berkeley
-            # totals, which fold it into bss. (.stack is deliberately NOT
-            # counted here -- it is the live MSP/PSP stack.)
-            data["binary_sections"]["reserved"] = bs.reserved
+        data["binary_sections"] = _serialise_binary_sections(ctx.binary_sections)
 
     arena: dict[str, Any] = {}
     if meta.arena_size is not None:
@@ -264,8 +263,7 @@ def _write_memory_breakdown(ctx: PipelineContext, detail_dir: Path) -> Path:
     if ctx.memory_regions is not None:
         data["memory_regions"] = _serialise_memory_regions(ctx.memory_regions)
 
-    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133;
-    # symbols are detailed-only by the aggregates convention)
+    # Plan-vs-measured reconciliation + the per-symbol enumeration (#133)
     if ctx.memory_reconciliation is not None:
         data["memory_reconciliation"] = _serialise_memory_reconciliation(ctx.memory_reconciliation)
     if ctx.memory_symbols is not None and ctx.memory_regions is not None:

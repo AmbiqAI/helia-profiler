@@ -176,7 +176,7 @@ class TestPreflightGate:
         issue's model (0.289) crashes the AOT compiler at stage 2. The gate
         catches it and names the cause.
         """
-        for engine in (EngineType.HELIA_RT, EngineType.TFLM):
+        for engine in (EngineType.HELIA_RT, EngineType.LITERT):
             with pytest.raises(ConfigError, match="AllocateTensors"):
                 _check_softmax_scaling(BAD_MODEL, engine)
 
@@ -283,7 +283,7 @@ class TestPreflightGate:
             lambda _path: [no_beta],
         )
 
-        for engine in (EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT):
+        for engine in (EngineType.HELIA_RT, EngineType.LITERT, EngineType.HELIA_AOT):
             with pytest.raises(ConfigError, match="no usable SoftmaxOptions") as exc:
                 _check_softmax_scaling(KWS_MODEL, engine)
             message = str(exc.value)
@@ -312,7 +312,7 @@ class TestPreflightGate:
         model = tmp_path / "no_beta.tflite"
         model.write_bytes(module.generate(betas=(0.0, 0.0, 0.0, 0.0)))
 
-        for engine in (EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT):
+        for engine in (EngineType.HELIA_RT, EngineType.LITERT, EngineType.HELIA_AOT):
             with pytest.raises(ConfigError, match="no usable SoftmaxOptions") as exc:
                 _check_softmax_scaling(model, engine)
             message = str(exc.value)
@@ -350,7 +350,9 @@ class TestPreflightGate:
         with pytest.raises(ConfigError, match="Softmax"):
             PreflightStage().run(ctx)
 
-    @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.TFLM, EngineType.HELIA_AOT])
+    @pytest.mark.parametrize(
+        "engine", [EngineType.HELIA_RT, EngineType.LITERT, EngineType.HELIA_AOT]
+    )
     def test_a_damaged_flatbuffer_is_an_error_not_a_stack_trace(self, tmp_path, engine):
         """Stage 0 must catch a corrupt file for EVERY TFLite engine.
 

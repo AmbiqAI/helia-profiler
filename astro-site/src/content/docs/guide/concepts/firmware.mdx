@@ -27,7 +27,7 @@ engine children, so a firmware change lands in the one block that owns it.
   </Block>
   <Block label="Templates" sublabel="firmware/templates" tone="accent" flow="column">
     <Block label="skeleton" sublabel="_main_base.cc.j2" emphasis="filled" flow="column">
-      <Block label="main.cc.j2" sublabel="tflm, helia-rt" />
+      <Block label="main.cc.j2" sublabel="litert, helia-rt" />
       <Block label="main_aot.cc.j2" />
       <Block label="main_executorch.cc.j2" />
     </Block>
@@ -60,7 +60,7 @@ engine children, so a firmware change lands in the one block that owns it.
 <summary>Text description of the diagram</summary>
 
 - Render context (`firmware/context.py`): config values, engine artifacts, PMU passes, platform features, power window
-- Templates (`firmware/templates`): skeleton `_main_base.cc.j2` (children `main.cc.j2` for tflm and helia-rt, `main_aot.cc.j2`, `main_executorch.cc.j2`), partials `_*.j2`, PMU harness `hpx_pmu_profiler`
+- Templates (`firmware/templates`): skeleton `_main_base.cc.j2` (children `main.cc.j2` for litert and helia-rt, `main_aot.cc.j2`, `main_executorch.cc.j2`), partials `_*.j2`, PMU harness `hpx_pmu_profiler`
 - Project files (`firmware/project.py`): `CMakeLists.txt`, `nsx.yml`, `modules.cmake`
 - Generated sources: model header, blob headers, local modules
 - Build (`firmware/build.py`): nsx configure, nsx build, compiler launcher

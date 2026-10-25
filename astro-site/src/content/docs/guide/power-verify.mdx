@@ -67,7 +67,7 @@ Placeholder values again; the keys are the contract, generated from
 | `measurement_scope` | `gpio_gated_clean_window` or `on_device_gated_inference` | `free_form_capture` means gating failed and the numbers cover the whole capture; the probe that ran inside the window is a separate field, and a `busy_loop` window is not an inference measurement |
 
 `tops` and `tops_per_watt` appear for any power run whose model can be
-analysed for MACs (heliaRT, TFLM and heliaAOT `.tflite` models; not
+analysed for MACs (heliaRT, LiteRT and heliaAOT `.tflite` models; not
 ExecuTorch) and only when the window is inference-bracketed.
 
 ### 3. Check the window clocks

@@ -26,7 +26,7 @@ from helia_profiler.deps.dependencies import (
 )
 from helia_profiler.deps.sync import invalidate_sync_stamp
 from helia_profiler.engines import TFLM_ENGINE_HEADER
-from helia_profiler.engines.base import ExecutorchArtifacts, TflmArtifacts
+from helia_profiler.engines.base import ExecutorchArtifacts, LiteRtArtifacts
 from helia_profiler.errors import BuildError, DependencyError, LockError, VersionError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.results import DependencyLockMode, DependencyOverride, NsxModuleRef
@@ -57,7 +57,7 @@ def _context(
     *,
     build: dict | None = None,
     backend: str | None = None,
-    engine_type: str = "tflm",
+    engine_type: str = "litert",
     engine_config: dict | None = None,
     model_name: str = "model.tflite",
     model_bytes: bytes = b"TFL3",
@@ -84,7 +84,7 @@ def _context(
     ctx.engine_artifacts = (
         _executorch_artifacts()
         if engine_type == "executorch"
-        else TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+        else LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
     )
     ctx.dependency_workspace = create_workspace(ctx)
     ctx.firmware_dir = ctx.dependency_workspace.root / "profiler_app"
@@ -175,7 +175,7 @@ def test_ordinary_reuse_is_byte_stable_and_never_locks(
 
 
 def test_receipt_provenance_survives_workspace_reuse(tmp_path, monkeypatch):
-    from helia_profiler.fixture import FixtureFile
+    from helia_profiler import FixtureFile
 
     ctx = _context(tmp_path)
     monkeypatch.setattr(
@@ -344,7 +344,7 @@ def test_engine_release_source_mapping_is_fingerprinted_and_serialized(
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ResolvePlatformStage().run(ctx)
-    ctx.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    ctx.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
 
     workspace = create_workspace(ctx)
 
@@ -515,7 +515,7 @@ def test_render_only_changes_share_the_workspace(tmp_path: Path) -> None:
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "tflm"},
+            "engine": {"type": "litert"},
             "profiling": {"iterations": 7},
             "work_dir": str(tmp_path / "three" / "work"),
         },
@@ -523,7 +523,7 @@ def test_render_only_changes_share_the_workspace(tmp_path: Path) -> None:
     third = PipelineContext(config=config, work_dir=tmp_path / "three" / "work")
     ResolvePlatformStage().run(third)
     third.resolved_jlink_serial = "1160009999"
-    third.engine_artifacts = TflmArtifacts(engine_header=TFLM_ENGINE_HEADER)
+    third.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
     third.dependency_workspace = create_workspace(third)
 
     assert first.dependency_workspace.fingerprint == second.dependency_workspace.fingerprint
@@ -916,7 +916,7 @@ def test_empty_engine_source_override_is_not_digested(
 @pytest.mark.parametrize(
     ("engine_type", "engine_config", "expected"),
     [
-        ("tflm", {}, []),
+        ("litert", {}, []),
         ("helia-rt", {"source_path": "rt"}, []),
         ("helia-rt", {}, ["env.HELIART_DIST_PATH"]),
     ],

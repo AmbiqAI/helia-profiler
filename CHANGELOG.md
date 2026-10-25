@@ -56,6 +56,72 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.4.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.0...v0.4.1) (2026-10-25)
+
+
+### Features
+
+* **tools:** build a validation models file from pinned Zoo models ([c3b3501](https://github.com/AmbiqAI/helia-profiler/commit/c3b3501bf7ab06a982636b9bdf4fa2148c33675b))
+* **validation:** record model family, precision, source and CPU clock ([92d1d23](https://github.com/AmbiqAI/helia-profiler/commit/92d1d237a7c8658cecf0b1a6968c33b6a64f0eca))
+
+
+### Bug Fixes
+
+* **security:** update certificate trust across HPX tooling ([#601](https://github.com/AmbiqAI/helia-profiler/issues/601)) ([67c9254](https://github.com/AmbiqAI/helia-profiler/commit/67c925430d103dfee889f5a78213337f487a8ee6)); environment rollout remains tracked in [#587](https://github.com/AmbiqAI/helia-profiler/issues/587)
+* **security:** update documentation dependency advisories ([#604](https://github.com/AmbiqAI/helia-profiler/issues/604)) ([981fff1](https://github.com/AmbiqAI/helia-profiler/commit/981fff18a2e17e33c0668bdfe619e0d9559c5eb2)), closes [#602](https://github.com/AmbiqAI/helia-profiler/issues/602)
+* **security:** update urllib3 and notebook Tornado dependencies ([#603](https://github.com/AmbiqAI/helia-profiler/issues/603)) ([ad4edc2](https://github.com/AmbiqAI/helia-profiler/commit/ad4edc23009d1c49579419f7acc21c29e9e12fba)), closes [#602](https://github.com/AmbiqAI/helia-profiler/issues/602)
+* **tools:** report malformed Zoo lists without a traceback ([df5f905](https://github.com/AmbiqAI/helia-profiler/commit/df5f905e037875d3baa7750e27da77b3ab1e42fb))
+
+
+### Documentation
+
+* clarify current contracts and consolidate schema history ([#600](https://github.com/AmbiqAI/helia-profiler/issues/600)) ([f78ce66](https://github.com/AmbiqAI/helia-profiler/commit/f78ce66492a31f20f48c3af03e7751b3b941db20)), closes [#599](https://github.com/AmbiqAI/helia-profiler/issues/599) [#580](https://github.com/AmbiqAI/helia-profiler/issues/580)
+* **validation:** document the --models-file keys ([aad7bd0](https://github.com/AmbiqAI/helia-profiler/commit/aad7bd068eb44b5d7f3845aa1c67ee5ce4e2795f))
+
+## [0.4.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.3.0...v0.4.0) (2026-10-21)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** retire fixture facade and pre-change readers ([#576](https://github.com/AmbiqAI/helia-profiler/issues/576))
+* **run:** save verified run results and portable observations ([#575](https://github.com/AmbiqAI/helia-profiler/issues/575))
+* **identity:** namespace semantic hashes ([#573](https://github.com/AmbiqAI/helia-profiler/issues/573))
+* **run:** the final formats are profile summary v19, `hpx.frozen-run` v2,
+  `hpx.compiled-build` v3 and `hpx.run-result` v1; saved runs export portable
+  mapping `hpx-run-2`. Interim schemas from development are unsupported.
+* **engines:** tflm is no longer an accepted engine selector; use litert in configuration, CLI and records.
+* **run:** `BuildRecord` is replaced by the public `CompiledBuild` workflow.
+  Import run types and functions from `helia_profiler`; the `helia_profiler.fixture`
+  facade and its interim API version are removed. Public root `Fixture*` types
+  remain available. Read old bundles with the HPX version that produced them,
+  or recreate plans/builds/captures; this release adds no legacy reader or
+  implicit migration window.
+
+### Features
+
+* **engines:** rename the tflm engine to litert ([#562](https://github.com/AmbiqAI/helia-profiler/issues/562)) ([d2c8f93](https://github.com/AmbiqAI/helia-profiler/commit/d2c8f93f669dd31b278d7efefb0be6c6cc978790)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* expose portable target configuration and CPU clock facts ([#578](https://github.com/AmbiqAI/helia-profiler/issues/578)) ([47a3a4e](https://github.com/AmbiqAI/helia-profiler/commit/47a3a4e7514771cdac7dfea4b02b9bc9f6aca74c)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* **identity:** namespace semantic hashes ([#573](https://github.com/AmbiqAI/helia-profiler/issues/573)) ([6b4a538](https://github.com/AmbiqAI/helia-profiler/commit/6b4a5380da917a1eb8cf3c2b47a2ba312a48c804)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* **run:** build, record and run a frozen plan with an engine-owned lifecycle ([#561](https://github.com/AmbiqAI/helia-profiler/issues/561)) ([f8a6fa5](https://github.com/AmbiqAI/helia-profiler/commit/f8a6fa5b6450a2d9e0410583f18eaeb31dc1d660)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* **run:** expose run workflow through CLI and package API ([#563](https://github.com/AmbiqAI/helia-profiler/issues/563)) ([b87b6cc](https://github.com/AmbiqAI/helia-profiler/commit/b87b6ccec70519e9370030fc962a1d24c9f226fc)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* **run:** measure rail energy and supply-only timing through the run API ([#564](https://github.com/AmbiqAI/helia-profiler/issues/564)) ([93cda08](https://github.com/AmbiqAI/helia-profiler/commit/93cda08bff983b08a124c5390adcf09fdf8a9fdf)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+* **run:** save verified run results and portable observations ([#575](https://github.com/AmbiqAI/helia-profiler/issues/575)) ([b2230ce](https://github.com/AmbiqAI/helia-profiler/commit/b2230ce6b9a2076d16462aec5cbf57c2860d1763)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+
+
+### Bug Fixes
+
+* validate saved run timing admission ([#577](https://github.com/AmbiqAI/helia-profiler/issues/577)) ([b7d31f5](https://github.com/AmbiqAI/helia-profiler/commit/b7d31f5546baf7bacfdbbe0cb6c2e076e6bbfa5f)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+
+
+### Documentation
+
+* regenerate reference for Placement docstring ([83e2a10](https://github.com/AmbiqAI/helia-profiler/commit/83e2a101a52fec0964cfee6484fcbf535d9eeabd))
+
+
+### Code Refactoring
+
+* **api:** retire fixture facade and pre-change readers ([#576](https://github.com/AmbiqAI/helia-profiler/issues/576)) ([2a90ead](https://github.com/AmbiqAI/helia-profiler/commit/2a90ead96e09f677ee36f43b98a5bf6883cdd76d)), closes [#558](https://github.com/AmbiqAI/helia-profiler/issues/558)
+
 ## [0.3.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.2.5...v0.3.0) (2026-10-19)
 
 

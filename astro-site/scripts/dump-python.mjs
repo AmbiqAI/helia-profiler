@@ -12,8 +12,8 @@
  *
  * griffe reads the source rather than importing it, so this needs no runtime
  * dependencies, no board and no secrets. The tier map is read out of the
- * dump for the same reason: `__api_stability__` is three comprehensions over
- * three sets of names, and all four are literals in the source.
+ * dump for the same reason: the lazy export catalog records a literal tier
+ * alongside each target.
  *
  * Both outputs land in .generated/, which is not committed: the dump embeds
  * the absolute source paths of the machine that produced it.
@@ -58,60 +58,54 @@ export function griffeCommand({ exec = run } = {}) {
 export const literal = (value) =>
   typeof value === 'string' ? value.replace(/^['"]|['"]$/g, '') : undefined;
 
-/**
- * The tier map, read from the definition of `__api_stability__`.
- *
- * Reading the three sets directly would be the same names in a different
- * order; reading them through the comprehensions that build the map means a
- * fourth tier, or a set dropped from it, changes this output rather than
- * being silently ignored.
- */
+/** Read literal export targets and tiers without importing the package. */
 export function tierMap(dump) {
   const members = dump[PACKAGE]?.members;
   if (!members) throw new Error(`The dump has no package "${PACKAGE}".`);
 
-  const names = (node, kinds) => {
-    const value = node?.value;
-    if (!value || !kinds.includes(value.cls) || !Array.isArray(value.elements)) return undefined;
-    return value.elements.map(literal);
-  };
-
-  const all = names(members.__all__, ['ExprList', 'ExprTuple', 'ExprSet']);
-  if (!all) throw new Error(`${PACKAGE}.__all__ is not a literal list of names.`);
-
-  const comprehensions = members[STABILITY]?.value?.values;
-  if (!Array.isArray(comprehensions) || comprehensions.length === 0) {
-    throw new Error(`${PACKAGE}.${STABILITY} is not a dict of comprehensions over the tier sets.`);
+  const string = (value) =>
+    typeof value === 'string' && /^(['"]).*\1$/s.test(value) ? literal(value) : undefined;
+  const allNode = members.__all__?.value;
+  if (!['ExprList', 'ExprTuple'].includes(allNode?.cls) || !Array.isArray(allNode.elements)) {
+    throw new Error(`${PACKAGE}.__all__ is not a literal list of names.`);
+  }
+  const all = allNode.elements.map(string);
+  if (all.some((name) => !name) || new Set(all).size !== all.length) {
+    throw new Error(`${PACKAGE}.__all__ has invalid or duplicate names.`);
   }
 
+  const catalog = members._EXPORTS?.value;
+  if (catalog?.cls !== 'ExprDict' || !Array.isArray(catalog.keys) ||
+      !Array.isArray(catalog.values) || catalog.keys.length !== catalog.values.length) {
+    throw new Error(`${PACKAGE}._EXPORTS is not a literal dictionary.`);
+  }
   const stability = {};
   const tiers = {};
-  for (const entry of comprehensions) {
-    const setName = entry?.generators?.[0]?.iterable?.name;
-    const tier = literal(entry?.value);
-    if (!setName || !tier) {
-      throw new Error(`${PACKAGE}.${STABILITY} has an entry this cannot read statically.`);
+  for (let index = 0; index < catalog.keys.length; index++) {
+    const name = string(catalog.keys[index]);
+    const entry = catalog.values[index];
+    if (!name || Object.hasOwn(stability, name)) {
+      throw new Error(`${PACKAGE}._EXPORTS has an invalid or duplicate name: ${name}`);
     }
-    const members_ = names(members[setName], ['ExprSet', 'ExprList', 'ExprTuple']);
-    if (!members_) throw new Error(`${PACKAGE}.${setName} is not a literal set of names.`);
-    tiers[tier] = members_.length;
-    for (const name of members_) {
-      if (stability[name]) {
-        throw new Error(`${name} is in both the ${stability[name]} and ${tier} tiers.`);
-      }
-      stability[name] = tier;
+    if (entry?.cls !== 'ExprTuple' || entry.elements?.length !== 3) {
+      throw new Error(`${name}: expected a literal (module, attribute, tier) tuple.`);
     }
+    const [module, attribute, tier] = entry.elements.map(string);
+    if (!module?.startsWith('.') || (!attribute && entry.elements[1] !== 'None') ||
+        !['stable', 'experimental', 'implementation'].includes(tier)) {
+      throw new Error(`${name}: invalid module, attribute or stability tier.`);
+    }
+    stability[name] = tier;
+    tiers[tier] = (tiers[tier] ?? 0) + 1;
   }
-
-  const untiered = all.filter((name) => !stability[name]);
-  if (untiered.length > 0) {
+  const untiered = all.filter((name) => !Object.hasOwn(stability, name));
+  if (untiered.length) {
     throw new Error(`${PACKAGE}.__all__ names without a stability tier: ${untiered.join(', ')}`);
   }
   const unpublished = Object.keys(stability).filter((name) => !all.includes(name));
-  if (unpublished.length > 0) {
+  if (unpublished.length) {
     throw new Error(`Tiered but not in ${PACKAGE}.__all__: ${unpublished.join(', ')}`);
   }
-
   return { all, stability, tiers };
 }
 

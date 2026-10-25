@@ -1,9 +1,9 @@
 """Shared identity vocabulary: canonical engine and kernel names, and reasoned unknowns.
 
 The canonical names are the ones heliaPROFILER, heliaESTIMATOR and the
-benchmark harness share. Each component's existing spellings stay accepted
-as aliases: the engine selector, the TFLM backend, the ExecuTorch kernel
-provider, the NSX module and the library project name. Case, ``_`` and
+benchmark harness share; the engine selector uses them as they are. Each
+component's other spellings stay accepted as aliases: the LiteRT backend, the
+ExecuTorch kernel provider, the NSX module and the library project name. Case, ``_`` and
 ``-`` are interchangeable.
 
 These functions translate names, not evidence: a configured backend label
@@ -55,7 +55,6 @@ class Unknown:
 
 _ENGINE_ALIASES = {
     "litert": CanonicalEngine.LITERT,
-    "tflm": CanonicalEngine.LITERT,
     "tflite-micro": CanonicalEngine.LITERT,
     "nsx-tflite-micro": CanonicalEngine.LITERT,
     "upstream": CanonicalEngine.LITERT,
@@ -137,14 +136,64 @@ class BuildFacts:
     arena_bytes: int | Unknown
 
 
+_UNRECORDED = Unknown("the record predates this fact")
+
+
+@dataclass(frozen=True)
+class EnergyFacts:
+    """The method a run's energy is measured with, whether or not the capture succeeded.
+
+    ``scope`` is what the measured window covers:
+    ``gross_rail_restore_and_invoke`` is everything the rail draws over the
+    timed restore-and-invoke loop. ``rail`` is the physical rail the run
+    measures, such as ``MCU``: the rail requested, also after a failed
+    capture, and unknown only where no request is at hand, as in a build's
+    identity before it runs. ``subtraction`` is what is taken off the
+    measurement, ``none`` when nothing is. ``completion_protocol`` is the
+    version of the firmware's READY, GO and DONE handshake that bounds the
+    window. The measurement itself, or its absence, is the run's outcome,
+    such as ``RunResult.energy``.
+    """
+
+    scope: str
+    rail: str | Unknown
+    subtraction: str
+    completion_protocol: int
+
+
 @dataclass(frozen=True)
 class RunFacts:
-    """How the model was run: state handling, invocation counts and the timed span."""
+    """How the model was run: state handling, invocation counts, the timed span and its clock.
+
+    ``timing_scope`` is what each timed span covers: ``invoke_only`` or
+    ``restore_and_invoke``, which also restores the fixed inputs.
+    ``instance_boundary`` is where one model instance ends: ``boot`` when the
+    engine initializes once and every invocation reuses it, ``invocation``
+    when each invocation loads and initializes its own.
+    ``first_invoke_initializer`` is whether the first invocation of an
+    instance runs the model's one-time initializer, such as a LiteRT
+    ``CALL_ONCE`` subgraph, and ``first_invoke_window`` where that invocation
+    falls: ``warmup`` or ``measured``. ``timing_clock`` is the clock that times
+    the span, ``cpu`` cycles or the 32.768 kHz ``stimer``; ``timing_clock_hz``
+    is its configured rate, not a measured one. ``timing_statistic`` is what
+    the reported time is: the ``total`` over the measured invocations or
+    their ``mean``. ``energy`` is the method the run's energy is measured
+    with, stated after a failed capture too, and ``None`` when the run
+    measures no energy; whether it was measured is the outcome, not a fact
+    here.
+    """
 
     lifecycle: str
     iterations: int
     warmups: int
     timing_scope: str
+    instance_boundary: str | Unknown = _UNRECORDED
+    first_invoke_initializer: bool | Unknown = _UNRECORDED
+    first_invoke_window: str | Unknown = _UNRECORDED
+    timing_clock: str | Unknown = _UNRECORDED
+    timing_clock_hz: int | Unknown = _UNRECORDED
+    timing_statistic: str | Unknown = _UNRECORDED
+    energy: EnergyFacts | Unknown | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +204,12 @@ class RunIdentity:
     runtime archive and the model, and never the HPX release (``producer``),
     so it changes only when what runs changes. ``observation_hash`` covers a
     capture's measured facts, so the same firmware measured twice gives two.
+    ``intent_hash`` is the :attr:`~helia_profiler.FrozenRun.intent_hash` of
+    the plan a run was built from, and ``None`` for a run built without one.
+    ``inputs_hash`` covers each pinned input's tensor name and data sha256.
+    The four are :class:`~helia_profiler.SemanticHash` strings of the kinds
+    ``hpx.build``, ``hpx.observation``, ``hpx.intent`` and ``hpx.inputs``;
+    each ``*_sha256`` fact is the bare hex sha256 of one file's bytes.
     """
 
     runtime: RuntimeIdentity
@@ -164,11 +219,12 @@ class RunIdentity:
     baseline_id: str | Unknown
     dependency_lock_sha256: str | Unknown
     model_sha256: str | Unknown
-    inputs_sha256: str | Unknown
+    inputs_hash: str | Unknown
     run: RunFacts
     producer: str | Unknown
     build_hash: str | Unknown
     observation_hash: str | None = None
+    intent_hash: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready form; an unknown fact becomes ``{"unknown": reason}``."""

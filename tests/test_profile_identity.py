@@ -6,14 +6,18 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
+from helia_profiler import SemanticHash
 from helia_profiler.config import load_config
 from helia_profiler.deps.compatibility import QualificationState
 from helia_profiler.identity import CanonicalEngine, CanonicalKernel, Unknown
+from helia_profiler.modelcost.model_analysis import LayerOps, ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
+from helia_profiler.platform import get_soc_for_board
 from helia_profiler.profile_identity import profile_run_identity
 from helia_profiler.report import write_report
 from helia_profiler.results import (
@@ -209,7 +213,7 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     assert identity.baseline_id == BASELINE
     assert identity.dependency_lock_sha256 == LOCK_SHA
     assert identity.model_sha256 == MODEL_SHA
-    assert identity.inputs_sha256 == Unknown(
+    assert identity.inputs_hash == Unknown(
         "profile firmware feeds zero-filled inputs and pins no input data"
     )
     assert identity.producer == "0.2.3"
@@ -221,8 +225,10 @@ def test_a_helia_rt_run_states_what_it_linked(tmp_path):
     run = identity.run
     assert (run.lifecycle, run.iterations, run.warmups) == ("carry", 100, 5)
     assert run.timing_scope == "invoke_only"
-    assert isinstance(identity.build_hash, str) and len(identity.build_hash) == 64
-    assert isinstance(identity.observation_hash, str) and len(identity.observation_hash) == 64
+    assert isinstance(identity.build_hash, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert isinstance(identity.observation_hash, str)
+    assert SemanticHash.parse(identity.observation_hash).kind == "observation"
 
 
 def test_the_build_hash_ignores_the_hpx_release_and_lock_stamps_but_not_the_image(tmp_path):
@@ -272,7 +278,7 @@ def test_the_kernel_library_is_the_linked_module_not_the_backend_label(tmp_path)
 
 def test_a_backend_label_without_a_linked_module_states_no_library(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", backend="cmsis_nn", modules=(TFLM,), version=None)
+        _ctx(tmp_path, engine="litert", backend="cmsis_nn", modules=(TFLM,), version=None)
     )
 
     reason = Unknown("the dependency lock names 0 CMSIS-NN modules, not one")
@@ -280,7 +286,7 @@ def test_a_backend_label_without_a_linked_module_states_no_library(tmp_path):
     assert identity.kernels.commit == reason
 
 
-def test_only_tflm_reference_links_no_kernel_module(tmp_path):
+def test_only_litert_reference_links_no_kernel_module(tmp_path):
     identity = profile_run_identity(_ctx(tmp_path, backend=None, modules=(HELIA_RT,)))
 
     assert identity.kernels.library == Unknown(
@@ -288,8 +294,8 @@ def test_only_tflm_reference_links_no_kernel_module(tmp_path):
     )
 
 
-def test_tflm_reference_links_no_kernel_module_and_states_reference(tmp_path):
-    identity = profile_run_identity(_ctx(tmp_path, engine="tflm", modules=(TFLM,), version=None))
+def test_litert_reference_links_no_kernel_module_and_states_reference(tmp_path):
+    identity = profile_run_identity(_ctx(tmp_path, engine="litert", modules=(TFLM,), version=None))
 
     assert identity.runtime.engine is CanonicalEngine.LITERT
     assert identity.runtime.version == "v1.3.0"
@@ -300,7 +306,7 @@ def test_tflm_reference_links_no_kernel_module_and_states_reference(tmp_path):
 
 def test_a_reference_label_with_a_linked_module_reports_the_module(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", modules=(ARM_CMSIS_NN, TFLM), version=None)
+        _ctx(tmp_path, engine="litert", modules=(ARM_CMSIS_NN, TFLM), version=None)
     )
 
     assert identity.kernels.library is CanonicalKernel.CMSIS_NN
@@ -575,7 +581,7 @@ def test_the_summary_carries_the_identity(tmp_path):
     assert identity is not None
     summary = json.loads((tmp_path / "results" / "summary.json").read_text())
     assert summary["identity"] == identity.to_dict()
-    assert summary["identity"]["inputs_sha256"] == {
+    assert summary["identity"]["inputs_hash"] == {
         "unknown": "profile firmware feeds zero-filled inputs and pins no input data"
     }
     loaded = load_run_summary(tmp_path / "results" / "summary.json")
@@ -588,9 +594,9 @@ HELIA_RT_SOURCE = _module(
 )
 
 
-def test_tflm_runtime_and_reference_kernels_come_from_helia_rt_source(tmp_path):
+def test_litert_runtime_and_reference_kernels_come_from_helia_rt_source(tmp_path):
     identity = profile_run_identity(
-        _ctx(tmp_path, engine="tflm", modules=(TFLM, HELIA_RT_SOURCE), version=None)
+        _ctx(tmp_path, engine="litert", modules=(TFLM, HELIA_RT_SOURCE), version=None)
     )
     assert identity.runtime.commit == "6" * 40
     assert identity.kernels.library is CanonicalKernel.REFERENCE
@@ -610,3 +616,87 @@ def test_a_nan_counter_still_gives_an_observation_hash(tmp_path):
     ctx = _ctx(tmp_path)
     set_profile_result(ctx, _pmu(float("nan")))
     assert isinstance(profile_run_identity(ctx).observation_hash, str)
+
+
+def _analysis(*ops: str, index_space: Literal["source", "execution"] = "source") -> ModelAnalysis:
+    layers = [LayerOps(id=index, op=op) for index, op in enumerate(ops)]
+    return ModelAnalysis(layers, 0, 0, 0, index_space=index_space)
+
+
+@pytest.mark.parametrize(
+    "engine,analysis,expected",
+    [
+        ("helia-rt", _analysis("CALL_ONCE", "CONV_2D"), True),
+        ("litert", _analysis("CONV_2D"), False),
+        ("helia-rt", None, Unknown("the run recorded no analysis of the source model's operators")),
+        ("helia-aot", _analysis("CALL_ONCE", index_space="execution"), False),
+    ],
+)
+def test_the_first_invocation_states_whether_it_runs_the_initializer(
+    tmp_path, engine, analysis, expected
+):
+    ctx = _ctx(tmp_path, engine=engine, profiling={"warmup": 0})
+    ctx.model_analysis = analysis
+    run = profile_run_identity(ctx).run
+
+    assert run.first_invoke_initializer == expected
+    assert (run.lifecycle, run.instance_boundary) == ("carry", "boot")
+    # The clean window always warms up first, even with no configured warmups.
+    assert (run.warmups, run.first_invoke_window) == (0, "warmup")
+
+
+def test_executorch_reloads_its_instance_for_every_invocation(tmp_path):
+    ctx = _ctx(tmp_path, engine="executorch", backend="arm", version=None, model="model.pte")
+    ctx.soc = get_soc_for_board("apollo510_evb")
+    run = profile_run_identity(ctx).run
+
+    assert (run.lifecycle, run.instance_boundary, run.first_invoke_window) == (
+        "single",
+        "invocation",
+        "measured",
+    )
+    assert isinstance(run.first_invoke_initializer, Unknown)
+    assert (run.timing_clock, run.timing_clock_hz, run.timing_statistic) == (
+        "cpu",
+        96_000_000,
+        "mean",
+    )
+
+
+@pytest.mark.parametrize(
+    "board,probe,clock,clock_hz",
+    [
+        ("apollo510_evb", "infer", "stimer", 32768),
+        ("apollo4p_evb", "infer", "cpu", 96_000_000),
+        ("apollo4p_evb", "busy_loop", "stimer", 32768),
+    ],
+)
+def test_the_clean_window_states_the_clock_that_timed_it(tmp_path, board, probe, clock, clock_hz):
+    ctx = _ctx(tmp_path, profiling={"clean_window_probe": probe})
+    ctx.soc = get_soc_for_board(board)
+    run = profile_run_identity(ctx).run
+
+    assert (run.timing_clock, run.timing_clock_hz, run.timing_statistic) == (
+        clock,
+        clock_hz,
+        "mean",
+    )
+
+
+def test_a_run_without_a_resolved_soc_states_why_its_clock_is_unknown(tmp_path):
+    identity = profile_run_identity(_ctx(tmp_path))
+
+    assert identity.run.timing_clock == Unknown("the run resolved no SoC")
+    assert identity.intent_hash is None
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_a_profile_with_power_states_its_energy_method_as_unknown(tmp_path, enabled):
+    ctx = _ctx(tmp_path)
+    ctx.config = replace(ctx.config, power=replace(ctx.config.power, enabled=enabled))
+
+    energy = profile_run_identity(ctx).run.energy
+
+    assert energy == (
+        Unknown("a profile does not state how its energy is measured") if enabled else None
+    )

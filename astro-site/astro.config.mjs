@@ -18,6 +18,7 @@ const base = '/helia-profiler';
 const basePath = `${base}/`;
 
 export default defineConfig({
+  output: 'static',
   site,
   base,
   /* Legacy MkDocs routes. `served` entries are already real pages at the same
@@ -138,7 +139,7 @@ export default defineConfig({
                 { label: 'Overview', slug: 'examples' },
                 { label: 'Profile a model', slug: 'examples/basic-profiling' },
                 { label: 'Capture per-layer counters', slug: 'examples/per-layer' },
-                { label: 'Vanilla TFLM baseline', slug: 'examples/tflm-baseline' },
+                { label: 'LiteRT baseline', slug: 'examples/litert-baseline' },
                 { label: 'Compare engines', slug: 'examples/engine-comparison' },
                 { label: 'Compare toolchains', slug: 'examples/toolchain-comparison' },
                 { label: 'Power capture', slug: 'examples/power-profiling' },
@@ -164,6 +165,7 @@ export default defineConfig({
                   slug: 'reference/compatibility-baseline',
                 },
                 { label: 'Compatibility table', slug: 'reference/compatibility' },
+                { label: 'Run-summary schema', slug: 'reference/run-summary-schema' },
                 { label: 'Wire Protocol', slug: 'reference/wire-protocol' },
               ],
             },

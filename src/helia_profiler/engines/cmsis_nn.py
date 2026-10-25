@@ -3,7 +3,7 @@
 ns-cmsis-nn (heliaCORE) is shared by the heliaRT, heliaAOT, and ExecuTorch-ns
 source routes: the module is declared at the compatibility baseline's qualified
 ref unless the user overrides it, and :func:`cmsis_nn_cmake_vars` supplies the
-kernel switches it needs. ARM's upstream ``arm-cmsis-nn`` serves stock TFLM and
+kernel switches it needs. ARM's upstream ``arm-cmsis-nn`` serves LiteRT and
 the ExecuTorch-arm route.
 """
 

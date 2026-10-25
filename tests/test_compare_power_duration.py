@@ -17,6 +17,7 @@ from helia_profiler.report import _write_csv, _write_run_metadata, _write_summar
 from helia_profiler.results import BinarySections, FirmwareMeta, LayerResult, PmuResult, TimingInfo
 from helia_profiler.results.serde import nested_get
 from tests.pipeline_context_helpers import set_power_result, set_profile_result
+from tests.result_bundles import published
 
 
 def _produced_run(
@@ -92,6 +93,7 @@ def test_duration_row_uses_the_produced_power_summary(tmp_path: Path, scope: Mea
         assert summary["power"]["capture_duration_s"] == duration
         assert "duration_s" not in summary["power"]
         assert summary["latency"]["capture_duration_s"] == 19.0
+    published(baseline, candidate)
     result = compare_runs(baseline, candidate)
     assert result.comparability.power_metrics_comparable
     row = next(m for m in result.metrics if m.name == "power.duration_s")
@@ -138,6 +140,7 @@ def test_incomparable_power_omits_duration_but_keeps_cycles(tmp_path: Path, mism
         else MeasurementScope.GPIO_GATED_CLEAN_WINDOW,
         integrity=PowerIntegrity.DEGRADED if mismatch == "integrity" else PowerIntegrity.VALID,
     )
+    published(baseline, candidate)
     result = compare_runs(baseline, candidate)
     assert not result.comparability.power_metrics_comparable
     assert not any(m.group == "power" for m in result.metrics)

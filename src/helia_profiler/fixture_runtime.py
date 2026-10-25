@@ -14,6 +14,8 @@ from .errors import ConfigError
 
 @dataclass(frozen=True)
 class FixtureFile:
+    """A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match."""
+
     path: Path
     sha256: str
 
@@ -95,7 +97,7 @@ _STACK_PROVIDERS = {
 _STACK_KERNEL_DIR = {"helia-rt": "helia"}
 #: Each stack's kernel library by baseline project name, and its runtime record name.
 STACK_KERNEL_LIBRARY = {"upstream": "arm-cmsis-nn", "helia-rt": "ns-cmsis-nn"}
-STACK_RUNTIME_RECORD = {"upstream": "tflm", "helia-rt": "helia-rt"}
+STACK_RUNTIME_RECORD = {"upstream": "litert", "helia-rt": "helia-rt"}
 #: Consumer defines of schema 1, which the manifest does not declare.
 _UPSTREAM_DEFINES = (
     "TF_LITE_STATIC_MEMORY",
@@ -126,16 +128,6 @@ class PreparedRuntimeFacts:
     stack: str
     archive_sha256: str
     providers: tuple[RuntimeProvider, ...]
-
-
-def read_prepared_runtime_manifest(manifest: FixtureFile) -> PreparedRuntimeFacts:
-    """Read a prepared runtime's manifest without verifying its archive or headers.
-
-    The manifest's own hash and declared fields are checked;
-    :meth:`PreparedUpstreamRuntime.verify` also checks the archive, ABI and
-    header closure.
-    """
-    return _manifest_facts(manifest)[2]
 
 
 def _manifest_facts(

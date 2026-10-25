@@ -1,0 +1,346 @@
+{
+  "schema_version": "1.0-draft",
+  "producer": {
+    "name": "helia-profiler",
+    "version": "0.3.0",
+    "revision": null,
+    "mapping_version": "hpx-run-2"
+  },
+  "native_result": {
+    "schema": "hpx.run-result",
+    "identity": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
+    "artifacts": [
+      {
+        "id": "native-result",
+        "role": "hpx.run-result",
+        "location": "result.json",
+        "sha256": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
+        "size_bytes": 4409
+      },
+      {
+        "id": "artifact:build.json",
+        "role": "hpx.compiled-build",
+        "location": "build.json",
+        "sha256": "01dd793a3fd87feb473c5344e9941997aad9281094de1a02c951ca198bd36ec6",
+        "size_bytes": 6996
+      },
+      {
+        "id": "artifact:evidence/output_0.bin",
+        "role": "hpx.capture-output",
+        "location": "evidence/output_0.bin",
+        "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "size_bytes": 4
+      },
+      {
+        "id": "artifact:result.reference_0.bin",
+        "role": "hpx.reference-output",
+        "location": "result.reference_0.bin",
+        "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+        "size_bytes": 4
+      }
+    ]
+  },
+  "workload": {
+    "name": "tiny_cnn.tflite",
+    "model_identity": "4419dfff1e15e9479ad90b81c7997c4a2db274c87f6433e06cd34698108ac26f",
+    "input_identity": "hpx.inputs/1:sha256:2ca56ae8fa19aeebf0c53411603e6be71e50821f1c8b74735643928ee5191081",
+    "state_policy": "carry"
+  },
+  "engine": {
+    "name": "helia-aot",
+    "version": null
+  },
+  "target": {
+    "name": "apollo510_evb",
+    "identity": "hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0"
+  },
+  "outcome": {
+    "status": "completed",
+    "stage": null,
+    "reason": null
+  },
+  "observations": [
+    {
+      "id": "latency.invoke.v1",
+      "metric": "latency.invoke.v1",
+      "unit": "ms",
+      "domain": "cpu",
+      "origin": "measured",
+      "scope": "invoke_only",
+      "statistic": "mean",
+      "value": 10.0,
+      "unavailable_reason": null,
+      "sample_count": 100,
+      "evidence": [
+        "native-result"
+      ],
+      "basis": {
+        "kind": "derived",
+        "sources": [
+          {
+            "artifact": "native-result",
+            "pointer": "/capture/timing/ticks"
+          },
+          {
+            "artifact": "native-result",
+            "pointer": "/capture/timing/timer_hz"
+          },
+          {
+            "artifact": "native-result",
+            "pointer": "/capture/timing/iterations"
+          }
+        ],
+        "transformation": "ticks / timer_hz / iterations * 1000",
+        "clocks": [
+          {
+            "role": "configured",
+            "value_hz": 32768,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/identity/run/timing_clock_hz"
+            },
+            "domain": "timer"
+          },
+          {
+            "role": "reported",
+            "value_hz": 32768,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/capture/timing/timer_hz"
+            },
+            "domain": "timer"
+          },
+          {
+            "role": "configured",
+            "domain": "cpu",
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/identity/build/cpu_hz"
+            }
+          },
+          {
+            "role": "reported",
+            "domain": "cpu",
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/capture/timing/cpu_hz"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "energy.per_inference.v1",
+      "metric": "energy.per_inference.v1",
+      "unit": "uJ",
+      "domain": "system",
+      "origin": "measured",
+      "scope": "gross_rail_restore_and_invoke",
+      "statistic": "mean",
+      "value": null,
+      "unavailable_reason": "energy_not_measured_timing_only",
+      "sample_count": null,
+      "evidence": [
+        "native-result"
+      ],
+      "basis": null
+    },
+    {
+      "id": "power.mean.v1",
+      "metric": "power.mean.v1",
+      "unit": "mW",
+      "domain": "system",
+      "origin": "measured",
+      "scope": "gross_rail_restore_and_invoke",
+      "statistic": "mean",
+      "value": null,
+      "unavailable_reason": "energy_not_measured_timing_only",
+      "sample_count": null,
+      "evidence": [
+        "native-result"
+      ],
+      "basis": null
+    },
+    {
+      "id": "memory.arena_capacity.v1",
+      "metric": "memory.arena_capacity.v1",
+      "unit": "B",
+      "domain": "memory",
+      "origin": "reported",
+      "scope": "arena_capacity",
+      "statistic": "size",
+      "value": null,
+      "unavailable_reason": "not_recorded",
+      "sample_count": null,
+      "evidence": [
+        "native-result"
+      ],
+      "basis": null
+    },
+    {
+      "id": "memory.arena_used_after_invoke.v1",
+      "metric": "memory.arena_used_after_invoke.v1",
+      "unit": "B",
+      "domain": "memory",
+      "origin": "reported",
+      "scope": "allocator_after_invoke",
+      "statistic": "size",
+      "value": null,
+      "unavailable_reason": "not_recorded",
+      "sample_count": null,
+      "evidence": [
+        "native-result"
+      ],
+      "basis": null
+    }
+  ],
+  "verification": {
+    "verifier": "helia-profiler.run_record/run-1",
+    "checks": [
+      "run-result-schema-version",
+      "compiled-build-path-size-sha256-and-verify",
+      "evidence-path-size-sha256",
+      "identity-recomputed",
+      "power-request-fits-build",
+      "output-comparison-recomputed"
+    ],
+    "limitations": [
+      "Not authentication or numerical qualification.",
+      "Free text, such as a failed capture's error message, is recorded, not verified.",
+      "Clock rates are configured or firmware-reported, not externally calibrated.",
+      "Rail energy is the gross MCU rail over the timed restore-and-invoke loop; nothing is subtracted.",
+      "Per-layer attribution is not mapped.",
+      "The output comparison is against the recorded reference and the caller's tolerance; it does not qualify the engine numerically."
+    ]
+  },
+  "extensions": {
+    "helia-profiler": {
+      "engine_version_basis": "aot_provider_release",
+      "engine_version_unavailable_reason": "the record states no runtime source",
+      "build_producer": {
+        "unknown": "the dependency state records no workspace"
+      },
+      "target_config": {
+        "schema_id": "hpx.target-config",
+        "schema_version": 1,
+        "identity": "hpx.target-config/1:sha256:41d565d1ce07c353df4a6156c30885773b692ad5b6224fd58b5a918d26ad04e0",
+        "basis": {
+          "board": "apollo510_evb",
+          "device": "AP510NFA-CBR",
+          "load_address": 4259840,
+          "clock_profile": "lp",
+          "cpu_hz": 96000000,
+          "arena_location": "sram",
+          "weights_location": "mram"
+        },
+        "sources": {
+          "board": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/board"
+          },
+          "device": {
+            "artifact": "artifact:build.json",
+            "pointer": "/build/build/target/device"
+          },
+          "load_address": {
+            "artifact": "artifact:build.json",
+            "pointer": "/build/build/target/load_address"
+          },
+          "clock_profile": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/clock_profile"
+          },
+          "cpu_hz": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/cpu_hz"
+          },
+          "arena_location": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/arena_location"
+          },
+          "weights_location": {
+            "artifact": "native-result",
+            "pointer": "/identity/build/weights_location"
+          }
+        },
+        "unavailable_reasons": {}
+      },
+      "cpu_clocks": {
+        "schema_id": "hpx.cpu-clocks",
+        "schema_version": 1,
+        "facts": {
+          "configured": {
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/identity/build/cpu_hz"
+            },
+            "unavailable_reason": null
+          },
+          "reported": {
+            "value_hz": 96000000,
+            "source": {
+              "artifact": "native-result",
+              "pointer": "/capture/timing/cpu_hz"
+            },
+            "unavailable_reason": null
+          }
+        }
+      },
+      "semantic_hashes": {
+        "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+        "build_hash": {
+          "unknown": "the dependency lock is not an NSX lock"
+        },
+        "inputs_hash": "hpx.inputs/1:sha256:2ca56ae8fa19aeebf0c53411603e6be71e50821f1c8b74735643928ee5191081",
+        "observation_hash": "hpx.observation/1:sha256:45d6451bce4da231df4a00b43f52b4e9679f65dab05b2c50e9b5f5116aaf53e1",
+        "binding": "hpx.binding/1:sha256:5f8e121b65e5ec79ae5c098fe004a4fe9e1e0d31c771f87f6edd60650fe8389a"
+      },
+      "run": {
+        "lifecycle": "carry",
+        "timing_scope": "invoke_only",
+        "iterations": 100,
+        "warmups": 5,
+        "instance_boundary": "boot",
+        "first_invoke_initializer": false,
+        "first_invoke_window": "warmup",
+        "timing_clock": "stimer",
+        "timing_clock_hz": 32768,
+        "timing_statistic": "total"
+      },
+      "capture_state": "success",
+      "power_request": null,
+      "output_comparison": {
+        "reference": {
+          "invocations": 105,
+          "kind": "host-litert",
+          "litert_version": "2.2.0",
+          "resolver": "BUILTIN_REF"
+        },
+        "tolerance": 1,
+        "matched": true,
+        "tensors": [
+          {
+            "dtype": "int8",
+            "elements": 4,
+            "identical": true,
+            "index": 13,
+            "max_abs_error": 0.0,
+            "max_abs_error_real": 0.0,
+            "mismatched_elements": 0,
+            "name": "probabilities",
+            "observed_sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+            "reference_sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
+            "shape": [
+              1,
+              4
+            ],
+            "within_tolerance": true
+          }
+        ]
+      }
+    }
+  }
+}

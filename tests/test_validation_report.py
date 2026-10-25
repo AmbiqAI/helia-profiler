@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from io import StringIO
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 from rich.console import Console
 
 from helia_profiler.console import HpxConsole
+from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.report import (
     build_manifest,
     load_validation_report,
@@ -64,7 +66,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         json.dumps(
             {
                 "schema": "hpx.run-summary",
-                "schema_version": 3,
+                "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
                 "binary": {"text": 80_000, "data": 2_000, "bss": 5_000, "total": 87_000},
                 "memory": {
                     "arena_size": 32_768,
@@ -182,7 +184,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
     }
     assert case["provenance"]["system_clock_hz"] == 96_000_000
     assert case["provenance"]["run_metadata_schema_version"] == 1
-    assert case["provenance"]["run_summary_schema_version"] == 3
+    assert case["provenance"]["run_summary_schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert case["resources"]["binary_sections"] == {
         "text": 80_000,
         "data": 2_000,
@@ -313,7 +315,15 @@ def test_powered_case_publishes_dashboard_metrics_and_detailed_artifact(tmp_path
         "energy_per_inference_j": 0.000147657,
         "inferences_per_joule": 6772.47,
     }
-    (case_dir / "summary.json").write_text(json.dumps({"power": power}))
+    (case_dir / "summary.json").write_text(
+        json.dumps(
+            {
+                "schema": "hpx.run-summary",
+                "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                "power": power,
+            }
+        )
+    )
 
     result = CaseResult(
         case_id="apollo510-power",
@@ -390,3 +400,90 @@ def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path,
         ) in output.getvalue()
     elif expected is None:
         assert field not in loaded.cases[0].to_dict()
+
+
+@pytest.mark.parametrize("version", [18, 20, None])
+@pytest.mark.parametrize("writer", [build_manifest, write_validation_reports])
+def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer):
+    from helia_profiler.errors import ReportError
+
+    result = _case(tmp_path)
+    assert result.output_dir is not None
+    case_dir = Path(result.output_dir)
+    case_dir.mkdir(parents=True)
+    (case_dir / "summary.json").write_text(
+        json.dumps({"schema": "hpx.run-summary", "schema_version": version})
+    )
+    with pytest.raises(ReportError, match="Unsupported run summary version"):
+        writer([result], tmp_path, repo_root=tmp_path / "missing")
+
+
+@pytest.mark.parametrize("contents", ['{"schema":', "[]", None])
+def test_failed_case_with_malformed_summary_keeps_aggregate_report(tmp_path, contents):
+    failed = _case(tmp_path / "failed")
+    failed.status = "fail"
+    failed.case_id = "failed"
+    healthy = _case(tmp_path / "healthy")
+    healthy.case_id = "healthy"
+    assert failed.output_dir is not None
+    assert healthy.output_dir is not None
+    for result, summary in (
+        (failed, contents),
+        (
+            healthy,
+            json.dumps(
+                {
+                    "schema": "hpx.run-summary",
+                    "schema_version": RUN_SUMMARY_SCHEMA_VERSION,
+                    "binary": {"text": 80, "data": 2, "bss": 5, "total": 87},
+                }
+            ),
+        ),
+    ):
+        assert result.output_dir is not None
+        case_dir = Path(result.output_dir)
+        case_dir.mkdir(parents=True)
+        if summary is None:
+            (case_dir / "summary.json").mkdir()
+        else:
+            (case_dir / "summary.json").write_text(summary)
+    write_validation_reports([failed, healthy], tmp_path, repo_root=tmp_path / "missing")
+    report = json.loads((tmp_path / "validation_report.json").read_text())
+    assert [case["status"] for case in report["cases"]] == ["fail", "pass"]
+    assert not report["cases"][0].get("resources")
+    assert report["cases"][1]["resources"]["binary_sections"]["total"] == 87
+
+
+@pytest.mark.usefixtures("missing_git_metadata")
+def test_custom_model_metadata_and_clock_reach_manifest(tmp_path: Path) -> None:
+    result = dataclasses.replace(
+        _case(tmp_path),
+        model_id="mlperf-tiny-kws-a8w8",
+        family="mlperf-tiny-kws",
+        precision="a8w8",
+        source="zoo://mlperf-tiny-kws/a8w8@abc",
+    )
+    assert result.output_dir is not None
+    case_dir = Path(result.output_dir)
+    case_dir.mkdir(parents=True)
+    (case_dir / "run_metadata.json").write_text(
+        json.dumps({"platform": {"cpu_clock_name": "lp", "cpu_clock_mhz": 96}})
+    )
+
+    case = build_manifest([result], tmp_path)["cases"][0]
+
+    assert case["model"] == {
+        "family": "mlperf-tiny-kws",
+        "precision": "a8w8",
+        "source": "zoo://mlperf-tiny-kws/a8w8@abc",
+    }
+    assert case["provenance"]["cpu_clock_name"] == "lp"
+    assert case["provenance"]["cpu_clock_mhz"] == 96
+
+
+@pytest.mark.usefixtures("missing_git_metadata")
+def test_builtin_model_manifest_omits_model_object(tmp_path: Path) -> None:
+    case = build_manifest([_case(tmp_path)], tmp_path)["cases"][0]
+
+    assert "model" not in case
+    assert "cpu_clock_name" not in case["provenance"]

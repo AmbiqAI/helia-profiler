@@ -1,31 +1,18 @@
-"""Typed model of ``summary.json`` — the schema as code.
+"""Typed reader and canonical writer for ``summary.json``.
 
-One class owns the artifact's shape for BOTH sides of the boundary:
+``RunSummary.from_dict`` accepts the current schema identity and version.
+Root and typed-section fields that are not recognized are retained in
+``extras`` for inspection; ``to_dict`` omits those extras. Untyped nested
+mappings are carried through. Optional measurements may remain absent.
+Properties provide unit conversions and gate-drift interpretation.
 
-* the **producer** (``report/summary.py``) routes its assembled content
-  through this model -- ``from_dict`` -> a write-time round-trip equality
-  check -> :meth:`RunSummary.to_dict` -- whose emission order and
-  omit-when-``None`` conditionality reproduce the hand-built dict
-  byte-for-byte (``tests/contracts/test_report_golden.py`` is the proof, and
-  the equality check makes any divergence a loud producer-time failure);
-* **consumers** (``validation/runner.py`` today; more as they migrate) load
-  artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
-  a *tolerant* reader: missing fields become ``None``, unknown keys are
-  preserved on ``extras`` for inspection, and cross-version interpretation
-  (legacy key spellings, drift arbitration between schema versions) lives in
-  properties here instead of being re-derived at every read site.
+``report.summary`` assembles the producer's data and checks that its rendered
+form is unchanged after passing through this model. This protects emission
+order, absent-field conventions and values from reader coercion or omission.
 
-A field's meaning has one home: consumers read it here instead of
-re-deriving semantics the producer never promised.
-
-Layering: this module sits in ``results/`` (bottom of the import graph) and
-imports nothing from ``evaluation/`` or ``report/`` — ``evaluation`` imports
-``results``, so a ``RunEvaluation`` reference here would cycle.
-
-Reader vs writer asymmetry, stated honestly: ``to_dict`` serializes only the
-canonical schema — it does NOT re-emit ``extras``. The producer never
-populates ``extras``; the reader keeps them so a consumer can inspect a
-newer-or-older artifact without this module lying about round-tripping it.
+This module imports neither ``evaluation`` nor ``report``: both consume these
+result types. Schema history and reader boundaries are documented at
+https://ambiqai.github.io/helia-profiler/reference/run-summary-schema/
 """
 
 from __future__ import annotations
@@ -38,40 +25,21 @@ from typing import Any, Mapping
 from .serde import to_float, to_int
 
 RUN_SUMMARY_SCHEMA = "hpx.run-summary"
-#: Version history lives with the shape it versions (re-exported by
-#: report/contracts.py for its long-standing import sites):
-#: v2: #24 binary.bss; v3: #133 memory_regions owns region truth;
-#: v4: #142/#181 gate verdict re-sourced -- energy_per_inference_j can
-#: coexist with gate_duration_integrity.valid=false, suspect re-keyed to
-#: the observer arbitration, gated_window_reference_drift added.
-#: v5: #249 gated durations prefer driver delta, then sample span, then UTC;
-#: duration_s, avg_current_a,
-#: avg_power_w and the TOPS figures shift; energy_j and TOPS-per-watt do
-#: not. A v4 and a v5 summary are not comparable on those fields.
-#: v6: #317 AOT clean timing and power include per-call input restoration.
-#: v7: #299 on-device power divides by the INA228 accumulation interval, and
-#: the firmware side of the window-clock checks is the gate bracket.
-#: v8: model_analysis MACs fixed for TRANSPOSE_CONV, non-flat
-#: FULLY_CONNECTED and BATCH_MATMUL; total_macs, total_ops, TOPS and
-#: cycles_per_mac move for models with those ops.
-#: v9: #386 on-device gated inference publishes per-inference energy and
-#: inferences-per-joule alongside the existing gated totals.
-#: v10: heliaAOT model_analysis counts SQRT, RSQRT, ABS and
-#: SQUARED_DIFFERENCE as elementwise; helia-aot total_ops and TOPS move for
-#: models with those ops.
-#: v11: #370 the window-clock agreement contexts (power.window_observer_mismatch,
-#: power.window_clock_mismatch) name the firmware gate interval gate_elapsed_us /
-#: gate_elapsed_s; elapsed_us stays the whole firmware window (ceiling, frozen).
-#: v12: #224 AOT costs use the compiled graph and execution positions;
-#: model_analysis records engine and index_space.
-#: v13: #466 memory_plan MRAM capacity is the linker's application window for the
-#: selected toolchain where the SoC has a linked memory map, not the whole part.
-#: v14: #537 adds identity, the run's RunIdentity in the vocabulary fixture
-#: builds share. Additive: no existing field changes meaning.
-#: v15: #558 heliaAOT model_analysis takes heliaAOT's own MAC and parameter
-#: counts from its result views; total_macs, num_parameters, total_ops, TOPS
-#: and cycles_per_mac move for models whose weights lowering repacks.
-RUN_SUMMARY_SCHEMA_VERSION = 15
+#: Current summary format; historical changes are in the schema reference above.
+RUN_SUMMARY_SCHEMA_VERSION = 19
+
+
+def _require_current_summary(data: Mapping[str, Any]) -> None:
+    version = data.get("schema_version")
+    if type(version) is not int or version != RUN_SUMMARY_SCHEMA_VERSION:
+        raise ValueError(
+            f"Unsupported run summary version: {version!r}; this heliaPROFILER reads "
+            f"version {RUN_SUMMARY_SCHEMA_VERSION}, so read the result with the HPX "
+            "release that wrote it"
+        )
+    if data.get("schema") != RUN_SUMMARY_SCHEMA:
+        raise ValueError(f"Expected summary schema {RUN_SUMMARY_SCHEMA!r}")
+
 
 __all__ = [
     "RUN_SUMMARY_SCHEMA",
@@ -101,7 +69,7 @@ class MemorySection:
     num_tensors: int | None = None
     input_size: int | None = None
     output_size: int | None = None
-    #: Reader-only: keys a newer producer wrote that this schema predates.
+    #: Unrecognized fields from an admitted document, retained for inspection only.
     extras: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -290,9 +258,8 @@ class LatencySection:
 class PowerSection:
     """``summary["power"]`` — instrument metrics plus the gate verdict render.
 
-    Field order is emission order. Nested blobs the schema does not (yet)
-    type stay as mappings under their historical keys; they graduate to
-    typed sections when a consumer needs their interior.
+    Field order is emission order. Nested mappings retain their recorded keys
+    and values; their contents are not converted into typed sections.
     """
 
     avg_current_a: float | None = None
@@ -424,44 +391,26 @@ class PowerSection:
             extras={k: v for k, v in data.items() if k not in known},
         )
 
-    # -- cross-version interpretation (the runner's legacy fallbacks, once) --
+    # -- derived readings, interpreted once for every consumer --
 
     @property
     def energy_uj(self) -> float | None:
-        """Total gated energy in µJ, across three schema generations.
-
-        Precedence: explicit-unit legacy keys, then the canonical SI field
-        scaled. A null or garbage legacy value falls through to the next
-        source instead of raising.
-        """
-        for legacy in ("total_energy_uj", "energy_uJ"):
-            value = to_float(self.extras.get(legacy))
-            if value is not None:
-                return value
+        """Total gated energy in µJ."""
         value = to_float(self.energy_j)
         return value * 1e6 if value is not None else None
 
     @property
     def avg_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("avg_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.avg_current_a)
         return value * 1e3 if value is not None else None
 
     @property
     def avg_power_mw(self) -> float | None:
-        value = to_float(self.extras.get("avg_power_mw"))
-        if value is not None:
-            return value
         value = to_float(self.avg_power_w)
         return value * 1e3 if value is not None else None
 
     @property
     def peak_current_ma(self) -> float | None:
-        value = to_float(self.extras.get("peak_current_ma"))
-        if value is not None:
-            return value
         value = to_float(self.peak_current_a)
         return value * 1e3 if value is not None else None
 
@@ -572,6 +521,7 @@ class RunSummary:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RunSummary:
+        _require_current_summary(data)
         known = {
             "schema",
             "schema_version",
@@ -608,7 +558,7 @@ class RunSummary:
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
-            schema_version=to_int(data.get("schema_version")) or 1,
+            schema_version=RUN_SUMMARY_SCHEMA_VERSION,
             compatibility=data.get("compatibility"),
             dependencies=data.get("dependencies"),
             identity=data.get("identity"),
@@ -628,10 +578,10 @@ class RunSummary:
 
 
 def load_run_summary(path: str | Path) -> RunSummary:
-    """Load a ``summary.json`` from disk, tolerantly.
+    """Load a current-version ``summary.json`` from disk.
 
     Raises ``OSError``/``json.JSONDecodeError``/``ValueError`` for an
-    unreadable or non-object document — the caller decides what a broken
+    unreadable, non-object or unsupported-schema document — the caller decides what a broken
     artifact means (the validation runner fails the case; a report viewer
     might not).
     """

@@ -78,9 +78,12 @@ class ModelSpec:
     id: str  # short stable ID (used on CLI + in reports)
     name: str
     fixture_path: str  # path relative to helia-profiler root
-    arena_size: int  # tensor arena in bytes (RT / TFLM)
+    arena_size: int  # tensor arena in bytes (RT / LiteRT)
     description: str = ""
     comparison_group: str | None = None
+    family: str | None = None  # groups precisions of one model
+    precision: str | None = None
+    source: str | None = None  # where the model came from
     executorch: ExecuTorchModelSpec | None = None
 
     @property
@@ -159,7 +162,7 @@ class CaseSpec:
             if self.cmsis_nn_backend is None:
                 raise ValueError("ExecuTorch validation case is missing a CMSIS-NN provider")
             return self.cmsis_nn_backend
-        if self.engine is EngineType.TFLM:
+        if self.engine is EngineType.LITERT:
             return CmsisNNProvider.ARM
         return CmsisNNProvider.NS
 
@@ -259,7 +262,7 @@ def _board_spec(board_id: str, display_name: str, description: str = "") -> Boar
 ENGINES: tuple[EngineType, ...] = (
     EngineType.HELIA_RT,
     EngineType.HELIA_AOT,
-    EngineType.TFLM,
+    EngineType.LITERT,
     EngineType.EXECUTORCH,
 )
 
@@ -388,8 +391,20 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
             arena_size=arena_size,
             description=str(raw_spec.get("description", "")),
             comparison_group=comparison_group,
+            family=_optional_label(raw_spec, "family", model_id),
+            precision=_optional_label(raw_spec, "precision", model_id),
+            source=_optional_label(raw_spec, "source", model_id),
         )
     return models
+
+
+def _optional_label(raw_spec: dict[str, Any], key: str, model_id: str) -> str | None:
+    value = raw_spec.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{key} for model {model_id!r} must be a non-empty string")
+    return value.strip()
 
 
 def models_from_paths(
@@ -503,7 +518,7 @@ def build_matrix(
             :class:`EngineType`; default: all in :data:`ENGINES`).
         executorch_backends: ExecuTorch CMSIS-NN providers to include (``arm``
             and/or ``ns``). Defaults to both. Other engines use their fixed
-            validation provider: ARM CMSIS-NN for TFLM and ns-cmsis-nn for
+            validation provider: ARM CMSIS-NN for LiteRT and ns-cmsis-nn for
             heliaRT/heliaAOT.
         power: One of ``"both"``, ``"on"``, ``"off"``.  ``"both"`` runs each
             (model, engine) case twice — with and without Joulescope.

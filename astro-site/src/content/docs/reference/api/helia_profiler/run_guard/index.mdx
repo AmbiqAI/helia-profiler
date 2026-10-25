@@ -1,0 +1,525 @@
+---
+title: "run_guard"
+description: "Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command l…"
+sidebar:
+  order: 19
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+Who vouches for the board a run flashes and the instrument it powers or measures with: the guard protocols a capture consults, the operator guard the command line uses, and the rail and supply requests a power run selects.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/run_guard.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.OperatorGuard","name":"OperatorGuard","kind":"class","summary":"Capture authority from an operator who names the board and the J-Link probe on it."},{"id":"helia_profiler.FixtureTarget","name":"FixtureTarget","kind":"class","summary":"The board a fixture image runs on, its J-Link device and the image's load address."},{"id":"helia_profiler.FixtureBoardPowerRequest","name":"FixtureBoardPowerRequest","kind":"class","summary":"Explicit station-owned supply path; enabling it does not request energy measurement."},{"id":"helia_profiler.FixtureCaptureGuard","name":"FixtureCaptureGuard","kind":"class","summary":"Caller-owned authorization and remaining-window checks."},{"id":"helia_profiler.FixtureRailPowerRequest","name":"FixtureRailPowerRequest","kind":"class","summary":"Station-selected instrument/rail and channels, separate from firmware wiring."},{"id":"helia_profiler.FixturePowerGuard","name":"FixturePowerGuard","kind":"class","summary":"Station authority for the board and measured instrument/rail."}]} />
+
+<RefSymbol
+  id={"helia_profiler.OperatorGuard"}
+  name={"OperatorGuard"}
+  kind={"class"}
+  language={"python"}
+  signature={"OperatorGuard(board: str, jlink_serial: str) -> None"}
+  level={2}
+  summary={"Capture authority from an operator who names the board and the J-Link probe on it."}
+  source={{"path":"src/helia_profiler/run_guard.py","line":14,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L14"}}
+>
+
+  `dataclass`
+
+  Capture authority from an operator who names the board and the J-Link probe on it.
+
+  HPX cannot prove which physical board a probe is wired to: the core's
+  CPUID and the probe list name a SoC and a serial, not a board. With this
+  guard the operator vouches for the board and holds it for the whole
+  capture, as ``hpx profile`` assumes. :meth:`verify_target` refuses a
+  capture whose board or probe serial differs from the ones the operator
+  named, and :meth:`check` allows every step. A harness that can prove the
+  board and lock it passes its own
+  :class:`~helia_profiler.FixtureCaptureGuard` instead.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.OperatorGuard.board"}
+    name={"board"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"board: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/run_guard.py","line":28,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L28"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.OperatorGuard.jlink_serial"}
+    name={"jlink_serial"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"jlink_serial: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/run_guard.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L29"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.OperatorGuard.check"}
+    name={"check"}
+    kind={"method"}
+    language={"python"}
+    signature={"check(*, require_free: bool, remaining_s: float) -> None"}
+    level={3}
+    summary={"Allow the step: the operator holds the board for the whole capture."}
+    source={{"path":"src/helia_profiler/run_guard.py","line":37,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L37"}}
+  >
+
+    Allow the step: the operator holds the board for the whole capture.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.OperatorGuard.verify_target"}
+    name={"verify_target"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify_target(*, target: FixtureTarget, jlink_serial: str) -> None"}
+    level={3}
+    summary={"Refuse a target board or probe serial other than the operator's."}
+    source={{"path":"src/helia_profiler/run_guard.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L41"}}
+  >
+
+    Refuse a target board or probe serial other than the operator's.
+
+    <RefSection title="Raises">
+      <RefParams
+        caption={"Errors raised by verify_target"}
+        density={"compact"}
+        nameLabel="Type"
+        rows={[{"name":"ConfigError","description":"The board or the serial differs from the operator's."}]}
+      />
+    </RefSection>
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureTarget"}
+  name={"FixtureTarget"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureTarget(board: str, device: str, load_address: int) -> None"}
+  level={2}
+  summary={"The board a fixture image runs on, its J-Link device and the image's load address."}
+  source={{"path":"src/helia_profiler/fixture_target.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L19"}}
+>
+
+  `dataclass`
+
+  The board a fixture image runs on, its J-Link device and the image's load address.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTarget.board"}
+    name={"board"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"board: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_target.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L23"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTarget.device"}
+    name={"device"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"device: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_target.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L24"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTarget.load_address"}
+    name={"load_address"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"load_address: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_target.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L25"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureTarget.verify"}
+    name={"verify"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify() -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_target.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L27"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureBoardPowerRequest"}
+  name={"FixtureBoardPowerRequest"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureBoardPowerRequest(driver: str, serial: str, rail: str) -> None"}
+  level={2}
+  summary={"Explicit station-owned supply path; enabling it does not request energy measurement."}
+  source={{"path":"src/helia_profiler/fixture_power.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L42"}}
+>
+
+  `dataclass`
+
+  Explicit station-owned supply path; enabling it does not request energy measurement.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.driver"}
+    name={"driver"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"driver: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.serial"}
+    name={"serial"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"serial: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L47"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.rail"}
+    name={"rail"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"rail: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L48"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureCaptureGuard"}
+  name={"FixtureCaptureGuard"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureCaptureGuard()"}
+  level={2}
+  summary={"Caller-owned authorization and remaining-window checks."}
+  source={{"path":"src/helia_profiler/fixture_capture.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L46"}}
+>
+
+  Caller-owned authorization and remaining-window checks.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCaptureGuard.check"}
+    name={"check"}
+    kind={"method"}
+    language={"python"}
+    signature={"check(*, require_free: bool, remaining_s: float) -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_capture.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L49"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureCaptureGuard.verify_target"}
+    name={"verify_target"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify_target(*, target: FixtureTarget, jlink_serial: str) -> None"}
+    level={3}
+    summary={"Require caller-verified physical board/serial identity and exclusive ownership."}
+    source={{"path":"src/helia_profiler/fixture_capture.py","line":51,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L51"}}
+  >
+
+    Require caller-verified physical board/serial identity and exclusive ownership.
+
+    Core CPUID and probe enumeration cannot establish the physical board.
+    Reject if the caller has no current independent board/serial evidence.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureRailPowerRequest"}
+  name={"FixtureRailPowerRequest"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureRailPowerRequest(\n    serial: str,\n    rail: str,\n    io_voltage: float,\n    sync_gpio_pin: int,\n    state_gpio_pin: int,\n    go_gpio_pin: int,\n    sync_input_index: int = 0,\n    state_input_index: int = 1,\n    go_output_index: int = 0,\n    stats_rate_hz: int = 1000,\n) -> None"}
+  level={2}
+  summary={"Station-selected instrument/rail and channels, separate from firmware wiring."}
+  source={{"path":"src/helia_profiler/fixture_power.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L57"}}
+>
+
+  `dataclass`
+
+  Station-selected instrument/rail and channels, separate from firmware wiring.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.serial"}
+    name={"serial"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"serial: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L61"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.rail"}
+    name={"rail"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"rail: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L62"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.io_voltage"}
+    name={"io_voltage"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"io_voltage: float"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L63"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.sync_gpio_pin"}
+    name={"sync_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_gpio_pin: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L64"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.state_gpio_pin"}
+    name={"state_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_gpio_pin: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L65"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.go_gpio_pin"}
+    name={"go_gpio_pin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"go_gpio_pin: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.sync_input_index"}
+    name={"sync_input_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sync_input_index: int = 0"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L67"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.state_input_index"}
+    name={"state_input_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"state_input_index: int = 1"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L68"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.go_output_index"}
+    name={"go_output_index"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"go_output_index: int = 0"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L69"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.stats_rate_hz"}
+    name={"stats_rate_hz"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"stats_rate_hz: int = 1000"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L70"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureRailPowerRequest.firmware_wiring"}
+    name={"firmware_wiring"}
+    kind={"method"}
+    language={"python"}
+    signature={"firmware_wiring() -> FixturePowerSync"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L93"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixturePowerGuard"}
+  name={"FixturePowerGuard"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixturePowerGuard()"}
+  level={2}
+  summary={"Station authority for the board and measured instrument/rail."}
+  source={{"path":"src/helia_profiler/fixture_power.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L97"}}
+>
+
+  Station authority for the board and measured instrument/rail.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixturePowerGuard.check"}
+    name={"check"}
+    kind={"method"}
+    language={"python"}
+    signature={"check(*, require_free: bool, remaining_s: float) -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L100"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixturePowerGuard.verify_power_device"}
+    name={"verify_power_device"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify_power_device(*, serial: str, rail: str) -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixture_power.py","line":102,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L102"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`run_guard.json`](/helia-profiler/reference/api/helia_profiler/run_guard.json) · [`run_guard.md`](/helia-profiler/reference/api/helia_profiler/run_guard.md), complete and lossless.

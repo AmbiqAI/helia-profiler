@@ -95,7 +95,7 @@ def _check_model(path: Path, engine: EngineType) -> None:
             hint=(
                 "Use a PTE exported for ExecuTorch when engine.type is executorch."
                 if engine is EngineType.EXECUTORCH
-                else "TFLM, heliaRT, and heliaAOT consume TFLite flatbuffers."
+                else "LiteRT, heliaRT, and heliaAOT consume TFLite flatbuffers."
             ),
         )
     # TFLite flatbuffer sanity: 'TFL3' magic should appear in the first 16
@@ -171,7 +171,7 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
             ),
         )
 
-    if engine in (EngineType.TFLM, EngineType.HELIA_RT):
+    if engine in (EngineType.LITERT, EngineType.HELIA_RT):
         unsupported = [f for f in findings if not f.supported]
         consequence = (
             "The target would abort inside AllocateTensors() (a HardFault / "
@@ -423,7 +423,7 @@ def _check_transport_support(cfg) -> None:
             hint=(
                 "Use profiling.clean_window_probe=infer with ExecuTorch, or "
                 "switch to an engine that supports the dedicated power binary "
-                "(tflm, helia-rt, helia-aot)."
+                "(litert, helia-rt, helia-aot)."
             ),
         )
     if cfg.target.transport != Transport.USB_CDC:

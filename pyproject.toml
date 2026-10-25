@@ -1,6 +1,6 @@
 [project]
 name = "helia-profiler"
-version = "0.3.0"
+version = "0.4.1"
 description = "Profile LiteRT and ExecuTorch models on Ambiq Apollo hardware"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -24,6 +24,8 @@ classifiers = [
     "Topic :: Software Development :: Embedded Systems",
 ]
 dependencies = [
+    "certifi>=2026.10.19",
+    "urllib3>=2.8.0",
     "Jinja2>=3.1",
     "PyYAML>=6.0",
     "rich>=13.0",
@@ -69,14 +71,19 @@ test = ["pytest>=8.0", "pytest-timeout>=2.3", "packaging>=24.0", "jsonschema>=4.
 notebook = ["ipykernel>=6,<8"]
 
 [tool.uv]
-# Security floors for transitive dependencies. HPX does not depend on these
-# directly, so the only durable place to hold the fixed versions is the
-# resolver. Each entry is the first patched release for a published advisory;
-# drop an entry once every path to it already resolves above the floor.
+required-version = ">=0.13.4"
+# Resolver floors protect project installs. Runtime trust floors also belong
+# in project.dependencies so published wheel consumers receive them.
 constraint-dependencies = [
+    # GHSA-6q48-6c7w-9gw2: remove the compromised emSign certificate chain.
+    "certifi>=2026.10.19",
     # GHSA idna: crafted input bypasses the CVE-2024-3651 fix in idna.encode().
     # Reaches HPX via pyjoulescope-driver -> requests.
     "idna>=3.15",
+    # GHSA-8988-9cw3-xx77, GHSA-vxq7-64xx-v4gw, GHSA-gh4c-6fx4-qh6g.
+    "urllib3>=2.8.0",
+    # GHSA-c2m8-h5v5-343r, GHSA-chx6-46f5-w4vp, GHSA-3hv7-mjh2-fv65.
+    "tornado>=6.5.9",
 ]
 
 [build-system]

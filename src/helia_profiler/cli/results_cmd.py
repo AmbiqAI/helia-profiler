@@ -12,14 +12,14 @@ from ..api import export_result, inspect_result, load_result, observations
 from ..records import ResultReadError
 
 results_app = typer.Typer(
-    help="Inspect and export verified ordinary profile bundles.", add_completion=False
+    help="Inspect and export verified profile bundles and saved run results.", add_completion=False
 )
 app = results_app
 
 
 @results_app.callback()
 def results() -> None:
-    """Inspect and export verified ordinary profile bundles."""
+    """Inspect and export verified profile bundles and saved run results."""
 
 
 @results_app.command("inspect")
@@ -59,7 +59,7 @@ def inspect(location: Annotated[Path, typer.Argument()]) -> None:
 
 @results_app.command("show")
 def show(location: Annotated[Path, typer.Argument()]) -> None:
-    """Emit the portable JSON view of a verified native bundle."""
+    """Emit the portable JSON view of a verified profile bundle or saved run result."""
     try:
         typer.echo(json.dumps(observations(load_result(location)), indent=2, allow_nan=False))
     except ResultReadError as exc:

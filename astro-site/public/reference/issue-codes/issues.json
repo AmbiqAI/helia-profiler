@@ -8,7 +8,7 @@
   },
   "counts": {
     "issues": 27,
-    "comparability": 8,
+    "comparability": 7,
     "families": 3,
     "familyCodes": 25
   },
@@ -286,12 +286,6 @@
       "code": "result.invalid",
       "severity": "blocking",
       "description": "A result is invalid and cannot be compared.",
-      "metricGroup": null
-    },
-    {
-      "code": "result.invalid_pmu_overflow",
-      "severity": "blocking",
-      "description": "A legacy result without a manifest has PMU counter overflow.",
       "metricGroup": null
     },
     {

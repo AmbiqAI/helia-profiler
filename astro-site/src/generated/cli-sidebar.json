@@ -15,6 +15,10 @@
         "slug": "reference/cli/boards"
       },
       {
+        "label": "hpx build",
+        "slug": "reference/cli/build"
+      },
+      {
         "label": "hpx cache",
         "slug": "reference/cli/cache"
       },
@@ -29,6 +33,10 @@
       {
         "label": "hpx engines",
         "slug": "reference/cli/engines"
+      },
+      {
+        "label": "hpx freeze",
+        "slug": "reference/cli/freeze"
       },
       {
         "label": "hpx ports",
@@ -49,6 +57,10 @@
       {
         "label": "hpx results",
         "slug": "reference/cli/results"
+      },
+      {
+        "label": "hpx run",
+        "slug": "reference/cli/run"
       },
       {
         "label": "hpx runtimes",

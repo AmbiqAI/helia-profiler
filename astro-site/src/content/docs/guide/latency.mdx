@@ -14,16 +14,74 @@ wrong one can lead to a misleading comparison.
 Ordinary `hpx profile` measures execution time and counters; it does not feed
 representative samples, export output tensor values, or compare outputs with a
 reference. The profiling harness initializes input storage with zero bytes:
-heliaRT/TFLM clear the first input tensor, heliaAOT clears every input buffer,
+heliaRT/LiteRT clear the first input tensor, heliaAOT clears every input buffer,
 and ExecuTorch clears its configured input buffer. Zero bytes need not represent
 real-valued zero for a quantized tensor with a nonzero zero point.
 
 Treat these results as timings for that input setup. Data-dependent kernels and
 stateful models can behave differently on application data; clearing input
 buffers is not a promise that the runtime resets internal state between calls.
-For caller-supplied inputs and output readback, use the
-[fixed-input fixture guide](https://github.com/AmbiqAI/helia-profiler/blob/main/maintainers/fixed-fixture.md) rather than inferring numerical
-correctness from a successful profile.
+For caller-supplied inputs and output readback, use the run API, from
+[the command line](#run-api-from-the-command-line) or from
+[Python](../../reference/api/helia_profiler/compiled_build/), rather than
+inferring numerical correctness from a successful profile.
+
+## Run API from the command line
+
+The run API builds a model once for fixed input bytes and captures from that
+build later, on this host or another, comparing the outputs with a
+reference. Four commands walk it:
+
+```sh
+hpx runtimes prepare helia-rt   # heliaRT and LiteRT link a prepared runtime
+hpx freeze model.tflite --engine helia-rt --backend helia --toolchain atfe \
+    --cpu-clock lp --arena-size 131072 --arena-location sram \
+    --weights-location mram -o plan.json
+hpx build plan.json --out runs/model --input input.bin
+hpx validate build runs/model
+hpx run runs/model --board apollo510_evb --jlink-serial 1160002255 --tolerance 1
+```
+
+- [`hpx freeze`](../../reference/cli/freeze/) takes a subset of the options
+  `hpx profile` takes: the config file (`-c`), the model, `--engine`,
+  `--engine-config`, `--arena-size`, `--arena-location`,
+  `--weights-location`, `--core-override`, `--board`, `--toolchain`,
+  `--cpu-clock`, `--iterations` and `--warmup`, plus `--backend` for
+  `engine.backend`. It writes the resolved plan. A run build needs ATfE, the
+  `lp` clock, an SRAM arena of explicit size and MRAM weights.
+- [`hpx build`](../../reference/cli/build/) copies the model and one file
+  per model input (`--input`, repeated in model order; zero bytes when
+  omitted) into `runs/model/inputs`, compiles under `runs/model/work`, and
+  saves `runs/model/build.json`. The directory must be new or empty, so a
+  failed build never touches an earlier one; a `--work-dir` must sit inside
+  it, since the saved build records its files relative to the run directory.
+  `--lifecycle` and `--timing-scope` choose how the build runs and what its
+  timed span covers.
+- [`hpx validate build`](../../reference/cli/validate/#hpx-validate-build) re-verifies
+  every pinned file and the plan without hardware. The saved build names the
+  run directory and the HPX cache as roots. The run directory can move to
+  another host as a unit, but a heliaRT or LiteRT build links a runtime
+  prepared under the HPX cache: on the new host, run `hpx runtimes prepare`
+  for the same release, or set `HPX_CACHE_DIR` to a cache that holds it.
+- [`hpx run`](../../reference/cli/run/) flashes the build, captures once
+  into a fresh `evidence-<N>` directory, or a new `--evidence-dir` inside the
+  run directory, and saves the run there as `result.json`
+  ([A saved run result](../output/#7-a-saved-run-result)). You
+  vouch for the physical board behind the probe, as `hpx profile` assumes:
+  `--board` names the board wired to the probe `--jlink-serial` names. A
+  `--board` other than the build's board is refused before any device is
+  touched; HPX cannot check the physical board itself. Outputs are compared
+  with host LiteRT by default (the `analysis` extra); `--reference` files
+  or `--expect none` change that.
+
+`hpx validate build` and `hpx run` take the run directory or its
+`build.json`. Each command prints JSON: the build's inputs and identity, or
+a run's outcome, the authority that vouched for the board, the saved
+result's path, its identity,
+per-tensor verification and timing. A non-finite error is written as
+`null`; `identical` and `mismatched_elements` still say what differed.
+`hpx run` exits 1 when the capture fails and 3 when the outputs do not
+match.
 
 ## Prerequisites
 
@@ -91,6 +149,25 @@ you convert or transfer a figure, say which tier.
 - `clean_workload` names what the clean window ran (AOT input restoration
   is inside it from schema v6); a comparison across different workloads is
   not a latency comparison.
+
+### 5. Check the window facts before comparing routes
+
+`summary.identity.run` states how a time was taken, and a fixed-input
+fixture or a run-API capture states the same fields in its `RunIdentity`.
+Compare times only when these agree:
+
+| Field | Ordinary profile | Fixture and run API |
+|---|---|---|
+| `timing_scope` | the clean window: `restore_and_invoke` on heliaAOT, else `invoke_only` | the caller's `FixtureMethod`: `invoke_only` brackets each invocation, `restore_and_invoke` one span around the timed loop, input restoration included |
+| `timing_clock`, `timing_clock_hz` | `stimer` at 32,768 Hz for the `busy_loop` probe; otherwise `cpu` cycles at the CPU clock for ExecuTorch (its execute-cycle count) on every SoC, `stimer` on Apollo5, and `cpu` (DWT) cycles elsewhere | `stimer` at 32,768 Hz; a `single` invocation under about 30.5 µs can fail as `TIMING_BOUND` |
+| `timing_statistic` | `mean` per invocation | `total` ticks over the timed invocations; divide by `iterations` and the rate for a mean |
+| `lifecycle`, `instance_boundary` | `carry`/`boot`; ExecuTorch `single`/`invocation`: every call reloads the program, so each invocation is its own instance | the build's lifecycle: `carry` runs the plan's counts, `single` one timed invocation and no warmups per boot |
+| `first_invoke_initializer`, `first_invoke_window` | whether the first invocation runs a one-time initializer, and whether it is a `warmup` (always, before the clean window) or `measured` (ExecuTorch) | the same answer per engine; `measured` under `single` or with no warmups, so a `CALL_ONCE` lands in the timed span |
+
+LiteRT and heliaRT run a `CALL_ONCE` subgraph inside the first
+`Invoke()`; heliaAOT runs it in `model_init()`, before any timed span.
+Engine initialization (`AllocateTensors()`, `model_init()`) is never
+timed. Clock rates are the configured ones, not measured.
 
 ## Expected output
 

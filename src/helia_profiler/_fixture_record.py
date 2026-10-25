@@ -10,21 +10,21 @@ import hashlib
 import json
 from collections.abc import Mapping
 from dataclasses import asdict
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest
 
+from ._files import RootedPaths, read_json
 from ._fixture_build import (
     FixtureBuild,
-    FixtureCapability,
     FixtureIO,
     FixtureRole,
     FixtureStatePolicy,
     FixtureTimingScope,
-    _io_capabilities,
 )
+from ._fixture_io import FixtureCapability, io_capabilities
 from .engines import EngineType
 from .engines.base import EngineSource
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
@@ -89,7 +89,10 @@ _FIELDS = frozenset(
 )
 
 
-#: Optional since API 5.6; absent from a record when unknown, so older identities hold.
+#: The record's ``fixture_api`` version, inside ``hpx.compiled-build`` version 3.
+_RECORD_VERSION = (7, 0)
+
+#: Absent from a record when unknown.
 _SOURCE_FIELDS = ("kernel_source", "runtime_source")
 
 
@@ -103,21 +106,8 @@ def _object(value, fields):
     return value
 
 
-def _unique(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError(f"Duplicate fixture build field: {key}")
-        result[key] = value
-    return result
-
-
-def _reject_constant(value):
-    raise ValueError(f"Nonfinite fixture build value: {value}")
-
-
 def _read_json(value):
-    return json.loads(value, object_pairs_hook=_unique, parse_constant=_reject_constant)
+    return read_json(value, label="fixture build")
 
 
 def _payload(build: FixtureBuild, *, file, path) -> dict:
@@ -130,8 +120,6 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
             del result[name]
     if result["power_sync"] is None:
         del result["power_sync"]
-    elif build.power_sync is not None and build.power_sync.protocol_version == 1:
-        del result["power_sync"]["protocol_version"]
     _object(
         result,
         _FIELDS
@@ -279,8 +267,6 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError("Runtime source version must be a string or absent")
         _digest(build.runtime_source.archive_sha256)
     if build.kernel_source is not None or build.runtime_source is not None:
-        if build.power_sync is not None and build.power_sync.protocol_version == 1:
-            raise ValueError("Kernel and runtime sources postdate power protocol 1 records")
         try:
             stated = pinned_sources(
                 build.runtime_manifest.read() if build.runtime_manifest else None,
@@ -305,7 +291,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError("Incomplete fixture input/state bytes")
     for tensor in build.output_tensors:
         _tensor(asdict(tensor))
-    capabilities = _io_capabilities(
+    capabilities = io_capabilities(
         tuple(io.tensor for io in build.inputs), build.output_tensors, build.engine
     )
     if build.capabilities != capabilities:
@@ -358,40 +344,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Compiled fixture identity mismatch")
 
 
-class _Roots:
-    def __init__(self, roots: Mapping[str, Path]):
-        if not roots or any(
-            not isinstance(k, str) or not k or not isinstance(v, Path) for k, v in roots.items()
-        ):
-            raise ValueError("Named explicit Path roots required")
-        self.roots = {k: v.resolve() for k, v in roots.items()}
-
-    def encode(self, value: Path) -> dict:
-        resolved = value.resolve()
-        for name, root in sorted(self.roots.items(), key=lambda kv: (-len(kv[1].parts), kv[0])):
-            if resolved.is_relative_to(root):
-                return {"root": name, "path": resolved.relative_to(root).as_posix()}
-        raise ValueError(f"Fixture path has no supplied root: {value}")
-
-    def decode(self, value: dict) -> Path:
-        _object(value, ("root", "path"))
-        name, relative = value["root"], value["path"]
-        if not isinstance(name, str) or name not in self.roots or not isinstance(relative, str):
-            raise ValueError("Unknown fixture record root/path")
-        path = PurePosixPath(relative)
-        if (
-            not relative
-            or path.is_absolute()
-            or ".." in path.parts
-            or "\\" in relative
-            or path.as_posix() != relative
-        ):
-            raise ValueError("Fixture record requires canonical relative paths")
-        result = (self.roots[name] / relative).resolve()
-        if not result.is_relative_to(self.roots[name]):
-            raise ValueError("Fixture record path escapes its root")
-        return result
-
+class _Roots(RootedPaths):
     def file(self, value: FixtureFile) -> dict:
         return {**self.encode(value.path), "sha256": value.sha256}
 
@@ -411,17 +364,13 @@ class _Roots:
 
 def dump_fixture_build(build: FixtureBuild, *, roots: Mapping[str, Path]) -> str:
     """Return canonical JSON for a verified compiled build under caller roots."""
-    from .fixture import FIXTURE_API_VERSION
-
     verify_fixture_build(build)
     mapping = _Roots(roots)
     return (
         _json(
             {
                 "schema_version": 1,
-                "fixture_api": (5, 1)
-                if build.power_sync is not None and build.power_sync.protocol_version == 1
-                else FIXTURE_API_VERSION,
+                "fixture_api": _RECORD_VERSION,
                 "build": _payload(build, file=mapping.file, path=mapping.encode),
             }
         )
@@ -488,8 +437,6 @@ def _memory(value) -> MemoryPlan | None:
 
 def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> FixtureBuild:
     """Load and verify a producer record without resolving/preparing an engine."""
-    from .fixture import FIXTURE_API_VERSION
-
     if not isinstance(record, (str, bytes)):
         raise ValueError("Fixture build record must be JSON text or bytes")
     mapping = _Roots(roots)
@@ -497,36 +444,17 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     if (
         type(outer["schema_version"]) is not int
         or outer["schema_version"] != 1
-        or _json(outer["fixture_api"])
-        not in (
-            _json((5, 0)),
-            _json((5, 1)),
-            _json((5, 2)),
-            _json((5, 3)),
-            _json((5, 4)),
-            _json((5, 5)),
-            _json((5, 6)),
-            _json(FIXTURE_API_VERSION),
-        )
+        or _json(outer["fixture_api"]) != _json(_RECORD_VERSION)
     ):
-        raise ValueError("Unsupported fixture build record/API version")
+        raise ValueError(
+            f"Unsupported fixture build record version {outer['fixture_api']!r}; "
+            f"this heliaPROFILER reads {list(_RECORD_VERSION)}, so read it with the "
+            "HPX release that wrote it"
+        )
     if not isinstance(outer["build"], dict):
         raise ValueError("Fixture build must be a JSON object")
-    power_fields = {"power_sync"} if "power_sync" in outer["build"] else set()
-    if power_fields and _json(outer["fixture_api"]) == _json((5, 0)):
-        raise ValueError("Power firmware requires its declared API version")
-    ram_fields = {"observe_ram"} if "observe_ram" in outer["build"] else set()
-    if ram_fields and outer["fixture_api"] not in (
-        [5, 4],
-        [5, 5],
-        [5, 6],
-        list(FIXTURE_API_VERSION),
-    ):
-        raise ValueError("RAM diagnostic requires its declared API version")
-    source_fields = {name for name in _SOURCE_FIELDS if name in outer["build"]}
-    if source_fields and tuple(outer["fixture_api"]) < (5, 6):
-        raise ValueError("Kernel and runtime sources require their declared API version")
-    value = dict(_object(outer["build"], _FIELDS | power_fields | ram_fields | source_fields))
+    optional = {"power_sync", "observe_ram", *_SOURCE_FIELDS} & set(outer["build"])
+    value = dict(_object(outer["build"], _FIELDS | optional))
     try:
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
@@ -586,11 +514,11 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
                 psram["clock_hz"],
             )
         if "power_sync" in value:
-            legacy = _json(outer["fixture_api"]) == _json((5, 1))
-            fields = ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin")
             value["power_sync"] = FixturePowerSync(
-                **_object(value["power_sync"], fields if legacy else (*fields, "protocol_version")),
-                **({"protocol_version": 1} if legacy else {}),
+                **_object(
+                    value["power_sync"],
+                    ("sync_gpio_pin", "state_gpio_pin", "go_gpio_pin", "protocol_version"),
+                )
             )
         result = FixtureBuild(**value)
         verify_fixture_build(result)

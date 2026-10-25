@@ -27,15 +27,13 @@ _TERMINAL_TRANSPORTS: dict[Transport, type[PowerTerminalTransport]] = {}
 def register_power_terminal_transport(
     transport: Transport,
     implementation: type[PowerTerminalTransport],
-    *,
-    replace: bool = False,
 ) -> None:
     declared = getattr(implementation, "transport", None)
     if declared is not transport:
         raise ValueError(
             f"Terminal adapter declares {declared!r}, cannot register for {transport.value}."
         )
-    if transport in _TERMINAL_TRANSPORTS and not replace:
+    if transport in _TERMINAL_TRANSPORTS:
         raise ValueError(f"Terminal adapter already registered for {transport.value}.")
     _TERMINAL_TRANSPORTS[transport] = implementation
 

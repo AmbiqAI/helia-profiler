@@ -55,7 +55,7 @@ def test_snapshot_file_has_no_stale_cases():
     assert set(_SNAPSHOTS) == {_key(*case) for case in _CASES}
 
 
-@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+@pytest.mark.parametrize("engine", ["helia-aot", "litert"])
 def test_power_terminal_written_from_live_main_before_initialization(engine):
     text, _ = render_fixture("power-resource", engine, "restore_and_invoke")
     main = text.split("int main() {", 1)[1]
@@ -64,7 +64,7 @@ def test_power_terminal_written_from_live_main_before_initialization(engine):
         assert main.index(f"deployment_power[{index}] = {value}U;") < initialization
 
 
-@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+@pytest.mark.parametrize("engine", ["helia-aot", "litert"])
 def test_power_idle_before_model_and_done_after_terminal(engine):
     text, _ = render_fixture("power-resource", engine, "restore_and_invoke")
     main = text.split("int main() {", 1)[1]

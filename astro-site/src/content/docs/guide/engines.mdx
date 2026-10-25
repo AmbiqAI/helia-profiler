@@ -13,7 +13,7 @@ Prefer an interpreter? **heliaRT** brings Ambiq-tuned kernels to a familiar Lite
 |---|---|---|
 | **heliaAOT** | Our recommended starting point for compiled inference and per-tensor memory placement. | `.tflite` |
 | **heliaRT** | Interpreter-based inference with Ambiq-tuned kernels. The hpx default. | `.tflite` |
-| **LiteRT / TFLM** | An upstream interpreter baseline to compare with the HELIA engines. | `.tflite` |
+| **LiteRT** | An upstream interpreter baseline to compare with the HELIA engines. | `.tflite` |
 | **ExecuTorch (experimental)** | Profiling an exported Cortex-M program from your PyTorch workflow. | `.pte` |
 
 Support depends on your model's operators and target. Compare saved runs to choose the engine that meets your requirements; gains vary by model and configuration.
@@ -40,12 +40,12 @@ hpx profile --config hpx.yml --engine helia-rt --output-dir results/rt
 
 hpx resolves the runtime and builds the required operators into the firmware. The first build needs network access to fetch pinned dependencies through neuralSPOT-X.
 
-## TFLM
+## LiteRT
 
-Use `tflm` for an upstream LiteRT baseline with reference or upstream CMSIS-NN kernels:
+Use `litert` for an upstream baseline: LiteRT for Microcontrollers (TensorFlow Lite Micro), with reference or upstream CMSIS-NN kernels:
 
 ```bash
-hpx profile --config hpx.yml --engine tflm --output-dir results/tflm
+hpx profile --config hpx.yml --engine litert --output-dir results/litert
 ```
 
 Select the kernel backend deliberately and record it with the result. The [engine comparison example](../../examples/engine-comparison/) walks through the setup.
@@ -61,7 +61,7 @@ Power capture is not supported by this engine. Keep `power.enabled: false` and c
 Run the same model with the same board and measurement settings, changing the engine. Then compare the result bundles:
 
 ```bash
-hpx compare results/tflm results/aot
+hpx compare results/litert results/aot
 ```
 
 Read the configuration differences and comparability notes alongside the metrics. A different operation sequence can prevent a layer-by-layer comparison even when whole-model measurements remain useful. See [Comparing runs](../analysis-comparison/).

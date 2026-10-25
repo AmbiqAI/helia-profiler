@@ -1,0 +1,152 @@
+---
+title: "Run-summary schema"
+description: "Current summary.json reader and writer boundaries, with the history of field and measurement changes that affect interpretation."
+---
+
+## Current contract
+
+The ordinary profile artifact `summary.json` uses schema `hpx.run-summary`.
+The current version is 19, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
+`helia_profiler.results.run_summary` and re-exported by `report.contracts`.
+This schema is separate from the saved-run `hpx.run-result` format.
+
+`RunSummary.from_dict` requires the exact schema identity and an integer
+current version. `load_run_summary` also reads JSON and requires an object
+at the document root. Older, future, missing and non-integer versions are
+refused. Use the producing HPX release to read historical summaries; changing
+a version field does not migrate an artifact.
+
+The typed reader applies field-specific conversions and defaults. Optional
+measurements may remain absent. Unknown keys in the root and typed sections
+are retained in `extras` for inspection but omitted by `to_dict`. Untyped
+nested mappings, such as `identity` and `power.gate_failure`, are carried
+through; this is not recursive filtering of every key.
+
+The report writer assembles the summary, passes it through `RunSummary`, and
+checks that the rendered JSON still matches the assembled data. A dropped
+section, unmodelled field or changed value fails that check. The model owns
+emission order and omission of optional fields whose value is `None`.
+
+Reading a summary alone does not verify a result bundle's hashes, establish
+measurement validity or establish comparability with another run. Use the
+verified result loaders described in [Re-analyse saved results](../../examples/reanalyse-results/),
+and inspect validity, issues and comparison dimensions before using its values.
+
+## Version history
+
+These entries preserve the recorded changes from the
+[result model](https://github.com/AmbiqAI/helia-profiler/blob/3aae271f/src/helia_profiler/results/run_summary.py)
+and [report contracts](https://github.com/AmbiqAI/helia-profiler/blob/3aae271f/src/helia_profiler/report/contracts.py).
+They explain historical interpretation, not support for reading those versions
+with the current release. Additive changes still have a distinct schema version;
+`run_summary_schema_version` is a comparability dimension. Version 1 predates
+this recorded change list; no additional migration guarantees are inferred.
+
+### Version 2
+
+`binary.bss` excludes linker-reserved NOBITS, which moved to `binary.reserved`.
+[#24](https://github.com/AmbiqAI/helia-profiler/issues/24).
+
+### Version 3
+
+Measured `memory_regions` owns region facts; `memory_plan` records placement decisions.
+[#133](https://github.com/AmbiqAI/helia-profiler/issues/133).
+
+### Version 4
+
+`energy_per_inference_j` can coexist with `gate_duration_integrity.valid: false`.
+`gated_window_duration_suspect` uses the observer arbitration;
+`gated_window_reference_drift` was added.
+[#142](https://github.com/AmbiqAI/helia-profiler/issues/142) and
+[#181](https://github.com/AmbiqAI/helia-profiler/issues/181).
+
+### Version 5
+
+Gated duration prefers driver `time.delta`, then sample span, then fitted `utc` as
+fallback. The published `power.capture_duration_s` (the model's `duration_s`),
+`power.avg_current_a`, `power.avg_power_w` and TOPS can change by up to the fit error;
+`power.energy_j` and TOPS-per-watt do not. A v4 and v5 summary are not comparable on
+the affected fields. [#249](https://github.com/AmbiqAI/helia-profiler/issues/249).
+
+### Version 6
+
+AOT clean timing and power include per-call input restoration.
+[#317](https://github.com/AmbiqAI/helia-profiler/issues/317).
+
+### Version 7
+
+On-device power divides by the INA228 accumulation interval. The firmware side of the
+window-clock checks uses the gate bracket.
+[#299](https://github.com/AmbiqAI/helia-profiler/issues/299).
+
+### Version 8
+
+`model_analysis` MAC counts were corrected for `TRANSPOSE_CONV`, non-flat
+`FULLY_CONNECTED` and `BATCH_MATMUL`. This changes `total_macs`, `total_ops`, TOPS and
+`cycles_per_mac` for models with those operators.
+
+### Version 9
+
+On-device gated inference publishes per-inference energy and inferences-per-joule
+alongside the existing gated totals.
+[#386](https://github.com/AmbiqAI/helia-profiler/issues/386).
+
+### Version 10
+
+heliaAOT `model_analysis` counts `SQRT`, `RSQRT`, `ABS` and `SQUARED_DIFFERENCE` as
+elementwise operations. This changes `helia-aot` `total_ops` and TOPS for models with
+those operators.
+
+### Version 11
+
+The window-clock agreement contexts (`power.window_observer_mismatch` and
+`power.window_clock_mismatch`) name the firmware gate interval, `gate_elapsed_us` /
+`gate_elapsed_s`. `elapsed_us` remains the whole firmware window used as the frozen
+ceiling. [#370](https://github.com/AmbiqAI/helia-profiler/issues/370).
+
+### Version 12
+
+AOT costs use the compiled graph and execution positions. `model_analysis` records
+`engine` and `index_space`.
+[#224](https://github.com/AmbiqAI/helia-profiler/issues/224).
+
+### Version 13
+
+For SoCs with a linked memory map, `memory_plan` MRAM capacity is the linker's
+application window for the selected toolchain, rather than the whole part's capacity.
+[#466](https://github.com/AmbiqAI/helia-profiler/issues/466).
+
+### Version 14
+
+Adds `identity`, the run's `RunIdentity`, using the vocabulary shared with fixture
+builds. This is additive; no existing field changes meaning.
+[#537](https://github.com/AmbiqAI/helia-profiler/issues/537).
+
+### Version 15
+
+heliaAOT `model_analysis` takes MAC and parameter counts from heliaAOT's result views.
+This changes `total_macs`, `num_parameters`, `total_ops`, TOPS and `cycles_per_mac` for
+models whose weights lowering repacks.
+[#558](https://github.com/AmbiqAI/helia-profiler/issues/558).
+
+### Version 16
+
+`identity` adds `intent_hash`. Under `run`, it adds the instance boundary, first-invoke
+initializer and window, and timing clock, rate and statistic. An ExecuTorch run's
+lifecycle is `single`; the remaining changes are additive.
+[#558](https://github.com/AmbiqAI/helia-profiler/issues/558).
+
+### Version 17
+
+The engine ID `tflm` becomes `litert`, both in `engine` and wherever a summary names the
+engine. Other semantics are unchanged.
+
+### Version 18
+
+`identity.run` adds `energy`, describing how the run's energy was measured: null for a
+profile without power and unknown for one with power. Other changes are additive.
+[#558](https://github.com/AmbiqAI/helia-profiler/issues/558).
+
+### Version 19
+
+The identity's `build_hash`, `observation_hash` and `intent_hash` become semantic hashes of the form `hpx.<kind>/<version>:sha256:<hex>`, replacing bare hex. `inputs_sha256` is renamed `inputs_hash` and also becomes a semantic hash. Other semantics are unchanged. [#558](https://github.com/AmbiqAI/helia-profiler/issues/558).

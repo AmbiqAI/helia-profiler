@@ -6,16 +6,18 @@ description: "How one engine type becomes an adapter, a typed artifact bundle an
 import BlockDiagram from '@ambiqai/helia-ui/astro/BlockDiagram';
 import Block from '@ambiqai/helia-ui/astro/Block';
 
-Show the seam that keeps the pipeline engine-agnostic. Everything an
-engine contributes to a run passes through one `prepare()` call and one
-typed artifact object; the rest of hpx reads those and never imports an
-engine package.
+The registry selects an adapter, and the preparation stage obtains its typed
+artifacts through `prepare()` or, for a supplied prepared runtime,
+`prepare_runtime()`. Shared build stages consume those artifacts. Specialized
+model-analysis and frozen-plan code also consult engine-specific helpers;
+the import rule below prevents dependencies between adapters, not every
+engine-specific import elsewhere in hpx.
 
 ## Diagram
 
 <BlockDiagram
   title="Engine dispatch"
-  caption="From the engine.type key to the objects the rest of the pipeline reads. The shared helpers are called by more than one adapter; the consumers never import an adapter."
+  caption="From the engine.type key to the objects the rest of the pipeline reads. Adapters share helpers and hand typed artifacts to the build stages."
   flow="grid"
   columns={3}
 >
@@ -25,7 +27,7 @@ engine package.
     <Block label="get_adapter" emphasis="filled" />
   </Block>
   <Block label="Adapters" tone="accent" flow="column">
-    <Block label="tflm" emphasis="filled" />
+    <Block label="litert" emphasis="filled" />
     <Block label="helia_rt" emphasis="filled" />
     <Block label="helia_aot" emphasis="filled" />
     <Block label="executorch" emphasis="filled" />
@@ -36,7 +38,7 @@ engine package.
   </Block>
   <Block label="Artifacts" sublabel="engines/base.py" tone="accent" flow="column">
     <Block label="EngineArtifacts" emphasis="filled" />
-    <Block label="TflmArtifacts" emphasis="filled" />
+    <Block label="LiteRtArtifacts" emphasis="filled" />
     <Block label="HeliaRtArtifacts" emphasis="filled" />
     <Block label="HeliaAotArtifacts" emphasis="filled" />
     <Block label="ExecutorchArtifacts" emphasis="filled" />
@@ -53,9 +55,9 @@ engine package.
 <summary>Text description of the diagram</summary>
 
 - Registry (`engines/__init__.py`): `EngineType`, adapter factories, `get_adapter`
-- Adapters: `tflm`, `helia_rt`, `helia_aot`, `executorch`
+- Adapters: `litert`, `helia_rt`, `helia_aot`, `executorch`
 - Shared helpers: `cmsis_nn`, `ethos_u`
-- Artifacts (`engines/base.py`): `EngineArtifacts`, `TflmArtifacts`, `HeliaRtArtifacts`, `HeliaAotArtifacts`, `ExecutorchArtifacts`
+- Artifacts (`engines/base.py`): `EngineArtifacts`, `LiteRtArtifacts`, `HeliaRtArtifacts`, `HeliaAotArtifacts`, `ExecutorchArtifacts`
 - Consumers: firmware render, memory planning, workspace fingerprint, model analysis
 
 </details>
@@ -64,7 +66,7 @@ engine package.
 
 ### Registry
 
-`EngineType` is a `StrEnum` with four members, `tflm`, `helia-rt`,
+`EngineType` is a `StrEnum` with four members, `litert`, `helia-rt`,
 `helia-aot` and `executorch`, so YAML and Jinja compare against the hyphen
 form without unwrapping. `_ADAPTER_FACTORIES` maps each member to a
 deferred import, so registering an engine does not import its package
@@ -82,11 +84,34 @@ placement implies (fixture builds apply it before hashing their inputs); and
 the PSRAM preflight on [Memory placement](../../memory/#6-psram) is enforced
 per engine.
 
+### State lifecycles
+
+A lifecycle says how a model's internal state behaves across the
+invocations of one run. `carry` initializes the engine once and keeps its
+internal state through warmups and timed invocations, restoring only the
+fixed inputs each time. `single` invokes the model once, so no state
+carries between invocations. Each adapter declares the lifecycles its own
+firmware implements in `lifecycles`; `require_lifecycle()` refuses any
+other with the adapter's `lifecycle_refusal()` reason. HPX never inspects
+the model graph to decide. LiteRT, heliaRT and heliaAOT implement both.
+ExecuTorch implements `single` only, because its firmware reloads the
+program on every invocation. Further lifecycles, such as resetting state
+before each invocation, arrive per engine as each firmware implements them.
+
+Each adapter also states its `instance_boundary` (`boot`, or `invocation`
+for ExecuTorch) and answers `first_invoke_initializer()`: whether the first
+invocation of an instance runs the model's one-time initializer. LiteRT and
+heliaRT run a `CALL_ONCE` subgraph inside the first `Invoke()`, so
+the answer is whether the model has one; heliaAOT runs it in `model_init()`,
+so `false`; ExecuTorch answers unknown. Run identities record both, with
+where the first invocation falls (see
+[Inference and layer timing](../../latency/#5-check-the-window-facts-before-comparing-routes)).
+
 ### What each adapter's `prepare()` does
 
 | Engine | Module | Steps | Modules it adds |
 |---|---|---|---|
-| tflm | `engines/tflm.py` | resolves the `nsx-tflite-micro` module and the reference or CMSIS-NN backend | `nsx-tflite-micro` (plus the CMSIS-NN provider for that backend) |
+| litert | `engines/litert.py` | resolves the `nsx-tflite-micro` module and the reference or CMSIS-NN backend | `nsx-tflite-micro` (plus the CMSIS-NN provider for that backend) |
 | helia-rt | `engines/helia_rt/` | validates the variant and toolchain; with no override returns the pinned registry module; `source_path` installs a local tree as a module; `dist_path` or a release source verifies the matching core and toolchain archive and generates a wrapper (`nsx_module.py`, `artifacts.py`, `download.py`) | `nsx-helia-rt` |
 | helia-aot | `engines/helia_aot/` | maps the board to a compiler platform and runs the `helia-aot` compiler (`compile.py`); reads the operator manifest, arena regions and memory plan from the compiler's result views (`manifest.py`); vendors the generated model as a local module named by `engine.config.module_name` (default `hpx_model`); resolves the CMSIS-NN provider | `nsx-cmsis-nn`, the model module |
 | executorch | `engines/executorch.py` | resolves the `nsx-executorch` checkout at the commit the compatibility baseline pins (auto-cloned into the hpx cache, or `engine.config.source_path`); reads the optional `<model>.pte.json` sidecar for the provider, op lists, planned arena and I/O sizes; resolves the region of each static RAM buffer; generates a wrapper module and emits the provider module before it | the CMSIS-NN provider, the `nsx-executorch` wrapper |
@@ -127,7 +152,7 @@ adapter-to-artifact map is complete over `EngineType`.
 
 | Engine | Main template | Module graph on top of the board's starter profile |
 |---|---|---|
-| tflm | `main.cc.j2` | `nsx-tflite-micro`, with the CMSIS-NN provider first for that backend |
+| litert | `main.cc.j2` | `nsx-tflite-micro`, with the CMSIS-NN provider first for that backend |
 | helia-rt | `main.cc.j2` | `nsx-helia-rt` |
 | helia-aot | `main_aot.cc.j2` | `nsx-cmsis-nn`, then the generated model module |
 | executorch | `main_executorch.cc.j2` | the CMSIS-NN provider, then `nsx-executorch` |
@@ -143,10 +168,15 @@ engine choice cost in flash and RAM for the run at hand.
 |---|---|
 | registry | `engines/__init__.py` |
 | protocol and artifacts | `engines/base.py` |
-| adapters | `engines/tflm.py`, `engines/helia_rt/`, `engines/helia_aot/`, `engines/executorch.py` |
-| shared helpers | `engines/cmsis_nn.py`, `engines/ethos_u.py` |
+| adapters | `engines/litert.py`, `engines/helia_rt/`, `engines/helia_aot/`, `engines/executorch.py` |
+| shared helpers | `engines/cmsis_nn.py`, `engines/ethos_u.py`, `engines/semver.py` |
 | stage | `stages/prepare_engine.py` |
 | contract test | `tests/contracts/test_engine_artifact_types.py` |
+
+`tests/test_package_layout.py` classifies every engine Python module and checks
+absolute and relative imports, including lazy imports. Adapters may use their
+own internals and shared helpers; only the registry imports across adapters.
+Classify a new adapter or helper there when adding it.
 
 ## What next
 

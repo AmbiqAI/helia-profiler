@@ -26,12 +26,12 @@ form (``"helia-aot"``) without manually unwrapping ``.value``.
 
 Source: `src/helia_profiler/engines/__init__.py:17`
 
-### helia_profiler.EngineType.TFLM
+### helia_profiler.EngineType.LITERT
 
 `constant` · `python`
 
 ```python
-TFLM = 'tflm'
+LITERT = 'litert'
 ```
 
 Source: `src/helia_profiler/engines/__init__.py:25`
@@ -164,7 +164,7 @@ Placement()
 Logical placement region for arenas / weights / model data.
 
 The four logical regions abstract over the SoC physical layout —
-e.g. ``Placement.TCM`` covers DTCM on AP5 and is unavailable on AP3.
+e.g. ``Placement.TCM`` covers DTCM on AP5.
 Engine adapters that emit physical names (heliaAOT's ``DTCM``,
 ``ITCM``, …) normalise to this enum at the adapter boundary.
 

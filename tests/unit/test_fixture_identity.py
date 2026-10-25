@@ -9,20 +9,24 @@ import pytest
 from test_fixture_record import _build, _pin, _sourced
 from test_fixture_sources import NS
 
-from helia_profiler._fixture_record import compiled_fixture_identity
-from helia_profiler.engines.base import EngineSource
-from helia_profiler.fixture import (
+from helia_profiler import (
     CanonicalEngine,
     CanonicalKernel,
     FixtureCaptureResult,
     FixtureFile,
     FixtureTimingScope,
+    SemanticHash,
     Unknown,
-    dump_fixture_build,
-    fixture_run_identity,
-    load_fixture_build,
-    read_prepared_runtime_manifest,
 )
+from helia_profiler._fixture_record import (
+    compiled_fixture_identity,
+    dump_fixture_build,
+    load_fixture_build,
+)
+from helia_profiler.engines import EngineType
+from helia_profiler.engines.base import EngineSource
+from helia_profiler.fixture_identity import fixture_run_identity
+from helia_profiler.fixture_runtime import _manifest_facts
 
 AOT_COMMIT = "7b92ec8a3ced8459eb68940a42d405536144368e"
 
@@ -104,7 +108,9 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
     assert identity.producer == "0.2.3"
     assert identity.build.toolchain_version == "22.1.0" and identity.build.cpu_hz == 96000000
     assert (identity.run.lifecycle, identity.run.iterations) == ("carry", 100)
-    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_sha256, str)
+    assert isinstance(identity.build_hash, str) and isinstance(identity.inputs_hash, str)
+    assert SemanticHash.parse(identity.build_hash).kind == "build"
+    assert SemanticHash.parse(identity.inputs_hash).kind == "inputs"
 
 
 def test_the_build_hash_ignores_the_hpx_release_but_not_the_image(tmp_path):
@@ -180,6 +186,8 @@ def test_the_observation_hash_follows_measured_facts_not_paths(tmp_path):
     failed = fixture_run_identity(build, _capture(tmp_path / "z", status=3))
 
     assert one.observation_hash == moved.observation_hash != failed.observation_hash
+    assert isinstance(one.observation_hash, str)
+    assert SemanticHash.parse(one.observation_hash).kind == "observation"
     assert one.build_hash == failed.build_hash
     assert fixture_run_identity(build).observation_hash is None
 
@@ -202,7 +210,7 @@ def _manifest(root):
 
 
 def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
-    facts = read_prepared_runtime_manifest(_manifest(tmp_path))
+    facts = _manifest_facts(_manifest(tmp_path))[2]
     assert (facts.stack, facts.archive_sha256) == ("helia-rt", "c" * 64)
     assert [(p.name, p.revision) for p in facts.providers] == [
         ("helia-rt", "a" * 40),
@@ -210,19 +218,11 @@ def test_a_prepared_runtime_manifest_reads_without_its_archive(tmp_path):
     ]
     tampered = FixtureFile(_manifest(tmp_path).path, "0" * 64)
     with pytest.raises(ValueError, match="hash mismatch"):
-        read_prepared_runtime_manifest(tampered)
-
-
-def test_a_record_from_the_previous_api_still_loads(tmp_path):
-    build = _aot(tmp_path)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    assert record["fixture_api"] == [5, 7]
-    record["fixture_api"] = [5, 6]
-    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+        _manifest_facts(tampered)
 
 
 def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_path):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     build = _aot(tmp_path)
     base = fixture_run_identity(build).build_hash
@@ -240,7 +240,7 @@ def test_the_build_hash_covers_the_runtime_archive_the_model_and_the_lock(tmp_pa
 
 
 def test_each_missing_fact_states_its_own_reason(tmp_path):
-    from helia_profiler.fixture import FixtureRuntimeSource
+    from helia_profiler import FixtureRuntimeSource
 
     build = _aot(tmp_path)
     no_modules = _pin(tmp_path / "none.json", json.dumps({"modules": []}).encode())
@@ -256,7 +256,7 @@ def test_each_missing_fact_states_its_own_reason(tmp_path):
         )
     )
     assert identity.model_sha256 == Unknown("the record predates pinned models")
-    assert identity.inputs_sha256 == Unknown("the record predates pinned inputs")
+    assert identity.inputs_hash == Unknown("the record predates pinned inputs")
     assert identity.build.cpu_hz == Unknown("the record predates this fact")
     assert identity.build.toolchain == Unknown("the record states no toolchain")
     assert identity.kernels.library == Unknown(
@@ -299,16 +299,16 @@ def test_lifecycle_and_input_names_are_part_of_the_identity(tmp_path):
         replace(io, tensor=replace(io.tensor, name=io.tensor.name + "_x")) for io in build.inputs
     )
     assert (
-        fixture_run_identity(replace(build, inputs=renamed)).inputs_sha256
-        != fixture_run_identity(build).inputs_sha256
+        fixture_run_identity(replace(build, inputs=renamed)).inputs_hash
+        != fixture_run_identity(build).inputs_hash
     )
 
 
-def test_a_ram_observing_record_from_the_previous_api_still_loads(tmp_path):
+def test_a_ram_observing_record_round_trips(tmp_path):
     build = _reseal(_aot(tmp_path), observe_ram=True)
-    record = json.loads(dump_fixture_build(build, roots={"run": tmp_path}))
-    record["fixture_api"] = [5, 6]
-    assert load_fixture_build(json.dumps(record), roots={"run": tmp_path}) == build
+    record = dump_fixture_build(build, roots={"run": tmp_path})
+    assert json.loads(record)["build"]["observe_ram"] is True
+    assert load_fixture_build(record, roots={"run": tmp_path}) == build
 
 
 @pytest.mark.parametrize(
@@ -327,7 +327,7 @@ def test_the_manifest_reader_checks_declared_fields(tmp_path, change, message):
     data = json.loads(manifest.path.read_bytes())
     change(data)
     with pytest.raises(ValueError, match=message):
-        read_prepared_runtime_manifest(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
+        _manifest_facts(_pin(tmp_path / "changed.json", json.dumps(data).encode()))
 
 
 def test_capture_evidence_files_are_not_part_of_the_observation(tmp_path):
@@ -357,6 +357,23 @@ def test_a_lock_that_is_not_an_nsx_lock_has_no_build_hash(tmp_path):
     assert fixture_run_identity(build).build_hash == Unknown(
         "the dependency lock is not an NSX lock"
     )
+
+
+def test_a_lock_with_a_non_finite_number_has_no_build_hash():
+    from helia_profiler._identity_hash import build_hash
+
+    lock = b"""
+targets:
+  app:
+    target: apollo510_evb
+    modules:
+      tooling:
+        kind: packaged
+        resolved: {content_hash: .nan}
+"""
+    assert build_hash(
+        image_sha256="0" * 64, lock=lock, runtime_archive=None, model_sha256="1" * 64
+    ) == Unknown("the dependency lock holds a non-finite number")
 
 
 def test_records_that_predate_sources_rederive_them_from_pinned_files(tmp_path):
@@ -416,3 +433,41 @@ def test_generated_vendored_modules_do_not_change_the_build_hash(tmp_path):
     first = fixture_run_identity(_aot(tmp_path / "a", lock("6" * 64))).build_hash
     second = fixture_run_identity(_aot(tmp_path / "b", lock("7" * 64))).build_hash
     assert first == second
+
+
+@pytest.mark.parametrize(
+    "engine,declared,expected",
+    [
+        (EngineType.LITERT, True, True),
+        (EngineType.LITERT, False, False),
+        (EngineType.HELIA_RT, True, True),
+        (EngineType.HELIA_AOT, True, False),
+    ],
+)
+def test_the_first_invocation_states_whether_it_runs_the_initializer(
+    tmp_path, engine, declared, expected
+):
+    build = replace(_build(tmp_path), engine=engine, source_initializer_present=declared)
+    run = fixture_run_identity(build).run
+
+    assert run.first_invoke_initializer is expected
+    assert run.instance_boundary == "boot"
+    assert (run.warmups, run.first_invoke_window) == (5, "warmup")
+    unwarmed = fixture_run_identity(replace(build, warmups=0)).run
+    assert unwarmed.first_invoke_window == "measured"
+
+
+def test_the_window_is_one_stimer_total_over_the_timed_invocations(tmp_path):
+    identity = fixture_run_identity(_build(tmp_path))
+
+    run = identity.run
+    assert (run.timing_scope, run.timing_clock, run.timing_clock_hz) == (
+        "invoke_only",
+        "stimer",
+        32768,
+    )
+    assert run.timing_statistic == "total"
+    assert identity.intent_hash is None
+    assert fixture_run_identity(replace(_build(tmp_path), timer_hz=None)).run.timing_clock_hz == (
+        Unknown("the record predates this fact")
+    )

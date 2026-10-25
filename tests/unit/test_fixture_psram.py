@@ -7,15 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from helia_profiler.errors import ConfigError
-from helia_profiler.fixture import (
+from helia_profiler import (
     EngineType,
-    FixtureBackend,
-    FixtureBuildRequest,
     FixtureFile,
     FixtureIO,
     FixtureMethod,
-    FixturePlacement,
     FixtureTensor,
     FixtureTimingScope,
     PerTensorQuantization,
@@ -23,6 +19,7 @@ from helia_profiler.fixture import (
     PreparedUpstreamRuntime,
     TypedFixture,
 )
+from helia_profiler.errors import ConfigError
 from helia_profiler.fixture_image import ContractError
 from helia_profiler.fixture_psram import (
     FixturePsramPayload,
@@ -32,6 +29,7 @@ from helia_profiler.fixture_psram import (
 )
 from helia_profiler.fixture_target import fixture_app_region
 from helia_profiler.platform.memory_map import MemoryRegion
+from tests.fixture_requests import FixtureBackend, FixtureBuildRequest, FixturePlacement
 from tests.unit import test_fixture_capture as capture_helpers
 from tests.unit.test_fixture_capture import _SINKS, image_files
 from tests.unit.test_fixture_capture import rig as rig
@@ -63,7 +61,6 @@ def test_psram_aot_public_constructor(tmp_path):
         placement=FixturePlacement(Placement.SRAM, Placement.PSRAM),
     )
     assert request.to_config().model.weights_location is Placement.PSRAM
-    assert request.intent_identity != replace(request, placement=FixturePlacement()).intent_identity
 
 
 def terminal(expected, *, base=None, addresses=None):
@@ -121,7 +118,7 @@ def test_psram_terminal_refuses_overlapping_payloads():
 def render_context(tmp_path, engine):
     from helia_profiler._fixture_build import FixtureRenderSpec
     from helia_profiler.config import load_config
-    from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts, TflmArtifacts
+    from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts, LiteRtArtifacts
     from helia_profiler.firmware.op_resolver import ResolverPlan
     from helia_profiler.fixture_analysis import TypedFixtureModelAnalysis
     from helia_profiler.modelcost import ModelAnalysis
@@ -174,11 +171,11 @@ def render_context(tmp_path, engine):
             extra_modules=[NsxModuleRef("fake", tmp_path)],
         )
     else:
-        ctx.engine_artifacts = TflmArtifacts(engine_header="model_data.h")
+        ctx.engine_artifacts = LiteRtArtifacts(engine_header="model_data.h")
     return ctx, regions
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 @pytest.mark.parametrize("arena", [Placement.SRAM, Placement.TCM])
 def test_psram_production_render_uses_active_consumer(tmp_path, engine, arena):
     from helia_profiler.firmware.fixture import fixture_template_vars
@@ -303,7 +300,7 @@ def test_psram_micro_production_generator_stages_only_fixture_model(tmp_path, fi
     from helia_profiler.results.dependencies import ContentDigest, DependencyWorkspace
     from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
-    ctx, _ = render_context(tmp_path, EngineType.TFLM)
+    ctx, _ = render_context(tmp_path, EngineType.LITERT)
     ctx.config = replace(ctx.config, build=replace(ctx.config.build, compiler_launcher="none"))
     ResolvePlatformStage().run(ctx)
     ctx.arena_region, ctx.weights_region = Placement.SRAM, Placement.PSRAM
@@ -341,7 +338,7 @@ def test_psram_aot_oversized_blob_refuses_before_read(tmp_path, monkeypatch):
         fixture_template_vars(ctx, regions)
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_psram_memory_plan_books_staging_and_terminal(tmp_path, engine):
     from helia_profiler.results import MemoryPlan
     from helia_profiler.stages.plan_memory import PlanMemoryStage, _add_hpx_owned_consumers
@@ -406,7 +403,7 @@ def test_psram_aot_memory_plan_counts_both_source_arrays(tmp_path):
     assert _add_hpx_owned_consumers(updated, ctx) == updated
 
 
-@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+@pytest.mark.parametrize("engine", ["helia-aot", "litert"])
 @pytest.mark.parametrize("kind", ["psram", "psram-resource", "psram-tcm", "psram-tcm-resource"])
 @pytest.mark.parametrize("scope", ["restore_and_invoke", "invoke_only"])
 def test_psram_shared_compile_cases_render_without_compiler(engine, kind, scope):
@@ -478,7 +475,7 @@ def test_psram_checksum_matches_independent_literal():
     assert payload_checksum(b"abcd") == 2987074
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_psram_other_placements_still_refuse(tmp_path, engine):
     from helia_profiler.fixture_target import validate_fixture_placement
 
@@ -492,7 +489,7 @@ def test_psram_other_placements_still_refuse(tmp_path, engine):
     validate_fixture_placement(Placement.SRAM, Placement.PSRAM, EngineType.HELIA_RT)
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 @pytest.mark.parametrize(
     "arena,weights",
     [
@@ -517,8 +514,8 @@ def test_fixture_bank_choices_are_not_recipe_pairs(tmp_path, engine, arena, weig
         32768,
         100,
         5,
-        backend=FixtureBackend.CMSIS_NN if engine is EngineType.TFLM else None,
-        runtime=runtime if engine is EngineType.TFLM else None,
+        backend=FixtureBackend.CMSIS_NN if engine is EngineType.LITERT else None,
+        runtime=runtime if engine is EngineType.LITERT else None,
         placement=FixturePlacement(arena, weights),
     )
     validate_fixture_placement(arena, weights, engine)
@@ -531,7 +528,7 @@ def capture_rig(tmp_path, monkeypatch):
     return getattr(capture_helpers.rig, "__wrapped__")(tmp_path, monkeypatch)
 
 
-@pytest.mark.parametrize("engine", ["helia-aot", "tflm"])
+@pytest.mark.parametrize("engine", ["helia-aot", "litert"])
 @pytest.mark.parametrize(
     "placement", [FixturePlacement(), FixturePlacement(Placement.TCM, Placement.TCM)]
 )
@@ -542,7 +539,7 @@ def test_existing_fixture_placements_keep_original_render(engine, placement):
     assert "deployment_psram_weights" not in source
     assert "nsx_psram_init" not in source
     assert "fixed_fixture_clock.h" in headers
-    if engine == "tflm":
+    if engine == "litert":
         assert "tflite::GetModel(model_data)" in source
     else:
         assert "fake_model_init(&model_ctx)" in source

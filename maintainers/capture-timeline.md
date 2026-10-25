@@ -41,6 +41,9 @@ A bench run turns [E] and [U] into [M], or revises the number.
 **Host code:**
 - `capture/__init__.py` (`capture_power`, `_release`);
 - `power/joulescope/capture_gated.py` (`capture_gated`);
+- `power/joulescope/_gated_resources.py` (stream attempts, poller and processing drain);
+- `power/joulescope/_gated_state.py` (poller-owned transitions and completion guard);
+- `power/joulescope/_gated_selection.py`, `power/joulescope/_gated_result.py` (post-drain selection, reduction and result assembly);
 - `power/diagnostics.py`;
 - `power/joulescope/sync.py`, `power/sync.py`;
 - `power/joulescope/device.py`, `power/joulescope/diagnostics.py`;
@@ -175,7 +178,7 @@ plans keep the legacy deadline; the external post-observation wait is unchanged.
 | INA228 accumulation (dedicated with INA228) | from after the accumulator reset to just before the register reads | the reads, which latch a few I2C transactions later | `power.on_device_summary.duration_us` |
 | Firmware whole window (dedicated) | from after the STIMER settle to after the INA228 reads: setup, gate and reads | settle, calibration, warm-up, READY/GO | `power.terminal.elapsed_us` |
 | Instrument gate | sum of stats-packet durations whose time falls within the chosen rise and fall. Edges come from the GPI stream, taking the last qualifying segment, with snapshot polling as the fallback. | anything outside the gate. Packet-quantized: about 1 ms at 1 kHz. | `summary.json` `power.capture_duration_s` and `profile_results.json` `power.duration_s`, for a valid gated result only (C-I3) |
-| Capture window | host monotonic, from after the instrument is opened to the result | nothing: includes reset, READY, GO, the wait and teardown | `power.capture_window_s` (`summary.json`) |
+| Capture window | host monotonic, from after recorder/callback setup to the captured-duration reading during reduction | includes stream setup, reset, READY, GO, the wait and stream teardown; excludes outer device release and subsequent result assembly | `power.capture_window_s` (`summary.json`) |
 | Gate bound | the value of `F` | n/a | `power.observation.observation_deadline_s` (`profile_results.json` only) |
 | READY wait | host time from after the grace to READY qualified | reset and grace | `power.sync.ready_wait_s` (`summary.json`) |
 | Reset | duration of the reset primitive and any power cycle | n/a | `power.target_lifecycle.timings_s` (`summary.json`; keys `reset`, `power_cycle`) |
@@ -210,10 +213,42 @@ what they mean.
   any error the capture would otherwise raise;
 - a replaced capture error is hidden as context.
 
+The driver skips its duration wait on a start-hook failure. Shutdown first
+requests stop, closes admission to evidence processing and application callbacks,
+and drains work already admitted. Poll-cadence waits, before and after GO, wake
+on that stop request rather than waiting out the configured interval. It then joins the poller for up to 1 s before
+disabling/unsubscribing streams. No processing lock is held while application
+callbacks or vendor operations run: a GO-release callback may publish to the
+driver and wait for another thread's stream delivery.
+
+The join does not cancel a blocked vendor read. That read may outlive stream
+teardown and device release, but its eventual result or failure is discarded;
+it cannot invoke a late application callback or change retained capture evidence.
+Late stats, gate, state and full-rate deliveries are also ignored after their
+processing is closed, even if unsubscribe fails. An application callback already
+in flight must return before shutdown can finish; the 1 s join does not bound
+that drain. Starting the thread before the hook does not guarantee a first
+snapshot has arrived. These are host ownership rules, not physical timing or
+vendor-call cancellation guarantees.
+
+Cleanup covers partial setup: each stats/gate/state control-enable attempt and
+subscription attempt is tracked separately before calling the vendor. Registration
+followed by an exception still gets an unsubscribe attempt, but a control whose
+enable was never attempted is left untouched. A full-rate request alone does not
+authorize raw teardown: raw startup must have been attempted. The full-rate
+recorder also tracks control-enable attempts separately from subscriptions and
+retries failed releases without repeating successful ones. Ordinary vendor cleanup
+exceptions are suppressed to preserve the initiating failure. The logical device reference is
+protected immediately after open, including recorder and resource construction
+failures. No reset of the prior current range is implied.
+
 **C-E2.** The capture stage passes any heliaPROFILER error through unchanged:
 a `PowerError`, and the `CaptureError` from a failed J-Link reset or USB CDC
 port open, keep their own message and hint. It wraps any other exception in a
-`PowerError` whose hint names the instrument.
+`PowerError` whose hint names the instrument. At the lower-level Joulescope
+driver boundary, only `PowerError` and the original start-hook/poller-callback
+exceptions pass through unchanged. A start-hook error wins over a recorded
+poller-callback error; snapshot read errors are counted and polling continues.
 
 **C-E3.** No usable window, but stats packets arrived: the capture returns a
 degraded result carrying a `gate_failure` classification, with no

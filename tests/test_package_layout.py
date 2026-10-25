@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import zipfile
+from importlib.util import resolve_name
 from pathlib import Path
 
 import pytest
@@ -27,48 +28,107 @@ def test_source_modules_stay_below_size_ceiling() -> None:
     )
 
 
-def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
-    """Shared engine logic lives in engines/, not inside one engine.
+_ENGINE_ADAPTERS = frozenset({"litert", "executorch", "helia_rt", "helia_aot"})
+_ENGINE_SHARED = frozenset({"base", "cmsis_nn", "ethos_u", "semver"})
+_ENGINE_REGISTRY = "__init__"
 
-    ``cmsis_nn_module_ref`` started inside the heliaAOT package, and heliaRT
-    and ExecuTorch both grew imports reaching into it -- three engines
-    depending on a fourth's internals for something none of them owns. It now
-    lives in ``engines/cmsis_nn.py``; this stops the pattern returning, for
-    that helper or any other.
 
-    An engine importing its OWN subpackage is fine; so is importing from
-    ``engines`` itself. What is flagged is one engine package naming another.
-    """
-    repo_root = Path(__file__).resolve().parent.parent
-    engines_root = repo_root / "src" / "helia_profiler" / "engines"
-    engine_packages = {
-        entry.name
-        for entry in engines_root.iterdir()
-        if entry.is_dir() and not entry.name.startswith("__")
-    }
-
-    offenders: list[str] = []
-    for path in sorted(engines_root.rglob("*.py")):
-        rel = path.relative_to(engines_root)
-        owner = rel.parts[0] if len(rel.parts) > 1 else None
-        for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            stripped = line.strip()
-            if "import" not in stripped:
-                continue
-            if owner is None:
-                # Lives directly in engines/ -- the registry and shared
-                # helpers legitimately name every adapter.
-                continue
-            for other in engine_packages:
-                if other == owner:
-                    continue
-                if f".{other} import" in stripped or f".{other}." in stripped:
-                    offenders.append(f"{rel}:{line_no}: {stripped}")
-
-    assert not offenders, (
-        "these engine modules import from another engine's package; move the "
-        "shared piece up into helia_profiler.engines instead:\n  " + "\n  ".join(offenders)
+def _engine_owner(path: Path) -> str:
+    owner = path.parts[0] if len(path.parts) > 1 else path.stem
+    assert owner in _ENGINE_ADAPTERS | _ENGINE_SHARED | {_ENGINE_REGISTRY}, (
+        f"Unclassified engine module: {path}; classify its adapter or shared responsibility"
     )
+    return owner
+
+
+def _engine_import_offenders(path: Path, source: str) -> list[str]:
+    owner = _engine_owner(path)
+    package = ".".join(("helia_profiler", "engines", *path.parts[:-1]))
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                base = resolve_name("." * node.level + base, package)
+            targets = [base, *(f"{base}.{alias.name}" for alias in node.names)]
+        else:
+            continue
+        for target in targets:
+            parts = target.split(".")
+            if parts[:2] != ["helia_profiler", "engines"] or len(parts) < 3:
+                continue
+            other = parts[2]
+            if other in _ENGINE_ADAPTERS and owner not in {other, _ENGINE_REGISTRY}:
+                offenders.append(f"{path.as_posix()}:{node.lineno}: {target}")
+    return offenders
+
+
+def test_no_engine_adapter_imports_out_of_another_engines_package() -> None:
+    """Adapters own their internals; shared helpers cannot depend on adapters.
+
+    Only the registry dispatches across adapters. Classify every Python module,
+    including flat-file adapters, so a new owner requires an explicit decision.
+    """
+    engines_root = Path(__file__).resolve().parent.parent / "src/helia_profiler/engines"
+    offenders = [
+        offender
+        for path in sorted(engines_root.rglob("*.py"))
+        for offender in _engine_import_offenders(
+            path.relative_to(engines_root), path.read_text(encoding="utf-8")
+        )
+    ]
+    assert not offenders, "Move cross-adapter logic to a shared engine helper:\n  " + "\n  ".join(
+        offenders
+    )
+
+
+@pytest.mark.parametrize(
+    ("path", "source"),
+    [
+        ("litert.py", "from .helia_rt import HeliaRTAdapter"),
+        ("executorch.py", "from . import litert as adapter"),
+        ("helia_rt/adapter.py", "from ..executorch import ExecuTorchAdapter"),
+        ("helia_aot/__init__.py", "from .. import helia_rt"),
+        ("helia_rt/nested/helper.py", "from ...helia_aot.compile import compile_model"),
+        ("litert.py", "import helia_profiler.engines.executorch as adapter"),
+        ("helia_rt/adapter.py", "from helia_profiler.engines import helia_aot"),
+        ("executorch.py", "from helia_profiler.engines.helia_rt import (\n    HeliaRTAdapter,\n)"),
+        ("litert.py", "def lazy():\n    from . import executorch"),
+        ("helia_rt/adapter.py", "if TYPE_CHECKING:\n    from .. import litert"),
+        ("cmsis_nn.py", "from .helia_aot import HeliaAOTAdapter"),
+    ],
+)
+def test_engine_import_guard_rejects_cross_adapter_imports(path: str, source: str) -> None:
+    assert _engine_import_offenders(Path(path), source)
+
+
+@pytest.mark.parametrize(
+    ("path", "source"),
+    [
+        ("litert.py", "from .cmsis_nn import ARM_CMSIS_NN_MODULE"),
+        ("executorch.py", "from . import EngineType"),
+        ("helia_rt/adapter.py", "from .artifacts import resolve"),
+        ("helia_aot/__init__.py", "from .adapter import HeliaAOTAdapter"),
+        ("helia_rt/nested/helper.py", "from .. import artifacts"),
+        ("helia_rt/adapter.py", "from helia_profiler.engines.helia_rt import artifacts"),
+        ("helia_aot/compile.py", "from helia_aot import AotConverter"),
+        ("base.py", "from . import EngineType"),
+        ("__init__.py", "from .litert import LiteRtAdapter"),
+        ("__init__.py", "from .helia_rt import HeliaRTAdapter"),
+        ("litert.py", "# from . import executorch\nmessage = 'from .helia_rt import x'"),
+        ("helia_rt/adapter.py", "from ...modelcost import analyze_model"),
+    ],
+)
+def test_engine_import_guard_allows_owned_and_shared_imports(path: str, source: str) -> None:
+    assert _engine_import_offenders(Path(path), source) == []
+
+
+@pytest.mark.parametrize("path", ["new_engine.py", "new_engine/adapter.py", "new_helper.py"])
+def test_engine_import_guard_requires_classification(path: str) -> None:
+    with pytest.raises(AssertionError, match="Unclassified engine module"):
+        _engine_import_offenders(Path(path), "")
 
 
 # Receivers whose ``.open()`` is not ``Path.open``: archive modules and the
@@ -376,3 +436,141 @@ def test_modelcost_closure_is_sibling_only() -> None:
     outside. This is the wall a future shared package ships behind."""
     offenders = _closure_offenders("modelcost", {"modelcost"})
     assert not offenders, f"modelcost/ gained hpx imports: {offenders}"
+
+
+def _run_contract_import_offenders(source: str) -> list[str]:
+    tree = ast.parse(source)
+    type_only = {
+        id(child)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.If)
+        and isinstance(node.test, ast.Name)
+        and node.test.id == "TYPE_CHECKING"
+        for statement in node.body
+        for child in ast.walk(statement)
+    }
+    offenders = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                base = resolve_name("." * node.level + base, "helia_profiler")
+            targets = [base, *(f"{base}.{alias.name}" for alias in node.names)]
+        else:
+            continue
+        for target in targets:
+            parts = target.split(".")
+            if len(parts) < 2 or parts[0] != "helia_profiler":
+                continue
+            if parts[1] in {"compiled_build", "run_record"} or (
+                id(node) not in type_only
+                and parts[1] in {"fixture_capture", "_fixture_build", "target", "capture"}
+            ):
+                offenders.append(f"{node.lineno}: {target}")
+    return offenders
+
+
+def test_shared_run_rules_do_not_depend_on_their_callers_or_device_orchestration():
+    path = Path(__file__).resolve().parent.parent / "src/helia_profiler/_run_contracts.py"
+    assert not _run_contract_import_offenders(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .compiled_build import CompiledBuild",
+        "from . import run_record",
+        "if TYPE_CHECKING:\n    from .compiled_build import CompiledBuild",
+        "def lazy():\n    from .fixture_capture import capture_fixture",
+        "import helia_profiler.target.probe",
+        "from ._fixture_build import build_fixed_fixture",
+    ],
+)
+def test_run_contract_guard_rejects_reverse_and_device_dependencies(source):
+    assert _run_contract_import_offenders(source)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .fixture_power import FixtureRailPowerRequest",
+        "from .identity import EnergyFacts",
+        "if TYPE_CHECKING:\n    from .fixture_capture import FixtureCaptureResult",
+        "if TYPE_CHECKING:\n    from ._fixture_build import FixtureBuild",
+    ],
+)
+def test_run_contract_guard_allows_values_and_type_only_references(source):
+    assert _run_contract_import_offenders(source) == []
+
+
+def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list[str]:
+    policy_names = {
+        "FixtureDType",
+        "FixtureCapability",
+        "FIXTURE_CAPABILITIES",
+        "FIXTURE_READBACK_BUDGET",
+        "_io_capabilities",
+    }
+    offenders = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                base = resolve_name("." * node.level + base, "helia_profiler")
+            targets = [f"{base}.{alias.name}" for alias in node.names]
+        else:
+            continue
+        for target in targets:
+            parts = target.split(".")
+            if len(parts) < 2 or parts[0] != "helia_profiler":
+                continue
+            forbidden = (
+                parts[1] == "_fixture_build" and parts[-1] in policy_names
+                if consumer
+                else parts[1]
+                in {
+                    "_fixture_build",
+                    "_fixture_record",
+                    "_fixture_facts",
+                    "compiled_build",
+                    "run_record",
+                    "fixture_capture",
+                    "pipeline",
+                    "target",
+                    "capture",
+                }
+            )
+            if forbidden:
+                offenders.append(f"{node.lineno}: {target}")
+    return offenders
+
+
+def test_fixture_io_policy_sits_below_its_consumers():
+    root = Path(__file__).resolve().parent.parent / "src/helia_profiler"
+    assert not _fixture_io_import_offenders((root / "_fixture_io.py").read_text(encoding="utf-8"))
+    for name in ("_fixture_record.py", "_fixture_facts.py"):
+        assert not _fixture_io_import_offenders(
+            (root / name).read_text(encoding="utf-8"), consumer=True
+        )
+
+
+@pytest.mark.parametrize(
+    ("source", "consumer", "bad"),
+    [
+        ("def lazy():\n    from ._fixture_build import FixtureDType", False, True),
+        ("from . import _fixture_record", False, True),
+        ("import helia_profiler.fixture_capture", False, True),
+        ("from .fixture_analysis import FixtureTensor", False, False),
+        ("from .engines import EngineType", False, False),
+        ("from ._fixture_build import FIXTURE_CAPABILITIES", True, True),
+        ("from helia_profiler._fixture_build import _io_capabilities", True, True),
+        ("from ._fixture_build import FixtureBuild", True, False),
+        ("from ._fixture_io import FixtureCapability", True, False),
+    ],
+)
+def test_fixture_io_guard_covers_reverse_edges_and_allowed_values(source, consumer, bad):
+    assert bool(_fixture_io_import_offenders(source, consumer=consumer)) is bad

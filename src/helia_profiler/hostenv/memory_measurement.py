@@ -167,8 +167,8 @@ def measure_memory_regions(
     )
 
 
-#: Plan-consumer name -> candidate symbol suffixes in the linked image.
-#: Matching is by SUFFIX (the symbol_address idiom), so C++ mangling
+#: Plan-consumer name -> candidate symbol names in the linked image.
+#: Matching uses :func:`_name_matches`, so C++ mangling
 #: (_ZL15g_arena_storage) resolves. Multi-piece consumers list every
 #: piece and the pieces' sizes are SUMMED (rtt_buffers = up buffer +
 #: down buffer + control block). heliaAOT consumers carry their own

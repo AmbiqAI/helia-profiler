@@ -8,15 +8,15 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from ..engines import EngineType
 from ..errors import ValidationBundleError
 
-#: Written by ``validation.report``; the loader accepts every version up to it.
+#: Written by ``validation.report``; the loader reads this version only.
 #: v6 (#133): per-case ``resources.memory_plan`` is the decision
 #: record only (its ``free``/``overflow``/``has_overflow`` keys are gone,
 #: mirroring run-summary schema v3) and ``resources.memory_regions`` is
 #: added — the measured per-region occupancy from the linked ELF.
 SCHEMA_VERSION = 6
-_REPEAT_SUFFIX = re.compile(r"-run(?P<attempt>[0-9]+)$")
 _WINDOWS_ABSOLUTE = re.compile(r"^(?:[A-Za-z]:|[\\/]{2})")
 _STATUSES = {"pass", "fail", "skip"}
 
@@ -70,6 +70,7 @@ class ValidationBundleCase:
     artifacts: tuple[tuple[str, ArtifactRef], ...]
     provenance: tuple[tuple[str, Any], ...]
     resources: tuple[tuple[str, Any], ...]
+    model: tuple[tuple[str, str], ...] = ()
 
     def artifact(self, name: str) -> ArtifactRef | None:
         return dict(self.artifacts).get(name)
@@ -93,7 +94,7 @@ class ValidationBundleMetadata:
 
 @dataclass(frozen=True)
 class ValidationBundle:
-    """A loaded validation bundle and any compatibility warnings."""
+    """A loaded validation bundle; ``warnings`` is empty for a current manifest."""
 
     root: Path
     schema_version: int
@@ -103,7 +104,7 @@ class ValidationBundle:
 
 
 def load_validation_bundle(root: Path) -> ValidationBundle:
-    """Load supported schemas, validate identities, and contain artifact paths."""
+    """Load the current schema, validate identities, and contain artifact paths."""
 
     bundle_root = root.expanduser().resolve()
     if not bundle_root.is_dir():
@@ -123,25 +124,22 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
         )
 
     version = manifest.get("schema_version")
-    if (
-        not isinstance(version, int)
-        or isinstance(version, bool)
-        or not 1 <= version <= SCHEMA_VERSION
-    ):
-        raise ValidationBundleError(f"Unsupported validation manifest schema_version: {version!r}")
+    if not isinstance(version, int) or isinstance(version, bool) or version != SCHEMA_VERSION:
+        raise ValidationBundleError(
+            f"Unsupported validation manifest schema_version: {version!r}; this heliaPROFILER "
+            f"reads version {SCHEMA_VERSION}, so read the bundle with the HPX release that "
+            "wrote it"
+        )
     raw_cases = manifest.get("cases")
     if not isinstance(raw_cases, list):
         raise ValidationBundleError("Validation manifest field 'cases' must be a list")
 
-    warnings: list[str] = []
-    if version == 1:
-        warnings.append("Loaded validation manifest schema v1 using compatibility inference.")
     cases: list[ValidationBundleCase] = []
     identities: set[ValidationCaseIdentity] = set()
     for index, raw_case in enumerate(raw_cases):
         if not isinstance(raw_case, dict):
             raise ValidationBundleError(f"Validation case {index} must be a JSON object")
-        case = _load_case(raw_case, version=version, root=bundle_root, index=index)
+        case = _load_case(raw_case, root=bundle_root, index=index)
         if case.identity in identities:
             raise ValidationBundleError(
                 f"Duplicate validation case identity: {case.identity.to_dict()}"
@@ -156,15 +154,13 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     github_raw = run.get("github")
     github: dict[str, object] = github_raw if isinstance(github_raw, dict) else {}
     dirty_raw = repo.get("dirty")
-    if version >= 4 and not isinstance(manifest.get("validation"), dict):
-        raise ValidationBundleError(
-            f"Validation manifest schema v{version} field 'validation' must be an object"
-        )
+    if not isinstance(manifest.get("validation"), dict):
+        raise ValidationBundleError("Validation manifest field 'validation' must be an object")
     return ValidationBundle(
         root=bundle_root,
         schema_version=version,
         cases=tuple(sorted(cases, key=lambda case: case.identity)),
-        warnings=tuple(warnings),
+        warnings=(),
         metadata=ValidationBundleMetadata(
             generated_at=_optional_string(manifest.get("generated_at")),
             hpx_version=_optional_string(manifest.get("hpx_version")),
@@ -180,57 +176,39 @@ def load_validation_bundle(root: Path) -> ValidationBundle:
     )
 
 
-def _load_case(
-    raw: dict[str, Any], *, version: int, root: Path, index: int
-) -> ValidationBundleCase:
+def _load_case(raw: dict[str, Any], *, root: Path, index: int) -> ValidationBundleCase:
     case_id = _required_string(raw, "case_id", index)
     status = _required_string(raw, "status", index)
     if status not in _STATUSES:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid status {status!r}")
 
-    if version >= 2:
-        identity_raw = raw.get("identity")
-        if not isinstance(identity_raw, dict):
-            raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
-        attempt = identity_raw.get("attempt")
-        memory = identity_raw.get("requested_memory")
-        power = identity_raw.get("requested_power")
-        health = raw.get("health_issues", [])
-        provenance = raw.get("provenance", {})
-        resources = raw.get("resources", {})
-        comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
-        if version >= 4:
-            repeat = raw.get("repeat")
-            if not isinstance(repeat, dict):
-                raise ValidationBundleError(
-                    f"Validation case {case_id!r} has no schema v{version} repeat object"
-                )
-            repeat_attempt = repeat.get("attempt")
-            repeat_total = repeat.get("total")
-            if (
-                not isinstance(repeat_attempt, int)
-                or isinstance(repeat_attempt, bool)
-                or not isinstance(repeat_total, int)
-                or isinstance(repeat_total, bool)
-                or repeat_attempt != attempt
-            ):
-                raise ValidationBundleError(
-                    f"Validation case {case_id!r} has invalid schema v{version} repeat metadata"
-                )
-            if repeat_total < 1 or repeat_attempt < 1 or repeat_attempt > repeat_total:
-                raise ValidationBundleError(
-                    f"Validation case {case_id!r} has invalid schema v{version} repeat metadata"
-                )
-    else:
-        identity_raw = raw
-        match = _REPEAT_SUFFIX.search(case_id)
-        attempt = int(match.group("attempt")) if match else 1
-        memory = {"preset": raw.get("memory")}
-        power = {"enabled": raw.get("power")}
-        health = []
-        provenance = {"jlink_serial": raw.get("jlink_serial")}
-        resources = {}
-        comparison_group = raw.get("model_id")
+    identity_raw = raw.get("identity")
+    if not isinstance(identity_raw, dict):
+        raise ValidationBundleError(f"Validation case {case_id!r} has no identity object")
+    attempt = identity_raw.get("attempt")
+    memory = identity_raw.get("requested_memory")
+    power = identity_raw.get("requested_power")
+    health = raw.get("health_issues", [])
+    provenance = raw.get("provenance", {})
+    resources = raw.get("resources", {})
+    model = raw.get("model", {})
+    comparison_group = identity_raw.get("comparison_group", identity_raw.get("model_id"))
+    repeat = raw.get("repeat")
+    if not isinstance(repeat, dict):
+        raise ValidationBundleError(f"Validation case {case_id!r} has no repeat object")
+    repeat_attempt = repeat.get("attempt")
+    repeat_total = repeat.get("total")
+    if (
+        not isinstance(repeat_attempt, int)
+        or isinstance(repeat_attempt, bool)
+        or not isinstance(repeat_total, int)
+        or isinstance(repeat_total, bool)
+        or repeat_attempt != attempt
+        or repeat_total < 1
+        or repeat_attempt < 1
+        or repeat_attempt > repeat_total
+    ):
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid repeat metadata")
 
     if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid repeat attempt")
@@ -244,16 +222,24 @@ def _load_case(
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid provenance")
     if not isinstance(resources, dict):
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid resources")
+    if not isinstance(model, dict) or not all(isinstance(v, str) for v in model.values()):
+        raise ValidationBundleError(f"Validation case {case_id!r} has invalid model")
     if isinstance(comparison_group, str):
         comparison_group = comparison_group.strip()
     if not isinstance(comparison_group, str) or not comparison_group:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid comparison_group")
 
     engine = _required_string(identity_raw, "engine", index)
+    if engine not in {member.value for member in EngineType}:
+        raise ValidationBundleError(
+            f"Validation case {case_id!r} names engine {engine!r}, which this HPX does not "
+            "know; a case that says 'tflm' was written before the engine became 'litert', "
+            "so read it with the HPX release that wrote it"
+        )
     identity = ValidationCaseIdentity(
         model_id=_required_string(identity_raw, "model_id", index),
         engine=engine,
-        cmsis_nn_provider=_cmsis_nn_provider(identity_raw, engine, case_id, version),
+        cmsis_nn_provider=_cmsis_nn_provider(identity_raw, engine, case_id),
         board=_required_string(identity_raw, "board", index),
         toolchain=_required_string(identity_raw, "toolchain", index),
         transport=_required_string(identity_raw, "transport", index),
@@ -271,19 +257,13 @@ def _load_case(
             raise ValidationBundleError(
                 f"Validation case {case_id!r} has a non-string artifact name"
             )
-        if version == 1:
-            path_value = value
-            available = False
-        elif isinstance(value, dict):
-            path_value = value.get("path")
-            available = value.get("available", False)
-        else:
+        if not isinstance(value, dict):
             raise ValidationBundleError(f"Validation case {case_id!r} artifact {name!r} is invalid")
+        path_value = value.get("path")
+        available = value.get("available", False)
         if not isinstance(path_value, str) or not isinstance(available, bool):
             raise ValidationBundleError(f"Validation case {case_id!r} artifact {name!r} is invalid")
         _resolve_safe_artifact(root, path_value, case_id=case_id, name=name)
-        if version == 1:
-            available = (root / PurePosixPath(path_value)).exists()
         artifacts.append((name, ArtifactRef(path=path_value, available=available)))
 
     return ValidationBundleCase(
@@ -294,26 +274,19 @@ def _load_case(
         artifacts=tuple(sorted(artifacts)),
         provenance=tuple(sorted(provenance.items())),
         resources=tuple(sorted(resources.items())),
+        model=tuple(sorted(model.items())),
     )
 
 
-def _cmsis_nn_provider(identity: dict[str, Any], engine: str, case_id: str, version: int) -> str:
-    """Load schema v5 provider identity or infer it for older manifests."""
+def _cmsis_nn_provider(identity: dict[str, Any], engine: str, case_id: str) -> str:
+    """The case's declared CMSIS-NN provider, checked against its engine."""
     provider = identity.get("cmsis_nn_provider")
     if provider is None:
-        if version >= 5:
-            raise ValidationBundleError(f"Validation case {case_id!r} has no cmsis_nn_provider")
-        backend = identity.get("backend")
-        if engine == "executorch" and backend in {"arm", "ns"}:
-            provider = backend
-        elif engine == "tflm":
-            provider = "arm"
-        elif engine in {"helia-rt", "helia-aot"}:
-            provider = "ns"
+        raise ValidationBundleError(f"Validation case {case_id!r} has no cmsis_nn_provider")
     if provider not in {"arm", "ns"}:
         raise ValidationBundleError(f"Validation case {case_id!r} has invalid cmsis_nn_provider")
     expected = {
-        "tflm": "arm",
+        "litert": "arm",
         "helia-rt": "ns",
         "helia-aot": "ns",
     }.get(engine)

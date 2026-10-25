@@ -80,11 +80,11 @@ class TestRegistry:
             module_name, toolchains = declared
             assert case.toolchain in toolchains, (case.case_id, module_name)
 
-    def test_engines_include_tflm_cmsis_nn_baseline(self):
+    def test_engines_include_litert_cmsis_nn_baseline(self):
         assert set(ENGINES) == {
             EngineType.HELIA_RT,
             EngineType.HELIA_AOT,
-            EngineType.TFLM,
+            EngineType.LITERT,
             EngineType.EXECUTORCH,
         }
 
@@ -110,6 +110,42 @@ models:
         assert loaded["kws-pruned"].fixture_path == str(model.resolve())
         assert loaded["kws-pruned"].decision_group == "kws"
         assert loaded["kws-pruned"].arena_size == 65536
+
+    def test_yaml_models_carry_family_precision_and_source(self, tmp_path):
+        model = tmp_path / "kws.tflite"
+        model.write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(
+            """
+models:
+  mlperf-tiny-kws-a8w8:
+    path: kws.tflite
+    family: mlperf-tiny-kws
+    precision: " a8w8 "
+    source: zoo://mlperf-tiny-kws/a8w8@abc
+"""
+        )
+
+        spec = load_model_file(registry)["mlperf-tiny-kws-a8w8"]
+
+        assert (spec.family, spec.precision, spec.source) == (
+            "mlperf-tiny-kws",
+            "a8w8",
+            "zoo://mlperf-tiny-kws/a8w8@abc",
+        )
+        assert spec.decision_group == "mlperf-tiny-kws-a8w8"
+
+    @pytest.mark.parametrize("value", ['""', "8", "[a8w8]"])
+    def test_yaml_models_reject_invalid_precision(self, tmp_path, value):
+        (tmp_path / "kws.tflite").write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(f"models:\n  kws-x:\n    path: kws.tflite\n    precision: {value}\n")
+
+        with pytest.raises(ValueError, match="precision for model 'kws-x'"):
+            load_model_file(registry)
+
+    def test_builtin_models_have_no_zoo_metadata(self):
+        assert all((m.family, m.precision, m.source) == (None, None, None) for m in MODELS.values())
 
     def test_command_line_paths_share_the_requested_comparison_group(self, tmp_path):
         first = tmp_path / "KWS Base.tflite"
@@ -204,10 +240,10 @@ class TestBuildMatrix:
         assert len(cases) == 1108
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
-    def test_tflm_engine_filter(self):
-        cases = build_matrix(engines=["tflm"], power="off")
+    def test_litert_engine_filter(self):
+        cases = build_matrix(engines=["litert"], power="off")
         assert len(cases) == 1108
-        assert all(c.engine is EngineType.TFLM for c in cases)
+        assert all(c.engine is EngineType.LITERT for c in cases)
 
     @pytest.mark.parametrize(
         ("board", "ordinary", "executorch"),
@@ -225,7 +261,7 @@ class TestBuildMatrix:
         assert {engine: sum(case.engine is engine for case in cases) for engine in ENGINES} == {
             EngineType.HELIA_RT: ordinary,
             EngineType.HELIA_AOT: ordinary,
-            EngineType.TFLM: ordinary,
+            EngineType.LITERT: ordinary,
             EngineType.EXECUTORCH: executorch,
         }
         if board in {"apollo4p_blue_kxr_evb", "apollo4l_blue_evb"}:
@@ -277,7 +313,7 @@ class TestBuildMatrix:
     @pytest.mark.parametrize(
         ("engine", "expected"),
         [
-            (EngineType.TFLM, ExecuTorchBackend.ARM),
+            (EngineType.LITERT, ExecuTorchBackend.ARM),
             (EngineType.HELIA_RT, ExecuTorchBackend.NS),
             (EngineType.HELIA_AOT, ExecuTorchBackend.NS),
         ],

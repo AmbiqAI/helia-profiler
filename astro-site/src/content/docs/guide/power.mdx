@@ -148,14 +148,16 @@ the instrument, or [INA228 on the target](../power-ina228/) if you do not.
 
 ## Fixed-input captures
 
-The public `helia_profiler.fixture` API builds fixed-input firmware without opening
-an instrument. `fixture_capabilities().targets` lists each board’s supported
-`engines`; combine that list with the engine/dtype capabilities when selecting a
-fixture. AP510B supports heliaAOT and TFLM. Timing-only captures read the complete output and timing terminal.
-For measured rail energy, build a method with `FixturePowerSync` protocol 2, then
-add a `FixtureRailPowerRequest` to the verified capture request. The firmware
-signals READY after initialization and warmups, acknowledges GO, gates the entire
-restore-and-invoke batch, and signals DONE after publishing its terminal.
+The [run API](../../reference/api/helia_profiler/compiled_build/) builds
+fixed-input firmware without opening an instrument. `hpx.capabilities().targets`
+lists each board’s supported `engines`; combine that list with the engine/dtype
+capabilities when selecting a fixture. AP510B supports heliaAOT and LiteRT.
+Timing-only captures read the complete output and timing terminal. For measured
+rail energy, build with a `FixturePowerSync` method and run with a
+`FixtureRailPowerRequest` ([Rail energy through the run API](#rail-energy-through-the-run-api)).
+The firmware signals READY after initialization and warmups, acknowledges GO,
+gates the entire restore-and-invoke batch, and signals DONE after publishing its
+terminal.
 
 The host retains the statistics and both packed GPIO streams. One shared native
 sample-counter transaction identifies the selected gate, its integral and typed
@@ -171,57 +173,95 @@ validation.
 Independent firmware and sensor clocks remain separate observations; a sample
 boundary uncertainty is not instrument calibration.
 
-### Timing with an instrument in the supply path
+Results expose gross measured joules, joules per completed iteration, scope,
+instrument identity and retained evidence. Repeats, comparison thresholds and
+calibration acceptance belong to the calling experiment.
 
-API 5.3 lets a timing-only caller explicitly select the supply that must power the
-board. This enables the existing driver power path before attachment or flashing;
-it does not enable energy measurement:
+
+## Rail energy through the run API
+
+The [run API](../../reference/api/helia_profiler/compiled_build/) measures one
+power route: the gross energy of the `MCU` rail over the timed
+restore-and-invoke loop, with nothing subtracted. It is admitted for heliaAOT
+and LiteRT builds on the `apollo510_evb` under `Lifecycle.CARRY`. HPX refuses
+any other engine, board, rail or lifecycle before it compiles or touches the
+board, and says why.
+
+Compile the power firmware with the GPIO wiring, then capture with the
+instrument, the rail and the station's authority over them:
 
 ```python
-from dataclasses import replace
-from helia_profiler.fixture import FixtureBoardPowerRequest, capture_fixture, fixture_capture_request
+import helia_profiler as hpx
 
-request = fixture_capture_request(
-    build,
+wiring = hpx.FixturePowerSync(sync_gpio_pin=29, state_gpio_pin=36, go_gpio_pin=14)
+method = hpx.FixtureMethod(hpx.FixtureTimingScope.RESTORE_AND_INVOKE, power_sync=wiring)
+compiled = hpx.build(plan, fixture, method=method, lifecycle=hpx.Lifecycle.CARRY)
+
+result = hpx.run_build(
+    compiled,
+    guard=station.board_guard,
     jlink_serial=station.probe_serial,
     evidence_dir=output_dir,
     settle_seconds=60,
-)
-request = replace(
-    request,
-    board_power=FixtureBoardPowerRequest(
-        driver=station.power_driver,
+    power=hpx.FixtureRailPowerRequest(
         serial=station.instrument_serial,
-        rail=station.supplied_rail,
+        rail="MCU",
+        io_voltage=1.8,  # the AP510 EVB GPIO level
+        sync_gpio_pin=29,
+        state_gpio_pin=36,
+        go_gpio_pin=14,
     ),
+    power_guard=station.power_guard,
 )
-result = capture_fixture(request, guard=station.guard)
+energy = result.energy  # None when the capture failed
 ```
 
-Here `build` is the verified compiled fixture and `station` supplies the current
-board and supply identities. The guard must authorize that instrument/rail through
-`verify_power_device` and keep checking exclusive ownership. Supply failure stops
-before target access. Omit `board_power` for an independently powered timing
-station: no power driver is resolved or opened. A rail-energy request uses its
-selected measurement instrument for supply setup; an explicit supply must match.
+`guard` vouches for the board and probe; `power_guard` authorizes the
+instrument and rail (`verify_power_device`) and keeps checking ownership.
+These are refused before the board is touched:
 
-Results expose gross measured joules, joules per completed iteration, scope,
-instrument identity and retained evidence. Repeats, comparison thresholds and
-calibration acceptance belong to the calling experiment. The typed request and
-result classes are exported by `helia_profiler.fixture`.
+- request GPIO pins that differ from the build's;
+- a build without wiring, or a power build run without a rail request;
+- a missing `power_guard`;
+- a `settle_seconds` that is not a finite number above 0, or is above 60.
 
+`build` also refuses a method without `power_sync` for a plan frozen with
+power enabled, rather than building timing-only firmware.
+
+`result.energy` holds:
+
+- the measured iterations, seconds, watts, amperes, joules and joules per iteration;
+- the rail and the instrument serial;
+- the hash-pinned raw instrument record;
+- `completion`: the protocol-2 READY, GO, gate and DONE sample IDs that bound the window.
+
+`result.identity.run.energy` states the method: scope, rail, subtraction and
+completion protocol, with the requested rail also when the capture failed.
+Each `run_build` call is one capture; run repeats as
+separate calls into separate evidence directories. The plan sets the warmup
+and iteration counts.
+`result.save(path, roots=..., build=...)` saves the run with its raw
+instrument record pinned; its portable view reports energy per inference and
+mean power ([A saved run result](../output/#7-a-saved-run-result)).
+
+For a timing capture through a configured supply, pass
+`power=hpx.FixtureBoardPowerRequest(driver, serial, rail)` and a
+`power_guard` with a build compiled without `power_sync`. It enables the
+supply before the probe attaches or flashes, powers the board and measures no
+energy; a supply failure stops before the target is touched. The
+`power_guard` must authorize that instrument and rail. It is not limited to
+the energy route's engines, boards or lifecycles, and its `settle_seconds`
+may reach 300. Pass no `power` for an independently powered timing station:
+no power driver is resolved or opened. `hpx run` takes no power options.
 
 ## Optional fixture RAM diagnostics
 
-For timing-only fixtures, pass `observe_ram=True` to `build_fixed_fixture` or
-`FixtureBuildRequest`. The config-based entry point preserves the supplied
-compatibility baseline and compiler launcher. Derive the capture request with
-`fixture_capture_request(build, ...)`; enabling the flag only at capture time
-cannot instrument an existing image. The option defaults to `False` and requires
-fixture API 5.4 when enabled.
+For a timing-only build, pass `observe_ram=True` to `hpx.build`; a build with
+`power_sync` refuses it. The option instruments the compiled image, so it cannot
+be enabled for an existing build at run time. It defaults to `False`.
 
 Successful diagnostic captures include a hashed `ram.json` file in
-`FixtureCaptureResult.artifacts`. Read it through `FixtureFile.read()` to verify
+`result.capture.artifacts`. Read it through `FixtureFile.read()` to verify
 its digest. The JSON has `schema_version: 1` and these quantities:
 
 | Field | Meaning |
@@ -246,12 +286,9 @@ not be added together or to an entire reserved heap region. The JSON also
 retains `measurement_window`, `limitations` and `heap_counter_basis` strings.
 These observations do not establish total peak RAM.
 
-AOT arena painting is a separate option. Keep `observe_aot_arenas=False` for
+AOT arena painting is a separate `hpx.build` option. Keep `observe_aot_arenas=False` for
 carry-state workloads unless the selected emitted arenas are proven scratch-only
 and contain no initialized state. Static arena accounting does not require
 painting.
 
-API 5.5 reads 5.0–5.4 build records, including RAM observations from API 5.4.
-Records older than 5.4 must have RAM observation disabled. Disabled
-`observe_ram` is omitted from serialized build records; enabled records contain
-`true`. Existing result dataclass fields retain their meanings.
+A saved build omits a disabled `observe_ram`; an enabled one records `true`.

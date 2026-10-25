@@ -95,7 +95,7 @@ def analysis_of(fixture, *, has_float16=False):
     )
 
 
-def config_for(tmp_path, fixture, engine=EngineType.TFLM):
+def config_for(tmp_path, fixture, engine=EngineType.LITERT):
     return ProfileConfig(
         model=ModelConfig(
             path=fixture.model.path,
@@ -179,17 +179,21 @@ def test_identity_is_path_free_and_covers_every_declaration(tmp_path):
 
 
 def test_capability_table_covers_every_fixture_engine_and_dtype():
-    assert set(FIXTURE_CAPABILITIES) == {EngineType.TFLM, EngineType.HELIA_RT, EngineType.HELIA_AOT}
+    assert set(FIXTURE_CAPABILITIES) == {
+        EngineType.LITERT,
+        EngineType.HELIA_RT,
+        EngineType.HELIA_AOT,
+    }
     for table in FIXTURE_CAPABILITIES.values():
         assert set(table) == {"int8", "int16", "int32", "float16", "float32"}
-    assert FIXTURE_CAPABILITIES[EngineType.TFLM]["int8"] is FixtureCapability.SUPPORTED
+    assert FIXTURE_CAPABILITIES[EngineType.LITERT]["int8"] is FixtureCapability.SUPPORTED
     assert FIXTURE_CAPABILITIES[EngineType.HELIA_AOT]["int8"] is FixtureCapability.SUPPORTED
-    assert FIXTURE_CAPABILITIES[EngineType.TFLM]["float16"] is FixtureCapability.UNSUPPORTED
+    assert FIXTURE_CAPABILITIES[EngineType.LITERT]["float16"] is FixtureCapability.UNSUPPORTED
     # No heliaRT fixture has a device pass yet.
     assert set(FIXTURE_CAPABILITIES[EngineType.HELIA_RT].values()) == {FixtureCapability.SUPPORTED}
 
 
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     f = typed(tmp_path)
     # IO support is independent of any exact release qualification.
@@ -204,7 +208,7 @@ def test_check_returns_capabilities_of_the_dtypes_used(tmp_path, engine):
     )
 
 
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 def test_per_axis_io_is_not_qualified_even_for_one_input_and_output(tmp_path, engine):
     per_axis = FixtureTensor("x", 0, "int8", (1, 2), PerAxisQuantization(1, (0.5, 0.25), (0, 1)))
     f = typed(tmp_path, inputs=(per_axis,), outputs=(LABEL,))
@@ -256,7 +260,7 @@ def test_readback_budget_is_inclusive_and_counts_every_output(tmp_path):
 
 def test_internal_float16_does_not_veto_supported_public_io(tmp_path):
     f = typed(tmp_path)
-    for engine in (EngineType.TFLM, EngineType.HELIA_AOT):
+    for engine in (EngineType.LITERT, EngineType.HELIA_AOT):
         assert _check_typed_fixture(f, analysis_of(f, has_float16=True), engine) == (
             ("float32", FixtureCapability.SUPPORTED),
             ("int16", FixtureCapability.SUPPORTED),
@@ -333,7 +337,7 @@ REGIONS = (
 )
 
 
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 def test_typed_build_reports_outputs_capabilities_and_scan(tmp_path, monkeypatch, engine):
     f = typed(tmp_path)
     c = config_for(tmp_path, f, engine)
@@ -349,7 +353,7 @@ def test_typed_build_reports_outputs_capabilities_and_scan(tmp_path, monkeypatch
     monkeypatch.setattr(
         "helia_profiler._fixture_build.PipelineRunner", _runner(tmp_path, calls, REGIONS)
     )
-    rt = runtime(tmp_path) if engine is EngineType.TFLM else None
+    rt = runtime(tmp_path) if engine is EngineType.LITERT else None
     observe = engine is EngineType.HELIA_AOT
     r = build_fixed_fixture(
         c, f, method=METHOD, runtime=rt, compile=False, observe_aot_arenas=observe
@@ -385,7 +389,15 @@ def test_arena_observation_changes_intent_and_binds_the_work_dir(tmp_path, monke
     assert observed.intent_identity != plain.intent_identity
 
 
-def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, monkeypatch):
+@pytest.mark.parametrize("capability", [FixtureCapability.SUPPORTED, FixtureCapability.UNSUPPORTED])
+def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(
+    tmp_path, monkeypatch, capability
+):
+    monkeypatch.setitem(
+        FIXTURE_CAPABILITIES,
+        EngineType.HELIA_AOT,
+        dict(FIXTURE_CAPABILITIES[EngineType.HELIA_AOT], int8=capability),
+    )
     t_in, t_out = Int8Tensor((1, 4), 0.25, -3, 0), Int8Tensor((1, 4), 0.5, 2, 1)
     f = FixedFixture(
         pin(tmp_path, "model.tflite", b"fixture-model"),
@@ -410,7 +422,7 @@ def test_single_int8_intent_identity_is_unchanged_by_the_scan_option(tmp_path, m
         == hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
     )
     assert r.outputs == (f.expected,)
-    assert r.capabilities == (("int8", FixtureCapability.SUPPORTED),)
+    assert r.capabilities == (("int8", capability),)
 
 
 def test_arena_observation_is_heliaaot_only(tmp_path, monkeypatch):
@@ -454,7 +466,7 @@ def test_internal_float16_reaches_selected_engine_and_preserves_failure(tmp_path
     monkeypatch.setattr("helia_profiler._fixture_build.PipelineRunner", Runner)
     with pytest.raises(EngineError) as caught:
         build_fixed_fixture(config_for(tmp_path, f), f, method=METHOD, runtime=runtime(tmp_path))
-    assert caught.value is error and calls == [EngineType.TFLM]
+    assert caught.value is error and calls == [EngineType.LITERT]
 
 
 def test_typed_mismatch_stops_before_pipeline(tmp_path, monkeypatch):
@@ -485,10 +497,10 @@ def render(tmp_path, f, engine, *, observe=False, regions=()):
     )
 
 
-def test_tflm_render_checks_each_tensor_type_and_only_per_tensor_quantization(tmp_path):
+def test_litert_render_checks_each_tensor_type_and_only_per_tensor_quantization(tmp_path):
     per_axis = FixtureTensor("pa", 5, "int8", (1, 2), PerAxisQuantization(1, (0.5, 0.25), (0, 1)))
     f = typed(tmp_path, outputs=(LABEL, LEVEL, per_axis))
-    source = render(tmp_path, f, EngineType.TFLM)
+    source = render(tmp_path, f, EngineType.LITERT)
     assert "graph->inputs()->size() != 2 || graph->outputs()->size() != 3" in source
     assert "input->type != kTfLiteInt16 || input->bytes != 32" in source
     assert "input->params.scale != 0x1.0000000000000p-10f" in source
@@ -503,7 +515,7 @@ def test_tflm_render_checks_each_tensor_type_and_only_per_tensor_quantization(tm
     assert "deployment_arena_scan" not in source
 
 
-@pytest.mark.parametrize("engine", [EngineType.TFLM, EngineType.HELIA_AOT])
+@pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 def test_render_restores_every_input_and_reads_every_output(tmp_path, engine):
     source = render(tmp_path, typed(tmp_path), engine)
     restores = [
@@ -610,11 +622,11 @@ def test_int32_contract_rejects_wrong_type_and_incomplete_tensors(tmp_path, faul
     if fault == "dtype":
         f = replace(f, inputs=(replace(f.inputs[0], tensor=replace(TOKENS, dtype="float32")),))
         with pytest.raises(ConfigError, match="declarations differ"):
-            _check_typed_fixture(f, model, EngineType.TFLM)
+            _check_typed_fixture(f, model, EngineType.LITERT)
     elif fault == "int32_output":
         f = typed(tmp_path, inputs=(TOKENS,), outputs=(TOKENS,))
         with pytest.raises(ConfigError, match="input-only"):
-            _check_typed_fixture(f, analysis_of(f), EngineType.TFLM)
+            _check_typed_fixture(f, analysis_of(f), EngineType.LITERT)
     else:
         direction = "inputs" if fault == "input_extent" else "outputs"
         io = getattr(f, direction)[0]
@@ -742,9 +754,9 @@ int main(int argc,char**argv) {
             assert (result.returncode == 0) == (name == "original")
 
 
-@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.TFLM])
+@pytest.mark.parametrize("engine", [EngineType.HELIA_AOT, EngineType.LITERT])
 def test_power_render_gates_full_restore_loop_after_warmups(tmp_path, engine):
-    from helia_profiler.fixture import FixturePowerSync, FixtureStatePolicy
+    from helia_profiler import FixturePowerSync, FixtureStatePolicy
 
     fixture = typed(tmp_path)
     config = config_for(tmp_path, fixture, engine)

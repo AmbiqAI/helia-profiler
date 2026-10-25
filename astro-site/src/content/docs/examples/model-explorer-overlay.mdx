@@ -69,7 +69,7 @@ Each is Model Explorer's node-data format keyed by graph id:
   `ARM_PMU_L1D_CACHE_MISS_RD` warrants investigating
   [memory placement](../../guide/memory/). Low cache misses alone do not
   prove a compute bottleneck; inspect stalls and instruction counts too.
-- Node matching: heliaRT and TFLM overlays match by the runtime's
+- Node matching: heliaRT and LiteRT overlays match by the runtime's
   sequential operator index; heliaAOT overlays use the model's original
   operator index, which the compiler preserves even when it skips
   operators ([Model Explorer overlays](../../guide/model-explorer/)).

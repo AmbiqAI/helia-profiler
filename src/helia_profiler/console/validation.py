@@ -30,7 +30,7 @@ def _cmsis_nn_provider(case: CaseResult) -> str | None:
     engine = str(case.engine)
     if engine == "executorch" and case.backend in {"arm", "ns"}:
         return case.backend
-    if engine == "tflm":
+    if engine == "litert":
         return "arm"
     if engine in {"helia-rt", "helia-aot"}:
         return "ns"

@@ -1,16 +1,16 @@
 # hpx validate
 
-Run hardware-in-the-loop validation suite (MLPerf Tiny models)
+Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`
 
 ## hpx validate
 
 ```bash
-hpx validate [OPTIONS]
+hpx validate [OPTIONS] COMMAND [ARGS]...
 ```
 
-Run hardware-in-the-loop validation suite (MLPerf Tiny models)
+Run hardware-in-the-loop validation suite (MLPerf Tiny models), or verify a run directory with `hpx validate build`
 
-Defined in `src/helia_profiler/cli/validation_app.py` line 92.
+Defined in `src/helia_profiler/cli/validation_app.py` line 100.
 
 ### Options
 
@@ -21,8 +21,8 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 92.
 | `--model-paths` | `str` |  | Comma-separated .tflite paths for an ad hoc comparison. |
 | `--comparison-group` | `str` | custom | Shared decision group for models supplied through --model-paths. |
 | `--model-arena-size` | `int` | 524288 | Arena size in bytes for models supplied through --model-paths. |
-| `--engines` | `str` |  | Comma-separated engines: rt,aot,tflm,et,executorch,helia-rt,helia-aot (default: all). |
-| `--executorch-backends` | `str` | both | ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). TFLM always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn. |
+| `--engines` | `str` |  | Comma-separated engines: rt,aot,litert,et,executorch,helia-rt,helia-aot (default: all). |
+| `--executorch-backends` | `str` | both | ExecuTorch CMSIS-NN providers: arm, ns, or both (default: both). LiteRT always uses ARM CMSIS-NN; heliaRT and heliaAOT always use ns-cmsis-nn. |
 | `--ns-cmsis-nn-ref` | `str` |  | Exact ns-cmsis-nn commit/ref used by heliaRT, heliaAOT, and ExecuTorch/ns. |
 | `--power` | `both \| on \| off` | off | Power matrix: off (default) \| on (only Joulescope runs) \| both. |
 | `--power-boards` | `str` |  | Comma-separated boards allowed to use power capture (default: all selected boards). |
@@ -30,7 +30,7 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 92.
 | `--toolchains` | `str` |  | Comma-separated toolchains: gcc,armclang/acfe,atfe (default: board defaults). |
 | `--interfaces` | `str` |  | Comma-separated interfaces/transports: rtt,uart,swo,usb_cdc (default: board defaults). |
 | `--memories` | `str` |  | Comma-separated model placement presets: auto,tcm,sram,mram,psram (default: board defaults). |
-| `--suite` | `smoke \| models-rt \| models-aot \| complete` |  | Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, TFLM/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win. |
+| `--suite` | `smoke \| models-rt \| models-aot \| complete` |  | Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, LiteRT/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win. |
 | `--jlink-serials` | `str` |  | Comma-separated board=serial entries for multi-board validation. |
 | `--power-serials` | `str` |  | Comma-separated board=Joulescope-serial entries for powered multi-board validation. |
 | `--power-gpios` | `str` |  | Comma-separated board=gate:state:go entries for powered boards without default sync wiring. |
@@ -73,7 +73,31 @@ Examples:
 
   hpx validate --suite models-aot      # 16-case AOT sweep: 2 boards x 4 models x 2 toolchains
 
-  hpx validate --suite complete        # RT + AOT + TFLM + ExecuTorch sweep
+  hpx validate --suite complete        # RT + AOT + LiteRT + ExecuTorch sweep
+
+  hpx validate build runs/kws          # verify a run directory, no hardware
 ```
+
+## hpx validate build
+
+```bash
+hpx validate build [OPTIONS] DIRECTORY
+```
+
+Verify a run directory written by hpx build (no hardware)
+
+Defined in `src/helia_profiler/cli/validation_app.py` line 340.
+
+### Arguments
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `directory` | `Path` |  | Run directory written by hpx build, or its build.json Required. |
+
+### Options
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--verbose, -v` | `int` | 0 | Increase verbosity |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

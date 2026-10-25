@@ -144,8 +144,14 @@ consumer plan-vs-measured verdicts and per-region deltas), absent whenever
 the symbol table is.
 
 Each case also carries cross-machine provenance when available: model SHA-256,
-HPX version, compiler name/version, firmware-reported `system_clock_hz`, and
-the summary/metadata schema versions. These values are not folded into case
+HPX version, compiler name/version, firmware-reported `system_clock_hz`, the
+resolved CPU clock profile (`cpu_clock_name`, `cpu_clock_mhz`, from
+`run_metadata.json` `platform`), and the summary/metadata schema versions.
+A custom model whose `--models-file` entry sets `family`, `precision`, or
+`source` also gets an additive per-case `model` object within schema v6 (for
+example `{"family": "mlperf-tiny-kws", "precision": "a8w8", "source":
+"zoo://mlperf-tiny-kws/a8w8@<rev>"}`), so a dashboard can group precisions of
+one model; built-in models omit it. These values are not folded into case
 identity because doing so would prevent useful pairing; comparison and
 regression profiles surface differences and can require exact matches.
 
@@ -157,6 +163,34 @@ Scheduled GitHub Actions runs record `run.origin: nightly`; user-triggered
 `run.github` object contains the event name, repository, numeric run ID and
 attempt, and a direct run URL. Dashboards can therefore separate nightly and
 ad hoc validation without inferring intent from timestamps or branch names.
+
+## Zoo model registry
+
+`tools/zoo_models.yaml` pins the helia-model-zoo models that
+validation runs as custom models: per entry the Zoo ID, precision, Zoo
+commit (`rev`), model sha256 and arena size. `tools/zoo_registry.py` turns
+it into a `--models-file`:
+
+```bash
+uv run tools/zoo_registry.py --output build/zoo/models.yaml
+uv run hpx validate --list --models-file build/zoo/models.yaml \
+  --models mlperf-tiny-kws-a8w8,mlperf-tiny-kws-fp32 --boards apollo510_evb
+```
+
+The script declares its dependencies inline (PEP 723), so `uv run` installs
+the Zoo client in an isolated environment. HPX does not depend on the Zoo
+client: it is a git dependency, which a PyPI release cannot carry. The
+builder fetches each model into the Zoo cache (`--cache`, else
+`HELIA_ZOO_CACHE`, else `~/.cache/helia-model-zoo`), refuses a file whose
+sha256 differs from its pin, and writes IDs `<zoo>-<precision>` with
+`family`, `precision`, `source: zoo://<zoo>/<precision>@<rev>`, the arena
+size and the cached model path. The entries mirror helia-benchmark's
+portfolio selections; nothing here reads that repository.
+
+To add a model, add an entry with the sha256 from the Zoo record at that
+commit and an arena size sized like the built-in models: the measured or
+estimated allocated arena plus about 10% headroom, rounded up to a power
+of two.
 
 ## Dependency source pinning
 
@@ -330,7 +364,7 @@ leave the optional axes empty. It uses the same model, board, toolchain,
 transport, and memory axes as `models-rt`, but runs `helia-aot`.
 
 For the full hardware regression, select `suite=complete`. It combines
-heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the stock TFLM ARM CMSIS-NN
+heliaRT/ns-cmsis-nn, heliaAOT/ns-cmsis-nn, the LiteRT ARM CMSIS-NN
 baseline, and ExecuTorch/ns-cmsis-nn into one sweep by default. Run
 `uv run hpx validate --list --suite complete --executorch-backends ns` for the exact current case
 count and axes.
@@ -338,7 +372,7 @@ count and axes.
 To compare runtime engines on the same smoke model, keep `suite=smoke` and set:
 
 ```text
-engines=helia-rt,helia-aot,tflm,executorch
+engines=helia-rt,helia-aot,litert,executorch
 executorch_backends=both
 ```
 

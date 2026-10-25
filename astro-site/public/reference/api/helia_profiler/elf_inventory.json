@@ -1,0 +1,365 @@
+{
+  "$schema": "https://ambiqai.github.io/helia-ui/schema/reference-model-1.json",
+  "generatedFrom": {
+    "tool": "pyref",
+    "version": "1.7.3"
+  },
+  "language": "python",
+  "modules": [
+    {
+      "description": "The measured memory inventory of a linked image, read with the toolchain's own tools: every section with its address and size, the load segments, and how many rows could not be parsed.\n\nEvery name on this page is imported from `helia_profiler`.\n\n**API tier:** `experimental`\n\nGenerated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.",
+      "name": "elf_inventory",
+      "path": "helia_profiler.elf_inventory",
+      "submodules": [],
+      "summary": "The measured memory inventory of a linked image, read with the toolchain's own tools: every section with its address and size, the load segments, and how many…",
+      "symbols": [
+        {
+          "description": "`dataclass`\n\nOne section of the linked image, address included.\n\n``index`` is the ELF section-header index — the section's IDENTITY.\nSection NAMES are not unique: armlink emits one section per execution\nregion per content class all named after the region (a real NSX AP510\nscatter link yields two ``MCU_TCM`` sections, PROGBITS + NOBITS), and\nNSX's own gcc scripts declare ``.text`` twice. Never key a collection\nof these on ``name`` alone — bytes vanish (#176).\n\n``linker_reserved`` marks the NOBITS+allocated regions the linker\nmanufactures rather than the program needing them (today: fill-to-end\nheaps, armlink's ``ARM_LIB_HEAP`` — the #24/#131 rule, same predicate\nas the ``BinarySections.reserved`` split). ``.stack``/``ARM_LIB_STACK``\nare deliberately NOT reserved: the stack is live memory the firmware\nneeds — but note it usually sits OUTSIDE the per-family app window\n(``LinkedRegionWindow.app_window``), which is how the free-space math\nstays consistent.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.ElfSection",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.name",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "name",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "name: str",
+              "source": {
+                "line": 88,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L88"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.address",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "address",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "address: int",
+              "source": {
+                "line": 89,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L89"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.size",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "size",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "size: int",
+              "source": {
+                "line": 90,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L90"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.nobits",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "nobits",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "nobits: bool",
+              "source": {
+                "line": 91,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L91"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.allocated",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "allocated",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "allocated: bool",
+              "source": {
+                "line": 92,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L92"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.index",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "index",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "index: int = -1",
+              "source": {
+                "line": 93,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L93"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ElfSection.linker_reserved",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "linker_reserved",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "linker_reserved: bool = False",
+              "source": {
+                "line": 94,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L94"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "ElfSection",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "ElfSection(\n    name: str,\n    address: int,\n    size: int,\n    nobits: bool,\n    allocated: bool,\n    index: int = -1,\n    linker_reserved: bool = False,\n) -> None",
+          "source": {
+            "line": 68,
+            "path": "src/helia_profiler/hostenv/elf_inventory.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L68"
+          },
+          "summary": "One section of the linked image, address included."
+        },
+        {
+          "description": "`dataclass`\n\nOne PT_LOAD program header: where bytes load (physical) vs run\n(virtual) — the fact that makes initialized data's MRAM load image\naccountable (#133 D3).\n\nToolchain shape caveat (#176, measured on real links against the NSX\nAP510 scripts): GNU ld emits one PT_LOAD per load\nregion (``.data`` gets vaddr in DTCM, paddr in MRAM — per-section\nrecovery works). armlink emits a SINGLE PT_LOAD whose vaddr==paddr is\nthe image base and whose ``memory_size`` SUMS discontiguous execution\nregions — ``paddr + memory_size`` is a phantom span, and mapping\nsections into segments by vaddr containment understates armlink MRAM\n~400x. Region-level load-image accounting that works on BOTH families:\nsum ``file_size`` grouped by ``classify_address(physical_address)``,\nnever walk sections into segments. Per-symbol load-image attribution\non armlink is NOT recoverable from these primitives.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.LoadSegment",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.LoadSegment.virtual_address",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "virtual_address",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "virtual_address: int",
+              "source": {
+                "line": 115,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L115"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.LoadSegment.physical_address",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "physical_address",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "physical_address: int",
+              "source": {
+                "line": 116,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L116"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.LoadSegment.file_size",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "file_size",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "file_size: int",
+              "source": {
+                "line": 117,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L117"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.LoadSegment.memory_size",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "memory_size",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "memory_size: int",
+              "source": {
+                "line": 118,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L118"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "LoadSegment",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "LoadSegment(virtual_address: int, physical_address: int, file_size: int, memory_size: int) -> None",
+          "source": {
+            "line": 97,
+            "path": "src/helia_profiler/hostenv/elf_inventory.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L97"
+          },
+          "summary": "One PTLOAD program header: where bytes load (physical) vs run (virtual) — the fact that makes initialized data's MRAM load image accountable (#133 D3)."
+        },
+        {
+          "description": "`dataclass`\n\nThe measured memory inventory of one linked binary.\n\n``unparsed_rows`` counts SECTION rows/blocks that LOOKED like\ninventory entries but failed to parse. When nonzero the section\ninventory is PARTIAL — occupancy computed from it is understated, and\na consumer must treat the measured view as unavailable rather\nthan publish a silently-low number (#131's discipline, structural\ninstead of a debug log). Segment parse failures are NOT counted:\nsegments refine the inventory and their absence degrades\nindependently (empty tuple), on both tool paths.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.SectionInventory",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SectionInventory.sections",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "sections",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "sections: tuple[ElfSection, ...]",
+              "source": {
+                "line": 134,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L134"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SectionInventory.segments",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "segments",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "segments: tuple[LoadSegment, ...] = ()",
+              "source": {
+                "line": 135,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L135"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.SectionInventory.unparsed_rows",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "unparsed_rows",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "unparsed_rows: int = 0",
+              "source": {
+                "line": 136,
+                "path": "src/helia_profiler/hostenv/elf_inventory.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L136"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "SectionInventory",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "SectionInventory(\n    sections: tuple[ElfSection, ...],\n    segments: tuple[LoadSegment, ...] = (),\n    unparsed_rows: int = 0,\n) -> None",
+          "source": {
+            "line": 121,
+            "path": "src/helia_profiler/hostenv/elf_inventory.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L121"
+          },
+          "summary": "The measured memory inventory of one linked binary."
+        },
+        {
+          "description": "The measured section/segment inventory of *binary_path*, or None.\n\nDispatches like :func:`binary_sections`: readelf for the size-probed\ntoolchains, ``fromelf --text -v`` for armclang. Degrades to ``None`` on\nany tool or parse failure — the measured memory view simply does not\nexist for that run, exactly like an absent ``reserved`` split.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.section_inventory",
+          "kind": "function",
+          "language": "python",
+          "members": [],
+          "name": "section_inventory",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "section_inventory(binary_path: Path, toolchain: str, *, timeout_s: int = 30) -> SectionInventory | None",
+          "source": {
+            "line": 335,
+            "path": "src/helia_profiler/hostenv/elf_inventory.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/hostenv/elf_inventory.py#L335"
+          },
+          "summary": "The measured section/segment inventory of binarypath, or None."
+        }
+      ]
+    }
+  ],
+  "name": "helia_profiler"
+}
