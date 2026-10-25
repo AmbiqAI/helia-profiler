@@ -387,59 +387,46 @@ def _custom_soc(name, spec):
     return build_custom_platform_registry({"custom_socs": {name: spec}}).socs[name]
 
 
-def test_a_declared_app_flash_load_address_beats_both_lookup_tiers(monkeypatch):
-    """The declared tier is consulted BEFORE the two tables, not after.
+def test_a_declared_app_flash_load_address_beats_the_linked_map():
+    """The declared address is consulted BEFORE the linked memory map.
 
     Observing that order needs a ``SocDef`` for which both sides could answer,
     and no such part exists in normal use: built-ins declare no address of
     their own (pinned by
     ``test_every_builtin_soc_is_stamped_builtin_and_states_no_address_itself``)
-    and custom ones never reach the tables.  So the fixture is built by hand --
+    and custom ones never reach the map.  So the fixture is built by hand --
     a ``replace`` copy of a built-in, which keeps ``SocOrigin.BUILTIN`` and
-    therefore keeps both tables in play, carrying a declared address as well.
-    Both tables are then stacked against it: a per-SoC override patched in
-    under its name, and its own family's baseline behind that.
+    therefore keeps the map in play, carrying a declared address as well.
 
-    Without this, the tier order is unobservable and moving the declared tier
-    below the tables leaves the whole suite green.
-
-    The two table reads below are *guard* asserts, not the subject: they show
-    what tiers 2 and 3 would have answered, so that a future reader can see the
-    declared tier beating something rather than beating nothing.  Tier 2's is
-    monkeypatched and therefore inert.  Tier 3's reads the production table, so
-    if ``_FAMILY_APP_FLASH_LOAD_ADDR[AP5]`` is ever revised this line fails
-    first -- deliberately.  When that happens, update the literal to whatever
-    the table now says; the assertion that matters is the last one.
+    Without this, the order is unobservable and moving the declared address
+    below the map leaves the whole suite green.  The map read below is a
+    *guard* assert, not the subject: it shows what the map would have
+    answered; the assertion that matters is the last one.
     """
     from dataclasses import replace
 
-    from helia_profiler.platform import capabilities
+    from helia_profiler.platform.memory_map import mram_app_origin
 
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo510", 0x22000000)
     soc = replace(get_soc("apollo510"), app_flash_load_addr=0x00040000)
 
-    assert soc.is_builtin  # both tables are reachable for it
-    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["apollo510"] == 0x22000000  # tier 2 would say
-    assert capabilities._FAMILY_APP_FLASH_LOAD_ADDR[SocFamily.AP5] == 0x00410000  # tier 3 would
+    assert soc.is_builtin  # the map is reachable for it
+    assert mram_app_origin("apollo510") == 0x00410000  # the map would say
     assert soc.capabilities.memory.app_flash_load_addr == 0x00040000
 
 
-def test_a_custom_socs_declared_address_survives_a_name_matched_override(monkeypatch):
+def test_a_custom_socs_declared_address_survives_a_name_matched_map():
     """What the user wrote about their own silicon outranks every table here.
 
     Sibling of the test above, from the other origin: this is the shape a real
-    ``target.custom_socs`` entry has, so the tables are gated off it entirely
-    and only the declared tier can answer.  What it pins is that naming the
-    part after a built-in with an override does not disturb that -- the user is
+    ``target.custom_socs`` entry has, so the linked map is gated off it entirely
+    and only the declared address can answer.  What it pins is that naming the
+    part after a built-in with a linked map does not disturb that -- the user is
     describing a part hpx has never seen, and is the only source of truth for
     its bootloader reservation.
     """
-    from helia_profiler.platform import capabilities
-
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo4p", 0x22000000)
     soc = _custom_soc("apollo4p", _scratch_soc_spec(app_flash_load_addr=0x00040000))
 
-    assert soc.family is SocFamily.AP4  # the family baseline would say 0x00018000
+    assert soc.family is SocFamily.AP4  # the built-in map would say 0x00018000
     assert soc.capabilities.memory.app_flash_load_addr == 0x00040000
 
 
@@ -564,21 +551,17 @@ def test_placement_base_inheritance_chains_through_another_custom_soc():
     assert bases[Placement.MRAM] == 0x22000000
 
 
-def test_based_on_inheritance_carries_a_per_soc_override_not_just_the_family(monkeypatch):
+def test_based_on_inheritance_carries_the_resolved_address():
     """Inheritance must take the base's RESOLVED address, not its raw field.
 
-    Built-in parts keep their addresses in the capability tables, so a
-    ``SocDef``-field copy would inherit ``None`` and silently fall back.  The
-    case that matters is a part with a per-SoC override -- atomiq110 in
-    production -- where the difference is 0x22000000 versus its family's
+    Built-in parts keep their addresses in the linked memory map, so a
+    ``SocDef``-field copy would inherit ``None``.  The case that matters is
+    atomiq110, whose 0x22000000 departs from the rest of its AP5 family's
     0x00410000.
     """
-    from helia_profiler.platform import capabilities
+    soc = _custom_soc("atomiq_like", {"based_on": "atomiq110"})
 
-    monkeypatch.setitem(capabilities._SOC_APP_FLASH_LOAD_ADDR, "apollo330P", 0x22000000)
-    soc = _custom_soc("atomiq_like", {"based_on": "apollo330P"})
-
-    assert soc.family is SocFamily.AP5  # its family would say 0x00410000
+    assert soc.family is SocFamily.AP5  # the rest of its family loads at 0x00410000
     assert soc.capabilities.memory.app_flash_load_addr == 0x22000000
 
 
@@ -627,34 +610,31 @@ def test_a_custom_soc_with_no_address_and_no_based_on_refuses_to_guess():
     """
     soc = _custom_soc("oem4", _scratch_soc_spec())
 
-    assert soc.family is SocFamily.AP4  # the family baseline would say 0x00018000
+    assert soc.family is SocFamily.AP4  # apollo4p's map would say 0x00018000
     assert soc.capabilities.memory.app_flash_load_addr is None
 
 
 def test_a_custom_soc_named_after_an_override_part_still_refuses_to_guess():
-    """The same refusal, with the per-SoC override table stacked against it.
+    """The same refusal, with a built-in's linked map stacked against it.
 
     Sibling of the test above, and the shape that actually observes the origin
-    gate: ``atomiq110`` is a real ``_SOC_APP_FLASH_LOAD_ADDR`` entry, so a
-    custom SoC that borrows the name has a live table value waiting under it.
+    gate: ``atomiq110`` has a real linked memory map, so a custom SoC that
+    borrows the name has a live MRAM origin waiting under it.
     With no address and no ``based_on`` there is nothing else that could
     answer, so a non-``None`` result here means the name reached the table.
 
-    Deliberately not monkeypatched: this uses the production table, so it keeps
-    holding if ``atomiq110`` becomes a built-in (#98) and the entry stops
-    being reachable only through a user-chosen name.
+    Deliberately not monkeypatched: this uses the production map.
 
     The cost of that choice is that the guard assert below pins a production
-    value, and ``platform/capabilities.py`` says this one is expected to move:
-    0x22000000 is the *nbl* origin correct for the atomiq110 FPGA realization,
-    and real AT110 silicon "very likely" shifts it to the *sbl* 0x22010000.
-    When that lands, this line fails first.  Update the literal -- do not
-    delete the assert, and do not "correct" the table to the sbl address for
-    the FPGA part.  The subject of the test is the two asserts after it.
+    value that is expected to move: 0x22000000 is the *nbl* origin correct
+    for the atomiq110 FPGA realization, and real AT110 silicon very likely
+    shifts it to the *sbl* 0x22010000.  When that lands, this line fails
+    first.  Update the literal -- do not delete the assert.  The subject of
+    the test is the two asserts after it.
     """
-    from helia_profiler.platform import capabilities
+    from helia_profiler.platform.memory_map import mram_app_origin
 
-    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000
+    assert mram_app_origin("atomiq110") == 0x22000000
     soc = _custom_soc("atomiq110", _scratch_soc_spec())
 
     assert soc.origin is SocOrigin.CUSTOM
@@ -712,8 +692,8 @@ def test_a_board_psram_override_does_not_cost_a_builtin_soc_its_address():
 
     Seven built-in boards override ``psram_kb``, and for those the SoC handed
     to the pipeline is a copy, not the registered object.  Gating the address
-    tables on object identity silently reclassified those copies as unknown
-    parts -- so the per-SoC override tier would vanish on exactly the boards
+    lookup on object identity silently reclassified those copies as unknown
+    parts -- so the map-derived address would vanish on exactly the boards
     that populate PSRAM, which is why this is a typed field.
     """
     soc = get_soc_for_board("apollo3p_evb")
@@ -735,7 +715,7 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     which is exactly what the sibling test above requires.  The cost is that a
     renamed copy survives it too: an ``origin``-only gate lets
     ``replace(get_soc("apollo510"), name="atomiq110")`` read atomiq110's
-    per-SoC override and flash an Apollo510 at 0x22000000, an address
+    MRAM origin and flash an Apollo510 at 0x22000000, an address
     belonging to a different part.  That is the same address forgery, reopened
     on the programmatic path one dimension over from the config path.
 
@@ -747,11 +727,11 @@ def test_a_renamed_builtin_copy_does_not_inherit_the_name_it_was_given():
     """
     from dataclasses import replace
 
-    from helia_profiler.platform import capabilities
+    from helia_profiler.platform.memory_map import mram_app_origin
 
     forged = replace(get_soc("apollo510"), name="atomiq110")
 
-    assert capabilities._SOC_APP_FLASH_LOAD_ADDR["atomiq110"] == 0x22000000  # waiting under it
+    assert mram_app_origin("atomiq110") == 0x22000000  # waiting under it
     assert forged.origin is SocOrigin.BUILTIN  # carried through by `replace`, as intended
     assert forged.registered_name == "apollo510"  # ...but the stamp says what it really is
     assert not forged.is_builtin
@@ -781,7 +761,7 @@ def test_a_self_stamped_registered_name_does_not_confer_builtin_provenance():
     "properly" -- the name half stops being sufficient and ``origin`` is the
     only thing still refusing.  Untested, that refusal could be deleted in a
     tidy-up with zero signal, reopening the address forgery against a live
-    per-SoC override: ``atomiq110``'s address read for an object that is
+    built-in map: ``atomiq110``'s address read for an object that is
     holding Apollo510's platform facts.
 
     Hence the shape below, which is deliberately not reachable today.  It is a
@@ -790,7 +770,7 @@ def test_a_self_stamped_registered_name_does_not_confer_builtin_provenance():
     """
     from dataclasses import replace
 
-    from helia_profiler.platform import capabilities
+    from helia_profiler.platform.memory_map import mram_app_origin
 
     claimed = replace(
         get_soc("apollo510"),
@@ -799,16 +779,14 @@ def test_a_self_stamped_registered_name_does_not_confer_builtin_provenance():
         origin=SocOrigin.CUSTOM,
     )
 
-    # Membership, not the value: the sibling above already pins 0x22000000, and
-    # `capabilities` says that literal is expected to move.  All this assert
-    # needs is that *some* table tier would answer if the gate opened.
-    assert "atomiq110" in capabilities._SOC_APP_FLASH_LOAD_ADDR
+    # Membership, not the value: the sibling pins it.
+    assert mram_app_origin("atomiq110") is not None
     assert claimed.registered_name == claimed.name  # the name half is satisfied...
     assert not claimed.is_builtin  # ...so only `origin` is left to refuse
     assert claimed.capabilities.memory.app_flash_load_addr is None
 
 
-def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_tables():
+def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_map():
     """The looser half: renaming is the disqualifier, copying is not.
 
     Stated on its own rather than only through ``get_soc_for_board`` so that
@@ -826,10 +804,10 @@ def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_tables():
 
 
 def test_every_builtin_soc_is_stamped_builtin_and_states_no_address_itself():
-    """Built-ins keep their addresses in the capability tables, not the field.
+    """Built-ins keep their addresses in the linked memory map, not the field.
 
-    The field is the escape hatch for parts those tables cannot speak for.  A
-    built-in quietly acquiring one would bypass the pinned table values, so
+    The field is the escape hatch for parts that map cannot speak for.  A
+    built-in quietly acquiring one would bypass the pinned map values, so
     adding an address to a registered ``SocDef`` must be a deliberate act that
     updates this test too.
     """
