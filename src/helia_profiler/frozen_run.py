@@ -392,7 +392,8 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
-    model_path = Path(config.model.path).expanduser().resolve()
+    # Preserve symlink spelling: sidecars belong beside the selected model path.
+    model_path = Path(config.model.path).expanduser().absolute()
     baseline = config.compatibility_baseline
     resolution = _compatibility(config)
     return FrozenRun(
