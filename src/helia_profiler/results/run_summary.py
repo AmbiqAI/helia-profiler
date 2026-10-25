@@ -1,31 +1,18 @@
-"""Typed model of ``summary.json`` — the schema as code.
+"""Typed reader and canonical writer for ``summary.json``.
 
-One class owns the artifact's shape for BOTH sides of the boundary:
+``RunSummary.from_dict`` accepts the current schema identity and version.
+Root and typed-section fields that are not recognized are retained in
+``extras`` for inspection; ``to_dict`` omits those extras. Untyped nested
+mappings are carried through. Optional measurements may remain absent.
+Properties provide unit conversions and gate-drift interpretation.
 
-* the **producer** (``report/summary.py``) routes its assembled content
-  through this model -- ``from_dict`` -> a write-time round-trip equality
-  check -> :meth:`RunSummary.to_dict` -- whose emission order and
-  omit-when-``None`` conditionality reproduce the hand-built dict
-  byte-for-byte (``tests/contracts/test_report_golden.py`` is the proof, and
-  the equality check makes any divergence a loud producer-time failure);
-* **consumers** (``validation/runner.py`` today; more as they migrate) load
-  artifacts through :func:`load_run_summary` / :meth:`RunSummary.from_dict`,
-  a current-schema reader: missing optional fields become ``None``, unknown keys are
-  preserved on ``extras`` for inspection, and derived readings (unit
-  conversions, the gate-drift arbitration) live in properties here instead
-  of being re-derived at every read site.
+``report.summary`` assembles the producer's data and checks that its rendered
+form is unchanged after passing through this model. This protects emission
+order, absent-field conventions and values from reader coercion or omission.
 
-A field's meaning has one home: consumers read it here instead of
-re-deriving semantics the producer never promised.
-
-Layering: this module sits in ``results/`` (bottom of the import graph) and
-imports nothing from ``evaluation/`` or ``report/`` — ``evaluation`` imports
-``results``, so a ``RunEvaluation`` reference here would cycle.
-
-Reader vs writer asymmetry, stated honestly: ``to_dict`` serializes only the
-canonical schema — it does NOT re-emit ``extras``. The producer never
-populates ``extras``; the reader keeps them so a consumer can inspect an
-unexpected key without this module lying about round-tripping it.
+This module imports neither ``evaluation`` nor ``report``: both consume these
+result types. Schema history and reader boundaries are documented at
+https://ambiqai.github.io/helia-profiler/reference/run-summary-schema/
 """
 
 from __future__ import annotations
@@ -38,49 +25,7 @@ from typing import Any, Mapping
 from .serde import to_float, to_int
 
 RUN_SUMMARY_SCHEMA = "hpx.run-summary"
-#: Version history lives with the shape it versions (re-exported by
-#: report/contracts.py for its long-standing import sites):
-#: v2: #24 binary.bss; v3: #133 memory_regions owns region truth;
-#: v4: #142/#181 gate verdict re-sourced -- energy_per_inference_j can
-#: coexist with gate_duration_integrity.valid=false, suspect re-keyed to
-#: the observer arbitration, gated_window_reference_drift added.
-#: v5: #249 gated durations prefer driver delta, then sample span, then UTC;
-#: duration_s, avg_current_a,
-#: avg_power_w and the TOPS figures shift; energy_j and TOPS-per-watt do
-#: not. A v4 and a v5 summary are not comparable on those fields.
-#: v6: #317 AOT clean timing and power include per-call input restoration.
-#: v7: #299 on-device power divides by the INA228 accumulation interval, and
-#: the firmware side of the window-clock checks is the gate bracket.
-#: v8: model_analysis MACs fixed for TRANSPOSE_CONV, non-flat
-#: FULLY_CONNECTED and BATCH_MATMUL; total_macs, total_ops, TOPS and
-#: cycles_per_mac move for models with those ops.
-#: v9: #386 on-device gated inference publishes per-inference energy and
-#: inferences-per-joule alongside the existing gated totals.
-#: v10: heliaAOT model_analysis counts SQRT, RSQRT, ABS and
-#: SQUARED_DIFFERENCE as elementwise; helia-aot total_ops and TOPS move for
-#: models with those ops.
-#: v11: #370 the window-clock agreement contexts (power.window_observer_mismatch,
-#: power.window_clock_mismatch) name the firmware gate interval gate_elapsed_us /
-#: gate_elapsed_s; elapsed_us stays the whole firmware window (ceiling, frozen).
-#: v12: #224 AOT costs use the compiled graph and execution positions;
-#: model_analysis records engine and index_space.
-#: v13: #466 memory_plan MRAM capacity is the linker's application window for the
-#: selected toolchain where the SoC has a linked memory map, not the whole part.
-#: v14: #537 adds identity, the run's RunIdentity in the vocabulary fixture
-#: builds share. Additive: no existing field changes meaning.
-#: v15: #558 heliaAOT model_analysis takes heliaAOT's own MAC and parameter
-#: counts from its result views; total_macs, num_parameters, total_ops, TOPS
-#: and cycles_per_mac move for models whose weights lowering repacks.
-#: v16: #558 identity adds intent_hash and, under run, the instance boundary,
-#: first-invoke initializer and window, and the timing clock, its rate and the
-#: statistic; an ExecuTorch run's lifecycle is single. Otherwise additive.
-#: v17: the engine id tflm is now litert, in engine and wherever a summary
-#: names the engine. Otherwise unchanged.
-#: v18: #558 identity.run adds energy: how the run's energy was measured, null
-#: for a profile without power and unknown for one with it. Otherwise additive.
-#: v19: #558 identity's build_hash, observation_hash and intent_hash are
-#: semantic hashes, hpx.<kind>/<version>:sha256:<hex>, not bare hex, and
-#: inputs_sha256 is renamed inputs_hash, also a semantic hash. Otherwise unchanged.
+#: Current summary format; historical changes are in the schema reference above.
 RUN_SUMMARY_SCHEMA_VERSION = 19
 
 
@@ -124,7 +69,7 @@ class MemorySection:
     num_tensors: int | None = None
     input_size: int | None = None
     output_size: int | None = None
-    #: Reader-only: keys a newer producer wrote that this schema predates.
+    #: Unrecognized fields from an admitted document, retained for inspection only.
     extras: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -313,9 +258,8 @@ class LatencySection:
 class PowerSection:
     """``summary["power"]`` — instrument metrics plus the gate verdict render.
 
-    Field order is emission order. Nested blobs the schema does not (yet)
-    type stay as mappings under their historical keys; they graduate to
-    typed sections when a consumer needs their interior.
+    Field order is emission order. Nested mappings retain their recorded keys
+    and values; their contents are not converted into typed sections.
     """
 
     avg_current_a: float | None = None

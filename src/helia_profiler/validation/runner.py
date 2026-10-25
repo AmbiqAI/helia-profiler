@@ -1,18 +1,13 @@
-"""Runner for a single validation case.
+"""Execute one validation case and read its result artifacts.
 
-Builds a temporary YAML config for one :class:`~helia_profiler.validation.CaseSpec`,
-invokes ``hpx profile`` as a subprocess, and parses the resulting artifacts
-into a structured :class:`CaseResult` dict.
+The default path writes a temporary YAML configuration for a
+:class:`~helia_profiler.validation.CaseSpec`, invokes ``hpx profile`` in a
+subprocess, and returns a structured :class:`CaseResult`. The subprocess
+isolates case state and exercises the user-facing CLI.
 
-The subprocess boundary is deliberate: it exercises the true user-facing
-code path (same as typing ``hpx profile --config foo.yml``), isolates state
-between cases, and maps 1:1 to what a GHA runner will eventually do.
-
-Set ``HPX_VALIDATE_INPROCESS=1`` (or pass ``in_process=True`` to
-:func:`run_case`) to bypass the subprocess and call
-:func:`helia_profiler.cli.main` directly instead.  This is faster, lets
-``coverage.py`` see the pipeline code, and surfaces live tracebacks.  The
-subprocess remains the default so CI still exercises the CLI surface.
+Set ``HPX_VALIDATE_INPROCESS=1`` or pass ``in_process=True`` to
+:func:`run_case` to call :func:`helia_profiler.cli.main` directly. This mode
+supports in-process coverage and tracebacks; the default remains a subprocess.
 """
 
 from __future__ import annotations
