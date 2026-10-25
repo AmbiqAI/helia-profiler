@@ -293,10 +293,18 @@ class FrozenRun:
         return plan
 
     def save(self, path: str | Path) -> Path:
-        """Write the plan as JSON and return its path."""
+        """Write the plan as JSON, refusing its source model path or aliases."""
         target = Path(path).expanduser()
         text = json.dumps(self.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
         try:
+            model_path = Path(self.model.path).expanduser().resolve()
+            if target.resolve() == model_path or (
+                target.exists() and model_path.exists() and target.samefile(model_path)
+            ):
+                raise ConfigError(
+                    f"{path} is the model the plan is frozen against",
+                    hint="Name another file for the plan, for example plan.json.",
+                )
             write_text_atomically(target, text)
         except OSError as exc:
             raise ConfigError(f"Cannot save frozen run plan to {target}: {exc}") from exc

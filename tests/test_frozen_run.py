@@ -59,6 +59,41 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+@pytest.mark.parametrize("alias", ["direct", "relative", "symlink", "hardlink"])
+def test_saving_a_plan_refuses_its_model(session, tmp_path, monkeypatch, alias):
+    plan = session.freeze()
+    model = Path(plan.model.path)
+    original = model.read_bytes()
+    target = model
+    if alias == "relative":
+        monkeypatch.chdir(tmp_path)
+        target = Path("sub/../model.tflite")
+    elif alias in {"symlink", "hardlink"}:
+        target = tmp_path / "plan.json"
+        try:
+            if alias == "symlink":
+                target.symlink_to(model)
+            else:
+                target.hardlink_to(model)
+        except (OSError, NotImplementedError):
+            pytest.skip(f"{alias} unavailable on this filesystem")
+
+    with pytest.raises(ConfigError, match="is the model the plan is frozen against"):
+        plan.save(target)
+
+    assert model.read_bytes() == original
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_saving_a_plan_can_replace_a_plan_after_the_model_is_removed(session, tmp_path):
+    plan = session.freeze()
+    target = plan.save(tmp_path / "plan.json")
+    Path(plan.model.path).unlink()
+    target.write_text("old plan")
+
+    assert FrozenRun.load(plan.save(target)) == plan
+
+
 def test_saving_a_plan_replaces_its_name_and_leaves_other_links_alone(session, tmp_path):
     other = tmp_path / "other"
     other.write_bytes(b"other")
