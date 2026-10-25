@@ -18,6 +18,7 @@ const base = '/helia-profiler';
 const basePath = `${base}/`;
 
 export default defineConfig({
+  output: 'static',
   site,
   base,
   /* Legacy MkDocs routes. `served` entries are already real pages at the same
