@@ -2,6 +2,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "certifi>=2026.10.19",
+#     "urllib3>=2.8.0",
 #     "helia-model-zoo @ git+https://github.com/AmbiqAI/helia-model-zoo.git@0124dea005e876b9589537180c0b1f111d115699",
 #     "pyyaml>=6.0",
 # ]
