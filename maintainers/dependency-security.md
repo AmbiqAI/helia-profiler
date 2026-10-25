@@ -8,8 +8,8 @@ live in `astro-site/scripts/security-advisories.test.mjs`, run by
 
 ## Cache advisory: proposed HPX disposition
 
-Recommendation: **not affected in the currently tested HPX documentation
-integration**. This is a consumer-specific assessment, not a claim that the
+Recommendation: **not affected by the client `max-stale` advisory path in the
+currently tested HPX documentation integration**. This is a consumer-specific assessment, not a claim that the
 library is fixed or that the advisory has been withdrawn. Closing #602 or
 dismissing the Dependabot alert requires the owner's explicit disposition.
 
@@ -50,8 +50,8 @@ the docs workflow publishes the built static artifact.
 checks the resolved configuration and actual installed Astro helpers with
 synthetic fetch responses, without network access:
 
-- Private, no-store, no-cache and stale revalidation-restricted images expire
-  immediately in the tested load and revalidation paths.
+- The tested private, no-store, no-cache and stale revalidation-restricted
+  headers expire immediately when no stale extensions are present.
 - Requests do not carry user authorization, cookies or client cache directives;
   revalidation sends the expected conditional request header.
 - Calling a shared-response reuse API from those helpers fails the test and
@@ -63,6 +63,15 @@ The test imports Astro internals intentionally: a package-layout change must
 prompt review of the boundary rather than silently skipping the checks. It
 checks these identified paths, not every possible use of the dependency. Image
 expiry is not a claim that private image bytes are never written to disk.
+
+This is not an assessment of general HTTP cache compliance. Independent probes
+found that adding `stale-if-error` or `stale-while-revalidate` can give restricted
+images a positive lifetime, including after a 304 response. Astro's build image
+pipeline treats that expiry as a cache hit and also reuses stale bytes if
+revalidation throws. Those behaviors are outside the client `max-stale` path;
+these tests do not certify them as safe for authenticated or private content.
+The configuration assertion runs before integration hooks; the successful
+static build supplies the separate publication check.
 
 ### Closeout and reassessment
 

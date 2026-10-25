@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { test } from 'node:test';
+import { beforeEach, test } from 'node:test';
 
 const require = createRequire(import.meta.url);
 const astroRoot = dirname(require.resolve('astro/package.json'));
@@ -13,8 +13,16 @@ const astroRequire = createRequire(join(astroRoot, 'package.json'));
 const CachePolicy = astroRequire('http-cache-semantics');
 const imageUrl = 'https://example.invalid/logo.png';
 
+beforeEach((t) => {
+  for (const method of ['satisfiesWithoutRevalidation', 'evaluateRequest', 'revalidatedPolicy']) {
+    t.mock.method(CachePolicy.prototype, method, () => {
+      assert.fail(`Astro reached shared response reuse API ${method}; reassess #602`);
+    });
+  }
+});
+
 // #602: an upstream helper/API change must trigger reassessment of this boundary.
-test('documentation publication remains static without a server adapter', async () => {
+test('documentation configuration requests static output without a server adapter', async () => {
   const { resolveConfig } = await import(
     pathToFileURL(join(astroRoot, 'dist/core/config/index.js')).href
   );
@@ -34,12 +42,7 @@ for (const cacheControl of [
   'max-age=1, proxy-revalidate',
   's-maxage=1',
 ]) {
-  test(`Astro expires restricted/stale remote images: ${cacheControl}`, async (t) => {
-    for (const method of ['satisfiesWithoutRevalidation', 'evaluateRequest', 'revalidatedPolicy']) {
-      t.mock.method(CachePolicy.prototype, method, () => {
-        assert.fail(`Astro reached shared response reuse API ${method}; reassess #602`);
-      });
-    }
+  test(`Astro expires restricted/stale remote images: ${cacheControl}`, async () => {
     const calls = [];
     const fetchImage = async (url, options = {}) => {
       const request = new Request(url, options);
