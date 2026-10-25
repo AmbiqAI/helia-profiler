@@ -56,6 +56,30 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.4.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.0...v0.4.1) (2026-10-25)
+
+
+### Features
+
+* **tools:** build a validation models file from pinned Zoo models ([c3b3501](https://github.com/AmbiqAI/helia-profiler/commit/c3b3501bf7ab06a982636b9bdf4fa2148c33675b))
+* **tools:** build a validation models file from pinned Zoo models ([64615dc](https://github.com/AmbiqAI/helia-profiler/commit/64615dc9e91674b3ee9f905a87a2cf26e5a5bed6))
+* **validation:** record model family, precision, source and CPU clock ([92d1d23](https://github.com/AmbiqAI/helia-profiler/commit/92d1d237a7c8658cecf0b1a6968c33b6a64f0eca))
+* **validation:** record model family, precision, source, and CPU clock ([33e8c23](https://github.com/AmbiqAI/helia-profiler/commit/33e8c23a3cb9b4f5803ca85af7156ed9466872e4))
+
+
+### Bug Fixes
+
+* **security:** update certificate trust across HPX tooling ([#601](https://github.com/AmbiqAI/helia-profiler/issues/601)) ([67c9254](https://github.com/AmbiqAI/helia-profiler/commit/67c925430d103dfee889f5a78213337f487a8ee6)), closes [#587](https://github.com/AmbiqAI/helia-profiler/issues/587)
+* **security:** update documentation dependency advisories ([#604](https://github.com/AmbiqAI/helia-profiler/issues/604)) ([981fff1](https://github.com/AmbiqAI/helia-profiler/commit/981fff18a2e17e33c0668bdfe619e0d9559c5eb2)), closes [#602](https://github.com/AmbiqAI/helia-profiler/issues/602)
+* **security:** update urllib3 and notebook Tornado dependencies ([#603](https://github.com/AmbiqAI/helia-profiler/issues/603)) ([ad4edc2](https://github.com/AmbiqAI/helia-profiler/commit/ad4edc23009d1c49579419f7acc21c29e9e12fba)), closes [#602](https://github.com/AmbiqAI/helia-profiler/issues/602)
+* **tools:** report malformed Zoo lists without a traceback ([df5f905](https://github.com/AmbiqAI/helia-profiler/commit/df5f905e037875d3baa7750e27da77b3ab1e42fb))
+
+
+### Documentation
+
+* clarify current contracts and consolidate schema history ([#600](https://github.com/AmbiqAI/helia-profiler/issues/600)) ([f78ce66](https://github.com/AmbiqAI/helia-profiler/commit/f78ce66492a31f20f48c3af03e7751b3b941db20)), closes [#599](https://github.com/AmbiqAI/helia-profiler/issues/599) [#580](https://github.com/AmbiqAI/helia-profiler/issues/580)
+* **validation:** document the --models-file keys ([aad7bd0](https://github.com/AmbiqAI/helia-profiler/commit/aad7bd068eb44b5d7f3845aa1c67ee5ce4e2795f))
+
 ## [0.4.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.3.0...v0.4.0) (2026-10-21)
 
 
