@@ -692,7 +692,7 @@ def test_a_board_psram_override_does_not_cost_a_builtin_soc_its_address():
 
     Seven built-in boards override ``psram_kb``, and for those the SoC handed
     to the pipeline is a copy, not the registered object.  Gating the address
-    address on object identity silently reclassified those copies as unknown
+    lookup on object identity silently reclassified those copies as unknown
     parts -- so the map-derived address would vanish on exactly the boards
     that populate PSRAM, which is why this is a typed field.
     """

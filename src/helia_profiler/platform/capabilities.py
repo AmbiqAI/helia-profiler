@@ -314,7 +314,7 @@ def _placement_bases(soc: SocDef) -> Mapping[Placement, int]:
 
 
 def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
-    """Resolve *soc*'s app-image flash (``LoadFile``) address.
+    """Resolve *soc*'s default app-image flash (``LoadFile``) address.
 
     ``soc.app_flash_load_addr`` wins when set: it is the only source a
     ``target.custom_socs`` entry can write.  Otherwise a **built-in** SoC
@@ -323,6 +323,10 @@ def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
     :mod:`~helia_profiler.platform.memory_map` -- the SBL-excluded app origin
     NSX's generated ``flash_cmds.jlink`` programs (the nbl origin on
     atomiq110, whose default profile has no bootloader).
+
+    The flash fallback uses this address when the generated NSX recipe is
+    missing. A present recipe supplies its own address and takes precedence;
+    this default does not characterize arbitrary custom linker layouts.
 
     A custom SoC resolves to ``None`` unless it states an address (directly
     or inherited from its ``based_on`` part, which ``platform.custom``
