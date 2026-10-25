@@ -73,7 +73,10 @@ def test_security_floors_are_declared() -> None:
     """
     floors = _security_floors()
 
-    for name, last_vulnerable, first_patched in (("idna", "3.14", "3.15"),):
+    for name, last_vulnerable, first_patched in (
+        ("idna", "3.14", "3.15"),
+        ("certifi", "2026.4.22", "2026.10.19"),
+    ):
         assert name in floors, (
             f"security floor for {name!r} is gone from [tool.uv] constraint-dependencies; "
             "if that removal is intentional, drop it from this test too"
@@ -108,3 +111,36 @@ def test_every_security_floor_is_still_load_bearing() -> None:
     assert not unused, (
         f"constraint-dependencies floors no longer apply to any locked package: {unused}"
     )
+
+
+def test_certificate_floor_protects_published_installations() -> None:
+    manifest = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    requirements = {
+        canonicalize_name(req.name): req
+        for req in map(Requirement, manifest["project"]["dependencies"])
+    }
+    certifi = requirements[canonicalize_name("certifi")]
+    assert certifi.marker is None
+    assert certifi.specifier.contains("2026.10.19")
+    assert not certifi.specifier.contains("2026.10.18")
+    assert not certifi.specifier.contains("2026.4.22")
+
+
+def test_ci_installers_require_patched_certificate_trust() -> None:
+    import yaml
+
+    installers = []
+    for workflow in (REPO_ROOT / ".github" / "workflows").glob("*.yml"):
+        document = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        for job in document.get("jobs", {}).values():
+            for step in job.get("steps", []):
+                if step.get("uses", "").startswith("astral-sh/setup-uv@"):
+                    version = step.get("with", {}).get("version")
+                    assert version, f"{workflow.name} leaves uv trust unpinned"
+                    assert Version(version) >= Version("0.13.4")
+                    installers.append(version)
+    assert installers
+    manifest = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
+    requirement = Requirement("uv" + manifest["tool"]["uv"]["required-version"])
+    assert not requirement.specifier.contains("0.13.3")
+    assert requirement.specifier.contains("0.13.4")
