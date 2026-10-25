@@ -85,6 +85,31 @@ def test_saving_a_plan_refuses_its_model(session, tmp_path, monkeypatch, alias):
     assert not list(tmp_path.glob("*.partial"))
 
 
+@pytest.mark.parametrize("reload", [False, True])
+def test_relative_model_is_protected_after_changing_directory(
+    session, tmp_path, monkeypatch, reload
+):
+    model = tmp_path / "model.tflite"
+    original = model.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    plan = session.with_model("model.tflite").freeze()
+    assert plan.intent_hash == session.freeze().intent_hash
+    if reload:
+        plan = FrozenRun.load(plan.save(tmp_path / "plan.json"))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    with pytest.raises(ConfigError, match="is the model the plan is frozen against"):
+        plan.save(model)
+
+    assert model.read_bytes() == original
+    assert Path(plan.model.path) == model.resolve()
+    destination = elsewhere / "model.tflite"
+    destination.write_text("old plan")
+    assert FrozenRun.load(plan.save(destination)) == plan
+
+
 def test_saving_a_plan_can_replace_a_plan_after_the_model_is_removed(session, tmp_path):
     plan = session.freeze()
     target = plan.save(tmp_path / "plan.json")

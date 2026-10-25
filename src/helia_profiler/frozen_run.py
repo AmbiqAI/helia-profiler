@@ -392,13 +392,13 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
-    model_path = Path(config.model.path)
+    model_path = Path(config.model.path).expanduser().resolve()
     baseline = config.compatibility_baseline
     resolution = _compatibility(config)
     return FrozenRun(
         settings=settings,
         model=FrozenModel(
-            path=str(config.model.path),
+            path=str(model_path),
             sha256=_file_sha256(model_path),
             size_bytes=model_path.stat().st_size,
         ),
