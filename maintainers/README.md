@@ -8,6 +8,7 @@ out of `astro-site/` so it is not part of the published documentation site.
 | [`architecture.md`](architecture.md) | Profile and retained-run owners, shared stages, verification boundaries and focused tests. |
 | [`fixed-fixture.md`](fixed-fixture.md) | Fixed-input run API, station setup, runtime preparation and retained evidence. |
 | [`fixture-energy.md`](fixture-energy.md) | Fixed-fixture power capture and energy contracts. |
+| [`dependency-security.md`](dependency-security.md) | Dependency advisory guards and the open docs cache-policy disposition. |
 | [`certificate-trust.md`](certificate-trust.md) | Certificate incident remediation, environment checks and rollout responsibilities. |
 | [`releasing.md`](releasing.md) | Release Please flow, version markers, and the trusted-publishing PyPI workflow. |
 | [`hardware-ci.md`](hardware-ci.md) | Running `hpx validate` on the self-hosted GitHub Actions runner and what it uploads. |

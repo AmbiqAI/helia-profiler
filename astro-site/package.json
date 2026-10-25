@@ -39,7 +39,7 @@
     "astro": "7.3.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.6",
