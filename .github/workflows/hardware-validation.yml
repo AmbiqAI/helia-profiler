@@ -243,10 +243,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
         with:
+          version: "0.13.5"
           enable-cache: true
 
       - name: Install Python
-        run: uv python install 3.12
+        run: uv python install --reinstall 3.12
 
       - name: Install validation dependencies
         run: uv sync --locked --python 3.12 --group test --extra aot

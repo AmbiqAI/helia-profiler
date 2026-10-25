@@ -39,7 +39,7 @@ def test_bench_python_reaches_the_js320_driver_lane(validate_job: dict[str, Any]
     # Python 3.11 resolves pyjoulescope-driver 2.2.x, which times out on the JS320 (#228).
     install = _step(validate_job, "Install Python")["run"]
     sync = _step(validate_job, "Install validation dependencies")["run"]
-    assert install == "uv python install 3.12"
+    assert install == "uv python install --reinstall 3.12"
     assert "--python 3.12 " in sync
 
 
