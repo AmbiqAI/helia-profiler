@@ -54,7 +54,7 @@ jobs:
           python-version: "3.11"
 
       - name: Update Python certificate tooling
-        run: uv pip install --python python 'pip>=26.2.2'
+        run: uv pip install --system --python python 'pip>=26.2.2'
 
       - name: Configure GitHub auth (higher API rate limits)
         env:
@@ -108,7 +108,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Update Python certificate tooling
-        run: uv pip install --python python 'pip>=26.2.2'
+        run: uv pip install --system --python python 'pip>=26.2.2'
 
       - name: Configure GitHub auth (higher API rate limits)
         env:
@@ -189,7 +189,7 @@ jobs:
           python-version: "3.11"
 
       - name: Update Python certificate tooling
-        run: uv pip install --python python 'pip>=26.2.2'
+        run: uv pip install --system --python python 'pip>=26.2.2'
 
       # Pinned to the same version contributors are told to install in
       # README.md -- a drifted local/CI pre-commit version is exactly the

@@ -96,7 +96,7 @@ jobs:
 
       - name: Install pinned Griffe with patched uv
         run: |
-          uv pip install --python python 'pip>=26.2.2'
+          uv pip install --system --python python 'pip>=26.2.2'
           uv tool install 'griffe==1.7.3'
           griffe --version
 
