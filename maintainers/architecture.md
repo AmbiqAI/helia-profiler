@@ -20,12 +20,16 @@ Paths below are relative to `src/helia_profiler/`; tests are relative to the rep
 | `api.load_result`, `api.observations` | `records.py` dispatches native profile/run loading; `_result_view.py` and `_run_view.py` map loaded facts into portable observations | Offline reading and mapping. Observations do not perform a new capture or establish verification merely by conforming to a schema. |
 
 `api._execute_profile` owns the single context-to-`ProfileResult` projection,
-including the stored report evaluation without recomputing it. Its private
-console parameter preserves CLI presentation through `profiler.run_profile`;
-public API calls pass no console. The CLI reads the typed outcome and its
-resolved config for the opt-in invalid exit policy. `RunEvaluation` retains
-its experimental payload contract. `profiler.run_profile` still returns a
-context internally; report generation owns evaluation and saved schemas.
+including the stored report evaluation without recomputing it. The CLI scopes
+logging, banner and spinner lifetime through `console.lifecycle.profile_presentation`
+and passes its console as an internal `PipelineObserver`. Pipeline stage notifications
+and profile completion drive rendering; profile completion runs after workspace
+ownership ends. Public API calls install no observer or presentation lifecycle.
+The CLI reads the typed outcome and its resolved config for the opt-in invalid
+exit policy. `RunEvaluation` retains its experimental payload contract.
+`profiler.run_profile` returns a context internally; report generation owns
+evaluation and saved schemas. Run-command JSON emission belongs to `console.json`;
+`run_directory` continues to own summary contents and run-directory coordination.
 
 The public `FixtureDType` and `FixtureCapability` enums are defined in `_fixture_io.py`;
 package-root and existing `_fixture_build` imports resolve to the same class objects.
