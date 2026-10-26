@@ -47,7 +47,7 @@ class LayerResult:
     """Profiling result for a single model layer (averaged across iterations).
 
     ``source_index`` is the ORIGINAL tflite operator index this measured
-    layer corresponds to, when the op label carries one (#218). ``id`` is
+    layer corresponds to, when the op label carries one. ``id`` is
     the firmware's execution position, which on AOT engines is NOT the
     original index — helia-aot skips ops without renumbering.
     """
@@ -181,7 +181,7 @@ class FirmwareMeta:
         string it received, so a corrupted or foreign line reaches consumers
         as text. Anything that needs a number asks here instead of assuming;
         the raw value stays on ``model_size`` so diagnostics can still quote
-        what the device actually said (#281).
+        what the device actually said.
         """
         value = self.model_size
         if isinstance(value, bool) or not isinstance(value, int):
@@ -236,9 +236,9 @@ class PlatformInfo:
     #: "armlink" (armclang: scatter). Measured memory used/free are only
     #: comparable WITHIN a family (GNU counts the floating stack inside the
     #: app extent; armlink's reservations sit outside it), so compare gates
-    #: per-region rows on it (#206). Computed by the same classifier the
+    #: per-region rows on it. Computed by the same classifier the
     #: memory measurer uses, so the two artifact copies cannot disagree.
-    #: ``None`` on artifacts predating #206.
+    #: ``None`` on older artifacts that did not record the link family.
     link_family: str | None = None
 
 
@@ -273,12 +273,11 @@ class EngineInfo:
 
 @dataclass(frozen=True)
 class BuildImage:
-    """Identity of one binary a run actually built (#291).
+    """Identity of one binary a run actually built.
 
-    Source provenance names the inputs; this names the output. Without it two
-    images differing only in ``-mcpu`` carry identical metadata, and evidence
-    can only be told apart by the directory it was filed under — the gap
-    behind the #480 misattribution and the #488 qualification limit.
+    Records output hashes and architecture flags alongside source provenance,
+    so runs built from the same sources with different ISA flags can be
+    distinguished by their recorded build evidence.
 
     ``architecture_flags`` maps each ISA-selecting flag to the number of
     configured translation units containing it, across the whole build tree
@@ -336,9 +335,8 @@ class BinarySections:
     size to whatever remained in the memory region rather than to a
     requirement, purely so ``_sbrk`` has a bounded area. Its size states
     leftover space, not need. ``size``'s Berkeley output folds it into bss,
-    which overstated the reported footprint by hundreds of KB on the affected
-    boards -- 392 KB of "bss" against 260 bytes of real state in the #24
-    reproduction.
+    so reporting that value as live state would count unused heap capacity
+    as program usage.
 
     ``total`` keeps the tool's own inclusive sum, so
     ``text + data + bss + reserved`` reconciles against it.
@@ -396,8 +394,8 @@ class MemoryConsumer:
     name: str
     size: int
     kind: ConsumerKind = ConsumerKind.ARENA
-    #: Optional linked-symbol hint for plan-vs-measured reconciliation
-    #: (#133). Set where the consumer name does not resemble its
+    #: Optional linked-symbol hint for plan-vs-measured reconciliation.
+    #: Set where the consumer name does not resemble its
     #: symbol (heliaAOT: consumer ``dtcm_scratch_arena_0`` vs symbol
     #: ``hpx_arena_dtcm_buffer``); the reconciler's name table covers the
     #: rest. Serialized only when present.
@@ -419,7 +417,7 @@ class MemoryRegionUsage:
     run-summary schema v3 the ``free``/``overflow`` properties are
     plan-time capacity checks (``plan_memory`` raises on oversubscription)
     and are NOT serialized — the measured truth is
-    :class:`MeasuredRegion`, read from the linked ELF (#133).
+    :class:`MeasuredRegion`, read from the linked ELF.
     """
 
     region: MemoryRegion
@@ -479,9 +477,9 @@ class MeasuredRegion:
     PLAN's decision record (what hpx intended, computed before any compiler
     ran); this one is what the linker actually did, computed from the
     binary's section inventory classified into the verified per-SoC windows
-    (``platform.memory_map``). ``used``/``free``/``reserved`` live HERE and
-    only here — the plan stopped wearing measurement vocabulary at
-    run-summary schema v3 (#133).
+    (``platform.memory_map``). Since run-summary schema v3, saved summaries
+    keep measured ``used``/``free``/``reserved`` here, separate from planned
+    usage. The plan records intended consumers and capacity checks.
 
     ``window_*`` is the classification aperture; ``app_*`` is the link
     family's app extent inside it. ``used`` sums allocated, non-reserved
@@ -536,11 +534,11 @@ class UnattributedSection:
 
 @dataclass(frozen=True)
 class MeasuredMemoryRegions:
-    """The measured memory truth of one linked binary (#133).
+    """Measured per-region occupancy of one linked binary.
 
-    Absent (None upstream) whenever it cannot be TRUE: unknown SoC or
+    Unavailable (``None`` upstream) for an unknown SoC or
     linker profile, tool failure, or a partial section inventory
-    (``unparsed_rows`` nonzero) — never guessed, per #131. Regions that no
+    (``unparsed_rows`` nonzero). Regions that no
     ELF section can land in (PSRAM) are excluded entirely; the plan owns
     them.
     """
@@ -608,8 +606,7 @@ class RegionReconciliation:
 
 @dataclass(frozen=True)
 class MemoryReconciliation:
-    """The #133 payoff artifact: what the plan intended vs what the
-    linker did, by name and by region."""
+    """Planned and linked memory usage, compared by consumer and region."""
 
     consumers: tuple[ConsumerReconciliation, ...] = ()
     regions: tuple[RegionReconciliation, ...] = ()

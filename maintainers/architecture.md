@@ -2,21 +2,28 @@
 
 Start with the published [Concepts](../astro-site/src/content/docs/guide/concepts/index.mdx)
 for subsystem responsibilities and [Pipeline](../astro-site/src/content/docs/guide/concepts/pipeline.mdx)
-for the profile stage list. This map locates the retained-run path beside it.
+for the profile stage list. This map locates profile execution, explicit
+freeze/build/run, runtime preparation and saved-record ownership.
 The [Run-summary schema reference](../astro-site/src/content/docs/reference/run-summary-schema.mdx)
 records ordinary profile summary reader/writer boundaries and version history.
 
 Paths below are relative to `src/helia_profiler/`; tests are relative to the repo.
+Module-qualified helpers identify implementation owners, not additional exports
+from the package root.
 
 ## Entry points and boundaries
 
 | Operation | Owner and handoff | Host/device boundary |
 | --- | --- | --- |
 | `profile(config)`, `Session.profile()`, `hpx profile` | `api._execute_profile` → `profiler.run_profile` → `build_default_pipeline` → `PipelineRunner`; returns `ProfileResult` and writes reports | The full path resolves the probe, builds, flashes and captures, including optional power stages. |
-| `Session.freeze()` | `session.py` resolves configuration; `frozen_run.freeze_config` records model/local-input hashes, resolved settings, runtime and environment identity in `FrozenRun` | Host-only planning and local file inspection; no firmware build or device access. |
+| `Session.freeze()`, `hpx freeze` | `session.py` resolves configuration; `frozen_run.freeze_config` records model/local-input hashes, resolved settings, runtime and environment identity in `FrozenRun`; `cli/run_cmds.py` saves the CLI plan | Host-only planning, local file inspection and a compiler `--version` query; no firmware compilation or device access. |
+| `hpx runtimes prepare` | `cli/runtimes_cmd.py` → `prepared_runtimes.prepare_runtime`; fetches and stages a verified archive in the cache. `fixture_runtime.py` owns runtime verification and link proof. | Host download and preparation; LiteRT archive preparation compiles sources, while heliaRT stages a release archive. No device access. |
 | `build(plan, fixture, ...)`, `FrozenRun.build()` | `compiled_build.py` → `_fixture_build.build_fixed_fixture` → shared stages; verifies and returns `CompiledBuild` | Host compilation, with explicit fixture bytes and method. LiteRT/heliaRT consume a prepared runtime supplied by the caller or already in the cache; preparing that runtime is a separate operation. No flashing or capture. |
 | `run_build(compiled, ...)`, `CompiledBuild.run()` | `compiled_build.py` checks the build and request, then `fixture_capture.capture_fixture`; returns `RunResult` | Device access begins here, with the caller's guard and explicit probe serial. Executes the retained build without rebuilding; optional power uses its capture route. |
-| Save/load | `FrozenRun.save/load` owns plan JSON; `CompiledBuild.save/load` owns build JSON and delegates pinned files to `_fixture_record.py`; `RunResult.save` and `load_run` delegate to `run_record.py` | Local file I/O. Build/run records resolve paths through caller-provided roots and verify retained evidence. `Session.save/load` stores reusable intent, a different document from a frozen plan. |
+| `hpx build`, `run_directory.build_into` | `cli/run_cmds.py` calls `build_into`, which pins model/inputs, calls `build` and saves `build.json`; returns `CompiledBuild` to Python callers | Host compilation and automatic persistence in a new or empty run directory. |
+| `hpx validate build`, `run_directory.load_from` | Loads and verifies `build.json` and retained files; the CLI emits a build summary | Host file verification; no compilation or device access. |
+| `hpx run`, `run_directory.run_from` | Loads the build, checks the guard and evidence location, calls `run_build` and saves `evidence_dir/result.json`; returns `RunResult` to Python callers | Device capture with automatic result persistence in a fresh evidence subdirectory. |
+| Save/load | `FrozenRun.save/load` owns plan JSON; `CompiledBuild.save/load` owns build JSON and delegates pinned files to `_fixture_record.py`; `RunResult.save` and `load_run` delegate to `run_record.py` | Local file I/O. Build/run records resolve paths through caller-provided roots and verify retained evidence. `Session.save/load` stores reusable intent, a different document from a frozen plan. Lower-level `build` / `run_build` return objects without automatically saving their build/result JSON; directory helpers perform those saves. |
 | `api.load_result`, `api.observations` | `records.py` dispatches native profile/run loading; `_result_view.py` and `_run_view.py` map loaded facts into portable observations | Offline reading and mapping. Observations do not perform a new capture or establish verification merely by conforming to a schema. |
 
 `api._execute_profile` owns the single context-to-`ProfileResult` projection,
@@ -33,7 +40,7 @@ evaluation and saved schemas. Run-command JSON emission belongs to `console.json
 
 The public `FixtureDType` and `FixtureCapability` enums are defined in `_fixture_io.py`;
 package-root and existing `_fixture_build` imports resolve to the same class objects.
-Their values and saved JSON representation are unchanged.
+Their values are also used in saved JSON.
 
 The public Python surface is the package root's `__all__`, pinned by
 `tests/test_api_stability.py`. Internal `fixture_*` and `_fixture_*` module names

@@ -128,14 +128,14 @@ class PipelineContext:
 
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
-    #: Measured per-region occupancy from the built ELF (#133);
+    #: Measured per-region occupancy from the built ELF;
     #: None whenever it cannot be true (uncharacterized map, tool failure,
     #: partial inventory).
     memory_regions: MeasuredMemoryRegions | None = None
-    #: Sized symbols from the built ELF (#133); None when nm is
+    #: Sized symbols from the built ELF; None when nm is
     #: unavailable or its listing was partial.
     memory_symbols: tuple[SymbolEntry, ...] | None = None
-    #: Plan-vs-measured reconciliation (#133); needs plan,
+    #: Plan-vs-measured reconciliation; needs plan,
     #: measured regions, AND symbols.
     memory_reconciliation: MemoryReconciliation | None = None
 
@@ -149,8 +149,8 @@ class PipelineContext:
     #: ``model_data[]``.
     weights_region: Placement | None = None
 
-    #: The run's single authoritative evaluation (#197): computed once in
-    #: ``write_report`` (#204 D5) and stored here so the console footer and
+    #: The run's single authoritative evaluation: computed once per publication
+    #: in ``report.write_report`` and stored here so the console footer and
     #: the ``--fail-on-invalid`` exit policy consume the same object the
     #: summary rendered and the manifest recorded.
     run_evaluation: RunEvaluation | None = None

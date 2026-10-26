@@ -8,9 +8,8 @@ import sys
 def main(argv: list[str] | None = None) -> None:
     """Entry point for the ``hpx`` console script.
 
-    Invokes the Typer/Click app in standalone mode so usage errors and
-    command implementations continue to raise ``SystemExit`` with the same
-    exit codes as the previous argparse-based CLI.
+    Invokes the Typer/Click app in standalone mode; usage errors and
+    command exit policies are reported through ``SystemExit``.
     """
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments[:1] == ["results"]:
