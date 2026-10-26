@@ -33,7 +33,7 @@
           "summary": "API tier: stable"
         },
         {
-          "description": "Run a full profiling session.\n\nThis is the main programmatic entry point.  It builds the default pipeline,\nexecutes all stages, and returns a typed :class:`ProfileResult`.\n\nRaises :class:`HpxError` (or a subclass) on failure.\n\n**API tier:** `stable`",
+          "description": "Run a full profiling session.\n\nThis is the main programmatic entry point.  It builds the default pipeline,\nexecutes all stages, and returns a typed :class:`ProfileResult`.\n\nThe result includes the stored report evaluation, whose payload retains\nthe experimental :class:`RunEvaluation` contract. Invalid evaluations\nare returned normally, including when ``output.fail_on_invalid`` is set;\nthat exit policy belongs to the CLI.\n\nRaises :class:`HpxError` (or a subclass) on failure.\n\n**API tier:** `stable`",
           "examples": [],
           "id": "helia_profiler.profile",
           "kind": "function",
@@ -45,9 +45,9 @@
           "returns": [],
           "signature": "profile(config: ProfileConfig, *, progress_sink: ProgressSink | None = None) -> ProfileResult",
           "source": {
-            "line": 34,
+            "line": 35,
             "path": "src/helia_profiler/api.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L34"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L35"
           },
           "summary": "Run a full profiling session."
         },

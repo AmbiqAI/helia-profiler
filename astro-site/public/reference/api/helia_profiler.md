@@ -213,11 +213,16 @@ Run a full profiling session.
 This is the main programmatic entry point.  It builds the default pipeline,
 executes all stages, and returns a typed :class:`ProfileResult`.
 
+The result includes the stored report evaluation, whose payload retains
+the experimental :class:`RunEvaluation` contract. Invalid evaluations
+are returned normally, including when ``output.fail_on_invalid`` is set;
+that exit policy belongs to the CLI.
+
 Raises :class:`HpxError` (or a subclass) on failure.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/api.py:34`
+Source: `src/helia_profiler/api.py:35`
 
 ## helia_profiler.ProgressUpdate
 

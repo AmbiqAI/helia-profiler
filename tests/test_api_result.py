@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from helia_profiler import (
     OnDevicePowerSummary,
     PowerObservation,
@@ -19,7 +21,7 @@ from helia_profiler.power.metadata import (
     PowerIntegrity,
     PowerMetadata,
 )
-from helia_profiler.results import FirmwareMeta, PmuResult, PowerRun, PowerRunPlan
+from helia_profiler.results import FirmwareMeta, PmuResult, PowerRun, PowerRunPlan, ResultValidity
 from helia_profiler.wire import POWER_TERMINAL_VERSION
 from tests.pipeline_context_helpers import set_power_result, set_profile_result
 
@@ -103,4 +105,44 @@ def test_profile_forwards_optional_progress_sink(tmp_path: Path, monkeypatch) ->
 
     profile(config, progress_sink=updates.append)
 
-    assert seen == {"progress_sink": updates.append}
+    assert seen == {"console": None, "progress_sink": updates.append}
+
+
+@pytest.mark.parametrize(
+    "validity", [ResultValidity.VALID, ResultValidity.DEGRADED, ResultValidity.INVALID, None]
+)
+def test_profile_preserves_stored_evaluation(tmp_path, monkeypatch, capsys, validity):
+    from helia_profiler.evaluation import RunEvaluation
+
+    config = load_config(
+        None, {"model": {"path": "model.tflite"}, "output": {"fail_on_invalid": True}}
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta(), layers=[]))
+    ctx.run_evaluation = RunEvaluation(validity=validity) if validity is not None else None
+    ctx.report_paths = [tmp_path / "summary.json"]
+    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda *args, **kwargs: ctx)
+
+    result = profile(config)
+
+    assert result.evaluation is ctx.run_evaluation
+    assert result.metadata is ctx.run_metadata
+    assert result.report_paths == ctx.report_paths
+    assert result.report_paths is not ctx.report_paths
+    assert capsys.readouterr() == ("", "")
+
+
+def test_profile_result_existing_construction():
+    from dataclasses import fields
+
+    from helia_profiler.results import ProfileResult, RunMetadata
+
+    pmu = PmuResult(meta=FirmwareMeta(), layers=[])
+    metadata = RunMetadata()
+    paths = [Path("summary.json")]
+    assert ProfileResult(pmu).evaluation is None
+    result = ProfileResult(pmu, None, None, None, None, metadata, paths)
+    assert result.metadata is metadata
+    assert result.report_paths is paths
+    assert result.evaluation is None
+    assert fields(ProfileResult)[-1].name == "evaluation"

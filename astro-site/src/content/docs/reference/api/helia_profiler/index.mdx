@@ -225,13 +225,18 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"profile(config: ProfileConfig, *, progress_sink: ProgressSink | None = None) -> ProfileResult"}
   level={2}
   summary={"Run a full profiling session."}
-  source={{"path":"src/helia_profiler/api.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L34"}}
+  source={{"path":"src/helia_profiler/api.py","line":35,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L35"}}
 >
 
   Run a full profiling session.
 
   This is the main programmatic entry point.  It builds the default pipeline,
   executes all stages, and returns a typed :class:`ProfileResult`.
+
+  The result includes the stored report evaluation, whose payload retains
+  the experimental :class:`RunEvaluation` contract. Invalid evaluations
+  are returned normally, including when ``output.fail_on_invalid`` is set;
+  that exit policy belongs to the CLI.
 
   Raises :class:`HpxError` (or a subclass) on failure.
 

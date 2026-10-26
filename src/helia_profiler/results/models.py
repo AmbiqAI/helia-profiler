@@ -26,6 +26,7 @@ from ..placement import MemoryRegion
 from ..power.base import PowerResult
 
 if TYPE_CHECKING:
+    from ..evaluation import RunEvaluation
     from ..identity import RunIdentity
     from .artifacts import OnDevicePowerSummary, PowerObservation, PowerTerminalRecord
     from .dependencies import DependencyProvenance
@@ -618,8 +619,12 @@ class MemoryReconciliation:
 class ProfileResult:
     """Complete profiling result — the public return type of ``hpx.profile()``.
 
-    This is the one object a programmatic user needs.  It carries everything:
-    PMU data, optional power data, run metadata, and report file paths.
+    Carries PMU data, optional power data, run metadata, report paths, and the
+    stored report evaluation. ``evaluation=None`` means no evaluation was
+    supplied, not a valid verdict. The evaluation payload retains the
+    experimental :class:`RunEvaluation` contract.
+
+    This in-memory result does not define a saved-record schema.
     """
 
     pmu: PmuResult
@@ -629,6 +634,7 @@ class ProfileResult:
     on_device_power: OnDevicePowerSummary | None = None
     metadata: RunMetadata = field(default_factory=RunMetadata)
     report_paths: list[Path] = field(default_factory=list)
+    evaluation: RunEvaluation | None = None
 
     @property
     def layers(self) -> list[LayerResult]:

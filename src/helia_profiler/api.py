@@ -12,8 +12,8 @@ This is the primary entry point for library users::
     if result.total_cycles is not None:
         print(f"{result.total_cycles:,.0f} total cycles across {result.layer_count} layers")
 
-The CLI (``hpx profile``) runs the same pipeline through
-:func:`helia_profiler.profiler.run_profile`, which this function also calls.
+The CLI (``hpx profile``) shares the internal execution helper and typed
+result projection with this function.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from .records import load_result as load_result
 
 if TYPE_CHECKING:
     from .config import ProfileConfig
+    from .console import HpxConsole
     from .pipeline import ProgressSink
     from .results import ProfileResult
 
@@ -41,12 +42,27 @@ def profile(
     This is the main programmatic entry point.  It builds the default pipeline,
     executes all stages, and returns a typed :class:`ProfileResult`.
 
+    The result includes the stored report evaluation, whose payload retains
+    the experimental :class:`RunEvaluation` contract. Invalid evaluations
+    are returned normally, including when ``output.fail_on_invalid`` is set;
+    that exit policy belongs to the CLI.
+
     Raises :class:`HpxError` (or a subclass) on failure.
     """
+    return _execute_profile(config, progress_sink=progress_sink)
+
+
+def _execute_profile(
+    config: ProfileConfig,
+    *,
+    console: HpxConsole | None = None,
+    progress_sink: ProgressSink | None = None,
+) -> ProfileResult:
+    """Execute once and project the completed context for API and CLI callers."""
     from .profiler import run_profile
     from .results import ProfileResult
 
-    ctx = run_profile(config, progress_sink=progress_sink)
+    ctx = run_profile(config, console=console, progress_sink=progress_sink)
 
     return ProfileResult(
         pmu=ctx.captured_pmu,
@@ -56,4 +72,5 @@ def profile(
         on_device_power=(ctx.power_run.on_device_summary if ctx.power_run is not None else None),
         metadata=ctx.run_metadata,
         report_paths=list(ctx.report_paths),
+        evaluation=ctx.run_evaluation,
     )

@@ -59,6 +59,13 @@ fields earlier stages set, through narrowing accessors that raise
 `PipelineError` naming the producing stage when it has not run. The
 [Pipeline](pipeline/) page lists both.
 
+The public profile API and CLI share one internal execution helper that maps
+this completed context into `ProfileResult`. Its optional `evaluation` is the
+same verdict stored by report generation; `None` means no evaluation was
+supplied. The CLI applies `output.fail_on_invalid` to that typed outcome after
+reports and presentation finish. Library callers receive invalid outcomes
+normally and choose their own policy.
+
 ### Two programmatic flows
 
 `hpx.profile` and `Session.profile` run the whole pipeline once: build,

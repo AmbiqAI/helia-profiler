@@ -67,8 +67,8 @@ helia-aot results/aot
 ```
 
 followed by the `hpx doctor` table that `show()` renders. The profile
-step prints the same stage progress and results panel as the CLI and
-returns a `ProfileResult`.
+step returns a `ProfileResult` without console presentation. Pass a
+`progress_sink` callback to receive structured progress updates.
 
 ## How to read it
 
@@ -83,11 +83,19 @@ returns a `ProfileResult`.
   `doctor.ok` and `doctor.checks` remain available for a script.
 - `ProfileResult` carries the merged layers, PMU presets and groups,
   firmware metadata, memory placement, optional power data, run
-  provenance and `report_paths`; `compare()` accepts results or result
+  provenance, `report_paths`, and optional `evaluation`; `compare()` accepts results or result
   directories and returns the `CompareResult` the CLI prints.
 - `session.analyze()` runs the host-side model analysis for the configured
   engine; `session.boards()`, `engines()`, `counters("cpu")`, `probes()`
   and `ports()` are the discovery calls, each typed.
+
+`result.evaluation` exposes the report's existing `RunEvaluation`, whose
+payload remains experimental. `None` means no evaluation was supplied, not
+`VALID`. The optional field is appended, so existing positional construction
+still works; dataclass field introspection includes the new field. This
+in-memory addition does not change saved profile, build or run schemas.
+`output.fail_on_invalid` controls CLI exit status only; Python callers receive
+the result even when its evaluation is `INVALID`.
 
 ## Variations
 
