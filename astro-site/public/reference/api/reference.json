@@ -20839,9 +20839,9 @@
           "returns": [],
           "signature": "profile(config: ProfileConfig, *, progress_sink: ProgressSink | None = None) -> ProfileResult",
           "source": {
-            "line": 35,
+            "line": 34,
             "path": "src/helia_profiler/api.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L35"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/api.py#L34"
           },
           "summary": "Run a full profiling session."
         },
