@@ -190,7 +190,9 @@ portfolio selections; nothing here reads that repository.
 To add a model, add an entry with the sha256 from the Zoo record at that
 commit and an arena size sized like the built-in models: the measured or
 estimated allocated arena plus about 10% headroom, rounded up to a power
-of two.
+of two. Estimate a float precision as its peak live activations (a
+tensor-lifetime pass over the graph) plus the runtime overhead its a8w8
+sibling measured on hardware (allocated arena minus peak activations).
 
 ## Dependency source pinning
 

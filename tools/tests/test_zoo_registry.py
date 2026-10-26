@@ -113,8 +113,9 @@ def test_duplicate_model_refuses(tmp_path):
 def test_checked_in_list_is_valid():
     entries = zoo_registry.load_model_list(zoo_registry.DEFAULT_LIST)
     assert {(e["zoo"], e["precision"]) for e in entries} == {
-        ("mlperf-tiny-kws", "a8w8"),
-        ("mlperf-tiny-kws", "fp32"),
+        (f"mlperf-tiny-{model}", precision)
+        for model in ("kws", "vww", "resnet8", "ad01")
+        for precision in ("a8w8", "fp32", "fp16")
     }
 
 
