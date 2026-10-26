@@ -16,12 +16,8 @@ from .jlink import _DEFAULT_TIMEOUT_S, run_jlink_script
 
 log = logging.getLogger("hpx")
 
-# Every pre-flight refusal in this module has to tell the user the board was
-# left alone: "refused" and "failed halfway through programming" call for
-# opposite next steps.  ``TestFlashRecipeValidation._refuse`` asserts that
-# invariant across all of them by substring, so the phrase is pinned here
-# rather than respelled at each site, where a reword could slip out from
-# under the assertion without failing a test.
+# Preflight refusals must distinguish an untouched board from a flash that
+# failed during programming; callers need different recovery steps.
 _NOTHING_PROGRAMMED_RECIPE = "Nothing was programmed — the recipe was refused before JLinkExe ran."
 # The fallback branch has no recipe to name: it is reached precisely because
 # the recipe is missing, so "the recipe was refused" would be a lie there.
@@ -35,26 +31,13 @@ _NOTHING_PROGRAMMED = "Nothing was programmed — this was refused before JLinkE
 # Handles the quoted form NSX generates and the unquoted form a hand-rolled or
 # hand-edited recipe may use.
 #
-# DELIBERATE DIVERGENCE FROM NSX: NSX's regex anchors the address at
-# end-of-line, which refuses three forms JLinkExe itself accepts.  Its embedded
-# help reads ``loadfile <filename> [, <Addr>] [, <noreset | reset>]``, and the
-# commander strips trailing ``//`` comments from every command line, so
-# ``LoadFile "x.bin", 0x410000, noreset`` and ``LoadFile "x.bin", 0x410000 //
-# the app`` are both valid and both flashed fine before this check existed.
-# NSX only ever reads its own generated recipes; hpx's docstring puts
-# hand-edited recipes in scope, which is exactly where those forms appear, so a
-# hard refusal here would be a regression NSX never risks.  The optional
-# reset/comment tail below closes that gap; keep it when re-syncing with NSX.
-#
-# A bare decimal address is tolerated because hpx has no reason to refuse one,
-# NOT because J-Link is known to read it as decimal: J-Link's numeric
-# convention is per-command and unverified for ``LoadFile``.  Every real NSX
-# recipe uses the ``0x`` form, so this branch is tolerance, not a contract.
-#
-# Named for the property that separates it from ``_ANY_LOAD_FILE_RE`` below:
-# this one requires an ADDRESS, and is the only one whose matches hpx will
-# verify a flash against.  (NSX's own regex, referenced above, is the bare
-# ``_LOAD_FILE_RE``; the names diverge deliberately because the grammars do.)
+# Unlike NSX's end-of-line address match, accept J-Link's optional reset flag
+# and trailing // comments in hand-edited recipes. Commander help gives
+# ``loadfile <filename> [, <Addr>] [, <noreset | reset>]``. Preserve these
+# accepted forms when updating the grammar from NSX.
+# Bare decimal addresses are tolerated, but J-Link's numeric convention is
+# per-command and unverified for LoadFile; NSX emits the unambiguous 0x form.
+# Only addressed matches can supply the expected bank-check address.
 _ADDRESSED_LOAD_FILE_RE = re.compile(
     r'^\s*LoadFile\s+(?:"(?P<quoted>[^"]+)"|(?P<plain>.+?))\s*,\s*'
     r"(?P<address>0x[0-9a-fA-F]+|[0-9]+)"
@@ -84,8 +67,8 @@ _ANY_LOAD_FILE_RE = re.compile(r"^\s*LoadFile\b", re.IGNORECASE | re.MULTILINE)
 # cannot be a per-range start, and J-Link reports no exact destination at all.
 #
 # What that DOES catch: any requested address that falls in a bank J-Link never
-# touched.  That covers the wrong-board case #150 was filed for, because every
-# registered part's ``app_flash_load_addr`` is exactly its bank base (verified
+# touched.  For the parts listed below,
+# ``app_flash_load_addr`` is exactly the bank base (verified
 # against J-Link's device database: apollo3p 0xC000, apollo4p/apollo4l
 # 0x18000, apollo510/apollo510b/apollo5b 0x410000, and against the NSX
 # recipes), so requested-address equality and bank equality coincide there.
@@ -120,42 +103,20 @@ def _parse_addr(text: str) -> int:
 
 
 def _names_this_builds_image(candidate: Path, expected: Path) -> bool:
-    """Does *candidate* name the same file on disk as *expected*?
+    """Match image paths by path equality or filesystem identity.
 
-    Path equality is kept as the fast path — it needs no filesystem access and
-    settles every recipe NSX generates — but on its own it compares path TEXT,
-    and that answer is platform-dependent.  ``Path.resolve()`` does NOT
-    case-fold on POSIX, while on Windows it canonicalises the case of a path
-    that exists, so a recipe whose baked path differs from this build's
-    ``.bin`` only in case is refused as stale on macOS/Linux and accepted on
-    Windows: a spurious hard refusal of a correct flash on one platform, and a
-    gate that disagrees with itself across the two.
-
-    ``samefile`` settles it on stat identity instead — device plus inode, and
-    the volume-serial plus file-index equivalent on Windows — so it is case-
-    correct wherever the volume is, and equally correct where it is not: on a
-    case-SENSITIVE volume the two names really are different files and it says
-    so.  That is the invariant worth asserting here, and unlike ``resolve()``
-    its semantics do not shift between platforms or Python versions.
-
-    Widening only: every pair the text comparison already accepted is still
-    accepted, and ``samefile`` is true solely on a same-file answer from the
-    OS, so the stale-recipe refusal cannot be loosened by this.
+    ``samefile`` honors the volume's case sensitivity and file aliases;
+    resolving paths alone does not establish that two spellings name the
+    same file. If path equality fails and filesystem identity cannot be
+    read, the candidate is rejected.
     """
     if candidate == expected:
         return True
     try:
         return candidate.samefile(expected)
     except (OSError, ValueError):
-        # ``samefile`` stats BOTH paths and raises if either is unreadable.
-        # *expected* is this build's own image, which ``flash_binary`` has
-        # already confirmed is a file, so in practice this is the recipe
-        # naming something that is not there — a stale recipe, the case the
-        # caller must keep refusing with its own message.  A path the OS will
-        # not stat at all lands here too (an embedded NUL raises ValueError,
-        # which ``ntpath.realpath`` waves through on Windows 3.13+).  None of
-        # those is this build's image, so ``False`` is the answer for all of
-        # them and the refusal below stays exactly as it was.
+        # A failed stat cannot prove identity; leave stale/invalid recipe
+        # paths to the caller's typed refusal.
         return False
 
 
@@ -198,27 +159,10 @@ def _recipe_load_address(
             "hand-edited deliberately; re-running the build regenerates the "
             "recipe from NSX but discards any such edits.",
         )
-    # ORDER, not just presence.  ``search`` is position-independent and J-Link
-    # runs a script strictly top to bottom, so ``LoadFile … / ExitOnError 1 /
-    # Exit`` satisfies a presence-only check while giving the flash NO
-    # fail-fast protection whatsoever — precisely the failure the directive is
-    # demanded for, passing the check meant to demand it.
-    #
-    # The rule is "before the first LoadFile" rather than the stricter "the
-    # recipe's first directive".  Both accept every recipe that exists in
-    # practice — NSX's ``flash_cmds.jlink.in`` emits ``ExitOnError 1`` first,
-    # and every NSX-generated recipe observed leads with it — so the two
-    # differ only in what they refuse of a HAND-EDITED recipe -- the same
-    # shapes ``_ADDRESSED_LOAD_FILE_RE`` accepts.
-    # "First directive" additionally refuses a ``Reset`` / ``Halt`` /
-    # ``SelectInterface`` preamble that JLinkExe accepts and that leaves the
-    # LoadFile fully protected: a hard refusal of a working recipe, the same
-    # regression this module already declines to risk.  "Before the first
-    # LoadFile" refuses exactly the recipes that program something with
-    # fail-fast still off, and nothing else.
-    #
-    # A later ``ExitOnError 0`` could disarm it again; that is not modelled,
-    # because nothing generates one and the check would stop being readable.
+    # Fail-fast must precede the first load, including addressless loads.
+    # Reset/Halt/interface preambles remain allowed. This checks the generated
+    # recipe convention, not arbitrary script control flow: a later
+    # ExitOnError 0 is not modelled.
     first_load = _ANY_LOAD_FILE_RE.search(script)
     if first_load is not None and fail_fast.start() > first_load.start():
         raise CaptureError(
@@ -233,9 +177,7 @@ def _recipe_load_address(
             "recipe from NSX, but discards any deliberate hand-edits.",
         )
 
-    # Resolved once: it is hpx's own build path and ``flash_binary`` has
-    # already confirmed it is a file, so unlike the recipe's paths below it
-    # cannot be the one that blows up.
+    # Resolve the expected artifact once for comparisons with recipe paths.
     expected_bin = bin_path.resolve()
     loaded: list[Path] = []
     for match in _ADDRESSED_LOAD_FILE_RE.finditer(script):
@@ -332,7 +274,7 @@ def _verify_flash_address(
 
     This narrows that to the BANK, which is all J-Link reports — see the
     ``_BANK_ADDR_RE`` comment for what that does and does not catch, and for
-    why it nonetheless covers the wrong-board case on every registered part.
+    which parts have verified app-origin/bank-base agreement.
 
     When J-Link names no bank at all this warns instead of raising: the bank
     line is corroboration layered on top of the exit-status gate and the
@@ -395,9 +337,9 @@ def flash_binary(
     ``<build_dir>/jlink/<target>/flash_cmds.jlink`` containing the exact proven
     recipe (``LoadFile <target>.bin, <load_addr>`` -- the address-explicit
     ``.bin`` form the primary flash path uses); prefer running it verbatim.
-    Hand-rolling ``loadfile`` on the extension-less ELF was tried first and
-    SILENTLY programmed nothing on Apollo510 (measured window current stayed
-    byte-identical to the previous firmware), so this must stay on that recipe.
+    Raw extension-less ELF ``loadfile`` can silently program nothing on
+    Apollo510, leaving stale firmware to be measured as the current build.
+    The explicit-address ``.bin`` recipe avoids that failure mode.
 
     Falls back to an explicit ``.bin``-sibling load only if the script is
     missing, and raises if neither is available -- a silent no-op flash is
@@ -430,35 +372,14 @@ def flash_binary(
     # dir, so both branches derive the same expected artifact the same way.
     bin_path = binary_path if binary_path.suffix == ".bin" else binary_path.with_suffix(".bin")
     if script_path.is_file():
-        # Explicit utf-8, never the locale codec: NSX writes the recipe as
-        # utf-8 and reads it back the same way, but Python's default here is
-        # cp1252 on Windows, where a build path with a non-ASCII character
-        # decodes to mojibake.  Before this check that only corrupted the text
-        # piped to JLinkExe; now it decides whether the flash runs at all, so a
-        # mis-decode would refuse a perfectly correct flash.
-        #
-        # Stating the codec also makes a mis-encoded recipe RAISE rather than
-        # mojibake, and ``UnicodeDecodeError`` is not this module's contract
-        # with its caller: ``stages.flash_power`` catches ``CaptureError`` only,
-        # so an untyped escape is reported as "likely a bug in heliaPROFILER"
-        # for what is a user's mis-encoded file.  Converted the same way the
-        # unresolvable-path case below is, and for the same reason.
-        #
-        # ``OSError`` for exactly that reason too, and not as belt-and-braces:
-        # ``is_file()`` above answered about the file as it was a moment ago, so
-        # a recipe that is permission-denied (``chmod 000``), or deleted or
-        # renamed in the window between the two calls, passes the check and then
-        # fails the read.  That is a user's own file in both cases -- the same
-        # class as the mis-encode -- and letting it escape untyped costs the
-        # same two things: the "likely a bug" misattribution, and the skipped
-        # power-cycle retry.
+        # NSX writes UTF-8; a locale codec can corrupt non-ASCII build paths.
+        # File access can also fail after is_file(). Both failures belong to
+        # CaptureError so callers apply capture recovery and diagnostics,
+        # rather than misreporting an internal bug or skipping power retries.
         try:
             script = script_path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError) as exc:
-            # One refusal, two causes, and the opening clause has to be true of
-            # whichever one fired: "is not valid UTF-8" would be a false
-            # diagnosis of a permission-denied read, and would send the user to
-            # re-save a file they cannot open.
+            # Distinguish encoding failures from inaccessible files.
             fault = (
                 "is not valid UTF-8" if isinstance(exc, UnicodeDecodeError) else "cannot be read"
             )
@@ -486,30 +407,9 @@ def flash_binary(
             script, script_path=script_path, bin_path=bin_path, target_name=target_name
         )
         expected_source = f"its NSX flash recipe ({script_path})"
-        # The recipe still WINS (that is this path's whole contract, and the
-        # divergence is legitimate often enough that hard-refusing it would
-        # break working configs), but a declared address that disagrees with it
-        # must not be discarded in silence.  hpx holds two authoritative-looking
-        # statements about where this part boots and quietly picks one; the
-        # disagreement itself is free, high-quality evidence that the build's
-        # linker configuration is not for the part the user declared.  If the
-        # DECLARATION is the correct one, the image lands at the wrong offset
-        # and hpx publishes power numbers for stale firmware — #150's own
-        # failure mode, arriving through the one door this path leaves open.
-        #
-        # Warn, never raise: ``load_addr`` is frequently a legitimately
-        # different (or ``None``) value here.  #153 both makes a custom SoC's
-        # ``app_flash_load_addr`` declarable and documents ``based_on:
-        # apollo510`` alongside a declared address as a WORKING configuration,
-        # stating that the recipe is used verbatim and the value ignored — so
-        # refusing this outright would break a shape the guide recommends.
-        #
-        # Name the CONFIG KEY, not just the firmware target.  ``target_name`` is
-        # ``hpx_profiler_power`` -- the image being flashed, which declares
-        # nothing.  The declaration this warning is about lives under the SoC
-        # entry, and a warning that never names it leaves the reader knowing
-        # something disagrees but not which line to go and edit.  The sibling
-        # refusal below names both keys for the same reason; match it.
+        # The recipe is authoritative, including for custom SoCs whose
+        # declared address differs. Warn without refusing supported configs;
+        # naming the config key lets the user investigate a wrong-part build.
         if load_addr is not None and load_addr != expected_addr:
             log.warning(
                 "DECLARED FLASH ADDRESS IGNORED: flashing %s, the config "
@@ -542,7 +442,7 @@ def flash_binary(
         # (spaces), load address.  A raw ELF loadfile is NOT safe (docstring).
         if not bin_path.is_file():
             # Deterministic: the artifacts are absent on disk, so a power
-            # cycle and retry reproduce the same refusal (#151).
+            # cycle and retry reproduce the same refusal.
             raise DeterministicCaptureError(
                 f"No flashable image for {target_name}: neither the NSX flash "
                 f"script ({script_path}) nor a .bin sibling ({bin_path}) exists. "
@@ -550,21 +450,8 @@ def flash_binary(
                 hint="Re-run the build; the NSX build emits both per target.",
             )
         if load_addr is None:
-            # The hint has to name the YAML a user can actually type.  The
-            # address reaches here as MemoryCapabilities.app_flash_load_addr,
-            # but that is an internal dataclass attribute: naming it sends the
-            # reader looking for a setting that does not exist.  Config first,
-            # because for a custom SoC that reached this branch the build is
-            # not what is broken — nothing declared the address.
-            #
-            # ``device`` can be EMPTY here, and interpolating it blind leaves
-            # the sentence with a hole where the part belongs ("...known for
-            # device  to fall back to").  ``platform.custom`` defaults
-            # ``jlink_device`` to "" for a custom SoC entry that declares
-            # neither the device string nor a ``based_on`` to inherit one from
-            # — the same under-specified entry that leaves the address unknown.
-            # So an empty device is not a formatting nuisance to paper over; it
-            # is a second symptom of the same cause, worth saying out loud.
+            # Point to the user-facing SoC settings. An unspecified custom
+            # SoC may lack both the load address and the J-Link device name.
             named = f"device {device}" if device else "this target's SoC"
             also_unnamed = (
                 ""

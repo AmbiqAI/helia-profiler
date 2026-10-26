@@ -1,68 +1,43 @@
-"""Verified linked-memory map per SoC (#133).
+"""Linked-memory classification windows and application extents per SoC.
 
-The characterized truth of where the LINKER puts things, per SoC and — where
-the two link families disagree — per link family. Every constant below was
-read from the NSX linker scripts and scatter files that hpx's builds actually
-link against (the DEFAULT profile — the ``sbl`` scripts on Apollo parts, the
-``nbl`` scripts on atomiq110; ``nsx_select_linker_script`` in nsx's
-``nsx_toolchain_flags.cmake`` picks it unless an engine opts into the
-``itcm`` profile), byte-verified identical across every cached nsx-ambiq-sdk
-revision, the dev checkout, and a materialized hpx workspace, and — for
-apollo510 (gcc), apollo330P (gcc + ATfE), and atomiq110 (gcc) — confirmed
-against real ``hpx_profiler.map`` files. Citations are
-``<soc>/<toolchain>/<script>:<line>`` inside ``nsx-core/src``.
+Bounds follow NSX's default linker profile: ``sbl`` on Apollo parts and
+``nbl`` on atomiq110, selected by ``nsx_select_linker_script`` in
+``nsx_toolchain_flags.cmake``. Citations below are
+``<soc>/<toolchain>/<script>:<line>`` inside ``nsx-core/src``; RAM aperture
+citations refer to the SDK's ``am_reg_base_addresses.h``.
 
-Why this table exists SEPARATELY from ``capabilities._FAMILY_MEMORY_BASES``:
-that older table records the datasheet-flavored values ``soc_placement_ranges``
-and ``VerifyPlacementStage`` grew up on, and its MRAM bases are wrong for
-accounting — apollo5's ``MRAM: 0x0`` is entirely disjoint from the real app
-flash window ``0x00410000+`` (0x0 is ITCM there). Correcting it in place would
-silently change verify-placement behavior, so a contract test pins the known
-divergences until the old callers migrate here (#133).
+Memory accounting and ``VerifyPlacementStage`` use these linked extents.
+``capabilities._FAMILY_MEMORY_BASES`` supplies declared placement ranges,
+which remain the placement-check fallback for custom SoCs without a linked
+map. Those ranges are not an accounting map: Apollo5's declared MRAM base
+is 0x0, while its linked app flash starts at 0x00410000 and 0x0 is ITCM.
 
-The toolchain axis is TWO-valued: there is no ATfE-specific script anywhere —
-ATfE links the gcc ``*.ld`` scripts (confirmed from nsx's cmake and an
-apollo330mP ATfE LLD map), so app-available lengths key on the LINK family
-(GNU ld vs armlink), not the compiler.
+Application extents depend on link family, not compiler. GCC and ATfE use
+GNU ``*.ld`` scripts; armclang uses armlink ``*.sct`` scatter files.
 
-Aperture rule (applied uniformly): every RAM classification ``window``
-(ITCM/DTCM/SRAM) is the HARDWARE aperture from the SDK's
-``am_reg_base_addresses.h`` for that part — never a single linker script's
-opinion of it — because the two link families carve the same silicon
-differently (gcc may decline to use the top of a TCM that armlink tiles
-exactly full). What differs per link family is only ``app_window``,
-which IS a linker-script fact. MRAM windows are deliberately NOT the
-hardware flash aperture: they start at the SBL-excluded app origin both
-scripts link at (e.g. 0x00410000 on AP5, where hardware MRAM begins at
-0x00400000) — an app section can only ever land in the app window, and
-"below the app origin" should classify as outside, not as MRAM.
+RAM classification ``window`` bounds describe hardware apertures, because
+link families carve the same silicon differently. ``app_window`` describes
+each link family's application extent within that aperture. MRAM windows
+instead begin at the app link origin, excluding any bootloader reservation:
+addresses below the app origin must classify as outside the app's MRAM.
 
-Scoping: only the RAM banks the NSX scripts actually link into are
-windowed. apollo4p/4l also have EXTRAM (0x10160000) and SSRAM1 (0x101C0000)
-apertures in the SDK, but no script places anything there and
-``soc.memory.sram_kb`` agrees with SSRAM0 alone — sections there classify
-``None``, correctly flagging an uncharacterized placement rather than
-absorbing it into "SRAM".
+Only RAM banks used by the default NSX scripts are characterized. Apollo4p
+and Apollo4l also have EXTRAM (0x10160000) and SSRAM1 (0x101C0000) apertures,
+but their scripts use SSRAM0 and ``soc.memory.sram_kb`` describes that bank.
+Sections in the other banks classify as ``None`` to expose an uncharacterized
+placement. PSRAM has no region in these linker scripts; board knowledge
+supplies its window with ``section_attributable=False``, so occupancy comes
+from the plan. ``nvm_kb`` has no linker counterpart and is absent here.
 
-PSRAM has no linker region on any SoC (grep-verified across every ``.ld`` and
-``.sct``); its window comes from the existing board-knowledge tables, is
-marked with that provenance, and carries ``section_attributable=False`` —
-no ELF section can ever land there, so occupancy must come from the plan.
-``nvm_kb`` likewise has no linker counterpart and is deliberately absent
-here.
+Free space is the app extent minus allocated section sizes inside it,
+excluding ``linker_reserved`` sections. Fixed heap/stack reservations outside
+the app extent count as reserved. GNU's floating ``.stack`` counts as live
+occupancy; its fill-to-end ``.heap`` counts as reserved. See
+``LinkedRegionWindow`` for the two reservation mechanisms.
 
-Free math (the contract these shapes exist for):
-``free = app_window[family].length − Σ(size of allocated sections whose
-address falls inside app_window[family], excluding linker_reserved ones)``.
-Sections inside ``window`` but outside ``app_window`` are the linker's
-FIXED reservations (armlink's scatter heap/stack, apollo3p's STACKMEM) —
-reserved, not app usage. gcc's floating ``.stack`` sits INSIDE the extent
-and counts as occupancy (live memory, the #131 stance); only the
-fill-to-end ``.heap`` is ``linker_reserved``-excluded. See the
-``LinkedRegionWindow`` docstring for why the two mechanisms exist.
-Load-image (MRAM) accounting sums ``LoadSegment.file_size`` grouped by
-``classify_address(physical_address)`` — see the ``LoadSegment`` docstring
-for why walking sections into segments is wrong on armlink.
+Load-image accounting sums ``LoadSegment.file_size`` by the region of each
+segment's physical address. See ``LoadSegment`` for why attributing load
+bytes by section is incorrect for armlink's aggregate segments.
 """
 
 from __future__ import annotations
@@ -89,7 +64,7 @@ class LinkFamily(StrEnum):
 #: raises instead of silently guessing GNU, so a future armlink-based
 #: toolchain must be added here on purpose. Kept in lockstep with
 #: :class:`helia_profiler.vocab.Toolchain` by a contract test — platform
-#: deliberately does not import the config layer (#229 D2).
+#: deliberately does not import the config layer.
 _LINK_FAMILY_BY_TOOLCHAIN: dict[str, LinkFamily] = {
     "arm-none-eabi-gcc": LinkFamily.GNU,
     "gcc": LinkFamily.GNU,
@@ -119,7 +94,7 @@ class LinkedRegionWindow:
     excluding linker_reserved ones)``.
 
     Reservations are handled by TWO mechanisms, matched to how each link
-    family expresses them (#176):
+    family expresses them:
 
     * FIXED script regions are carved out by EXTENT: armlink's scatter
       pins ``ARM_LIB_HEAP``/``ARM_LIB_STACK`` above ``MCU_TCM`` (so the
@@ -131,9 +106,9 @@ class LinkedRegionWindow:
       an ordinary output section whose position depends on what else the
       script places first (apollo330P's ``.dtcm_text`` — which hpx's own
       AOT engine emits via ``HELIAAOT_PUT_IN_ITCM`` — precedes it; a
-      fixed carve-out was wrong there). The gcc DTCM extent is therefore
+      fixed carve-out would exclude app code there). The gcc DTCM extent is therefore
       the FULL script region, and ``.stack`` counts as occupancy — it is
-      live memory the firmware needs (#131, as ``BinarySections``). gcc's fill-to-end ``.heap`` is the one
+      live memory the firmware needs. gcc's fill-to-end ``.heap`` is the one
       ``linker_reserved`` exclusion (its size states what was LEFT, so
       counting it would make free identically zero).
 
@@ -149,17 +124,16 @@ class LinkedRegionWindow:
     #: Where the WINDOW bounds came from: "hardware-aperture" (SDK regs
     #: headers — the RAM regions), "linker-app-origin" (MRAM: app link
     #: origin to hardware flash top), or "board-knowledge" (PSRAM). The
-    #: window and the app extents genuinely have different provenances;
-    #: one string covering both published a false claim (#176).
+    #: window and app extents have separate provenance because hardware
+    #: bounds and linker reservations come from different sources.
     window_provenance: str = "hardware-aperture"
     #: Where the app extents came from — linker-script characterization,
     #: or board knowledge (PSRAM).
     app_provenance: str = "linker-script"
-    #: False when no ELF section can ever land here (PSRAM: no linker
-    #: region exists on any SoC). Consumers must reconcile such regions from
+    #: False when the characterized linker scripts provide no section region
+    #: here (PSRAM). Consumers must reconcile such regions from
     #: the PLAN, never report "used 0, free capacity" from an inventory
-    #: that structurally cannot see them — that would recreate the exact
-    #: #133 pathology this module exists to close.
+    #: that structurally cannot see them.
     section_attributable: bool = True
 
     def __post_init__(self) -> None:
@@ -279,7 +253,7 @@ _APOLLO4 = (
 # beyond gcc's window). gcc app data: 496 KB - 16 KB stack = 480 KB, with
 # the fill-to-end .heap absorbing the remainder. armlink: 492 KB MCU_TCM
 # for RW+ZI (fixed 4 KB heap + 16 KB stack live above it).
-# MRAM: 4032 KB from the app origin 0x00410000 — hpx's older family table
+# MRAM: 4032 KB from the app origin 0x00410000 — the declared placement table
 # says base 0x0, which on this family is ITCM, not MRAM.
 _APOLLO5_FULL = (
     _window(MemoryRegion.ITCM, 0x00000000, 262_144, gnu=262_144, armlink=262_144),
@@ -314,7 +288,7 @@ _APOLLO5_FULL = (
 # scatter tiles to exactly that (MCU_TCM 0x3B000 + heap 0x1000 + stack
 # 0x4000 = 0x40000), the same pattern it uses on AP510. gcc's script
 # simply declines to use the top 16 KB (MCU_TCM stops at 240 KB) — a script
-# choice, not a hardware limit (#176). The
+# choice, not a hardware limit. The
 # armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
 # should.
 _APOLLO330P = (
@@ -329,8 +303,8 @@ _APOLLO330P = (
     # gcc extent = the FULL 240 KB MCU_TCM script region. On THIS part
     # .dtcm_text precedes .stack into MCU_TCM (and hpx's AOT engine emits
     # .dtcm_text via HELIAAOT_PUT_IN_ITCM on ITCM-less parts), so the
-    # stack's position is link-dependent — a fixed carve-out was wrong
-    # (#176). armlink extent = MCU_TCM.
+    # stack's position is link-dependent and cannot be a fixed carve-out.
+    # armlink extent = MCU_TCM.
     _window(
         MemoryRegion.DTCM,
         0x20000000,
@@ -407,14 +381,14 @@ def linked_memory_map(
     ``capabilities.resolve_app_flash_load_addr``; see ``SocDef.is_builtin``).
     Every registered SoC is currently characterized, so builtins never hit
     the empty branch today. Callers treat empty as unavailable, never
-    guessed, per #131's discipline.
+    guessed.
 
     ``linker_profile`` is the third axis of the real layout: these tables
     characterize NSX's DEFAULT profile ONLY (sbl-based on Apollo parts,
     nbl-based on atomiq110). ``itcm`` is a
     documented engine knob (the ``guide/engines`` page) forwarded straight
     to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
-    AP510-sized ones (the upstream NSX bug reported in #176) — so any
+    AP510-sized ones (see upstream-script investigation in #176) — so any
     profile other than ``default`` returns empty: the honest "unavailable"
     instead of a confidently wrong map.
     """
