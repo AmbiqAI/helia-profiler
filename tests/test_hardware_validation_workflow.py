@@ -71,8 +71,10 @@ def _run_bash(script: str, env: dict[str, str], cwd: Path) -> str:
     bash = shutil.which("bash")
     if bash is None:
         pytest.skip("workflow script tests require bash")
+    # Stdin keeps Windows argv quoting off backslashes.
     return subprocess.run(
-        [bash, "--noprofile", "--norc", "-euo", "pipefail", "-c", script],
+        [bash, "--noprofile", "--norc", "-euo", "pipefail", "-s"],
+        input=script,
         env={"PATH": os.environ["PATH"], **env},
         cwd=cwd,
         check=True,
