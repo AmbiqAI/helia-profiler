@@ -242,10 +242,10 @@ def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any)
 
     console = HpxConsole(resolved_config.verbose)
 
-    from ..profiler import run_profile
+    from ..api import _execute_profile
 
     try:
-        ctx = run_profile(resolved_config, console=console)
+        result = _execute_profile(resolved_config, console=console)
     except KeyboardInterrupt:
         console.print_interrupted()
         sys.exit(130)
@@ -253,18 +253,10 @@ def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any)
         console.print_error(exc)
         sys.exit(1)
 
-    # #197: opt-in exit policy for automation. Deliberately AFTER the run
-    # completes -- artifacts are written, the console footer rendered the
-    # verdict, and comparability already blocks invalid runs; 3 is distinct
-    # from 1 (error) / 2 (usage) / 130 (interrupt). Reads the STORED
-    # evaluation only: every run that returns from run_profile has passed
-    # write_report (the report stage never skips), so if a skip path is
-    # ever introduced this policy must gain the footer's fresh-evaluate
-    # fallback with it.
+    # Apply the opt-in exit policy only after reports and presentation complete.
     if (
-        ctx is not None
-        and ctx.run_evaluation is not None
-        and ctx.run_evaluation.validity is ResultValidity.INVALID
-        and ctx.config.output.fail_on_invalid
+        result.evaluation is not None
+        and result.evaluation.validity is ResultValidity.INVALID
+        and resolved_config.output.fail_on_invalid
     ):
         sys.exit(3)

@@ -12,12 +12,20 @@ Paths below are relative to `src/helia_profiler/`; tests are relative to the rep
 
 | Operation | Owner and handoff | Host/device boundary |
 | --- | --- | --- |
-| `profile(config)`, `Session.profile()` | `api.py` → `profiler.run_profile` → `build_default_pipeline` → `PipelineRunner`; returns `ProfileResult` and writes reports | The full path resolves the probe, builds, flashes and captures, including optional power stages. |
+| `profile(config)`, `Session.profile()`, `hpx profile` | `api._execute_profile` → `profiler.run_profile` → `build_default_pipeline` → `PipelineRunner`; returns `ProfileResult` and writes reports | The full path resolves the probe, builds, flashes and captures, including optional power stages. |
 | `Session.freeze()` | `session.py` resolves configuration; `frozen_run.freeze_config` records model/local-input hashes, resolved settings, runtime and environment identity in `FrozenRun` | Host-only planning and local file inspection; no firmware build or device access. |
 | `build(plan, fixture, ...)`, `FrozenRun.build()` | `compiled_build.py` → `_fixture_build.build_fixed_fixture` → shared stages; verifies and returns `CompiledBuild` | Host compilation, with explicit fixture bytes and method. LiteRT/heliaRT consume a prepared runtime supplied by the caller or already in the cache; preparing that runtime is a separate operation. No flashing or capture. |
 | `run_build(compiled, ...)`, `CompiledBuild.run()` | `compiled_build.py` checks the build and request, then `fixture_capture.capture_fixture`; returns `RunResult` | Device access begins here, with the caller's guard and explicit probe serial. Executes the retained build without rebuilding; optional power uses its capture route. |
 | Save/load | `FrozenRun.save/load` owns plan JSON; `CompiledBuild.save/load` owns build JSON and delegates pinned files to `_fixture_record.py`; `RunResult.save` and `load_run` delegate to `run_record.py` | Local file I/O. Build/run records resolve paths through caller-provided roots and verify retained evidence. `Session.save/load` stores reusable intent, a different document from a frozen plan. |
 | `api.load_result`, `api.observations` | `records.py` dispatches native profile/run loading; `_result_view.py` and `_run_view.py` map loaded facts into portable observations | Offline reading and mapping. Observations do not perform a new capture or establish verification merely by conforming to a schema. |
+
+`api._execute_profile` owns the single context-to-`ProfileResult` projection,
+including the stored report evaluation without recomputing it. Its private
+console parameter preserves CLI presentation through `profiler.run_profile`;
+public API calls pass no console. The CLI reads the typed outcome and its
+resolved config for the opt-in invalid exit policy. `RunEvaluation` retains
+its experimental payload contract. `profiler.run_profile` still returns a
+context internally; report generation owns evaluation and saved schemas.
 
 The public `FixtureDType` and `FixtureCapability` enums are defined in `_fixture_io.py`;
 package-root and existing `_fixture_build` imports resolve to the same class objects.

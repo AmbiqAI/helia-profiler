@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from helia_profiler.cli import profile_cmd as cli
 from helia_profiler.console import HpxConsole
+from helia_profiler.results import FirmwareMeta, PmuResult, ProfileResult
 
 
 def _run_profile_cmd(**overrides):
@@ -22,7 +23,10 @@ def test_profile_cli_forwards_rtt_buffer_size(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
+    monkeypatch.setattr(
+        "helia_profiler.api._execute_profile",
+        lambda config, **kwargs: ProfileResult(PmuResult(meta=FirmwareMeta(), layers=[])),
+    )
 
     _run_profile_cmd(rtt_buffer_size_up=16384)
 
@@ -40,7 +44,10 @@ def test_profile_cli_forwards_explicit_dependency_mode(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
+    monkeypatch.setattr(
+        "helia_profiler.api._execute_profile",
+        lambda config, **kwargs: ProfileResult(PmuResult(meta=FirmwareMeta(), layers=[])),
+    )
 
     _run_profile_cmd(update_dependencies=True)
 
@@ -59,7 +66,10 @@ def test_profile_cli_forwards_power_firmware(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
+    monkeypatch.setattr(
+        "helia_profiler.api._execute_profile",
+        lambda config, **kwargs: ProfileResult(PmuResult(meta=FirmwareMeta(), layers=[])),
+    )
 
     _run_profile_cmd(power=True, power_firmware="shared")
 
@@ -78,7 +88,10 @@ def test_profile_cli_forwards_split_placement_to_model(monkeypatch) -> None:
         return SimpleNamespace(verbose=False)
 
     monkeypatch.setattr("helia_profiler.config.load_config", fake_load_config)
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", lambda config, **kwargs: None)
+    monkeypatch.setattr(
+        "helia_profiler.api._execute_profile",
+        lambda config, **kwargs: ProfileResult(PmuResult(meta=FirmwareMeta(), layers=[])),
+    )
 
     _run_profile_cmd(runtime_arena_location="sram", runtime_weights_location="mram")
 
@@ -96,8 +109,9 @@ def test_profile_cli_owns_console_presentation(monkeypatch) -> None:
     def fake_run_profile(received_config, **kwargs):
         seen["config"] = received_config
         seen.update(kwargs)
+        return ProfileResult(PmuResult(meta=FirmwareMeta(), layers=[]))
 
-    monkeypatch.setattr("helia_profiler.profiler.run_profile", fake_run_profile)
+    monkeypatch.setattr("helia_profiler.api._execute_profile", fake_run_profile)
 
     _run_profile_cmd(verbose=1)
 
