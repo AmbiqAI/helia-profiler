@@ -130,8 +130,8 @@ class LinkedRegionWindow:
     #: Where the app extents came from — linker-script characterization,
     #: or board knowledge (PSRAM).
     app_provenance: str = "linker-script"
-    #: False when no ELF section can ever land here (PSRAM: no linker
-    #: region exists on any SoC). Consumers must reconcile such regions from
+    #: False when the characterized linker scripts provide no section region
+    #: here (PSRAM). Consumers must reconcile such regions from
     #: the PLAN, never report "used 0, free capacity" from an inventory
     #: that structurally cannot see them.
     section_attributable: bool = True

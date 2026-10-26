@@ -538,9 +538,9 @@ class MeasuredMemoryRegions:
 
     Unavailable (``None`` upstream) for an unknown SoC or
     linker profile, tool failure, or a partial section inventory
-    (``unparsed_rows`` nonzero). Regions that no
-    ELF section can land in (PSRAM) are excluded entirely; the plan owns
-    them.
+    (``unparsed_rows`` nonzero). Regions without a section-attributable
+    window in the characterized linker map (PSRAM) are excluded; the plan
+    owns their occupancy.
     """
 
     link_family: str
