@@ -38,7 +38,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   Profiling result for a single model layer (averaged across iterations).
 
   ``source_index`` is the ORIGINAL tflite operator index this measured
-  layer corresponds to, when the op label carries one (#218). ``id`` is
+  layer corresponds to, when the op label carries one. ``id`` is
   the firmware's execution position, which on AOT engines is NOT the
   original index — helia-aot skips ops without renumbering.
 
@@ -606,7 +606,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     string it received, so a corrupted or foreign line reaches consumers
     as text. Anything that needs a number asks here instead of assuming;
     the raw value stays on ``model_size`` so diagnostics can still quote
-    what the device actually said (#281).
+    what the device actually said.
 
   </RefSymbol>
 
@@ -709,7 +709,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"RunMetadata(\n    hpx_version: str = '',\n    run_id: str = '',\n    timestamp: str = '',\n    config_snapshot: dict[str, Any] = dict(),\n    platform: PlatformInfo | None = None,\n    model: ModelInfo | None = None,\n    toolchain: ToolchainInfo | None = None,\n    build_images: tuple[BuildImage, ...] = (),\n    engine: EngineInfo | None = None,\n    firmware: FirmwareMeta | None = None,\n    memory_plan: 'MemoryPlan | None' = None,\n    timing: TimingInfo | None = None,\n    compatibility: CompatibilityResolution | None = None,\n    dependencies: 'DependencyProvenance | None' = None,\n    identity: 'RunIdentity | None' = None,\n) -> None"}
   level={2}
   summary={"Accumulated run metadata — enriched by stages, consumed by reports."}
-  source={{"path":"src/helia_profiler/results/models.py","line":303,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L303"}}
+  source={{"path":"src/helia_profiler/results/models.py","line":302,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L302"}}
 >
 
   `dataclass`
@@ -725,7 +725,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"hpx_version: str = ''"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":307,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L307"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":306,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L306"}}
   >
 
 
@@ -739,7 +739,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"run_id: str = ''"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":308,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L308"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":307,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L307"}}
   >
 
 
@@ -753,7 +753,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"timestamp: str = ''"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":309,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L309"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":308,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L308"}}
   >
 
 
@@ -767,7 +767,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"config_snapshot: dict[str, Any] = field(default_factory=dict)"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":310,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L310"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":309,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L309"}}
   >
 
 
@@ -781,7 +781,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"platform: PlatformInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":311,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L311"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":310,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L310"}}
   >
 
 
@@ -795,7 +795,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"model: ModelInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":312,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L312"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":311,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L311"}}
   >
 
 
@@ -809,7 +809,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"toolchain: ToolchainInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":313,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L313"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":312,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L312"}}
   >
 
 
@@ -823,7 +823,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"build_images: tuple[BuildImage, ...] = ()"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":316,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L316"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":315,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L315"}}
   >
 
 
@@ -837,7 +837,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"engine: EngineInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":317,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L317"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":316,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L316"}}
   >
 
 
@@ -851,7 +851,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"firmware: FirmwareMeta | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":318,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L318"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":317,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L317"}}
   >
 
 
@@ -865,7 +865,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"memory_plan: 'MemoryPlan | None' = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":319,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L319"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":318,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L318"}}
   >
 
 
@@ -879,7 +879,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"timing: TimingInfo | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":320,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L320"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":319,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L319"}}
   >
 
 
@@ -893,7 +893,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"compatibility: CompatibilityResolution | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":321,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L321"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":320,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L320"}}
   >
 
 
@@ -907,7 +907,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"dependencies: 'DependencyProvenance | None' = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":322,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L322"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":321,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L321"}}
   >
 
 
@@ -921,7 +921,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"identity: 'RunIdentity | None' = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":325,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L325"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":324,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L324"}}
   >
 
 
@@ -938,7 +938,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"ProfileResult(\n    pmu: PmuResult,\n    power: PowerResult | None = None,\n    power_observation: PowerObservation | None = None,\n    power_terminal: PowerTerminalRecord | None = None,\n    on_device_power: OnDevicePowerSummary | None = None,\n    metadata: RunMetadata = RunMetadata(),\n    report_paths: list[Path] = list(),\n    evaluation: RunEvaluation | None = None,\n) -> None"}
   level={2}
   summary={"Complete profiling result — the public return type of hpx.profile()."}
-  source={{"path":"src/helia_profiler/results/models.py","line":618,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L618"}}
+  source={{"path":"src/helia_profiler/results/models.py","line":615,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L615"}}
 >
 
   `dataclass`
@@ -961,7 +961,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"pmu: PmuResult"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":630,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L630"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":627,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L627"}}
   >
 
 
@@ -975,7 +975,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"power: PowerResult | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":631,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L631"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":628,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L628"}}
   >
 
 
@@ -989,7 +989,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"power_observation: PowerObservation | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":632,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L632"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":629,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L629"}}
   >
 
 
@@ -1003,7 +1003,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"power_terminal: PowerTerminalRecord | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":633,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L633"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":630,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L630"}}
   >
 
 
@@ -1017,7 +1017,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"on_device_power: OnDevicePowerSummary | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":634,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L634"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":631,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L631"}}
   >
 
 
@@ -1031,7 +1031,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"metadata: RunMetadata = field(default_factory=RunMetadata)"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":635,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L635"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":632,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L632"}}
   >
 
 
@@ -1045,7 +1045,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"report_paths: list[Path] = field(default_factory=list)"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":636,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L636"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":633,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L633"}}
   >
 
 
@@ -1059,7 +1059,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"evaluation: RunEvaluation | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":637,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L637"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":634,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L634"}}
   >
 
 
@@ -1074,7 +1074,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"layers: list[LayerResult]"}
     level={3}
     summary={"Merged per-layer results across all PMU presets."}
-    source={{"path":"src/helia_profiler/results/models.py","line":640,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L640"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":637,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L637"}}
   >
 
     Merged per-layer results across all PMU presets.
@@ -1088,7 +1088,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"total_cycles: float | None"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":645,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L645"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":642,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L642"}}
   >
 
 
@@ -1102,7 +1102,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"layer_count: int"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":649,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L649"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":646,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L646"}}
   >
 
 
@@ -1116,7 +1116,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"overflow_detected: bool"}
     level={3}
-    source={{"path":"src/helia_profiler/results/models.py","line":653,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L653"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":650,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L650"}}
   >
 
 
