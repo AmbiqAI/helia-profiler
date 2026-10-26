@@ -8,8 +8,6 @@ can keep doing ``from helia_profiler.console import HpxConsole``.
 
 from __future__ import annotations
 
-# NB: status_console is a LIVE re-export surface — profiler.py routes the
-# stage-status stream through it.
 from .base import HpxConsole, _console, status_console
 
 __all__ = ["HpxConsole"]

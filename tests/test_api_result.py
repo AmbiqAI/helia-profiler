@@ -105,7 +105,7 @@ def test_profile_forwards_optional_progress_sink(tmp_path: Path, monkeypatch) ->
 
     profile(config, progress_sink=updates.append)
 
-    assert seen == {"console": None, "progress_sink": updates.append}
+    assert seen == {"observer": None, "progress_sink": updates.append}
 
 
 @pytest.mark.parametrize(

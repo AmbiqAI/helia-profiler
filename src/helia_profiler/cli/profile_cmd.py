@@ -243,9 +243,11 @@ def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any)
     console = HpxConsole(resolved_config.verbose)
 
     from ..api import _execute_profile
+    from ..console.lifecycle import profile_presentation
 
     try:
-        result = _execute_profile(resolved_config, console=console)
+        with profile_presentation(console):
+            result = _execute_profile(resolved_config, observer=console)
     except KeyboardInterrupt:
         console.print_interrupted()
         sys.exit(130)

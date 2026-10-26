@@ -116,7 +116,7 @@ def test_profile_cli_owns_console_presentation(monkeypatch) -> None:
     _run_profile_cmd(verbose=1)
 
     assert seen["config"] is config
-    console = seen["console"]
+    console = seen["observer"]
     assert isinstance(console, HpxConsole)
     assert console.verbosity == 1
 
