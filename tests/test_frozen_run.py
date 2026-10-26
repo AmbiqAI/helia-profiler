@@ -59,6 +59,66 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+@pytest.mark.parametrize("alias", ["direct", "relative", "symlink", "hardlink"])
+def test_saving_a_plan_refuses_its_model(session, tmp_path, monkeypatch, alias):
+    plan = session.freeze()
+    model = Path(plan.model.path)
+    original = model.read_bytes()
+    target = model
+    if alias == "relative":
+        monkeypatch.chdir(tmp_path)
+        target = Path("sub/../model.tflite")
+    elif alias in {"symlink", "hardlink"}:
+        target = tmp_path / "plan.json"
+        try:
+            if alias == "symlink":
+                target.symlink_to(model)
+            else:
+                target.hardlink_to(model)
+        except (OSError, NotImplementedError):
+            pytest.skip(f"{alias} unavailable on this filesystem")
+
+    with pytest.raises(ConfigError, match="is the model the plan is frozen against"):
+        plan.save(target)
+
+    assert model.read_bytes() == original
+    assert not list(tmp_path.glob("*.partial"))
+
+
+@pytest.mark.parametrize("reload", [False, True])
+def test_relative_model_is_protected_after_changing_directory(
+    session, tmp_path, monkeypatch, reload
+):
+    model = tmp_path / "model.tflite"
+    original = model.read_bytes()
+    monkeypatch.chdir(tmp_path)
+    plan = session.with_model("model.tflite").freeze()
+    assert plan.intent_hash == session.freeze().intent_hash
+    if reload:
+        plan = FrozenRun.load(plan.save(tmp_path / "plan.json"))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    with pytest.raises(ConfigError, match="is the model the plan is frozen against"):
+        plan.save(model)
+
+    assert model.read_bytes() == original
+    assert Path(plan.model.path) == model.resolve()
+    destination = elsewhere / "model.tflite"
+    destination.write_text("old plan")
+    assert FrozenRun.load(plan.save(destination)) == plan
+
+
+def test_saving_a_plan_can_replace_a_plan_after_the_model_is_removed(session, tmp_path):
+    plan = session.freeze()
+    target = plan.save(tmp_path / "plan.json")
+    Path(plan.model.path).unlink()
+    target.write_text("old plan")
+
+    assert FrozenRun.load(plan.save(target)) == plan
+
+
 def test_saving_a_plan_replaces_its_name_and_leaves_other_links_alone(session, tmp_path):
     other = tmp_path / "other"
     other.write_bytes(b"other")
@@ -412,6 +472,33 @@ def test_the_executorch_sidecar_is_frozen_beside_the_model(tmp_path):
     sidecar.write_text(sidecar.read_text(encoding="utf-8") + " ", encoding="utf-8")
     with pytest.raises(ConfigError, match="model.sidecar"):
         plan.config()
+
+
+@pytest.mark.parametrize("reload", [False, True])
+def test_a_model_symlink_keeps_its_adjacent_sidecar(tmp_path, monkeypatch, reload):
+    session = _pte_session(tmp_path, kernel_provider="ns")
+    model = tmp_path / "model.pte"
+    alias = tmp_path / "alias.pte"
+    try:
+        alias.symlink_to(model)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks unavailable on this filesystem")
+    Path(f"{model}.json").rename(Path(f"{alias}.json"))
+    monkeypatch.chdir(tmp_path)
+    plan = session.with_model("alias.pte").freeze()
+    if reload:
+        plan = FrozenRun.load(plan.save(tmp_path / "plan.json"))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    assert plan.config().model.path == alias
+    original = model.read_bytes()
+    for target in (model, alias):
+        with pytest.raises(ConfigError, match="is the model the plan is frozen against"):
+            plan.save(target)
+    assert model.read_bytes() == original
+    assert alias.is_symlink()
 
 
 def test_a_sidecar_that_appears_after_freezing_is_refused(tmp_path):

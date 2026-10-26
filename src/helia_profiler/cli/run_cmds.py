@@ -8,7 +8,6 @@ the console on stderr with exit status 1.
 from __future__ import annotations
 
 import json
-import os
 import sys
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -75,12 +74,6 @@ def _cmd_freeze(
             )
         session = Session.from_yaml(config) if config is not None else Session()
         plan = session.with_overrides(overrides).freeze()
-        model_path = Path(plan.model.path).expanduser().resolve()
-        if target == model_path or (target.exists() and os.path.samefile(target, model_path)):
-            raise ConfigError(
-                f"{output} is the model the plan is frozen against",
-                hint="Name another file for the plan, for example plan.json.",
-            )
         path = plan.save(output)
     _print({"plan": str(path), "intent_hash": plan.intent_hash, "portable": plan.portable})
 

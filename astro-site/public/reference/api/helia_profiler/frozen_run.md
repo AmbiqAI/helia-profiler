@@ -459,7 +459,7 @@ Source: `src/helia_profiler/frozen_run.py:235`
 save(path: str | Path) -> Path
 ```
 
-Write the plan as JSON and return its path.
+Write the plan as JSON, refusing its source model path or aliases.
 
 Source: `src/helia_profiler/frozen_run.py:295`
 
@@ -475,7 +475,7 @@ load(path: str | Path) -> FrozenRun
 
 Read a plan written by :meth:`save`, verifying its intent hash.
 
-Source: `src/helia_profiler/frozen_run.py:305`
+Source: `src/helia_profiler/frozen_run.py:313`
 
 ### helia_profiler.FrozenRun.config
 
@@ -497,7 +497,7 @@ variable set, unset or changed, another compiler version, or another
 engine runtime. Only the model can move; other local files must be
 at their recorded paths.
 
-Source: `src/helia_profiler/frozen_run.py:319`
+Source: `src/helia_profiler/frozen_run.py:327`
 
 ### helia_profiler.FrozenRun.build
 
@@ -509,4 +509,4 @@ build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild
 
 Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`.
 
-Source: `src/helia_profiler/frozen_run.py:368`
+Source: `src/helia_profiler/frozen_run.py:376`
