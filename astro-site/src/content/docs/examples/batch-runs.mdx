@@ -145,7 +145,8 @@ An ID may not reuse a built-in model ID (`kws`, `vww`, `ic`, `ad`).
 `family`, `precision` and `source` reach each case's `model` object in
 `validation_manifest.json` but not its case ID. Custom models have no
 ExecuTorch PTE contract, so the matrix enumerates no ExecuTorch cases for
-them.
+them. A model with a FLOAT16 tensor lists its LiteRT cases as skips,
+because upstream TFLM refuses such models.
 
 ## Validated on
 

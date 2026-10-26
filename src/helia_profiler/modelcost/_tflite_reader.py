@@ -24,8 +24,8 @@ drift between the two fails a test rather than silently diverging. Schema
 evolution cannot move them: flatbuffers appends new fields to the end of the
 vtable precisely so existing slots stay fixed.
 
-This reader answers two narrow questions (the Softmax scaling gate, #57; the
-float precisions a model works in, #246). Real model analysis belongs in
+This reader answers three narrow questions (the Softmax scaling gate, #57; the
+float precisions a model works in, #246; the tensor types a model holds). Real model analysis belongs in
 ``model_analysis``'s litert path, not here.
 """
 
@@ -180,6 +180,19 @@ def read_float_compute_types(buf: bytes) -> set[int]:
                 if counts.get(tensor_type, False):
                     found.add(tensor_type)
     return found
+
+
+def read_tensor_types(buf: bytes) -> set[int]:
+    """Every tensor type in any subgraph, read or not.
+
+    Raises like :func:`read_quantized_softmax_ops` on a malformed buffer.
+    """
+    model = _Table(buf, _read("<I", buf, 0))
+    return {
+        tensor.scalar(_TENSOR_TYPE, "<b", 0)
+        for sg in model.table_vector(_MODEL_SUBGRAPHS)
+        for tensor in sg.table_vector(_SUBGRAPH_TENSORS)
+    }
 
 
 @dataclass(frozen=True)

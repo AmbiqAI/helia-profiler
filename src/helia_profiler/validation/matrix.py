@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import re
+import struct
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -23,7 +24,9 @@ from ..config import Toolchain, Transport
 from ..deps import nsx as nsx_cli
 from ..engines import EngineType
 from ..hostenv.toolchains import get_toolchain_spec
+from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_tensor_types
 from ..platform import SocFamily, get_soc_for_board
+from ..runtime_records import runtime
 
 
 class MemoryProfile(StrEnum):
@@ -188,6 +191,24 @@ def nsx_declared_toolchains(board_id: str) -> tuple[str, frozenset[Toolchain]] |
     return module_name, frozenset(t for t in Toolchain if _nsx_toolchain_name(t) in names)
 
 
+def _fixture_file(case: CaseSpec) -> Path:
+    fixture = Path(case.model.fixture_for(case.engine))
+    if fixture.is_absolute():
+        return fixture
+    # matrix.py lives at src/helia_profiler/validation/ — repo root is
+    # three levels up from the package dir.
+    return Path(__file__).resolve().parents[3] / fixture
+
+
+@functools.lru_cache(maxsize=None)
+def _has_float16(path: Path) -> bool:
+    """Whether any tensor is FLOAT16; unreadable means no."""
+    try:
+        return TENSOR_TYPE_FLOAT16 in read_tensor_types(path.read_bytes())
+    except (OSError, struct.error, IndexError):
+        return False
+
+
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
     soc = get_soc_for_board(case.board.id)
@@ -210,6 +231,10 @@ def case_validity(case: CaseSpec) -> str | None:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
         return "usb_cdc not supported on this board"
+    if case.engine is EngineType.LITERT and _has_float16(_fixture_file(case)):
+        record = runtime("litert")
+        if record is not None and (reason := record.precisions.get("fp16")):
+            return reason
     # Statically infeasible TCM profile: arena and weights both use DTCM,
     # AND weights into DTCM, which cannot fit when their combined size
     # exceeds it (e.g. KWS's 32 KB arena + ~53 KB weights vs Apollo3's
@@ -217,11 +242,7 @@ def case_validity(case: CaseSpec) -> str | None:
     # fixture is missing (LFS not pulled) the guard stays silent — the
     # harness already skips missing fixtures with its own reason.
     if case.memory is MemoryProfile.TCM:
-        fixture = Path(case.model.fixture_for(case.engine))
-        if not fixture.is_absolute():
-            # matrix.py lives at src/helia_profiler/validation/ — repo root is
-            # three levels up from the package dir.
-            fixture = Path(__file__).resolve().parents[3] / case.model.fixture_for(case.engine)
+        fixture = _fixture_file(case)
         weights = fixture.stat().st_size if fixture.exists() else 0
         workspace = case.model.arena_size_for(case.engine)
         if case.engine is EngineType.EXECUTORCH and case.model.executorch is not None:
