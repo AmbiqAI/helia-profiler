@@ -10,8 +10,8 @@ import pytest
 from typer.testing import CliRunner
 
 from helia_profiler import ConfigError, Session
-from helia_profiler import config as config_module
 from helia_profiler.cli.app import app
+from helia_profiler.config import _yaml as config_yaml
 from helia_profiler.config import load_config, read_config_yaml
 
 
@@ -28,7 +28,7 @@ def test_directory_config_has_a_typed_error(tmp_path: Path, load) -> None:
 def test_permission_denied_config_preserves_cause(tmp_path: Path, monkeypatch, load) -> None:
     path = tmp_path / "config.yaml"
     fault = PermissionError("access denied by test")
-    monkeypatch.setattr(config_module, "open", Mock(side_effect=fault), raising=False)
+    monkeypatch.setattr(config_yaml, "open", Mock(side_effect=fault), raising=False)
     with pytest.raises(ConfigError, match="Cannot read config file") as caught:
         load(path)
     assert caught.value.__cause__ is fault
@@ -40,7 +40,7 @@ def test_config_read_failure_is_translated_after_open(tmp_path: Path, monkeypatc
     fault = OSError("read failed")
     stream = StringIO("model: {}")
     monkeypatch.setattr(stream, "read", Mock(side_effect=fault))
-    monkeypatch.setattr(config_module, "open", Mock(return_value=stream), raising=False)
+    monkeypatch.setattr(config_yaml, "open", Mock(return_value=stream), raising=False)
     with pytest.raises(ConfigError, match="Cannot read config file") as caught:
         read_config_yaml(tmp_path / "config.yaml")
     assert caught.value.__cause__ is fault
@@ -49,7 +49,7 @@ def test_config_read_failure_is_translated_after_open(tmp_path: Path, monkeypatc
 
 @pytest.mark.parametrize("fault", [RuntimeError("reader bug"), KeyboardInterrupt()])
 def test_unexpected_config_reader_errors_propagate(tmp_path: Path, monkeypatch, fault) -> None:
-    monkeypatch.setattr(config_module, "open", Mock(side_effect=fault), raising=False)
+    monkeypatch.setattr(config_yaml, "open", Mock(side_effect=fault), raising=False)
     with pytest.raises(type(fault)) as caught:
         read_config_yaml(tmp_path / "config.yaml")
     assert caught.value is fault
@@ -64,7 +64,7 @@ def test_config_io_errors_are_reported_on_stderr(
     if failure == "permission":
         path = tmp_path / "config.yaml"
         monkeypatch.setattr(
-            config_module, "open", Mock(side_effect=PermissionError("access denied")), raising=False
+            config_yaml, "open", Mock(side_effect=PermissionError("access denied")), raising=False
         )
     plan = tmp_path / "plan.json"
     args = [command, "--config", str(path)]
