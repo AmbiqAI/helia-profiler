@@ -27,8 +27,7 @@ from .records import load_result as load_result
 
 if TYPE_CHECKING:
     from .config import ProfileConfig
-    from .console import HpxConsole
-    from .pipeline import ProgressSink
+    from .pipeline import PipelineObserver, ProgressSink
     from .results import ProfileResult
 
 
@@ -55,14 +54,14 @@ def profile(
 def _execute_profile(
     config: ProfileConfig,
     *,
-    console: HpxConsole | None = None,
+    observer: PipelineObserver | None = None,
     progress_sink: ProgressSink | None = None,
 ) -> ProfileResult:
     """Execute once and project the completed context for API and CLI callers."""
     from .profiler import run_profile
     from .results import ProfileResult
 
-    ctx = run_profile(config, console=console, progress_sink=progress_sink)
+    ctx = run_profile(config, observer=observer, progress_sink=progress_sink)
 
     return ProfileResult(
         pmu=ctx.captured_pmu,

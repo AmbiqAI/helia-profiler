@@ -77,6 +77,11 @@ class HpxConsole:
         """Called after all stages complete — clean up any live spinner."""
         progress.pipeline_done(self)
 
+    def profile_done(self, ctx: PipelineContext) -> None:
+        """Render captured results after the workspace has been released."""
+        if ctx.pmu_result is not None:
+            self.print_results(ctx)
+
     def _stop_spinner(self) -> None:
         progress.stop_spinner(self)
 

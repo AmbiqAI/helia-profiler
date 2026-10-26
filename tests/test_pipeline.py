@@ -131,6 +131,9 @@ class RecordingConsole:
     def pipeline_done(self) -> None:
         pass
 
+    def profile_done(self, ctx: PipelineContext) -> None:
+        pass
+
 
 def _make_config(tmp_path: Path):
     model_file = tmp_path / "test.tflite"
@@ -167,7 +170,7 @@ class TestPipelineRunner:
     def test_runner_reports_true_stage_positions_and_progress(self, tmp_path: Path):
         config = _make_config(tmp_path)
         console = RecordingConsole()
-        runner = PipelineRunner([PassStage("first"), ProgressStage("second")], console=console)
+        runner = PipelineRunner([PassStage("first"), ProgressStage("second")], observer=console)
 
         runner.run(config)
 

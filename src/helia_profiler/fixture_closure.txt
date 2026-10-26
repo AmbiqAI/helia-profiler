@@ -44,6 +44,8 @@ console/analysis.py
 console/base.py
 console/compare.py
 console/doctor.py
+console/json.py
+console/lifecycle.py
 console/presentation.py
 console/progress.py
 console/results.py

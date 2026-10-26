@@ -362,15 +362,31 @@ class Stage(Protocol):
         ...
 
 
+class PipelineObserver(Protocol):
+    """Internal notifications for an observed profiling run."""
+
+    def stage_start(self, name: str, index: int, total: int) -> None: ...
+
+    def stage_done(self, name: str) -> None: ...
+
+    def stage_skip(self, name: str) -> None: ...
+
+    def progress_update(self, update: ProgressUpdate) -> None: ...
+
+    def pipeline_done(self) -> None: ...
+
+    def profile_done(self, ctx: PipelineContext) -> None: ...
+
+
 class PipelineRunner:
     def __init__(
         self,
         stages: list[Stage],
-        console: Any | None = None,
+        observer: PipelineObserver | None = None,
         progress_sink: ProgressSink | None = None,
     ) -> None:
         self._stages = list(stages)
-        self._console = console  # Optional HpxConsole — avoids circular import
+        self._observer = observer
         self._progress_sink = progress_sink
 
     def run(self, config: ProfileConfig) -> PipelineContext:
@@ -402,8 +418,8 @@ class PipelineRunner:
         ctx = PipelineContext(config=config, work_dir=work_dir)
         if self._progress_sink is not None:
             ctx.progress_sink = self._progress_sink
-        elif self._console is not None:
-            ctx.progress_sink = self._console.progress_update
+        elif self._observer is not None:
+            ctx.progress_sink = self._observer.progress_update
 
         ctx.run_metadata.hpx_version = __version__
         ctx.run_metadata.run_id = str(uuid.uuid4())
@@ -415,38 +431,31 @@ class PipelineRunner:
         for stage_index, stage in enumerate(self._stages, start=1):
             if stage.should_skip(ctx):
                 log.info("[skip] %s", stage.name)
-                if self._console is not None:
-                    self._console.stage_skip(stage.name)
+                if self._observer is not None:
+                    self._observer.stage_skip(stage.name)
                 continue
 
             log.info("[start] %s", stage.name)
-            if self._console is not None:
-                self._console.stage_start(stage.name, stage_index, total_stages)
+            if self._observer is not None:
+                self._observer.stage_start(stage.name, stage_index, total_stages)
             try:
                 stage.run(ctx)
             except KeyboardInterrupt:
-                if self._console is not None:
-                    self._console._stop_spinner()
                 raise
             except HpxError:
-                if self._console is not None:
-                    self._console._stop_spinner()
                 raise  # already typed — propagate as-is
             except Exception as exc:
-                if self._console is not None:
-                    self._console._stop_spinner()
                 raise HpxError(
                     f"Unexpected error in stage '{stage.name}': {exc}",
                     hint="This is likely a bug in heliaPROFILER. "
                     "Please file an issue with the full traceback.",
                 ) from exc
             log.info("[done]  %s", stage.name)
-            if self._console is not None:
-                self._console.stage_done(stage.name)
+            if self._observer is not None:
+                self._observer.stage_done(stage.name)
 
-        # Signal end of pipeline — clears any live spinner.
-        if self._console is not None:
-            self._console.pipeline_done()
+        if self._observer is not None:
+            self._observer.pipeline_done()
 
         return ctx
 

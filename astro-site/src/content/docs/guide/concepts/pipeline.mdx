@@ -138,6 +138,16 @@ count and verifies the measured gate duration, and the report, validity and
 comparison code all require a `PmuResult`. A power-only workflow would need
 its own result type and its own stage list, not a flag.
 
+### Terminal presentation
+
+The CLI enters a console-owned presentation scope before executing a profile.
+That scope owns the banner, temporary logging configuration, and spinner cleanup,
+including failed and interrupted runs. The runner sends internal stage and
+completion notifications; console rendering of captured results happens after
+workspace ownership is released. Library calls keep the caller's logging
+configuration and may supply the public progress callback without terminal
+presentation.
+
 ## Where the code lives
 
 | Block | Path under `src/helia_profiler/` |

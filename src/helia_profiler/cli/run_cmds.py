@@ -7,7 +7,6 @@ the console on stderr with exit status 1.
 
 from __future__ import annotations
 
-import json
 import sys
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -15,6 +14,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterator
 
 import typer
+
+from ..console.json import print_json
 
 if TYPE_CHECKING:
     from ..expect import Expect
@@ -44,10 +45,6 @@ def _reported(verbose: int) -> Iterator[None]:
         sys.exit(1)
 
 
-def _print(summary: dict[str, Any]) -> None:
-    print(json.dumps(summary, indent=2, sort_keys=True, allow_nan=False))
-
-
 def _cmd_freeze(
     *,
     model: Path | None,
@@ -75,7 +72,7 @@ def _cmd_freeze(
         session = Session.from_yaml(config) if config is not None else Session()
         plan = session.with_overrides(overrides).freeze()
         path = plan.save(output)
-    _print({"plan": str(path), "intent_hash": plan.intent_hash, "portable": plan.portable})
+    print_json({"plan": str(path), "intent_hash": plan.intent_hash, "portable": plan.portable})
 
 
 def _cmd_build(
@@ -108,7 +105,7 @@ def _cmd_build(
         if inputs
         else ["zero-filled"] * len(compiled.build.inputs)
     )
-    _print(build_summary(out, compiled, sources=sources))
+    print_json(build_summary(out, compiled, sources=sources))
 
 
 def _cmd_validate_build(*, directory: Path, verbose: int) -> None:
@@ -117,7 +114,7 @@ def _cmd_validate_build(*, directory: Path, verbose: int) -> None:
     directory = run_directory_of(directory)
     with _reported(verbose):
         compiled = load_from(directory)
-    _print(build_summary(directory, compiled))
+    print_json(build_summary(directory, compiled))
 
 
 def _cmd_run(
@@ -154,7 +151,7 @@ def _cmd_run(
             settle_seconds=settle_seconds,
             expect=expectation,
         )
-    _print(run_summary(result, evidence, authority="operator", saved=evidence / RESULT_FILE))
+    print_json(run_summary(result, evidence, authority="operator", saved=evidence / RESULT_FILE))
     if not result.succeeded:
         raise typer.Exit(1)
     if result.verification is not None and result.verification.matched is False:
