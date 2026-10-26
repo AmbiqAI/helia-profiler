@@ -777,7 +777,7 @@ def read_config_yaml(path: Path) -> dict[str, Any]:
     """Read an HPX YAML config file into an unvalidated mapping.
 
     An empty file reads as ``{}``. Raises :class:`ConfigError` if the file is
-    missing, is not valid YAML, or its top level is not a mapping.
+    missing or unreadable, is not valid YAML, or its top level is not a mapping.
     """
     import yaml
 
@@ -788,6 +788,11 @@ def read_config_yaml(path: Path) -> dict[str, Any]:
         raise ConfigError(
             f"Config file not found: {path}",
             hint="Check the config file path.",
+        ) from exc
+    except OSError as exc:
+        raise ConfigError(
+            f"Cannot read config file {path}: {exc}",
+            hint="Check that the path names a readable file and its storage is accessible.",
         ) from exc
     except UnicodeDecodeError as exc:
         raise ConfigError(
