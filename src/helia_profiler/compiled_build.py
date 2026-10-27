@@ -34,6 +34,7 @@ from .errors import CaptureError, ConfigError
 from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
 if TYPE_CHECKING:
+    from ._files import FixtureFile
     from ._fixture_build import FixtureBuild, FixtureMethod, TypedFixture
     from .expect import Expect, Verification
     from .fixture_capture import FixtureCaptureGuard, FixtureCaptureResult
@@ -43,10 +44,10 @@ if TYPE_CHECKING:
         FixtureRailEnergy,
         FixtureRailPowerRequest,
     )
-    from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
     from .fixture_target import FixtureTarget
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
+    from .runtime.archive import PreparedUpstreamRuntime
 
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
@@ -558,7 +559,7 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
     a saved build keeps verifying after this HPX's default changes; a new
     build links the default.
     """
-    from .runtime_records import runtime
+    from .runtime.records import runtime
 
     planned = plan.runtime
     if planned is None:
@@ -584,7 +585,7 @@ def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
     """The cached prepared runtime a fixture build of *plan* links, for heliaRT and LiteRT."""
     from .engines import EngineType, get_adapter
     from .engines.base import PreparedRuntimeAdapter
-    from .prepared_runtimes import prepared_runtime
+    from .runtime.prepare import prepared_runtime
 
     engine = EngineType(plan.settings["engine"]["type"])
     if not isinstance(get_adapter(engine), PreparedRuntimeAdapter):

@@ -9,7 +9,7 @@ from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
 from helia_profiler.identity import canonical_engine
-from helia_profiler.runtime_records import runtime
+from helia_profiler.runtime.records import runtime
 
 
 def test_the_engine_type_is_litert():

@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
+from ._files import FixtureFile
 from ._fixture_build import FixtureTimingScope
 from .fixture_image import (
     DTCM,
@@ -30,7 +31,6 @@ from .fixture_power import (
     observe_fixture_power,
 )
 from .fixture_psram import FixturePsramObservation, FixturePsramWeights, decode_psram_weights
-from .fixture_runtime import FixtureFile
 from .fixture_stage import FixtureStage
 from .fixture_target import FixtureTarget, fixture_cpu_hz
 from .target.probe.flash import flash_binary

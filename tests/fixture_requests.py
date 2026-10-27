@@ -20,7 +20,6 @@ from helia_profiler.config import ProfileConfig, load_config
 from helia_profiler.engines import EngineType, get_adapter
 from helia_profiler.engines.base import PreparedRuntimeAdapter
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture_runtime import PreparedUpstreamRuntime
 from helia_profiler.fixture_target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
@@ -28,7 +27,8 @@ from helia_profiler.fixture_target import (
     validate_fixture_placement,
 )
 from helia_profiler.placement import Placement
-from helia_profiler.prepared_runtimes import prepared_runtime
+from helia_profiler.runtime.archive import PreparedUpstreamRuntime
+from helia_profiler.runtime.prepare import prepared_runtime
 
 
 class FixtureBackend(StrEnum):

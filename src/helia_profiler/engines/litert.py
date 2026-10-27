@@ -37,7 +37,7 @@ class LiteRtAdapter(SingleArenaPlacementMixin):
     prepared_runtime_contract = ("upstream", "cmsis_nn")
 
     def prepare_runtime(self, config: ProfileConfig, work_dir: Path, runtime) -> LiteRtArtifacts:
-        from ..fixture_runtime import prepare_runtime_module
+        from ..runtime.archive import prepare_runtime_module
 
         stack, backend = self.prepared_runtime_contract
         if runtime.record.stack != stack or config.engine.backend != backend:

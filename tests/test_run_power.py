@@ -32,7 +32,7 @@ from helia_profiler.fixture_capture import FixtureCaptureRequest
 from helia_profiler.fixture_target import fixture_target_for_board
 from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle
-from helia_profiler.runtime_records import runtime
+from helia_profiler.runtime.records import runtime
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
 from tests.unit.test_fixture_record import _build, _pin
 

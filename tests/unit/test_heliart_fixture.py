@@ -529,7 +529,7 @@ def test_linked_inputs_keep_a_windows_drive_letter(sep):
     """ATfE maps on Windows name inputs as ``C:\\...`` with either separator."""
     from pathlib import PureWindowsPath
 
-    from helia_profiler.fixture_runtime import _linked_components
+    from helia_profiler.runtime.archive import _linked_components
 
     root = sep.join(["C:", "Users", "r", "helia-rt-bench", "modules", "tflite-micro", "app"])
     app = PureWindowsPath(root)
@@ -583,7 +583,7 @@ def test_link_map_proof_on_posix_and_windows_paths(stack, style, host, case, ref
     """Every map-scan case under POSIX and Windows paths, spaces and either separator."""
     from pathlib import PurePosixPath, PureWindowsPath
 
-    from helia_profiler.fixture_runtime import PREPARED_RUNTIME_MODULES, _prove_link_map
+    from helia_profiler.runtime.archive import PREPARED_RUNTIME_MODULES, _prove_link_map
 
     base = host.replace("-lower-drive", "")
     root, native = _APPS[base]
@@ -646,7 +646,7 @@ def test_prepared_runtime_build_proof_owns_module_lock_and_map_checks(
     tmp_path, fault, error, message
 ):
     """A built app proves the exact staged archive, lock providers and linked archive, or is refused."""
-    from helia_profiler.fixture_runtime import prove_prepared_runtime_build
+    from helia_profiler.runtime.archive import prove_prepared_runtime_build
 
     rt = runtime(tmp_path / "rt")
     verified = rt.verify()

@@ -21,9 +21,9 @@ from typing import TYPE_CHECKING, Literal, get_args
 
 import numpy as np
 
+from ._files import FixtureFile
 from .errors import ConfigError, EngineError
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
-from .fixture_runtime import FixtureFile
 
 if TYPE_CHECKING:
     from ._fixture_build import FixtureBuild

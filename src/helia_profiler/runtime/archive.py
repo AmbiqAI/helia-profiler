@@ -2,35 +2,14 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any
 
-from .errors import ConfigError
-
-
-@dataclass(frozen=True)
-class FixtureFile:
-    """A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match."""
-
-    path: Path
-    sha256: str
-
-    def read(self) -> bytes:
-        _digest(self.sha256)
-        data = self.path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != self.sha256:
-            raise ValueError(f"Fixture hash mismatch: {self.path}")
-        return data
-
-
-def _digest(value: object) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
-        raise ValueError("Expected a SHA256 fixture identity")
-    return value
+from .._files import FixtureFile, _digest
+from ..errors import ConfigError
 
 
 def _object(value: object, keys: set[str], label: str) -> dict:
@@ -349,7 +328,7 @@ def prove_prepared_runtime_build(
 
 def prepare_runtime_module(runtime: VerifiedPreparedRuntime, work_dir: Path):
     """Stage exactly the selected verified archive; the engine adapter owns its artifacts."""
-    from .results import NsxModuleRef
+    from ..results import NsxModuleRef
 
     data = runtime.record
     module_name, library, alias = PREPARED_RUNTIME_MODULES[data.stack]

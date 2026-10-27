@@ -149,7 +149,7 @@ def _patch_build(monkeypatch, out: Path, cache: Path, engine: str, prepared: obj
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )
     monkeypatch.setattr(
-        "helia_profiler.prepared_runtimes.prepared_runtime",
+        "helia_profiler.runtime.prepare.prepared_runtime",
         lambda name, version=None: SimpleNamespace(runtime=prepared),
     )
     return calls, built

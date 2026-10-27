@@ -25,11 +25,11 @@ from .errors import ConfigError
 from .lifecycle import Lifecycle
 
 if TYPE_CHECKING:
+    from ._files import FixtureFile
     from ._fixture_build import FixtureTimingScope, TypedFixture
     from .compiled_build import CompiledBuild, RunResult
     from .expect import Expect
     from .fixture_capture import FixtureCaptureGuard
-    from .fixture_runtime import FixtureFile
     from .frozen_run import FrozenRun
 
 BUILD_FILE = "build.json"
@@ -366,7 +366,7 @@ def _read(path: Path, label: str, *, hint: str | None = None) -> bytes:
 
 
 def _pin(path: Path, data: bytes) -> FixtureFile:
-    from .fixture_runtime import FixtureFile
+    from ._files import FixtureFile
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

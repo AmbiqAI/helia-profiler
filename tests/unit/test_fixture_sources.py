@@ -9,7 +9,7 @@ from test_heliart_fixture import runtime
 from helia_profiler import FixtureKernelSource, FixtureRuntimeSource
 from helia_profiler.fixture_sources import comparable, pinned_sources
 from helia_profiler.results.dependencies import ContentDigest, DependencyModule
-from helia_profiler.runtime_records import runtime as runtime_record
+from helia_profiler.runtime.records import runtime as runtime_record
 
 
 def _module(name, project, *, tag=None):

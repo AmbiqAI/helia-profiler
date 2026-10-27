@@ -320,7 +320,7 @@ another release. IO dtype does not prove a model's compute precision, operator
 support, numerical acceptance or device qualification. Plain INT32 inputs remain
 supported index payloads; INT32 outputs remain refused.
 
-Query `runtime_records.qualification(name, version, board=..., clock=...,
+Query `runtime.records.qualification(name, version, board=..., clock=...,
 precision=...)` for exact release evidence, including its source and basis.
 Historical qualification records and the `QUALIFIED` enum remain readable.
 Supported but unqualified execution remains available. Internal FLOAT16 tensors,

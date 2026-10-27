@@ -29,10 +29,11 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from .config import DEFAULT_DOWNLOAD_API_S, DEFAULT_DOWNLOAD_ASSET_S
-from .errors import ConfigError
-from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime
-from .runtime_records import RuntimeRecord, RuntimeSource, runtime
+from .._files import FixtureFile
+from ..config import DEFAULT_DOWNLOAD_API_S, DEFAULT_DOWNLOAD_ASSET_S
+from ..errors import ConfigError
+from .archive import PreparedUpstreamRuntime
+from .records import RuntimeRecord, RuntimeSource, runtime
 
 #: The heliaRT build a fixture links: its ATfE release-with-logs library for the fixture core.
 _HELIA_RT_VARIANT = "release-with-logs"
@@ -125,7 +126,7 @@ class PreparedArchive:
 
 
 def prepared_directory(record: RuntimeRecord) -> Path:
-    from .hostenv.cache_dirs import hpx_cache_root
+    from ..hostenv.cache_dirs import hpx_cache_root
 
     return hpx_cache_root() / "runtimes" / record.name / record.version
 
@@ -180,7 +181,7 @@ def prepare_runtime(
 def _fetch_helia_rt(
     record: RuntimeRecord, kernels: RuntimeSource, work: Path, api_s: float, asset_s: float
 ) -> Path:
-    from .engines.helia_rt.download import _fetch_github_release
+    from ..engines.helia_rt.download import _fetch_github_release
 
     dist, _ = _fetch_github_release(
         record.source.repo, f"helia-rt-v{record.version}", api_s=api_s, asset_s=asset_s
@@ -199,8 +200,8 @@ def _fetch_helia_rt(
 def _stage_helia_rt(
     record: RuntimeRecord, kernels: RuntimeSource, dist: Path, staging: Path
 ) -> None:
-    from .engines.helia_rt.artifacts import _core_tag, _library_name, _toolchain_tag
-    from .fixture_target import FIXTURE_BOARD
+    from ..engines.helia_rt.artifacts import _core_tag, _library_name, _toolchain_tag
+    from ..fixture_target import FIXTURE_BOARD
 
     include = staging / "include"
     headers = {}
@@ -247,8 +248,8 @@ def _fetch_tflm(
     translation units; each is compiled from the tree with relative paths, so
     the archive embeds no host path.
     """
-    from .hostenv.toolchains import resolve_toolchain_executable
-    from .vocab import Toolchain
+    from ..hostenv.toolchains import resolve_toolchain_executable
+    from ..vocab import Toolchain
 
     if sys.platform == "win32":
         raise ConfigError(

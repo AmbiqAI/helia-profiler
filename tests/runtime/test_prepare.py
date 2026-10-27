@@ -19,14 +19,12 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
-from helia_profiler import (
-    FixtureFile,
-    prepared_runtimes,
-)
+from helia_profiler import FixtureFile
 from helia_profiler.cli.app import app
 from helia_profiler.errors import ConfigError
-from helia_profiler.prepared_runtimes import prepare_runtime, prepared_directory, prepared_runtime
-from helia_profiler.runtime_records import runtime
+from helia_profiler.runtime import prepare as prepared_runtimes
+from helia_profiler.runtime.prepare import prepare_runtime, prepared_directory, prepared_runtime
+from helia_profiler.runtime.records import runtime
 
 _RECORD = runtime("helia-rt")
 assert _RECORD is not None

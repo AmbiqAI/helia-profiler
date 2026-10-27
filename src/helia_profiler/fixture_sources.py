@@ -12,8 +12,8 @@ import json
 from dataclasses import dataclass, replace
 
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
-from .fixture_runtime import _STACK_PROVIDERS, STACK_KERNEL_LIBRARY, STACK_RUNTIME_RECORD
-from .runtime_records import runtimes
+from .runtime.archive import _STACK_PROVIDERS, STACK_KERNEL_LIBRARY, STACK_RUNTIME_RECORD
+from .runtime.records import runtimes
 
 
 @dataclass(frozen=True)

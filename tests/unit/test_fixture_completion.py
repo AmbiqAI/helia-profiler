@@ -6,8 +6,8 @@ from hashlib import sha256
 import pytest
 from test_fixture_power import measured, request, state_frames
 
+from helia_profiler._files import FixtureFile
 from helia_profiler.fixture_power import _batch_completion
-from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.power.completion import GatedCompletion, resolve_counter_completion
 from helia_profiler.power.counter_gate import CounterGateTrace
 

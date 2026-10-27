@@ -29,7 +29,7 @@ from .identity import (
 )
 from .lifecycle import InstanceBoundary, Lifecycle, first_invoke_window
 from .results.dependencies import DependencyModule, DependencyProvenance
-from .runtime_records import runtime
+from .runtime.records import runtime
 from .wire import STIMER_HZ
 
 if TYPE_CHECKING:

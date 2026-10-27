@@ -481,7 +481,7 @@ def rt_plan_file(tmp_path, build, monkeypatch) -> Path:
     )
     monkeypatch.setattr("helia_profiler.run_inputs.analyze_run_model", lambda path: analysis)
     monkeypatch.setattr(
-        "helia_profiler.prepared_runtimes.prepared_runtime",
+        "helia_profiler.runtime.prepare.prepared_runtime",
         lambda name, version=None: SimpleNamespace(runtime=None),
     )
 

@@ -33,11 +33,11 @@ from ._files import RootedPaths, read_json, write_bytes_atomically, write_text_a
 from .errors import ConfigError
 
 if TYPE_CHECKING:
+    from ._files import FixtureFile
     from .compiled_build import CompiledBuild, RunResult
     from .expect import ReferenceOutputs, Verification
     from .fixture_capture import FixtureCaptureResult
     from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
-    from .fixture_runtime import FixtureFile
     from .identity import RunIdentity
 
 RUN_RESULT_SCHEMA = "hpx.run-result"
@@ -335,7 +335,7 @@ class _Files:
         return path
 
     def fixture_file(self, value: Any) -> FixtureFile:
-        from .fixture_runtime import FixtureFile
+        from ._files import FixtureFile
 
         path = self.check(value, "evidence file")
         return FixtureFile(path, value["sha256"])
@@ -354,7 +354,7 @@ def _fields(value: Any, names: tuple[str, ...] | list[str], label: str) -> dict[
 
 def _encode(value: Any, file: Callable[[FixtureFile], Any]) -> Any:
     """*value* as JSON-ready data, each pinned file through *file*."""
-    from .fixture_runtime import FixtureFile
+    from ._files import FixtureFile
 
     if isinstance(value, FixtureFile):
         return file(value)

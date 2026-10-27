@@ -49,12 +49,12 @@ _RUN_INPUT_TYPES = {
     "FixturePsramWeights": "fixture_psram",
     "FixturePsramPayload": "fixture_psram",
     "FixturePsramObservation": "fixture_psram",
-    "FixtureFile": "fixture_runtime",
-    "PreparedUpstreamRuntime": "fixture_runtime",
-    "VerifiedPreparedRuntime": "fixture_runtime",
-    "RuntimeABI": "fixture_runtime",
-    "RuntimeHeader": "fixture_runtime",
-    "RuntimeProvider": "fixture_runtime",
+    "FixtureFile": "_files",
+    "PreparedUpstreamRuntime": "runtime.archive",
+    "VerifiedPreparedRuntime": "runtime.archive",
+    "RuntimeABI": "runtime.archive",
+    "RuntimeHeader": "runtime.archive",
+    "RuntimeProvider": "runtime.archive",
     "FixtureKernelSource": "fixture_sources",
     "FixtureRuntimeSource": "fixture_sources",
     "FixtureTarget": "fixture_target",
@@ -84,7 +84,7 @@ def test_each_run_input_type_is_its_modules_type(name, module):
 
 
 def test_the_prepared_runtime_manifest_is_the_runtime_manifest():
-    from helia_profiler.fixture_runtime import RuntimeManifest
+    from helia_profiler.runtime.archive import RuntimeManifest
 
     assert hpx.PreparedRuntimeManifest is RuntimeManifest
 
@@ -107,7 +107,8 @@ _RUN_API_MODULES = {
         "fixture_capture",
         "fixture_power",
         "fixture_psram",
-        "fixture_runtime",
+        "runtime.archive",
+        "_files",
         "fixture_sources",
         "fixture_target",
         "frozen_run",

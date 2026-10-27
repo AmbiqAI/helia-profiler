@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from ..fixture_runtime import VerifiedPreparedRuntime
     from ..modelcost import ModelAnalysis
+    from ..runtime.archive import VerifiedPreparedRuntime
 
 from ..config import ProfileConfig
 from ..identity import Unknown

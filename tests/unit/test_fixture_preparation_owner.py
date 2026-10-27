@@ -8,7 +8,6 @@ from unittest.mock import Mock
 
 import pytest
 from test_fixture_request import _request
-from test_fixture_runtime import runtime
 
 from helia_profiler import EngineType, TypedFixture
 from helia_profiler.config import EngineConfig
@@ -17,6 +16,7 @@ from helia_profiler.engines.litert import LiteRtAdapter
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import Placement
 from helia_profiler.stages.prepare_engine import PrepareEngineStage
+from tests.runtime.helpers import runtime
 
 
 def test_selected_archive_does_not_prepare_and_replace_ordinary_engine(tmp_path, monkeypatch):

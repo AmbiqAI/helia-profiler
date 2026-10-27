@@ -18,8 +18,8 @@ from enum import StrEnum
 from importlib.resources.abc import Traversable
 from typing import Any
 
-from .errors import ConfigError
-from .platform import get_soc_for_board
+from ..errors import ConfigError
+from ..platform import get_soc_for_board
 
 RUNTIME_SCHEMA = "helia-profiler/runtime@1"
 #: The precision vocabulary shared with helia-model-zoo and helia-benchmark.

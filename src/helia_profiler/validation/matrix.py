@@ -26,7 +26,7 @@ from ..engines import EngineType
 from ..hostenv.toolchains import get_toolchain_spec
 from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_tensor_types
 from ..platform import SocFamily, get_soc_for_board
-from ..runtime_records import runtime
+from ..runtime.records import runtime
 
 
 class MemoryProfile(StrEnum):

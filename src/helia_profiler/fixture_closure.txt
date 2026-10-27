@@ -161,7 +161,6 @@ fixture_identity.py
 fixture_image.py
 fixture_power.py
 fixture_psram.py
-fixture_runtime.py
 fixture_sources.py
 fixture_stage.py
 fixture_target.py
@@ -214,7 +213,6 @@ power/joulescope/sync.py
 power/joulescope_compatibility.py
 power/metadata.py
 power/sync.py
-prepared_runtimes.py
 profile_identity.py
 profiler.py
 records.py
@@ -243,7 +241,10 @@ run_directory.py
 run_guard.py
 run_inputs.py
 run_record.py
-runtime_records.py
+runtime/__init__.py
+runtime/archive.py
+runtime/prepare.py
+runtime/records.py
 session.py
 stages/__init__.py
 stages/analyze_model.py
