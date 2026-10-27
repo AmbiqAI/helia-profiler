@@ -56,7 +56,7 @@ def _cmd_freeze(
 ) -> None:
     from ..errors import ConfigError
     from ..session import Session
-    from .profile_cmd import _build_cli_overrides
+    from .options import _build_cli_overrides
 
     overrides = _build_cli_overrides(
         model=model.expanduser().resolve() if model is not None else None, **params

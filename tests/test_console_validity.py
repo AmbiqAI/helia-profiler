@@ -201,7 +201,7 @@ def test_output_applier_forwards_the_flag() -> None:
     """The REAL overrides builder, un-mocked (#208: both exit tests
     it): the flag lands in the overrides dict, and a False value leaves
     the section untouched."""
-    from helia_profiler.cli.profile_cmd import _build_cli_overrides
+    from helia_profiler.cli.options import _build_cli_overrides
 
     cli = _build_cli_overrides(fail_on_invalid=True)
     assert cli["output"]["fail_on_invalid"] is True

@@ -26,6 +26,10 @@ from the package root.
 | Save/load | `FrozenRun.save/load` owns plan JSON; `CompiledBuild.save/load` owns build JSON and delegates pinned files to `_fixture_record.py`; `RunResult.save` and `load_run` delegate to `run_record.py` | Local file I/O. Build/run records resolve paths through caller-provided roots and verify retained evidence. `Session.save/load` stores reusable intent, a different document from a frozen plan. Lower-level `build` / `run_build` return objects without automatically saving their build/result JSON; directory helpers perform those saves. |
 | `api.load_result`, `api.observations` | `records.py` dispatches native profile/run loading; `_result_view.py` and `_run_view.py` map loaded facts into portable observations | Offline reading and mapping. Observations do not perform a new capture or establish verification merely by conforming to a schema. |
 
+`cli/options.py` owns the option-to-override mapping shared by profile and
+freeze. Command modules supply parsed values and retain their execution and
+presentation policies; `config.load_config` and `Session` resolve configuration.
+
 `api._execute_profile` owns the single context-to-`ProfileResult` projection,
 including the stored report evaluation without recomputing it. The CLI scopes
 logging, banner and spinner lifetime through `console.lifecycle.profile_presentation`
