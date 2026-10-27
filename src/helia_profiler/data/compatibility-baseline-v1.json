@@ -1,16 +1,16 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.8.1-2026-10-19.2",
+  "baseline_id": "hpx-neuralspotx-0.9.0-2026-10-27.1",
   "neuralspotx": {
     "package": "neuralspotx",
-    "version": "0.8.1",
-    "sha256": "7aac6f1b2e89ebf41dfe087c7588e0db11d65e8a11cac2cda03f6d7c510a9094"
+    "version": "0.9.0",
+    "sha256": "ba2dff4660ec0b6123796993e6a66637627ea55a8d8506a72e4408789856146a"
   },
   "projects": {
     "neuralspotx": {
       "url": "https://github.com/AmbiqAI/neuralspotx.git",
-      "ref": "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+      "ref": "ffb7339b14b00134b4ed2834a1640d61042c0962"
     },
     "nsx-ambiq-sdk": {
       "url": "https://github.com/AmbiqAI/nsx-ambiq-sdk.git",

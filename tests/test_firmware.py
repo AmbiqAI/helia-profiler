@@ -1888,7 +1888,7 @@ class TestNsxModuleOverrides:
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
         assert projects["nsx-ambiq-sdk"]["revision"] == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
-        assert projects["neuralspotx"]["revision"] == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+        assert projects["neuralspotx"]["revision"] == "ffb7339b14b00134b4ed2834a1640d61042c0962"
 
     def test_atomiq110_pins_nsx_core_and_npu_module_entries(self, tmp_path: Path, fake_dist: Path):
         """The sdk baseline pin must reach the module_registry *module* entries.
@@ -2078,7 +2078,7 @@ class TestNsxModuleOverrides:
         manifest = yaml.safe_load(nsx_yml)
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
         )
 
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
@@ -2106,7 +2106,7 @@ class TestNsxModuleOverrides:
         assert len(direct_overrides) == sdk_module_count
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
         )
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
@@ -2152,7 +2152,7 @@ class TestNsxModuleOverrides:
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
-            == "2dbe12a2799fd8c3df85f1a103b0adca340c901f"
+            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
         )
         # WORKAROUND neuralspotx#218: NSX honours a module's own revision
         # over its project's, so standalone baseline-pinned projects need a

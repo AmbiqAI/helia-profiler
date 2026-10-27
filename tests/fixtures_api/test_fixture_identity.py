@@ -74,7 +74,7 @@ def _state(root, build, *, hpx_version="0.2.3", name="state.json"):
         "lock": {"sha256": {"value": build.dependency_lock.sha256}},
         "modules": [asdict(NS)],
         "workspace": {
-            "baseline_id": "hpx-neuralspotx-0.8.1-2026-10-19.2",
+            "baseline_id": "hpx-neuralspotx-0.9.0-2026-10-27.1",
             "inputs": {"hpx_version": hpx_version},
         },
     }
@@ -104,7 +104,7 @@ def test_a_compiled_build_states_what_it_linked(tmp_path):
     assert identity.kernels.library is CanonicalKernel.HELIA_CORE
     assert identity.kernels.version == "v7.45.1"
     assert identity.prepared_archive_sha256 is None
-    assert identity.baseline_id == "hpx-neuralspotx-0.8.1-2026-10-19.2"
+    assert identity.baseline_id == "hpx-neuralspotx-0.9.0-2026-10-27.1"
     assert identity.producer == "0.2.3"
     assert identity.build.toolchain_version == "22.1.0" and identity.build.cpu_hz == 96000000
     assert (identity.run.lifecycle, identity.run.iterations) == ("carry", 100)

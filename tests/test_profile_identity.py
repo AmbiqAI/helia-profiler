@@ -51,7 +51,7 @@ TFLM_COMMIT = "4" * 40
 AOT_COMMIT = "5" * 40
 LOCK_SHA = "6" * 64
 MODEL_SHA = "a" * 64
-BASELINE = "hpx-neuralspotx-0.8.1-2026-10-19.2"
+BASELINE = "hpx-neuralspotx-0.9.0-2026-10-27.1"
 NO_PROVENANCE = Unknown("the run recorded no dependency provenance")
 
 

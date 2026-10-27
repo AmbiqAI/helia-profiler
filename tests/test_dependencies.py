@@ -108,7 +108,7 @@ def _write_valid_lock(
     (module_dir / "nsx-module.yaml").write_text("name: demo\n", encoding="utf-8")
     lock = NsxLock(
         generated_at="2026-08-03T00:00:00+00:00",
-        nsx_tool_version="0.8.1",
+        nsx_tool_version="0.9.0",
         manifest_hash=hash_manifest(ctx.firmware_dir / "nsx.yml"),
         target={"board": "apollo510_evb"},
         modules={
@@ -397,10 +397,10 @@ def test_exact_dependency_provenance_serialization(
 
     assert ctx.dependency_lock_path.read_bytes() == snapshot_bytes == exact_lock
     assert serialized["workspace"]["registry_hash"]["algorithm"] == "sha256"
-    assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.8.1-2026-10-19.2"
+    assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.9.0-2026-10-27.1"
     assert (
         serialized["workspace"]["baseline_fingerprint"]
-        == "be0055f2e94024a186387e3897646530981455ba79517b3aebfb4747288e9f2c"
+        == "711f7ebd3e74d04f5777a1e2cad4f6f00729524451bfe82c356daa421918518c"
     )
     assert serialized["lock"]["mode"] == "reused"
     assert serialized["qualification"] == "development-overrides"
