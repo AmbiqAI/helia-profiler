@@ -54,12 +54,18 @@ marker alone does not guard anything.
 - **NSX is the build backend** (configure → build → flash). Prefer the
   `neuralspotx` Python API, fall back to `subprocess.run([...])` on the `nsx`
   CLI. Never `os.system()` or `shell=True`.
-- **Data between stages is frozen dataclasses from `results/`**, never bare
-  dicts. The one exception is `LayerResult.counters` (PMU names are dynamic).
+- **Domain payloads passed between stages use typed, frozen dataclasses**,
+  not bare dicts. Keep each contract with its owning subsystem: result types
+  in `results/`, engine artifacts in `engines/base.py`, and fixture render
+  inputs in `_fixture_build.py`. This rule concerns domain handoffs, not the
+  mutable orchestration context. Frozen fields do not imply deep immutability;
+  typed payloads can contain mappings such as `LayerResult.counters` (PMU names
+  are dynamic).
 - **Cross-platform first:** `pathlib.Path`, argument-list subprocesses,
   `pyserial`, no POSIX-only assumptions.
 - **`cli/` stays thin:** parse args, call `api`/`Session`, hand results to
-  `console/`. The library never prints; only the console layer does.
+  `console/`. The library never prints. Console rendering belongs in `console/`;
+  CLI-local option parsers retain their argument diagnostics.
 - The default heliaRT route builds heliaRT's own `nsx-helia-rt` module from
   the registry. `engines/helia_rt/nsx_module.py` generates a wrapper only for
   the opt-in local modes: a prebuilt release (`engine.config.dist_path` or
