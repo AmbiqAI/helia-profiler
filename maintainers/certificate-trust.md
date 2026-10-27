@@ -1,10 +1,17 @@
 # Certificate trust remediation
 
-[Issue #587](https://github.com/AmbiqAI/helia-profiler/issues/587) tracks the
+[Issue #587](https://github.com/AmbiqAI/helia-profiler/issues/587) records HPX's remediation of the
 [emSign certificate incident](https://discuss.python.org/t/information-for-python-users-regarding-emudhra-emsign-ca-certificate-security-incident/109576/1).
 The upstream minimums are certifi 2026.10.19, uv 0.13.4 and pip 26.2.2.
 Updating one does not update the others: uv and pip carry their own trust stores.
 Do not disable TLS verification to bootstrap an update.
+
+Consumer remediation shipped in 0.4.1, and
+[#587 was closed at owner direction](https://github.com/AmbiqAI/helia-profiler/issues/587#issuecomment-6403728983).
+Existing installations do not upgrade automatically. Older local environments,
+external images, OS trust stores and custom CA stores remain the responsibility
+of their environment or infrastructure owners; they are not unfinished HPX
+consumer remediation. The checks below support those owners.
 
 ## Repository controls
 
@@ -78,22 +85,25 @@ owners. HPX maintains no container image in this repository. Custom enterprise
 CA stores also need their owner's review; a package update cannot prove those
 stores are clean.
 
-## Closeout evidence
+## Environment verification evidence
 
-Record actual commands, interpreter paths, package/tool versions, certificate
-store paths and a verified HTTPS fetch in #587. Inspect pip's vendored store as
+When checking a retained environment, record actual commands, interpreter paths,
+package/tool versions, certificate store paths and a verified HTTPS fetch in
+that environment owner's maintenance record. Inspect pip's vendored store as
 well as certifi's store when pip is installed. A lockfile change, successful
 flake evaluation or a green test suite alone is not deployment evidence.
 
-Track these separately until each is checked or explicitly handed to an owner:
+Use the following ownership boundaries when maintaining each surface:
 
 | Surface | Required disposition |
 | --- | --- |
-| Published HPX package | Fixed package released; consumers upgrade and resolve dependencies. |
+| Published HPX package | Consumer remediation shipped in 0.4.1; consumers upgrade and resolve dependencies. |
 | Developer and review environments | Rebuilt or inspected individually, including nested hook/tool environments. |
 | GitHub-hosted CI | Fixed workflow runs successfully on the exact revision. |
 | Self-hosted board runner | Owner runs the fixed bootstrap and records actual versions; no board experiment is required to check trust tooling. |
 | Nix users | Updated lock and rebuilt shell/check; old store paths remain old. |
 | External images, OS and custom CA stores | Owner confirms rebuild/update; not inferred from HPX CI. |
 
-Keep #587 open until these rollout obligations have explicit dispositions.
+These checks do not reopen #587 or assert that every retained environment has
+been inspected. A repository fix or package release does not update an existing
+environment's trust stores.

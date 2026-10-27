@@ -1,19 +1,21 @@
 # Dependency advisory follow-up
 
-[Issue #602](https://github.com/AmbiqAI/helia-profiler/issues/602) tracks the
-Python and documentation dependency remediation. Python floors live in
+[Issue #602](https://github.com/AmbiqAI/helia-profiler/issues/602) is closed following
+Python and documentation dependency remediation and the owner-approved static-site
+cache disposition described below. Python floors live in
 `pyproject.toml` and `tests/test_security_advisories.py`. The docs lock guards
 live in `astro-site/scripts/security-advisories.test.mjs`, run by
 `npm run check:guard`. Check every nested lock occurrence when updating them.
 
-## Cache advisory: proposed HPX disposition
+## Cache advisory: approved HPX disposition
 
-Recommendation: **not affected by the client `max-stale` advisory path in the
-currently tested HPX documentation integration**. This is a consumer-specific assessment, not a claim that the
-library is fixed or that the advisory has been withdrawn. Closing #602 or
-dismissing the Dependabot alert requires the owner's explicit disposition.
+The [owner-approved closeout](https://github.com/AmbiqAI/helia-profiler/issues/602#issuecomment-6402950878)
+records that **the vulnerable client `max-stale` path is not used in the tested
+HPX documentation integration**. The remaining Dependabot alert was dismissed
+on that basis. This is a consumer-specific assessment, not a claim that the
+library is fixed or that the advisory has been withdrawn.
 
-### Corrected interpretation
+### Advisory scope
 
 [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp) describes
 shared-cache reuse of cookied responses through a client `max-stale` directive.
@@ -21,8 +23,8 @@ The example reproduces in http-cache-semantics 4.2.0 and 4.3.0: the library
 reports a zero freshness lifetime for a cookied shared response, but permits
 reuse when the client allows stale content.
 
-Our earlier assessment called this reproduction a demonstrated vulnerability.
-That conclusion was too strong. [RFC 9111 section 7.3](https://www.rfc-editor.org/rfc/rfc9111.html#section-7.3)
+The cookie reproduction alone does not establish a cache-policy violation.
+[RFC 9111 section 7.3](https://www.rfc-editor.org/rfc/rfc9111.html#section-7.3)
 does not make `Set-Cookie` a caching prohibition; freshness is distinct from
 shared-cache privacy. The maintainer [disputes the advisory](https://github.com/kornelski/http-cache-semantics/issues/56#issuecomment-5975759591),
 and the [advisory-database dispute](https://github.com/github/advisory-database/issues/10139)
@@ -75,13 +77,16 @@ static build supplies the separate publication check.
 
 ### Closeout and reassessment
 
-The dependency and lock remain unchanged. No version-only alert suppression,
-cache monkey-patch, vendored fork or advisory dismissal is part of this change.
-The npm audit alert can remain visible until the owner approves a disposition.
+The cache disposition did not patch or replace the dependency. The approved
+Dependabot dismissal records HPX's integration-specific exposure assessment;
+it does not change npm audit's dependency-range reporting. The integration
+guards remain in place to detect changes to the assessed boundary.
 
 Reassess before adding SSR, authenticated remote-image fetching, a shared HTTP
 cache, or new consumers of this package, and when upgrading Astro's image
 pipeline. A future upstream adoption must be checked against the directive
 cases and normal public reuse, not just against the cookie example or an audit
-version range. Operational certificate rollout remains tracked separately in
-[#587](https://github.com/AmbiqAI/helia-profiler/issues/587).
+version range. Certificate consumer remediation shipped in 0.4.1 and
+[#587 was closed at owner direction](https://github.com/AmbiqAI/helia-profiler/issues/587#issuecomment-6403728983).
+See [certificate-trust.md](certificate-trust.md) for verification of retained
+environments and infrastructure-owner responsibilities.
