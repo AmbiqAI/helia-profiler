@@ -144,7 +144,7 @@ def test_profile_signature_matches_override_specs():
     import inspect
 
     from helia_profiler.cli.app import profile_command
-    from helia_profiler.cli.profile_cmd import _KNOWN_PARAMS
+    from helia_profiler.cli.options import _KNOWN_PARAMS
 
     sig_params = set(inspect.signature(profile_command).parameters) - {"config"}
     assert sig_params == set(_KNOWN_PARAMS)
