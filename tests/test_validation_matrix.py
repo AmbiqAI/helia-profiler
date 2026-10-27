@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +15,7 @@ from helia_profiler.validation import (
     MODELS,
     CaseSpec,
     ExecuTorchBackend,
+    ModelSpec,
     build_matrix,
     case_validity,
     load_model_file,
@@ -173,6 +175,13 @@ models:
         assert {case.model.id for case in cases} == {"kws-base", "kws-pruned"}
 
 
+_FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _fixture_model(path: Path) -> ModelSpec:
+    return dataclasses.replace(MODELS["kws"], fixture_path=str(path))
+
+
 class TestCaseValidity:
     def _case(self, **overrides: object) -> CaseSpec:
         # replace() on the frozen, __post_init__-free CaseSpec is exactly
@@ -202,6 +211,29 @@ class TestCaseValidity:
 
     def test_executorch_atfe_is_valid(self):
         case = self._case(engine=EngineType.EXECUTORCH, toolchain=Toolchain.ATFE)
+        assert case_validity(case) is None
+
+    @pytest.mark.parametrize(
+        "fixture", ["kws_float_fp32.tflite", "mlperf_tiny/kws/kws_ref_model.tflite"]
+    )
+    def test_litert_runs_non_float16(self, fixture):
+        case = self._case(model=_fixture_model(_FIXTURES / fixture), engine=EngineType.LITERT)
+        assert case_validity(case) is None
+
+    @pytest.mark.parametrize("fixture", ["kws_float_fp16.tflite", "kws_float_fp16_weights.tflite"])
+    def test_litert_skips_float16(self, fixture):
+        case = self._case(model=_fixture_model(_FIXTURES / fixture), engine=EngineType.LITERT)
+        assert case_validity(case) == "Upstream TFLM refuses any model with a FLOAT16 tensor"
+
+    @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.HELIA_AOT])
+    def test_helia_engines_run_float16(self, engine):
+        case = self._case(model=_fixture_model(_FIXTURES / "kws_float_fp16.tflite"), engine=engine)
+        assert case_validity(case) is None
+
+    def test_litert_runs_unreadable_model(self, tmp_path):
+        model = tmp_path / "broken.tflite"
+        model.write_bytes(b"not a flatbuffer")
+        case = self._case(model=_fixture_model(model), engine=EngineType.LITERT)
         assert case_validity(case) is None
 
 
