@@ -38,6 +38,7 @@ cli/validate_cmd.py
 cli/validation_app.py
 compiled_build.py
 config/__init__.py
+config/_yaml.py
 config/power.py
 console/__init__.py
 console/analysis.py
