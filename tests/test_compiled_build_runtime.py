@@ -20,7 +20,7 @@ from helia_profiler._fixture_build import (
 from helia_profiler.errors import ConfigError
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES
 from helia_profiler.lifecycle import Lifecycle
-from helia_profiler.runtime_records import RuntimeRecord, runtime
+from helia_profiler.runtime.records import RuntimeRecord, runtime
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
 from tests.unit.test_fixture_record import _build
 
@@ -141,7 +141,7 @@ def test_build_links_the_prepared_runtime_its_plan_names(tmp_path, monkeypatch, 
         calls.append(options)
         return reseal(build)
 
-    monkeypatch.setattr("helia_profiler.prepared_runtimes.prepared_runtime", prepared)
+    monkeypatch.setattr("helia_profiler.runtime.prepare.prepared_runtime", prepared)
     monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", fake)
     hpx.build(plan, fixture, method=FixtureMethod(FixtureTimingScope.INVOKE_ONLY))
 
@@ -182,5 +182,5 @@ def test_a_saved_litert_build_verifies_after_the_default_record_changes(tmp_path
             return replace(LITERT, version="newer", source=replace(LITERT.source, commit="e" * 40))
         return real(name, version)
 
-    monkeypatch.setattr("helia_profiler.runtime_records.runtime", newer_default)
+    monkeypatch.setattr("helia_profiler.runtime.records.runtime", newer_default)
     record.verify()

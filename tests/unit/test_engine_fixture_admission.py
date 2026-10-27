@@ -122,8 +122,8 @@ def test_stateful_build_records_carry_without_a_declared_policy(tmp_path, monkey
     import json
 
     from helia_profiler import _fixture_build as build
+    from helia_profiler._files import FixtureFile
     from helia_profiler.config import load_config
-    from helia_profiler.fixture_runtime import FixtureFile
 
     def stateful(model, graph):
         graph.tensors[2].isVariable = True
@@ -178,7 +178,7 @@ def test_stateful_build_records_carry_without_a_declared_policy(tmp_path, monkey
 def test_output_transport_and_dtype_limits_remain(tmp_path):
     path = typed_model(tmp_path, [F32], [("y", "float32", (1, 40000), None, None)])
     model = analyze_typed_fixture_model_for_engine(path, engine=EngineType.HELIA_AOT)
-    from helia_profiler.fixture_runtime import FixtureFile
+    from helia_profiler._files import FixtureFile
 
     file = FixtureFile(Path("unused"), "0" * 64)
     fixture = TypedFixture(
@@ -211,8 +211,8 @@ def test_real_build_entry_selects_engine_before_pipeline(tmp_path, monkeypatch):
     from test_typed_fixture_analysis import s
 
     from helia_profiler import _fixture_build as build
+    from helia_profiler._files import FixtureFile
     from helia_profiler.config import load_config
-    from helia_profiler.fixture_runtime import FixtureFile
 
     def gelu(model, graph):
         model.operatorCodes[0].builtinCode = s.BuiltinOperator.GELU
@@ -301,11 +301,11 @@ def test_resource_resolver_covers_initializer_subgraph(tmp_path):
 def test_resource_renderer_allocates_once_and_keeps_full_model(tmp_path):
     import hashlib
 
+    from helia_profiler._files import FixtureFile
     from helia_profiler._fixture_build import FixtureRenderSpec
     from helia_profiler.config import load_config
     from helia_profiler.firmware.fixture import fixture_template_vars
     from helia_profiler.firmware.render import _jinja_env
-    from helia_profiler.fixture_runtime import FixtureFile
     from helia_profiler.pipeline import PipelineContext
 
     path = typed_model(tmp_path, [F32], [Y32])
@@ -387,7 +387,7 @@ def test_auxiliary_float16_is_metadata_not_public_io_capability(tmp_path):
     path = typed_model(tmp_path, [F32], [Y32], change=change)
     actual = analyze_typed_fixture_model_for_engine(path, engine=EngineType.LITERT)
     assert actual.has_float16
-    from helia_profiler.fixture_runtime import FixtureFile
+    from helia_profiler._files import FixtureFile
 
     file = FixtureFile(Path("unused"), "0" * 64)
     fixture = TypedFixture(

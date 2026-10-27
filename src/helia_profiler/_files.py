@@ -2,12 +2,36 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
+
+
+@dataclass(frozen=True)
+class FixtureFile:
+    """A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match."""
+
+    path: Path
+    sha256: str
+
+    def read(self) -> bytes:
+        _digest(self.sha256)
+        data = self.path.read_bytes()
+        if hashlib.sha256(data).hexdigest() != self.sha256:
+            raise ValueError(f"Fixture hash mismatch: {self.path}")
+        return data
+
+
+def _digest(value: object) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError("Expected a SHA256 fixture identity")
+    return value
 
 
 def write_text_atomically(target: Path, text: str) -> None:

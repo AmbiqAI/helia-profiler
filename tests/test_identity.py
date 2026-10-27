@@ -10,7 +10,6 @@ from helia_profiler.engines.executorch import EXECUTORCH_MODULE
 from helia_profiler.engines.helia_rt.adapter import HeliaRTAdapter
 from helia_profiler.engines.helia_rt.artifacts import HELIART_MODULE
 from helia_profiler.engines.litert import _SUPPORTED_BACKENDS, TFLITE_MICRO_MODULE, LiteRtAdapter
-from helia_profiler.fixture_runtime import STACK_KERNEL_LIBRARY, STACK_RUNTIME_RECORD
 from helia_profiler.identity import (
     CanonicalEngine,
     CanonicalKernel,
@@ -18,6 +17,7 @@ from helia_profiler.identity import (
     canonical_engine,
     canonical_kernel,
 )
+from helia_profiler.runtime.archive import STACK_KERNEL_LIBRARY, STACK_RUNTIME_RECORD
 
 LITERT, HELIA_RT = CanonicalEngine.LITERT, CanonicalEngine.HELIA_RT
 REFERENCE, CMSIS_NN, HELIA_CORE = (

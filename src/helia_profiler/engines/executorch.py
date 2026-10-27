@@ -14,7 +14,7 @@ from ..errors import EngineError
 from ..identity import Unknown
 from ..lifecycle import InstanceBoundary, Lifecycle
 from ..results import NsxModuleRef
-from ..runtime_records import RuntimeRecord, runtime
+from ..runtime.records import RuntimeRecord, runtime
 from . import EngineType
 from .base import (
     ExecutorchArtifacts,

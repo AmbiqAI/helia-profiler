@@ -223,7 +223,7 @@ def test_the_engine_identity_is_what_a_profile_build_uses(session):
         "arm-cmsis-nn",
         baseline.module("arm-cmsis-nn").ref,
     )
-    from helia_profiler.runtime_records import runtime
+    from helia_profiler.runtime.records import runtime
 
     record = runtime("helia-rt")
     assert record is not None and heliart is not None and heliart.version == record.version
@@ -525,7 +525,7 @@ def test_a_missing_local_input_is_refused_at_freeze(session, tmp_path):
 def test_heliart_runtime_selectors_are_separate_from_kernel_overrides(
     session, tmp_path, monkeypatch
 ):
-    from helia_profiler.runtime_records import runtime
+    from helia_profiler.runtime.records import runtime
 
     kernels = session.with_engine("helia-rt", config={"cmsis_nn_path": str(tmp_path)}).freeze()
     record = runtime("helia-rt")

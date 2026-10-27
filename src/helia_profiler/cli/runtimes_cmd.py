@@ -6,7 +6,7 @@ import importlib.resources
 
 import typer
 
-from ..runtime_records import runtime, runtimes
+from ..runtime.records import runtime, runtimes
 
 
 def _cmd_runtimes_list() -> None:
@@ -39,7 +39,7 @@ def _cmd_runtimes_show(name: str, version: str | None) -> None:
 def _cmd_runtimes_prepare(name: str, version: str | None) -> None:
     from ..console import HpxConsole
     from ..errors import HpxError
-    from ..prepared_runtimes import prepare_runtime
+    from ..runtime.prepare import prepare_runtime
 
     try:
         prepared = prepare_runtime(name, version)

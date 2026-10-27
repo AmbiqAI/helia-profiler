@@ -655,7 +655,7 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
     from .engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
     from .engines.helia_rt.artifacts import HELIART_MODULE
     from .engines.litert import TFLITE_MICRO_MODULE
-    from .runtime_records import runtime
+    from .runtime.records import runtime
 
     baseline = config.compatibility_baseline
     resolution = _compatibility(config)

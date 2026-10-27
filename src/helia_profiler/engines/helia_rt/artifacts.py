@@ -25,7 +25,7 @@ from pathlib import Path
 from ...config import ProfileConfig
 from ...errors import ConfigError, EngineError
 from ...platform import CoreArch, PlatformRegistry, get_board, get_soc
-from ...runtime_records import runtime
+from ...runtime.records import runtime
 from ..semver import parse_semver
 
 log = logging.getLogger("hpx")

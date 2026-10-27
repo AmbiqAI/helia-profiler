@@ -13,8 +13,8 @@ import pytest
 
 from helia_profiler import FixtureTimingScope
 from helia_profiler import fixture_capture as capture
+from helia_profiler._files import FixtureFile
 from helia_profiler.fixture_image import Sink, inspect_elf
-from helia_profiler.fixture_runtime import FixtureFile
 from helia_profiler.fixture_stage import FixtureStage
 from helia_profiler.fixture_target import supported_fixture_target
 

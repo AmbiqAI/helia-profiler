@@ -79,7 +79,7 @@ def test_prepared_settings_before_staging(
     )
     module = NsxModuleRef.registry("prepared-helia", "prepared-helia")
     stage = Mock(return_value=module)
-    monkeypatch.setattr("helia_profiler.fixture_runtime.prepare_runtime_module", stage)
+    monkeypatch.setattr("helia_profiler.runtime.archive.prepare_runtime_module", stage)
     work_dir = tmp_path / "work"
     if case == "valid":
         artifacts = HeliaRTAdapter().prepare_runtime(config, work_dir, runtime)

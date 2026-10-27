@@ -10,11 +10,11 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
+from ._files import FixtureFile
 from ._identity_hash import build_hash, measured_facts
 from ._semantic_hash import semantic_hash
 from .deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from .engines import get_adapter
-from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .identity import (
     BuildFacts,
@@ -28,7 +28,7 @@ from .identity import (
     canonical_kernel,
 )
 from .lifecycle import first_invoke_window
-from .runtime_records import runtime
+from .runtime.records import runtime
 
 if TYPE_CHECKING:
     from ._fixture_build import FixtureBuild

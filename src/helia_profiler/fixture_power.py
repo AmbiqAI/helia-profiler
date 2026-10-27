@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import TYPE_CHECKING, Callable, Protocol
 
-from .fixture_runtime import FixtureFile
+from ._files import FixtureFile
 from .power.base import PowerResult
 from .power.joulescope.driver import JoulescopeDriver
 from .power.metadata import MeasurementScope, PowerIntegrity, classify_observation

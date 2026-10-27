@@ -26,7 +26,7 @@ from helia_profiler._fixture_record import (
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import EngineSource
 from helia_profiler.fixture_identity import fixture_run_identity
-from helia_profiler.fixture_runtime import _manifest_facts
+from helia_profiler.runtime.archive import _manifest_facts
 
 AOT_COMMIT = "7b92ec8a3ced8459eb68940a42d405536144368e"
 

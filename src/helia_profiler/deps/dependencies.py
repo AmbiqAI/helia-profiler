@@ -33,7 +33,7 @@ from ..results.dependencies import (
     installed_aot_source,
 )
 from ..results.serde import sha256_file
-from ..runtime_records import runtimes
+from ..runtime.records import runtimes
 from . import nsx as nsx_cli
 from .compatibility import (
     CMSIS_NN_PROVIDER_MODULES,

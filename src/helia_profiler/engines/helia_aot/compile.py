@@ -25,7 +25,7 @@ from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
 from ...errors import ConfigError, EngineError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
-from ...runtime_records import RuntimeRecord, runtimes
+from ...runtime.records import RuntimeRecord, runtimes
 from ..semver import parse_semver
 
 log = logging.getLogger("hpx")

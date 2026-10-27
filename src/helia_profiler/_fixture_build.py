@@ -9,6 +9,7 @@ from dataclasses import asdict, dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
+from ._files import FixtureFile
 from ._fixture_io import (
     FIXTURE_CAPABILITIES as FIXTURE_CAPABILITIES,
 )
@@ -42,7 +43,6 @@ from .fixture_analysis import (
 from .fixture_image import MAX_IMAGE, MRAM, bounded, fixture_sink_sizes, inspect_elf
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramWeights
-from .fixture_runtime import FixtureFile, PreparedUpstreamRuntime, prove_prepared_runtime_build
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, pinned_sources
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,
@@ -54,6 +54,7 @@ from .fixture_target import (
 from .pipeline import PipelineContext, PipelineRunner, Stage, serialize_config
 from .placement import ArenaRole, Placement
 from .results.models import MemoryPlan, ToolchainInfo
+from .runtime.archive import PreparedUpstreamRuntime, prove_prepared_runtime_build
 from .wire import STIMER_HZ
 
 

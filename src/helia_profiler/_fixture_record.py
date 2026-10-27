@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .fixture_capture import FixtureCaptureRequest
 
-from ._files import RootedPaths, read_json
+from ._files import FixtureFile, RootedPaths, read_json
 from ._fixture_build import (
     FixtureBuild,
     FixtureIO,
@@ -30,7 +30,6 @@ from .engines.base import EngineSource
 from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
 from .fixture_power import FixturePowerSync
 from .fixture_psram import FixturePsramPayload, FixturePsramWeights
-from .fixture_runtime import FixtureFile
 from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource, comparable, pinned_sources
 from .fixture_target import (
     FIXTURE_CLOCK_PROFILE,

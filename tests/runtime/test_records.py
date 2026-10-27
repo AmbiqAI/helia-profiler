@@ -15,7 +15,7 @@ from helia_profiler.cli.app import app
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
 from helia_profiler.platform import build_platform_registry, get_soc_for_board
-from helia_profiler.runtime_records import (
+from helia_profiler.runtime.records import (
     RuntimeQualification,
     load_runtime_records,
     qualification,
@@ -69,7 +69,7 @@ def test_shipped_records_name_engines_targets_and_one_default_each() -> None:
 
 def test_hardware_workflow_uses_default_executorch_commit() -> None:
     workflow_path = (
-        Path(__file__).resolve().parents[1] / ".github/workflows/hardware-validation.yml"
+        Path(__file__).resolve().parents[2] / ".github/workflows/hardware-validation.yml"
     )
     workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
     default = runtime("executorch")
@@ -112,8 +112,9 @@ def test_fixture_integration_capability_table() -> None:
 def test_generic_fixture_io_support_does_not_inherit_release_qualification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from helia_profiler import EngineType, FixtureCapability, runtime_records
+    from helia_profiler import EngineType, FixtureCapability
     from helia_profiler._fixture_facts import fixture_capabilities
+    from helia_profiler.runtime import records as runtime_records
 
     aot = {"name": "helia-aot", "source": {"repo": "AmbiqAI/helia-aot", "commit": _COMMIT}}
     root = _write(
@@ -301,7 +302,7 @@ def test_stray_files_are_ignored_and_duplicate_keys_refused(tmp_path: Path) -> N
 def test_the_helia_aot_range_spans_the_records() -> None:
     from helia_profiler.engines.helia_aot.compile import _recorded_range
 
-    records = load_runtime_records(Path(__file__).parents[1] / "src/helia_profiler/data/runtimes")
+    records = load_runtime_records(Path(__file__).parents[2] / "src/helia_profiler/data/runtimes")
     assert _recorded_range(records) == ("0.33.0", "2.0.0")
     newest = [r for r in records if (r.name, r.version) == ("helia-aot", "0.33.0")]
     assert newest[0].default
@@ -371,7 +372,8 @@ def test_fixture_io_capabilities_ignore_qualification_records(monkeypatch, state
     import importlib.util
     import sys
 
-    from helia_profiler import _fixture_build, runtime_records
+    from helia_profiler import _fixture_build
+    from helia_profiler.runtime import records as runtime_records
 
     calls = []
 

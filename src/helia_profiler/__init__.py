@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from . import examples
+    from ._files import FixtureFile
     from ._fixture_build import (
         FixtureBuild,
         FixtureIO,
@@ -121,17 +122,6 @@ if TYPE_CHECKING:
         FixtureRailPowerRequest,
     )
     from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
-    from .fixture_runtime import (
-        FixtureFile,
-        PreparedUpstreamRuntime,
-        RuntimeABI,
-        RuntimeHeader,
-        RuntimeProvider,
-        VerifiedPreparedRuntime,
-    )
-    from .fixture_runtime import (
-        RuntimeManifest as PreparedRuntimeManifest,
-    )
     from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
     from .fixture_target import FixtureTarget
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
@@ -194,7 +184,15 @@ if TYPE_CHECKING:
     from .run_guard import OperatorGuard
     from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
     from .run_record import RunResultError, RunResultRecord, load_run
-    from .runtime_records import (
+    from .runtime.archive import (
+        PreparedUpstreamRuntime,
+        RuntimeABI,
+        RuntimeHeader,
+        RuntimeProvider,
+        VerifiedPreparedRuntime,
+    )
+    from .runtime.archive import RuntimeManifest as PreparedRuntimeManifest
+    from .runtime.records import (
         Qualification,
         QualifiedTarget,
         RuntimeQualification,
@@ -327,13 +325,13 @@ _EXPORTS = {
     "SupportBundleManifest": (".results", "SupportBundleManifest", "experimental"),
     "SupportBundleSection": (".results", "SupportBundleSection", "experimental"),
     "load_result_manifest": (".results", "load_result_manifest", "experimental"),
-    "Qualification": (".runtime_records", "Qualification", "experimental"),
-    "QualifiedTarget": (".runtime_records", "QualifiedTarget", "experimental"),
-    "RuntimeQualification": (".runtime_records", "RuntimeQualification", "experimental"),
-    "RuntimeRecord": (".runtime_records", "RuntimeRecord", "experimental"),
-    "RuntimeSource": (".runtime_records", "RuntimeSource", "experimental"),
-    "qualification": (".runtime_records", "qualification", "experimental"),
-    "runtimes": (".runtime_records", "runtimes", "experimental"),
+    "Qualification": (".runtime.records", "Qualification", "experimental"),
+    "QualifiedTarget": (".runtime.records", "QualifiedTarget", "experimental"),
+    "RuntimeQualification": (".runtime.records", "RuntimeQualification", "experimental"),
+    "RuntimeRecord": (".runtime.records", "RuntimeRecord", "experimental"),
+    "RuntimeSource": (".runtime.records", "RuntimeSource", "experimental"),
+    "qualification": (".runtime.records", "qualification", "experimental"),
+    "runtimes": (".runtime.records", "runtimes", "experimental"),
     "Session": (".session", "Session", "stable"),
     "FrozenRun": (".frozen_run", "FrozenRun", "experimental"),
     "FrozenModel": (".frozen_run", "FrozenModel", "experimental"),
@@ -354,8 +352,8 @@ _EXPORTS = {
     "FixtureRole": ("._fixture_build", "FixtureRole", "experimental"),
     "FixtureMethod": ("._fixture_build", "FixtureMethod", "experimental"),
     "FixtureTimingScope": ("._fixture_build", "FixtureTimingScope", "experimental"),
-    "FixtureFile": (".fixture_runtime", "FixtureFile", "experimental"),
-    "PreparedUpstreamRuntime": (".fixture_runtime", "PreparedUpstreamRuntime", "experimental"),
+    "FixtureFile": ("._files", "FixtureFile", "experimental"),
+    "PreparedUpstreamRuntime": (".runtime.archive", "PreparedUpstreamRuntime", "experimental"),
     "FixtureTensor": (".fixture_analysis", "FixtureTensor", "experimental"),
     "TypedFixtureModelAnalysis": (".fixture_analysis", "TypedFixtureModelAnalysis", "experimental"),
     "FixtureCaptureGuard": (".fixture_capture", "FixtureCaptureGuard", "experimental"),
@@ -387,11 +385,11 @@ _EXPORTS = {
     "EngineSource": (".engines.base", "EngineSource", "experimental"),
     "MemoryPlan": (".results.models", "MemoryPlan", "experimental"),
     "ToolchainInfo": (".results.models", "ToolchainInfo", "experimental"),
-    "VerifiedPreparedRuntime": (".fixture_runtime", "VerifiedPreparedRuntime", "experimental"),
-    "PreparedRuntimeManifest": (".fixture_runtime", "RuntimeManifest", "experimental"),
-    "RuntimeABI": (".fixture_runtime", "RuntimeABI", "experimental"),
-    "RuntimeHeader": (".fixture_runtime", "RuntimeHeader", "experimental"),
-    "RuntimeProvider": (".fixture_runtime", "RuntimeProvider", "experimental"),
+    "VerifiedPreparedRuntime": (".runtime.archive", "VerifiedPreparedRuntime", "experimental"),
+    "PreparedRuntimeManifest": (".runtime.archive", "RuntimeManifest", "experimental"),
+    "RuntimeABI": (".runtime.archive", "RuntimeABI", "experimental"),
+    "RuntimeHeader": (".runtime.archive", "RuntimeHeader", "experimental"),
+    "RuntimeProvider": (".runtime.archive", "RuntimeProvider", "experimental"),
     "RunIdentity": (".identity", "RunIdentity", "experimental"),
     "RunFacts": (".identity", "RunFacts", "experimental"),
     "BuildFacts": (".identity", "BuildFacts", "experimental"),

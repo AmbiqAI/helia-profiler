@@ -41,7 +41,7 @@ from helia_profiler.results.dependencies import (
     DependencyWorkspace,
 )
 from helia_profiler.results.run_summary import load_run_summary
-from helia_profiler.runtime_records import runtime
+from helia_profiler.runtime.records import runtime
 from tests.pipeline_context_helpers import set_profile_result
 
 RT_COMMIT = "1" * 40

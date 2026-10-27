@@ -11,6 +11,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+from helia_profiler._files import FixtureFile
 from helia_profiler._fixture_build import FixtureIO, FixtureTimingScope
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
@@ -29,7 +30,6 @@ from helia_profiler.fixture_analysis import (
     PerTensorQuantization,
 )
 from helia_profiler.fixture_capture import FixtureCaptureResult
-from helia_profiler.fixture_runtime import FixtureFile
 
 TINY_CNN = Path(__file__).resolve().parents[1] / "src/helia_profiler/data/models/tiny_cnn.tflite"
 TINY_INPUT = FixtureTensor("input", 0, "int8", (1, 8, 8, 1), PerTensorQuantization(0.1, 0))

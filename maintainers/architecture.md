@@ -17,7 +17,7 @@ from the package root.
 | --- | --- | --- |
 | `profile(config)`, `Session.profile()`, `hpx profile` | `api._execute_profile` → `profiler.run_profile` → `build_default_pipeline` → `PipelineRunner`; returns `ProfileResult` and writes reports | The full path resolves the probe, builds, flashes and captures, including optional power stages. |
 | `Session.freeze()`, `hpx freeze` | `session.py` resolves configuration; `frozen_run.freeze_config` records model/local-input hashes, resolved settings, runtime and environment identity in `FrozenRun`; `cli/run_cmds.py` saves the CLI plan | Host-only planning, local file inspection and a compiler `--version` query; no firmware compilation or device access. |
-| `hpx runtimes prepare` | `cli/runtimes_cmd.py` → `prepared_runtimes.prepare_runtime`; fetches and stages a verified archive in the cache. `fixture_runtime.py` owns runtime verification and link proof. | Host download and preparation; LiteRT archive preparation compiles sources, while heliaRT stages a release archive. No device access. |
+| `hpx runtimes prepare` | `cli/runtimes_cmd.py` → `runtime.prepare.prepare_runtime`; fetches and stages a verified archive in the cache. `runtime/archive.py` owns runtime verification and link proof. | Host download and preparation; LiteRT archive preparation compiles sources, while heliaRT stages a release archive. No device access. |
 | `build(plan, fixture, ...)`, `FrozenRun.build()` | `compiled_build.py` → `_fixture_build.build_fixed_fixture` → shared stages; verifies and returns `CompiledBuild` | Host compilation, with explicit fixture bytes and method. LiteRT/heliaRT consume a prepared runtime supplied by the caller or already in the cache; preparing that runtime is a separate operation. No flashing or capture. |
 | `run_build(compiled, ...)`, `CompiledBuild.run()` | `compiled_build.py` checks the build and request, then `fixture_capture.capture_fixture`; returns `RunResult` | Device access begins here, with the caller's guard and explicit probe serial. Executes the retained build without rebuilding; optional power uses its capture route. |
 | `hpx build`, `run_directory.build_into` | `cli/run_cmds.py` calls `build_into`, which pins model/inputs, calls `build` and saves `build.json`; returns `CompiledBuild` to Python callers | Host compilation and automatic persistence in a new or empty run directory. |
@@ -50,6 +50,13 @@ The public Python surface is the package root's `__all__`, pinned by
 `tests/test_api_stability.py`. Internal `fixture_*` and `_fixture_*` module names
 remain implementation details; root-exported `Fixture*` types are public.
 
+`runtime/records.py` owns release records and qualification lookup;
+`runtime/prepare.py` acquires and prepares archives, while `runtime/archive.py`
+verifies manifests, stages headers and proves link provenance. The package
+initializer performs no work. Shared pinned files (`FixtureFile`) belong to
+`_files.py`, so capture and retained readers do not depend on runtime preparation
+for file verification. Runtime tests live in `tests/runtime/`.
+
 ## Shared work and verification owners
 
 Both build paths use `PipelineContext` and `PipelineRunner` in `pipeline.py`.
@@ -64,7 +71,7 @@ engine adapter or firmware module, and check both callers.
 | Intent resolution and frozen plan | `session.py`, `config/`, `frozen_run.py` | `tests/test_session.py`, `tests/test_frozen_run.py` |
 | Engine preparation and ownership | `engines/__init__.py` dispatches; `litert.py`, `executorch.py`, `helia_rt/`, `helia_aot/` own adapters; `base.py`, `cmsis_nn.py`, `ethos_u.py`, `semver.py` are shared | `tests/test_package_layout.py`, `tests/contracts/test_engine_artifact_types.py`, engine-specific tests |
 | Fixture IO declarations and admission | `_fixture_io.py` owns dtype/capability enums, engine IO declarations, the readback budget and typed IO admission; construction, retained verification and capability reporting consume it. Fixed-input construction without typed tensor declarations selects the int8 capability directly. | `tests/unit/test_fixture_io.py`, `tests/unit/test_typed_fixture.py`, `tests/unit/test_fixture_record.py` |
-| Build binding and retained files | `compiled_build.py` checks plan/build agreement; `_fixture_record.py` verifies pinned build evidence; `fixture_runtime.py` verifies prepared-runtime declarations and link proof | `tests/test_compiled_build.py`, `tests/test_compiled_build_runtime.py`, `tests/unit/test_fixture_record.py` |
+| Build binding and retained files | `compiled_build.py` checks plan/build agreement; `_fixture_record.py` verifies pinned build evidence; `runtime/archive.py` verifies prepared-runtime declarations and link proof | `tests/test_compiled_build.py`, `tests/test_compiled_build_runtime.py`, `tests/unit/test_fixture_record.py` |
 | Semantic identity | `identity.py` defines facts; `frozen_run.py` owns intent identity; `fixture_identity.py` derives build/capture identity; `profile_identity.py` derives profile identity; `_identity_hash.py` shares hash rules | `tests/test_identity.py`, `tests/unit/test_fixture_identity.py`, `tests/test_profile_identity.py` |
 | Output comparison | `expect.py` owns `Expect`, references, tolerances and `Verification`; `compiled_build.py` applies the requested comparison after a successful capture | `tests/test_expect.py`, `tests/test_compiled_build.py` |
 | Shared run rules | `_run_contracts.py` owns capture-count agreement, power admission (including build-time route checks) and lifecycle/intent/rail identity enrichment. `compiled_build.py` and `run_record.py` supply existing fixture values; the rules do not depend on those callers. | `tests/test_run_power.py`, `tests/test_run_record.py`, `tests/test_package_layout.py` |
