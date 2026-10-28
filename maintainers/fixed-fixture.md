@@ -231,7 +231,7 @@ configuration and provider defaults are unchanged.
 
 `FixtureBuild` pins generated sources, ELF, flat image, dependency lock and map;
 its runtime manifest is absent for AOT. A compiled build refuses a flat image over
-`fixture_image.MAX_IMAGE` (2 MiB) or outside the MRAM application region, the same
+`fixtures.image.MAX_IMAGE` (2 MiB) or outside the MRAM application region, the same
 limits capture applies, so no plan can pin an image capture would refuse. The cap is
 a policy bound well inside MRAM: every capture flashes the whole image and reads it
 all back to verify it, which costs roughly 11–12 s per MB per capture on the
@@ -263,7 +263,7 @@ halting it until the status leaves its
 poison and running sentinels or `settle_seconds` elapses. A timeout names the
 stage reached (not started, before tensor allocation, warmups, timed loop; the
 intermediate stages need the TFLM memory sink) and a nonzero status names the
-failing firmware stage from the shared `fixture_stage.FixtureStage`
+failing firmware stage from the shared `fixtures.status.FixtureStage`
 vocabulary that also renders the firmware return codes. `completion.json` records
 the detached time and whether the first poll already saw completion. Each attempt preserves started, identity, completion,
 binary terminal and final receipt artifacts; existing attempt directories are
