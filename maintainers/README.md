@@ -25,3 +25,8 @@ Everything user-facing belongs on the site instead: a page under
 
 Start with [architecture.md](architecture.md) for implementation ownership and
 [`../AGENTS.md`](../AGENTS.md) for repository rules.
+
+For runnable material and its prerequisites, start with the
+[recipe index](../configs/README.md), [example index](../examples/README.md)
+and [tool index](../tools/README.md). These distinguish station-specific setup,
+shipped/generated assets and the working directory each entry point expects.
