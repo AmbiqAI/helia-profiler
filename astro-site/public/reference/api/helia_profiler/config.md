@@ -1009,4 +1009,4 @@ derived property rather than a helper each caller re-implements,
 because the rule spans two config sections and every caller (firmware
 render, power planner) must agree on the same effective value (#136).
 
-Source: `src/helia_profiler/config/__init__.py:714`
+Source: `src/helia_profiler/config/__init__.py:721`

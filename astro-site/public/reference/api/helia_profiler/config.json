@@ -1658,9 +1658,9 @@
               "returns": [],
               "signature": "effective_window_target_ms: int",
               "source": {
-                "line": 714,
+                "line": 721,
                 "path": "src/helia_profiler/config/__init__.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L714"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/__init__.py#L721"
               },
               "summary": "The clean-window target the firmware is actually built with."
             }
