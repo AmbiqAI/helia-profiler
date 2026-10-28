@@ -382,7 +382,7 @@ directory moves as a unit.
 | Field | Holds |
 |---|---|
 | `location` | where the result itself sits, under its root |
-| `runs.compiled` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
+| `compiled_build` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
 | `capture` | the capture's facts (`state`, `timing`, `memory`, `rail_energy`, `error` and the rest); every file it references (outputs, terminal snapshots, the rail trace) as `root`, `path`, `sha256` and `size_bytes` |
 | `power` | `null`, or the request with `kind` `rail` or `supply` |
 | `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.<publication>.bin` |
