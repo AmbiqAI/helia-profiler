@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 
 from ..api import export_result, inspect_result, load_result, observations
-from ..records import ResultReadError
+from ..readers.native import ResultReadError
 
 results_app = typer.Typer(
     help="Inspect and export verified profile bundles and saved run results.", add_completion=False

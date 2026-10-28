@@ -10,7 +10,7 @@ from pathlib import Path, PureWindowsPath
 import pytest
 
 from helia_profiler.api import inspect_result, load_result
-from helia_profiler.records import ProfileResultRecord, ResultReadError
+from helia_profiler.readers.native import ProfileResultRecord, ResultReadError
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 
 
@@ -34,7 +34,7 @@ forbidden = ("pylink", "pyjoulescope_driver", "neuralspotx", "helia_profiler.tar
              "helia_profiler.power.joulescope", "helia_profiler.profiler")
 assert not [name for name in sys.modules if name.startswith(forbidden)]
 """)
-    guard = Path(__file__).resolve().parents[1] / "tools" / "software_only.py"
+    guard = Path(__file__).resolve().parents[2] / "tools" / "software_only.py"
     result = subprocess.run(
         [sys.executable, str(guard), "python", str(probe)],
         capture_output=True,
@@ -538,7 +538,7 @@ from helia_profiler.cli.app import app as second
 from helia_profiler.cli.app import app as third
 assert first is second is third is sentinel
 """)
-    guard = Path(__file__).resolve().parents[1] / "tools" / "software_only.py"
+    guard = Path(__file__).resolve().parents[2] / "tools" / "software_only.py"
     result = subprocess.run(
         [sys.executable, str(guard), "python", str(probe), str(implementation_first)],
         capture_output=True,

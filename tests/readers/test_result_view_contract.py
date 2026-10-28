@@ -11,7 +11,7 @@ from helia_profiler.api import load_result, observations
 
 from .test_records import bundle, edit_document
 
-CONTRACT = Path(__file__).parent / "fixtures" / "result_contract_v1"
+CONTRACT = Path(__file__).parents[1] / "fixtures" / "result_contract_v1"
 
 
 @pytest.mark.parametrize("workload", [None, "unknown", "aot_raw_zero_refill_included_v1"])
@@ -99,7 +99,7 @@ def test_the_run_reader_imports_no_instrument_or_probe_driver():
     import subprocess
     import sys
 
-    example = Path(__file__).parents[1] / "examples" / "results" / "run-api-synthetic"
+    example = Path(__file__).parents[2] / "examples" / "results" / "run-api-synthetic"
     probe = f"""
 import sys
 from helia_profiler.api import load_result, observations

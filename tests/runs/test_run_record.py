@@ -27,7 +27,7 @@ from helia_profiler.api import export_result, inspect_result, load_result, obser
 from helia_profiler.errors import ConfigError
 from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
 from helia_profiler.lifecycle import Lifecycle
-from helia_profiler.records import ResultReadError
+from helia_profiler.readers.native import ResultReadError
 from helia_profiler.runs.compiled import CompiledBuild, RunResult
 from helia_profiler.runs.expect import (
     ReferenceOrigin,
@@ -723,7 +723,7 @@ def test_a_result_that_is_not_json_is_refused(root, record):
 
 
 def test_a_result_that_changes_while_it_is_read_is_refused(root, record, monkeypatch):
-    from helia_profiler import records
+    from helia_profiler.readers import native as records
 
     path = _save(_run(record))
     real = records.read_run

@@ -391,7 +391,7 @@ neither is trusted from the file. Unknown identity facts compare as unknown what
 reason, so rewording a reason does not invalidate saved results; a reworded value does. Both
 save and load refuse a power request the build's wiring rules out, as `CompiledBuild.run`
 does. Free text such as the capture's error is recorded, not verified. started.json and
-receipt.json are not pinned, since the capture does not reference them. `_run_view.py` maps a `RunResultRecord` as `hpx-run-1`.
+receipt.json are not pinned, since the capture does not reference them. `readers/run_view.py` maps a `RunResultRecord` as `hpx-run-2`.
 `examples/run_api_conformance.py` walks freeze, build, save, load and run on a
 typed fixture and prints the identity, verification facts and key measurements.
 Its plan states what a fixture build requires (ATfE, the `lp` clock, an SRAM

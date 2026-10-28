@@ -7,9 +7,9 @@ import math
 from pathlib import Path
 from typing import Any
 
-from .records import ProfileResultRecord, ResultReadError
-from .results.manifest import ResultValidity, RunStatus
-from .runs.record import RunResultRecord
+from ..results.manifest import ResultValidity, RunStatus
+from ..runs.record import RunResultRecord
+from .native import ProfileResultRecord, ResultReadError
 
 
 def _text(value: Any) -> str | None:
@@ -51,7 +51,7 @@ def observations(record: ProfileResultRecord | RunResultRecord) -> dict[str, Any
     hashes under ``extensions.helia-profiler``.
     """
     if isinstance(record, RunResultRecord):
-        from ._run_view import run_observations
+        from .run_view import run_observations
 
         return run_observations(record)
     manifest, summary = record.manifest, record.summary

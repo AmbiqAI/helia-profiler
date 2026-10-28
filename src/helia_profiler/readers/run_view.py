@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from ._semantic_hash import semantic_hash
-from .fixtures.power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
-from .identity import Unknown
-from .runs.record import RunResultRecord
+from .._semantic_hash import semantic_hash
+from ..fixtures.power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
+from ..identity import Unknown
+from ..runs.record import RunResultRecord
 
 MAPPING_VERSION = "hpx-run-2"
 _RESULT = "native-result"
