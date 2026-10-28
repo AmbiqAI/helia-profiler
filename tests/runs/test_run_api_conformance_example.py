@@ -17,9 +17,9 @@ from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement
 from helia_profiler.runs.expect import host_reference
 from tests.fixtures_api.test_fixture_record import _build, _pin
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 
-_EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "run_api_conformance.py"
+_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "run_api_conformance.py"
 
 
 @pytest.fixture

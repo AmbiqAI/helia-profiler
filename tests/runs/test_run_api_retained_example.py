@@ -10,8 +10,8 @@ from jsonschema import Draft202012Validator
 import helia_profiler as hpx
 from helia_profiler.api import load_result, observations
 
-_ROOT = Path(__file__).resolve().parents[1] / "examples" / "results" / "run-api-synthetic"
-_CONTRACT = Path(__file__).parent / "fixtures" / "result_contract_v1"
+_ROOT = Path(__file__).resolve().parents[2] / "examples" / "results" / "run-api-synthetic"
+_CONTRACT = Path(__file__).parents[1] / "fixtures" / "result_contract_v1"
 
 
 def test_the_retained_result_loads_with_its_build():

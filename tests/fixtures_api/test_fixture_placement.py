@@ -15,7 +15,7 @@ from helia_profiler.fixtures.build import _validate
 from helia_profiler.fixtures.types import FixtureRenderSpec
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole
-from tests.fixture_requests import FixturePlacement
+from tests.fixtures_api.requests import FixturePlacement
 from tests.fixtures_api.test_fixture_request import _request
 from tests.fixtures_api.test_typed_fixture import METHOD, analysis_of, config_for, typed
 

@@ -31,7 +31,7 @@ from helia_profiler.runs.expect import (
 from helia_profiler.runs.guard import OperatorGuard
 from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES, FrozenRun
 from tests.fixtures_api.test_fixture_record import _build
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 
 runner = CliRunner()
 SERIAL = "1160002255"
@@ -470,7 +470,7 @@ def test_validate_build_refuses_a_changed_pinned_file(out, plan, build):
 def rt_plan_file(tmp_path, build, monkeypatch) -> Path:
     """A heliaRT plan whose mocked build links a runtime prepared under the HPX cache."""
     from helia_profiler.hostenv.cache_dirs import hpx_cache_root
-    from tests.run_api_helpers import linking
+    from tests.runs.helpers import linking
 
     plan = plan_for(build, tmp_path / "rt-model.tflite", engine="helia-rt")
     assert plan.runtime is not None

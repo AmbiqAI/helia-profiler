@@ -23,7 +23,7 @@ from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runs.compiled import CompiledBuild, RunResult
 from helia_profiler.runs.expect import Expect
 from tests.fixtures_api.test_fixture_record import _build, _pin
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 
 _SCORE, _CACHE = b"\x01\x02", b"\x03\x04\x05\x06"
 
