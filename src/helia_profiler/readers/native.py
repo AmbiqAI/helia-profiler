@@ -13,19 +13,19 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-from ._semantic_hash import Kind, require
-from .errors import ConfigError, ReportError
-from .results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
-from .results.manifest import (
+from .._semantic_hash import Kind, require
+from ..errors import ConfigError, ReportError
+from ..results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
+from ..results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
     ResultArtifact,
     ResultIssue,
     ResultManifest,
     RunStatus,
 )
-from .results.run_summary import RunSummary, _require_current_summary
-from .results.serde import nested_get
-from .runs.record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
+from ..results.run_summary import RunSummary, _require_current_summary
+from ..results.serde import nested_get
+from ..runs.record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
 
 _MANIFEST_FILE = "result_manifest.json"
 _RUN_RESULT_FILE = "result.json"

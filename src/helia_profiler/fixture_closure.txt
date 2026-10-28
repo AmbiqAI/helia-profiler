@@ -2,8 +2,6 @@ __init__.py
 _files.py
 _identity_hash.py
 _litert_inspection.py
-_result_view.py
-_run_view.py
 _semantic_hash.py
 _version.py
 api.py
@@ -213,7 +211,10 @@ power/metadata.py
 power/sync.py
 profile_identity.py
 profiler.py
-records.py
+readers/__init__.py
+readers/native.py
+readers/profile_view.py
+readers/run_view.py
 report/__init__.py
 report/aot.py
 report/contracts.py

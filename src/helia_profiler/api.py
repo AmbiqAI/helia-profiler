@@ -20,10 +20,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._result_view import export_result as export_result
-from ._result_view import observations as observations
-from .records import inspect_result as inspect_result
-from .records import load_result as load_result
+from .readers.native import inspect_result as inspect_result
+from .readers.native import load_result as load_result
+from .readers.profile_view import export_result as export_result
+from .readers.profile_view import observations as observations
 
 if TYPE_CHECKING:
     from .config import ProfileConfig
