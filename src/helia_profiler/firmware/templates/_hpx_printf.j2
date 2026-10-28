@@ -163,12 +163,14 @@ static void hpx_rtt_set_nonblocking(void) {
     g_hpx_rtt_lossless = false;
 }
 
+{% if power_sync_enabled %}
 // Call once, right after a gated power/clean window completes (see
 // main.cc.j2), before any subsequent hpx_rtt_set_blocking()/hpx_printf() call.
 // See HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS above for why.
 static void hpx_rtt_shorten_lossless_timeout(void) {
     g_hpx_rtt_lossless_timeout_ms = HPX_RTT_LOSSLESS_TIMEOUT_POST_WINDOW_MS;
 }
+{% endif %}
 {% elif transport == "swo" %}
 {{ _linkage }}void hpx_printf(const char *fmt, ...) {
     static char line_buf[512];

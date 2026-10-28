@@ -419,9 +419,12 @@ class TestLockstepDefaultsOnWhenWired:
         assert template_vars["power_sync_enabled"] is expect_sync, scenario
 
         rendered = _jinja_env.get_template("_gpio_sync.j2").render(**template_vars)
-        assert (
-            f"static constexpr bool     kSyncLockstep     = {str(expect_lockstep).lower()};"
-        ) in rendered, scenario
+        if expect_sync:
+            assert (
+                f"static constexpr bool     kSyncLockstep     = {str(expect_lockstep).lower()};"
+            ) in rendered, scenario
+        else:
+            assert "kSyncLockstep" not in rendered, scenario
         assert (
             f"static constexpr bool     kPowerSyncEnabled = {str(expect_sync).lower()};"
         ) in rendered, scenario
