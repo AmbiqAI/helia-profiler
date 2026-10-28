@@ -11,3 +11,53 @@ models:
     rev: 0124dea005e876b9589537180c0b1f111d115699
     sha256: 56118080c1451eedd82b0989ee3b7f81ac8ecf7eec0ea744564762127160075c
     arena_size: 131072
+  - zoo: mlperf-tiny-kws
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 9fe02726897c493d7b7e9f03fa096fb60c719ca55f7c1644800412a7f3077fef
+    arena_size: 65536
+  - zoo: mlperf-tiny-vww
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 597a384c8c2c8a1276f04702f25013b7838f2f814f1ca7c174d295b73e3d6b7b
+    arena_size: 524288
+  - zoo: mlperf-tiny-vww
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 115bbc094d2119561320a21f01b6500a18bea8cc8589282ab007097bec8af38c
+    arena_size: 524288
+  - zoo: mlperf-tiny-vww
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 3e0ee08fda92163bbe501e502838fa761314edbeb4976165119d9b7835f43a40
+    arena_size: 262144
+  - zoo: mlperf-tiny-resnet8
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 3c002613d1b2475eb51dd78dfb85a546c8ae658dee71cf6ade43b022fe205415
+    arena_size: 262144
+  - zoo: mlperf-tiny-resnet8
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: b5c0046d6e0328b4956afd6baa29555a29b1f1c65bdd45aaed75b7cd484d9f79
+    arena_size: 262144
+  - zoo: mlperf-tiny-resnet8
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 1266a31bce015ba776897391ca4d7039ce7af2c9e159d3f90efea047c1c51e95
+    arena_size: 131072
+  - zoo: mlperf-tiny-ad01
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 87cf24194ef93d1d9b11a591d805526b98008e351655d29883c825c9c106ba24
+    arena_size: 131072
+  - zoo: mlperf-tiny-ad01
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: c66636f4d7f8af8b10518e7be750a22c9d8d46ec97326b40b0d94c097e0aad9b
+    arena_size: 16384
+  - zoo: mlperf-tiny-ad01
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 9e6b9904bf5987912b41445f64d7d0233ab66d0128675a764986177fb6b0c064
+    arena_size: 16384
