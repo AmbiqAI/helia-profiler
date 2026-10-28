@@ -84,6 +84,13 @@ directory explicitly on the command line or in YAML.
 [Getting Started](https://ambiqai.github.io/helia-profiler/getting-started/)
 for a real walkthrough.)*
 
+## Repository navigation
+
+- [Examples](examples/README.md): quickstart working directories, Python examples and retained results.
+- [Profiling recipes](configs/README.md): station customization, diagnostic cases and model assets.
+- [Repository tools](tools/README.md): generators, validation helpers and release tooling.
+- [Maintainer documentation](maintainers/README.md): architecture, hardware CI and release processes.
+
 ## Development
 
 ```bash
