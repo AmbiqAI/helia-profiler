@@ -5,15 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from .._fixture_build import TypedFixture
-from .._fixture_placement import validate_fixture_regions
 from ..engines import EngineType
 from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError
-from ..fixture_analysis import PerTensorQuantization
-from ..fixture_psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
-from ..fixture_stage import FixtureStage
-from ..fixture_target import fixture_app_region, fixture_cpu_hz, validate_fixture_placement
+from ..fixtures.analysis import PerTensorQuantization
+from ..fixtures.placement import validate_fixture_regions
+from ..fixtures.psram import MAX_PSRAM_PAYLOADS, FixturePsramPayload, payload_checksum
+from ..fixtures.status import FixtureStage
+from ..fixtures.target import fixture_app_region, fixture_cpu_hz, validate_fixture_placement
+from ..fixtures.types import TypedFixture
 from ..pipeline import PipelineContext
 from ..placement import ArenaRole, Placement
 from ..platform.memory_map import MemoryRegion

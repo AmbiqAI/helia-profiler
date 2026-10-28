@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 import helia_profiler
-from helia_profiler._fixture_build import FIXTURE_REFUSED_ENVIRONMENT, _refuse_overrides
 from helia_profiler.config import load_config
 from helia_profiler.errors import ConfigError
+from helia_profiler.fixtures.build import FIXTURE_REFUSED_ENVIRONMENT, _refuse_overrides
 
 PACKAGE = Path(helia_profiler.__file__).resolve().parent
 WHOLE = "<environment>"
@@ -36,8 +36,8 @@ REFUSED = {
 
 #: Reads in this package that cannot change fixture firmware, with the reason.
 ALLOWED = {
-    ("_fixture_build.py", "<name>"): "the fixture refusal check itself",
-    ("_fixture_build.py", "HPX_COMPILER_LAUNCHER"): "the fixture refusal check itself",
+    ("fixtures/build.py", "<name>"): "the fixture refusal check itself",
+    ("fixtures/build.py", "HPX_COMPILER_LAUNCHER"): "the fixture refusal check itself",
     (
         "frozen_run.py",
         "<variable>",

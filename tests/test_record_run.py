@@ -15,15 +15,15 @@ from helia_profiler import (
     FixtureTiming,
     FixtureTimingScope,
 )
-from helia_profiler._fixture_record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import CaptureError, ConfigError
 from helia_profiler.expect import Expect
-from helia_profiler.fixture_capture import FixtureCaptureRequest
-from helia_profiler.fixture_identity import fixture_run_identity
+from helia_profiler.fixtures.capture import FixtureCaptureRequest
+from helia_profiler.fixtures.identity import fixture_run_identity
+from helia_profiler.fixtures.record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.lifecycle import Lifecycle
+from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
-from tests.unit.test_fixture_record import _build, _pin
 
 _SCORE, _CACHE = b"\x01\x02", b"\x03\x04\x05\x06"
 
@@ -85,7 +85,7 @@ class _Device:
 @pytest.fixture
 def device(monkeypatch: pytest.MonkeyPatch) -> _Device:
     device = _Device()
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", device.capture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", device.capture)
     return device
 
 
@@ -200,7 +200,7 @@ def test_an_error_raised_by_the_capture_propagates(record, monkeypatch, tmp_path
     def capture(request, *, guard):
         raise RuntimeError("probe vanished")
 
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", capture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", capture)
 
     with pytest.raises(RuntimeError, match="probe vanished"):
         record.run(
@@ -284,7 +284,7 @@ def test_run_never_builds(record, device, tmp_path, monkeypatch):
         raise AssertionError("run() must not build")
 
     for target in (
-        "helia_profiler._fixture_build.build_fixed_fixture",
+        "helia_profiler.fixtures.build.build_fixed_fixture",
         "helia_profiler.deps.nsx.build",
         "helia_profiler.stages.build_firmware.BuildFirmwareStage.run",
     ):

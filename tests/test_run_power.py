@@ -24,17 +24,17 @@ from helia_profiler import (
     FixtureTimingScope,
     TypedFixture,
 )
-from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
 from helia_profiler.compiled_build import CompiledBuild, _binding
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture_capture import FixtureCaptureRequest
-from helia_profiler.fixture_target import fixture_target_for_board
+from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
+from helia_profiler.fixtures.capture import FixtureCaptureRequest
+from helia_profiler.fixtures.target import fixture_target_for_board
 from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runtime.records import runtime
+from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
-from tests.unit.test_fixture_record import _build, _pin
 
 _WIRING = FixturePowerSync(29, 36, 14)
 _POWER_METHOD = FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE, power_sync=_WIRING)
@@ -130,7 +130,7 @@ class _Compiler:
 @pytest.fixture
 def compiler_calls(monkeypatch: pytest.MonkeyPatch, build: FixtureBuild) -> _Compiler:
     fake = _Compiler(build)
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", fake)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", fake)
     return fake
 
 
@@ -214,7 +214,7 @@ class _Device:
 @pytest.fixture
 def device(monkeypatch: pytest.MonkeyPatch) -> _Device:
     device = _Device()
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", device.capture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", device.capture)
     return device
 
 
@@ -605,7 +605,7 @@ def test_supply_only_timing_refuses_an_unbounded_settle_time(tmp_path, build, de
 
 
 def test_the_settle_limits_are_the_capture_s_own():
-    from helia_profiler import fixture_capture
+    from helia_profiler.fixtures import capture as fixture_capture
 
     assert (fixture_capture._RAIL_SETTLE_LIMIT_S, fixture_capture._SETTLE_LIMIT_S) == (60, 300)
 

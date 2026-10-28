@@ -14,13 +14,6 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler import FixtureFile
-from helia_profiler._fixture_build import (
-    FixtureMethod,
-    FixtureOutput,
-    FixtureTimingScope,
-    TypedFixture,
-)
-from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.compiled_build import (
     COMPILED_BUILD_SCHEMA,
     COMPILED_BUILD_SCHEMA_VERSION,
@@ -28,11 +21,19 @@ from helia_profiler.compiled_build import (
     _binding,
 )
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture_identity import fixture_run_identity
+from helia_profiler.fixtures.identity import fixture_run_identity
+from helia_profiler.fixtures.record import compiled_fixture_identity
+from helia_profiler.fixtures.types import (
+    FixtureMethod,
+    FixtureOutput,
+    FixtureTimingScope,
+    TypedFixture,
+)
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement
 from helia_profiler.results.models import ToolchainInfo
+from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import (
     ATFE_OUTPUT,
     ATFE_VERSION,
@@ -41,7 +42,6 @@ from tests.run_api_helpers import (
     plan_for,
     reseal,
 )
-from tests.unit.test_fixture_record import _build, _pin
 
 _METHOD = FixtureMethod(FixtureTimingScope.INVOKE_ONLY)
 
@@ -92,7 +92,7 @@ def calls(monkeypatch: pytest.MonkeyPatch, build) -> list[dict[str, Any]]:
         profiling = config.profiling
         return reseal(build, iterations=profiling.iterations, warmups=profiling.warmup)
 
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", fake)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", fake)
     return seen
 
 
@@ -116,7 +116,7 @@ def test_build_verifies_what_it_compiled(plan, build, fixture, monkeypatch):
     def wrong_counts(config, fixture, **options):
         return reseal(build, iterations=7, warmups=0)
 
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", wrong_counts)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", wrong_counts)
     with pytest.raises(ConfigError, match="runs 100 and 5"):
         plan.build(fixture, method=_METHOD, lifecycle=Lifecycle.CARRY)
 

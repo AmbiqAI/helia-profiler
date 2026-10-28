@@ -57,7 +57,7 @@ marker alone does not guard anything.
 - **Domain payloads passed between stages use typed, frozen dataclasses**,
   not bare dicts. Keep each contract with its owning subsystem: result types
   in `results/`, engine artifacts in `engines/base.py`, and fixture render
-  inputs in `_fixture_build.py`. This rule concerns domain handoffs, not the
+  inputs in `fixtures/types.py`. This rule concerns domain handoffs, not the
   mutable orchestration context. Frozen fields do not imply deep immutability;
   typed payloads can contain mappings such as `LayerResult.counters` (PMU names
   are dynamic).

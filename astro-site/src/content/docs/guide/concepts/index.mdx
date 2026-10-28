@@ -48,7 +48,7 @@ and writes a result bundle. Four rules shape every package:
 |---|---|---|
 | Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen pydantic models with `extra="forbid"`) |
 | One engine per run | the engine is explicit; comparing engines means two runs and `hpx compare` | `engines/__init__.py` (`get_adapter` takes one `EngineType`) |
-| Typed stage boundaries | domain handoffs use typed, frozen dataclasses owned by their subsystem, not bare dicts; fields can contain mappings such as `LayerResult.counters`. `PipelineContext` separately owns mutable orchestration state | `results/`, `engines/base.py` (`EngineArtifacts`), `_fixture_build.py` (`FixtureRenderSpec`), `pipeline.py` |
+| Typed stage boundaries | domain handoffs use typed, frozen dataclasses owned by their subsystem, not bare dicts; fields can contain mappings such as `LayerResult.counters`. `PipelineContext` separately owns mutable orchestration state | `results/`, `engines/base.py` (`EngineArtifacts`), `fixtures/build.py` (`FixtureRenderSpec`), `pipeline.py` |
 | Subprocess isolation | GCC, CMake, J-Link and the heliaAOT compiler run through `subprocess.run()` with argument lists, never a shell | `deps/nsx.py`, `target/probe/jlink.py`, `engines/helia_aot/compile.py` |
 
 ### Two objects flow through everything

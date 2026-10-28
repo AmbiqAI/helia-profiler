@@ -166,7 +166,7 @@ class HeliaAOTAdapter:
 
     def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
         from ...firmware.op_resolver import ResolverPlan
-        from ...fixture_analysis import prepare_litert_fixture
+        from ...fixtures.analysis import prepare_litert_fixture
 
         return prepare_litert_fixture(
             path,

@@ -435,7 +435,7 @@ these before the evidence directory is created:
 - a build outside the route (`_require_power_route` runs again, for a hand-made `CompiledBuild`);
 - a `settle_seconds` that is not a number above 0 and at most the 60 s a
   rail capture allows (a supply-only capture keeps the 300 s every capture
-  allows; both limits are `fixture_capture`'s own);
+  allows; both limits are `fixtures.capture`'s own);
 - a power build run without a rail request (its firmware waits for GO);
 - a missing `power_guard`, or one without `check()` and `verify_power_device()`;
 - a `power_guard` given without a request.
@@ -557,7 +557,7 @@ facts; the identity builders copy them.
   is outside the window. The heliaAOT clean window restores its inputs
   inside the span. Per-layer counters are separate and aggregated by
   `profiling.aggregation`.
-- **Fixture** (`fixture_identity.py`, `fixed_fixture.cc.j2`): engine setup
+- **Fixture** (`fixtures/identity.py`, `fixed_fixture.cc.j2`): engine setup
   and warmups run before the first timed STIMER read. `invoke_only`
   sums one STIMER bracket per invocation; `restore_and_invoke` takes one
   bracket around the timed loop, input copies included. `deployment_timing`

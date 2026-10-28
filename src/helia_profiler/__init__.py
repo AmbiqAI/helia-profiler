@@ -8,18 +8,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from . import examples
     from ._files import FixtureFile
-    from ._fixture_build import (
-        FixtureBuild,
-        FixtureIO,
-        FixtureMethod,
-        FixtureOutput,
-        FixtureRole,
-        FixtureStatePolicy,
-        FixtureTimingScope,
-        TypedFixture,
-    )
-    from ._fixture_facts import EngineDTypeCapability, FixtureCapabilities, QualifiedFixtureTarget
-    from ._fixture_io import FixtureCapability, FixtureDType
     from ._semantic_hash import SemanticHash
     from ._version import __version__
     from .api import profile
@@ -101,19 +89,25 @@ if TYPE_CHECKING:
         host_reference,
     )
     from .firmware.op_resolver import ResolverPlan
-    from .fixture_analysis import (
+    from .fixtures.analysis import (
         FixtureTensor,
         PerAxisQuantization,
         PerTensorQuantization,
         TypedFixtureModelAnalysis,
     )
-    from .fixture_capture import (
+    from .fixtures.capabilities import (
+        EngineDTypeCapability,
+        FixtureCapabilities,
+        QualifiedFixtureTarget,
+    )
+    from .fixtures.capture import (
         FixtureCaptureGuard,
         FixtureCaptureResult,
         FixtureMemory,
         FixtureTiming,
     )
-    from .fixture_power import (
+    from .fixtures.io import FixtureCapability, FixtureDType
+    from .fixtures.power import (
         FixtureBatchCompletion,
         FixtureBoardPowerRequest,
         FixturePowerGuard,
@@ -121,9 +115,19 @@ if TYPE_CHECKING:
         FixtureRailEnergy,
         FixtureRailPowerRequest,
     )
-    from .fixture_psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
-    from .fixture_sources import FixtureKernelSource, FixtureRuntimeSource
-    from .fixture_target import FixtureTarget
+    from .fixtures.psram import FixturePsramObservation, FixturePsramPayload, FixturePsramWeights
+    from .fixtures.sources import FixtureKernelSource, FixtureRuntimeSource
+    from .fixtures.target import FixtureTarget
+    from .fixtures.types import (
+        FixtureBuild,
+        FixtureIO,
+        FixtureMethod,
+        FixtureOutput,
+        FixtureRole,
+        FixtureStatePolicy,
+        FixtureTimingScope,
+        TypedFixture,
+    )
     from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
@@ -346,42 +350,46 @@ _EXPORTS = {
     "RunResultError": (".run_record", "RunResultError", "experimental"),
     "load_run": (".run_record", "load_run", "experimental"),
     "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root", "experimental"),
-    "TypedFixture": ("._fixture_build", "TypedFixture", "experimental"),
-    "FixtureIO": ("._fixture_build", "FixtureIO", "experimental"),
-    "FixtureOutput": ("._fixture_build", "FixtureOutput", "experimental"),
-    "FixtureRole": ("._fixture_build", "FixtureRole", "experimental"),
-    "FixtureMethod": ("._fixture_build", "FixtureMethod", "experimental"),
-    "FixtureTimingScope": ("._fixture_build", "FixtureTimingScope", "experimental"),
+    "TypedFixture": (".fixtures.types", "TypedFixture", "experimental"),
+    "FixtureIO": (".fixtures.types", "FixtureIO", "experimental"),
+    "FixtureOutput": (".fixtures.types", "FixtureOutput", "experimental"),
+    "FixtureRole": (".fixtures.types", "FixtureRole", "experimental"),
+    "FixtureMethod": (".fixtures.types", "FixtureMethod", "experimental"),
+    "FixtureTimingScope": (".fixtures.types", "FixtureTimingScope", "experimental"),
     "FixtureFile": ("._files", "FixtureFile", "experimental"),
     "PreparedUpstreamRuntime": (".runtime.archive", "PreparedUpstreamRuntime", "experimental"),
-    "FixtureTensor": (".fixture_analysis", "FixtureTensor", "experimental"),
-    "TypedFixtureModelAnalysis": (".fixture_analysis", "TypedFixtureModelAnalysis", "experimental"),
-    "FixtureCaptureGuard": (".fixture_capture", "FixtureCaptureGuard", "experimental"),
-    "FixtureTarget": (".fixture_target", "FixtureTarget", "experimental"),
-    "FixtureCapabilities": ("._fixture_facts", "FixtureCapabilities", "experimental"),
-    "QualifiedFixtureTarget": ("._fixture_facts", "QualifiedFixtureTarget", "experimental"),
-    "EngineDTypeCapability": ("._fixture_facts", "EngineDTypeCapability", "experimental"),
-    "FixtureBuild": ("._fixture_build", "FixtureBuild", "experimental"),
-    "FixtureCapability": ("._fixture_io", "FixtureCapability", "experimental"),
-    "FixtureDType": ("._fixture_io", "FixtureDType", "experimental"),
-    "FixtureStatePolicy": ("._fixture_build", "FixtureStatePolicy", "experimental"),
-    "PerTensorQuantization": (".fixture_analysis", "PerTensorQuantization", "experimental"),
-    "PerAxisQuantization": (".fixture_analysis", "PerAxisQuantization", "experimental"),
+    "FixtureTensor": (".fixtures.analysis", "FixtureTensor", "experimental"),
+    "TypedFixtureModelAnalysis": (
+        ".fixtures.analysis",
+        "TypedFixtureModelAnalysis",
+        "experimental",
+    ),
+    "FixtureCaptureGuard": (".fixtures.capture", "FixtureCaptureGuard", "experimental"),
+    "FixtureTarget": (".fixtures.target", "FixtureTarget", "experimental"),
+    "FixtureCapabilities": (".fixtures.capabilities", "FixtureCapabilities", "experimental"),
+    "QualifiedFixtureTarget": (".fixtures.capabilities", "QualifiedFixtureTarget", "experimental"),
+    "EngineDTypeCapability": (".fixtures.capabilities", "EngineDTypeCapability", "experimental"),
+    "FixtureBuild": (".fixtures.types", "FixtureBuild", "experimental"),
+    "FixtureCapability": (".fixtures.io", "FixtureCapability", "experimental"),
+    "FixtureDType": (".fixtures.io", "FixtureDType", "experimental"),
+    "FixtureStatePolicy": (".fixtures.types", "FixtureStatePolicy", "experimental"),
+    "PerTensorQuantization": (".fixtures.analysis", "PerTensorQuantization", "experimental"),
+    "PerAxisQuantization": (".fixtures.analysis", "PerAxisQuantization", "experimental"),
     "ResolverPlan": (".firmware.op_resolver", "ResolverPlan", "experimental"),
-    "FixtureCaptureResult": (".fixture_capture", "FixtureCaptureResult", "experimental"),
-    "FixtureTiming": (".fixture_capture", "FixtureTiming", "experimental"),
-    "FixtureMemory": (".fixture_capture", "FixtureMemory", "experimental"),
-    "FixturePowerSync": (".fixture_power", "FixturePowerSync", "experimental"),
-    "FixtureRailEnergy": (".fixture_power", "FixtureRailEnergy", "experimental"),
-    "FixtureBatchCompletion": (".fixture_power", "FixtureBatchCompletion", "experimental"),
-    "FixtureRailPowerRequest": (".fixture_power", "FixtureRailPowerRequest", "experimental"),
-    "FixtureBoardPowerRequest": (".fixture_power", "FixtureBoardPowerRequest", "experimental"),
-    "FixturePowerGuard": (".fixture_power", "FixturePowerGuard", "experimental"),
-    "FixturePsramWeights": (".fixture_psram", "FixturePsramWeights", "experimental"),
-    "FixturePsramPayload": (".fixture_psram", "FixturePsramPayload", "experimental"),
-    "FixturePsramObservation": (".fixture_psram", "FixturePsramObservation", "experimental"),
-    "FixtureKernelSource": (".fixture_sources", "FixtureKernelSource", "experimental"),
-    "FixtureRuntimeSource": (".fixture_sources", "FixtureRuntimeSource", "experimental"),
+    "FixtureCaptureResult": (".fixtures.capture", "FixtureCaptureResult", "experimental"),
+    "FixtureTiming": (".fixtures.capture", "FixtureTiming", "experimental"),
+    "FixtureMemory": (".fixtures.capture", "FixtureMemory", "experimental"),
+    "FixturePowerSync": (".fixtures.power", "FixturePowerSync", "experimental"),
+    "FixtureRailEnergy": (".fixtures.power", "FixtureRailEnergy", "experimental"),
+    "FixtureBatchCompletion": (".fixtures.power", "FixtureBatchCompletion", "experimental"),
+    "FixtureRailPowerRequest": (".fixtures.power", "FixtureRailPowerRequest", "experimental"),
+    "FixtureBoardPowerRequest": (".fixtures.power", "FixtureBoardPowerRequest", "experimental"),
+    "FixturePowerGuard": (".fixtures.power", "FixturePowerGuard", "experimental"),
+    "FixturePsramWeights": (".fixtures.psram", "FixturePsramWeights", "experimental"),
+    "FixturePsramPayload": (".fixtures.psram", "FixturePsramPayload", "experimental"),
+    "FixturePsramObservation": (".fixtures.psram", "FixturePsramObservation", "experimental"),
+    "FixtureKernelSource": (".fixtures.sources", "FixtureKernelSource", "experimental"),
+    "FixtureRuntimeSource": (".fixtures.sources", "FixtureRuntimeSource", "experimental"),
     "EngineSource": (".engines.base", "EngineSource", "experimental"),
     "MemoryPlan": (".results.models", "MemoryPlan", "experimental"),
     "ToolchainInfo": (".results.models", "ToolchainInfo", "experimental"),

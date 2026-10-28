@@ -21,7 +21,7 @@ from helia_profiler import (
     PreparedUpstreamRuntime,
     TypedFixture,
 )
-from helia_profiler._fixture_build import build_fixed_fixture
+from helia_profiler.fixtures.build import build_fixed_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = Path(helia_profiler.__file__).resolve().parent
@@ -81,7 +81,7 @@ def test_heliaaot_fixture_build_reads_only_closure_files(
     """A real host-only heliaAOT fixture build loads templates and vendored sources from the closure."""
     pytest.importorskip("helia_aot")
     from helia_profiler.config import load_config
-    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+    from helia_profiler.fixtures.analysis import analyze_typed_fixture_model
 
     monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
@@ -170,7 +170,7 @@ def test_litert_fixture_build_reads_only_closure_files(
     """A host-only LiteRT fixture build through the prepared upstream runtime reads only closure files."""
     pytest.importorskip("ai_edge_litert")
     from helia_profiler.config import load_config
-    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+    from helia_profiler.fixtures.analysis import analyze_typed_fixture_model
 
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
     model = tmp_path / "tiny_cnn.tflite"

@@ -30,8 +30,8 @@ from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.run_directory import run_roots
 from helia_profiler.run_guard import OperatorGuard
+from tests.fixtures_api.test_fixture_record import _build
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
-from tests.unit.test_fixture_record import _build
 
 runner = CliRunner()
 SERIAL = "1160002255"
@@ -117,7 +117,7 @@ def calls(monkeypatch: pytest.MonkeyPatch, build: FixtureBuild) -> list[dict[str
             warmups=profiling.warmup,
         )
 
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", build_fixed_fixture)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", build_fixed_fixture)
     return seen
 
 
@@ -495,7 +495,7 @@ def rt_plan_file(tmp_path, build, monkeypatch) -> Path:
         )
         return reseal(made, model=fixture.model, inputs=fixture.inputs)
 
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", build_fixed_fixture)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", build_fixed_fixture)
     return plan.save(tmp_path / "rt-plan.json")
 
 
@@ -605,7 +605,7 @@ def test_run_captures_under_the_operator_guard(out, plan, build, monkeypatch):
         seen.update(request=request, guard=guard)
         return _capture(build)
 
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", capture_fixture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", capture_fixture)
 
     result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
 
@@ -629,7 +629,7 @@ def test_run_captures_under_the_operator_guard(out, plan, build, monkeypatch):
 def test_run_saves_a_failed_capture_and_exits_1(out, plan, build, monkeypatch):
     _saved(out, plan, build)
     monkeypatch.setattr(
-        "helia_profiler.fixture_capture.capture_fixture",
+        "helia_profiler.fixtures.capture.capture_fixture",
         lambda request, *, guard: _capture(build, state="failure"),
     )
 
@@ -643,7 +643,7 @@ def test_run_saves_a_failed_capture_and_exits_1(out, plan, build, monkeypatch):
 def test_a_result_that_cannot_be_saved_names_the_intact_evidence(out, plan, build, monkeypatch):
     _saved(out, plan, build)
     monkeypatch.setattr(
-        "helia_profiler.fixture_capture.capture_fixture",
+        "helia_profiler.fixtures.capture.capture_fixture",
         lambda request, *, guard: _capture(build),
     )
 
@@ -684,7 +684,7 @@ def test_run_refuses_another_board_before_any_device_call(out, plan, build, monk
     def capture_fixture(request, *, guard):
         raise AssertionError("the capture ran for another board")
 
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", capture_fixture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", capture_fixture)
 
     result = _invoke(
         "run", out, "--board", "apollo510b_evb", "--jlink-serial", SERIAL, "--expect", "none"

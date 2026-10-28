@@ -11,18 +11,18 @@ from typing import Any
 import pytest
 
 import helia_profiler as hpx
-from helia_profiler._fixture_build import (
+from helia_profiler.errors import ConfigError
+from helia_profiler.fixtures.types import (
     FixtureMethod,
     FixtureOutput,
     FixtureTimingScope,
     TypedFixture,
 )
-from helia_profiler.errors import ConfigError
 from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runtime.records import RuntimeRecord, runtime
+from tests.fixtures_api.test_fixture_record import _build
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
-from tests.unit.test_fixture_record import _build
 
 
 def _record(name: str, version: str | None = None) -> RuntimeRecord:
@@ -142,7 +142,7 @@ def test_build_links_the_prepared_runtime_its_plan_names(tmp_path, monkeypatch, 
         return reseal(build)
 
     monkeypatch.setattr("helia_profiler.runtime.prepare.prepared_runtime", prepared)
-    monkeypatch.setattr("helia_profiler._fixture_build.build_fixed_fixture", fake)
+    monkeypatch.setattr("helia_profiler.fixtures.build.build_fixed_fixture", fake)
     hpx.build(plan, fixture, method=FixtureMethod(FixtureTimingScope.INVOKE_ONLY))
 
     assert asked == ([expected] if expected else [])

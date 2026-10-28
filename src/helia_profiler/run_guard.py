@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from .errors import ConfigError
 
 if TYPE_CHECKING:
-    from .fixture_target import FixtureTarget
+    from .fixtures.target import FixtureTarget
 
 
 @dataclass(frozen=True)

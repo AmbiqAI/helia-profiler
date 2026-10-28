@@ -8,24 +8,18 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from helia_profiler._fixture_build import (
-    FIXTURE_CAPABILITIES,
-    FixedFixture,
-    FixtureBuild,
-    FixtureMethod,
-    TypedFixture,
-    build_fixed_fixture,
-)
 from helia_profiler.config import ProfileConfig, load_config
 from helia_profiler.engines import EngineType, get_adapter
 from helia_profiler.engines.base import PreparedRuntimeAdapter
 from helia_profiler.errors import ConfigError
-from helia_profiler.fixture_target import (
+from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES, build_fixed_fixture
+from helia_profiler.fixtures.target import (
     FIXTURE_CLOCK_PROFILE,
     FixtureTarget,
     supported_fixture_target,
     validate_fixture_placement,
 )
+from helia_profiler.fixtures.types import FixedFixture, FixtureBuild, FixtureMethod, TypedFixture
 from helia_profiler.placement import Placement
 from helia_profiler.runtime.archive import PreparedUpstreamRuntime
 from helia_profiler.runtime.prepare import prepared_runtime

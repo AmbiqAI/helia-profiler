@@ -26,10 +26,10 @@ from ._semantic_hash import require, semantic_hash
 from .errors import ConfigError
 
 if TYPE_CHECKING:
-    from ._fixture_build import TypedFixture
     from .compiled_build import CompiledBuild
     from .config import ProfileConfig
     from .deps.compatibility import CompatibilityResolution
+    from .fixtures.types import TypedFixture
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
 FROZEN_RUN_SCHEMA_VERSION = 2

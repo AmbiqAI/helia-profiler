@@ -14,12 +14,12 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler import _semantic_hash
-from helia_profiler._fixture_build import FixtureTimingScope
 from helia_profiler._identity_hash import build_hash
 from helia_profiler._semantic_hash import KIND_VERSIONS
 from helia_profiler.api import observations
-from helia_profiler.fixture_capture import FixtureCaptureResult
-from helia_profiler.fixture_identity import fixture_run_identity
+from helia_profiler.fixtures.capture import FixtureCaptureResult
+from helia_profiler.fixtures.identity import fixture_run_identity
+from helia_profiler.fixtures.types import FixtureTimingScope
 from helia_profiler.profile_identity import _observation_hash
 from helia_profiler.results import FirmwareMeta, PmuResult
 

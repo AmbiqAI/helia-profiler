@@ -1395,7 +1395,7 @@ def test_system_clock_is_described_as_assumed():
 
 
 def test_the_stimer_rate_and_settle_band_come_from_the_wire_constants():
-    from helia_profiler.fixture_capture import FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
+    from helia_profiler.fixtures.capture import FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
     from helia_profiler.wire import STIMER_HZ, STIMER_SETTLE_TICKS
 
     source = (
