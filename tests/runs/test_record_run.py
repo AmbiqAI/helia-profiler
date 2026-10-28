@@ -15,13 +15,13 @@ from helia_profiler import (
     FixtureTiming,
     FixtureTimingScope,
 )
-from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import CaptureError, ConfigError
-from helia_profiler.expect import Expect
 from helia_profiler.fixtures.capture import FixtureCaptureRequest
 from helia_profiler.fixtures.identity import fixture_run_identity
 from helia_profiler.fixtures.record import compiled_fixture_identity, fixture_capture_request
 from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.runs.compiled import CompiledBuild, RunResult
+from helia_profiler.runs.expect import Expect
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 

@@ -5,14 +5,14 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING, TypeAlias
 
-from .errors import ConfigError
-from .lifecycle import Lifecycle
+from ..errors import ConfigError
+from ..lifecycle import Lifecycle
 
 if TYPE_CHECKING:
-    from .fixtures.capture import FixtureCaptureResult
-    from .fixtures.power import FixtureBoardPowerRequest, FixturePowerSync, FixtureRailPowerRequest
-    from .fixtures.types import FixtureBuild
-    from .identity import RunIdentity
+    from ..fixtures.capture import FixtureCaptureResult
+    from ..fixtures.power import FixtureBoardPowerRequest, FixturePowerSync, FixtureRailPowerRequest
+    from ..fixtures.types import FixtureBuild
+    from ..identity import RunIdentity
 
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
@@ -28,7 +28,7 @@ def enrich_identity(
     identity: RunIdentity, lifecycle: Lifecycle, intent_hash: str, rail: str | None = None
 ) -> RunIdentity:
     """Apply the frozen intent and selected lifecycle without changing fixture facts."""
-    from .identity import EnergyFacts
+    from ..identity import EnergyFacts
 
     run = replace(identity.run, lifecycle=lifecycle.value)
     if rail is not None and isinstance(run.energy, EnergyFacts):
@@ -50,7 +50,7 @@ def check_capture_counts(build: FixtureBuild, capture: FixtureCaptureResult) -> 
 
 def check_power_request(build: FixtureBuild, lifecycle: Lifecycle, power: _PowerRequest) -> None:
     """Validate power admission without acquiring device authority."""
-    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from ..fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
 
     wiring = build.power_sync
     if power is None:

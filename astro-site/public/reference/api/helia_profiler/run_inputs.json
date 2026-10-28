@@ -297,8 +297,8 @@
           "signature": "analyze_run_model(path: str | Path) -> TypedFixtureModelAnalysis",
           "source": {
             "line": 34,
-            "path": "src/helia_profiler/run_inputs.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L34"
+            "path": "src/helia_profiler/runs/inputs.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/inputs.py#L34"
           },
           "summary": "Read a LiteRT model's public inputs and outputs without selecting an engine."
         },
@@ -650,8 +650,8 @@
           "signature": "analyze_run_model_for_engine(path: str | Path, engine: EngineType | str) -> TypedFixtureModelAnalysis",
           "source": {
             "line": 56,
-            "path": "src/helia_profiler/run_inputs.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L56"
+            "path": "src/helia_profiler/runs/inputs.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/inputs.py#L56"
           },
           "summary": "Read a model's public inputs and outputs as engine's fixture integration admits them."
         },

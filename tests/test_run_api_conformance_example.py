@@ -13,9 +13,9 @@ import pytest
 import helia_profiler as hpx
 from helia_profiler import FixtureBuild, FixtureCaptureResult, FixtureTiming, TypedFixture
 from helia_profiler.engines import EngineType
-from helia_profiler.expect import host_reference
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement
+from helia_profiler.runs.expect import host_reference
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 
@@ -144,7 +144,7 @@ def _patch_build(monkeypatch, out: Path, cache: Path, engine: str, prepared: obj
         built.append(build)
         return build
 
-    for owner in ("fixtures.build", "compiled_build"):
+    for owner in ("fixtures.build", "runs.compiled"):
         monkeypatch.setattr(
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )

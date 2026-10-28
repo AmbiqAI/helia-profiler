@@ -21,16 +21,16 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .errors import ConfigError
-from .lifecycle import Lifecycle
+from ..errors import ConfigError
+from ..lifecycle import Lifecycle
 
 if TYPE_CHECKING:
-    from ._files import FixtureFile
-    from .compiled_build import CompiledBuild, RunResult
+    from .._files import FixtureFile
+    from ..fixtures.capture import FixtureCaptureGuard
+    from ..fixtures.types import FixtureTimingScope, TypedFixture
+    from .compiled import CompiledBuild, RunResult
     from .expect import Expect
-    from .fixtures.capture import FixtureCaptureGuard
-    from .fixtures.types import FixtureTimingScope, TypedFixture
-    from .frozen_run import FrozenRun
+    from .plan import FrozenRun
 
 BUILD_FILE = "build.json"
 INPUTS_DIR = "inputs"
@@ -41,7 +41,7 @@ RESULT_FILE = "result.json"
 
 def run_roots(directory: str | Path) -> dict[str, Path]:
     """The roots a run directory's build is saved and loaded with."""
-    from .hostenv.cache_dirs import hpx_cache_root
+    from ..hostenv.cache_dirs import hpx_cache_root
 
     # Resolved like the paths a loaded build reports, so a symlinked cache matches.
     return {"run": _absolute(directory), "cache": hpx_cache_root().resolve()}
@@ -74,8 +74,8 @@ def pin_fixture(
             *model_sha256*, or the inputs do not match the model's input
             count or byte sizes.
     """
-    from .fixtures.types import FixtureIO, FixtureOutput, TypedFixture
-    from .run_inputs import analyze_run_model
+    from ..fixtures.types import FixtureIO, FixtureOutput, TypedFixture
+    from .inputs import analyze_run_model
 
     target = _absolute(directory) / INPUTS_DIR
     source = Path(model).expanduser()
@@ -136,8 +136,8 @@ def build_into(
         ConfigError: *directory* holds files, *work_dir* is outside it, or
             the model or inputs do not fit the plan.
     """
-    from .compiled_build import build
-    from .fixtures.types import FixtureMethod, FixtureTimingScope
+    from ..fixtures.types import FixtureMethod, FixtureTimingScope
+    from .compiled import build
 
     root = _absolute(directory)
     work = _absolute(work_dir) if work_dir is not None else root / WORK_DIR
@@ -185,7 +185,7 @@ def load_from(directory: str | Path) -> CompiledBuild:
         ConfigError: The build does not verify, or a file it records is
             missing, with a hint naming how to restore a missing runtime.
     """
-    from .compiled_build import load_build, missing_runtime_hint
+    from .compiled import load_build, missing_runtime_hint
 
     roots = run_roots(directory)
     path = roots["run"] / BUILD_FILE
@@ -231,7 +231,7 @@ def run_from(
     is outside *directory*, is refused as early: the saved result records
     its files relative to the run directory.
     """
-    from .compiled_build import run_build
+    from .compiled import run_build
 
     compiled = load_from(directory)
     guard.verify_target(target=compiled.build.target, jlink_serial=jlink_serial)
@@ -366,7 +366,7 @@ def _read(path: Path, label: str, *, hint: str | None = None) -> bytes:
 
 
 def _pin(path: Path, data: bytes) -> FixtureFile:
-    from ._files import FixtureFile
+    from .._files import FixtureFile
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)

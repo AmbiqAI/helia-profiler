@@ -10,7 +10,7 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler.errors import ConfigError
-from helia_profiler.frozen_run import FrozenRun
+from helia_profiler.runs.plan import FrozenRun
 
 _GCC = "arm-none-eabi-gcc (Arm GNU Toolchain 15.2.Rel1) 15.2.1 20251203\nCopyright (C) 2025\n"
 
@@ -22,7 +22,7 @@ def compiler(monkeypatch: pytest.MonkeyPatch) -> dict[str, str | None]:
         "helia_profiler.hostenv._proc.tool_output",
         lambda command, *, timeout_s: reply["output"],
     )
-    from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES
+    from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES
 
     for variable in (
         "SEGGER_RTT_PATH",

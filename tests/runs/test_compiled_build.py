@@ -14,12 +14,6 @@ import pytest
 
 import helia_profiler as hpx
 from helia_profiler import FixtureFile
-from helia_profiler.compiled_build import (
-    COMPILED_BUILD_SCHEMA,
-    COMPILED_BUILD_SCHEMA_VERSION,
-    CompiledBuild,
-    _binding,
-)
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixtures.identity import fixture_run_identity
 from helia_profiler.fixtures.record import compiled_fixture_identity
@@ -29,10 +23,16 @@ from helia_profiler.fixtures.types import (
     FixtureTimingScope,
     TypedFixture,
 )
-from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement
 from helia_profiler.results.models import ToolchainInfo
+from helia_profiler.runs.compiled import (
+    COMPILED_BUILD_SCHEMA,
+    COMPILED_BUILD_SCHEMA_VERSION,
+    CompiledBuild,
+    _binding,
+)
+from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES, FrozenRun
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import (
     ATFE_OUTPUT,
@@ -131,7 +131,7 @@ def test_build_asks_the_engine_for_the_lifecycle(plan, fixture, calls, monkeypat
     def refuse(engine, lifecycle):
         raise ConfigError(f"{engine.value} refuses {lifecycle.value}")
 
-    monkeypatch.setattr("helia_profiler.compiled_build.require_lifecycle", refuse)
+    monkeypatch.setattr("helia_profiler.runs.compiled.require_lifecycle", refuse)
     with pytest.raises(ConfigError, match="helia-aot refuses single"):
         hpx.build(plan, fixture, method=_METHOD, lifecycle=Lifecycle.SINGLE)
     assert not calls
@@ -395,8 +395,8 @@ def test_package_exports_the_run_api():
 
     assert hpx.CompiledBuild is CompiledBuild
     assert hpx.Lifecycle is Lifecycle
-    assert hpx.RunResult.__module__ == "helia_profiler.compiled_build"
-    assert hpx.build.__module__ == "helia_profiler.compiled_build"
+    assert hpx.RunResult.__module__ == "helia_profiler.runs.compiled"
+    assert hpx.build.__module__ == "helia_profiler.runs.compiled"
     assert {hpx.__api_stability__[name] for name in _RUN_API} == {"experimental"}
     assert importlib.util.find_spec("helia_profiler.build") is None
 

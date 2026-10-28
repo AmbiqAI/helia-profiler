@@ -9,7 +9,7 @@ from typing import Any
 
 from .records import ProfileResultRecord, ResultReadError
 from .results.manifest import ResultValidity, RunStatus
-from .run_record import RunResultRecord
+from .runs.record import RunResultRecord
 
 
 def _text(value: Any) -> str | None:

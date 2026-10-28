@@ -100,7 +100,7 @@ def test_the_run_inputs_are_experimental_exports():
 _RUN_API_MODULES = {
     f"helia_profiler.{name}"
     for name in (
-        "compiled_build",
+        "runs.compiled",
         "fixtures.build",
         "fixtures.types",
         "fixtures.io",
@@ -113,12 +113,12 @@ _RUN_API_MODULES = {
         "_files",
         "fixtures.sources",
         "fixtures.target",
-        "frozen_run",
+        "runs.plan",
         "identity",
-        "expect",
+        "runs.expect",
         "lifecycle",
-        "run_guard",
-        "run_record",
+        "runs.guard",
+        "runs.record",
     )
 }
 _RUN_API_ENTRY_POINTS = (

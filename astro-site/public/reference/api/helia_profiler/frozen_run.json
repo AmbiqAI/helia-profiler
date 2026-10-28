@@ -34,8 +34,8 @@
               "signature": "path: str",
               "source": {
                 "line": 108,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L108"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L108"
               },
               "summary": ""
             },
@@ -53,8 +53,8 @@
               "signature": "sha256: str",
               "source": {
                 "line": 109,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L109"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L109"
               },
               "summary": ""
             },
@@ -72,8 +72,8 @@
               "signature": "size_bytes: int",
               "source": {
                 "line": 110,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L110"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L110"
               },
               "summary": ""
             }
@@ -85,8 +85,8 @@
           "signature": "FrozenModel(path: str, sha256: str, size_bytes: int) -> None",
           "source": {
             "line": 104,
-            "path": "src/helia_profiler/frozen_run.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L104"
+            "path": "src/helia_profiler/runs/plan.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L104"
           },
           "summary": "The model a plan was frozen against, identified by content."
         },
@@ -111,8 +111,8 @@
               "signature": "name: str",
               "source": {
                 "line": 125,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L125"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L125"
               },
               "summary": ""
             },
@@ -130,8 +130,8 @@
               "signature": "version: str | None",
               "source": {
                 "line": 126,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L126"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L126"
               },
               "summary": ""
             },
@@ -149,8 +149,8 @@
               "signature": "unavailable_reason: str | None = None",
               "source": {
                 "line": 127,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L127"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L127"
               },
               "summary": ""
             },
@@ -168,8 +168,8 @@
               "signature": "lines: tuple[str, ...]",
               "source": {
                 "line": 130,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L130"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L130"
               },
               "summary": "The version-bearing lines version joins, or none when it is unknown."
             }
@@ -181,8 +181,8 @@
           "signature": "ToolchainIdentity(name: str, version: str | None, unavailable_reason: str | None = None) -> None",
           "source": {
             "line": 116,
-            "path": "src/helia_profiler/frozen_run.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L116"
+            "path": "src/helia_profiler/runs/plan.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L116"
           },
           "summary": "The compiler a plan expects: name and exact version, never a path."
         },
@@ -207,8 +207,8 @@
               "signature": "name: str",
               "source": {
                 "line": 144,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L144"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L144"
               },
               "summary": ""
             },
@@ -226,8 +226,8 @@
               "signature": "version: str | None",
               "source": {
                 "line": 145,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L145"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L145"
               },
               "summary": ""
             },
@@ -245,8 +245,8 @@
               "signature": "source_commit: str | None",
               "source": {
                 "line": 146,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L146"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L146"
               },
               "summary": ""
             },
@@ -264,8 +264,8 @@
               "signature": "kernels_module: str | None = None",
               "source": {
                 "line": 147,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L147"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L147"
               },
               "summary": ""
             },
@@ -283,8 +283,8 @@
               "signature": "kernels_commit: str | None = None",
               "source": {
                 "line": 148,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L148"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L148"
               },
               "summary": ""
             },
@@ -302,8 +302,8 @@
               "signature": "unavailable_reason: str | None = None",
               "source": {
                 "line": 149,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L149"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L149"
               },
               "summary": ""
             }
@@ -315,8 +315,8 @@
           "signature": "FrozenRuntime(\n    name: str,\n    version: str | None,\n    source_commit: str | None,\n    kernels_module: str | None = None,\n    kernels_commit: str | None = None,\n    unavailable_reason: str | None = None,\n) -> None",
           "source": {
             "line": 135,
-            "path": "src/helia_profiler/frozen_run.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L135"
+            "path": "src/helia_profiler/runs/plan.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L135"
           },
           "summary": "The engine and kernel sources a profile build uses."
         },
@@ -341,8 +341,8 @@
               "signature": "setting: str",
               "source": {
                 "line": 160,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L160"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L160"
               },
               "summary": ""
             },
@@ -360,8 +360,8 @@
               "signature": "path: str",
               "source": {
                 "line": 161,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L161"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L161"
               },
               "summary": ""
             },
@@ -379,8 +379,8 @@
               "signature": "kind: str",
               "source": {
                 "line": 162,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L162"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L162"
               },
               "summary": ""
             },
@@ -398,8 +398,8 @@
               "signature": "sha256: str | None = None",
               "source": {
                 "line": 163,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L163"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L163"
               },
               "summary": ""
             }
@@ -411,8 +411,8 @@
           "signature": "LocalInput(setting: str, path: str, kind: str, sha256: str | None = None) -> None",
           "source": {
             "line": 152,
-            "path": "src/helia_profiler/frozen_run.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L152"
+            "path": "src/helia_profiler/runs/plan.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L152"
           },
           "summary": "A local file or directory the build reads instead of a pinned source."
         },
@@ -437,8 +437,8 @@
               "signature": "settings: Mapping[str, Any]",
               "source": {
                 "line": 178,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L178"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L178"
               },
               "summary": ""
             },
@@ -456,8 +456,8 @@
               "signature": "model: FrozenModel",
               "source": {
                 "line": 179,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L179"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L179"
               },
               "summary": ""
             },
@@ -475,8 +475,8 @@
               "signature": "baseline_id: str",
               "source": {
                 "line": 180,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L180"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L180"
               },
               "summary": ""
             },
@@ -494,8 +494,8 @@
               "signature": "baseline_fingerprint: str",
               "source": {
                 "line": 181,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L181"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L181"
               },
               "summary": ""
             },
@@ -513,8 +513,8 @@
               "signature": "qualification: str",
               "source": {
                 "line": 182,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L182"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L182"
               },
               "summary": ""
             },
@@ -532,8 +532,8 @@
               "signature": "overrides: tuple[str, ...]",
               "source": {
                 "line": 183,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L183"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L183"
               },
               "summary": ""
             },
@@ -551,8 +551,8 @@
               "signature": "local_inputs: tuple[LocalInput, ...]",
               "source": {
                 "line": 184,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L184"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L184"
               },
               "summary": ""
             },
@@ -570,8 +570,8 @@
               "signature": "environment: Mapping[str, str]",
               "source": {
                 "line": 185,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L185"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L185"
               },
               "summary": ""
             },
@@ -589,8 +589,8 @@
               "signature": "toolchain: ToolchainIdentity",
               "source": {
                 "line": 186,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L186"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L186"
               },
               "summary": ""
             },
@@ -608,8 +608,8 @@
               "signature": "runtime: FrozenRuntime | None",
               "source": {
                 "line": 187,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L187"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L187"
               },
               "summary": ""
             },
@@ -627,8 +627,8 @@
               "signature": "hpx_version: str",
               "source": {
                 "line": 188,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L188"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L188"
               },
               "summary": ""
             },
@@ -646,8 +646,8 @@
               "signature": "intent_hash: str",
               "source": {
                 "line": 199,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L199"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L199"
               },
               "summary": "The hpx.intent hash of what this plan asks for; the HPX release is not part of it."
             },
@@ -665,8 +665,8 @@
               "signature": "portable: bool",
               "source": {
                 "line": 204,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L204"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L204"
               },
               "summary": "Whether every input is pinned or content-identified, so another host can rebuild it."
             },
@@ -684,8 +684,8 @@
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
                 "line": 218,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L218"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L218"
               },
               "summary": ""
             },
@@ -703,8 +703,8 @@
               "signature": "from_dict(data: Mapping[str, Any]) -> FrozenRun",
               "source": {
                 "line": 235,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L235"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L235"
               },
               "summary": ""
             },
@@ -722,8 +722,8 @@
               "signature": "save(path: str | Path) -> Path",
               "source": {
                 "line": 295,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L295"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L295"
               },
               "summary": "Write the plan as JSON, refusing its source model path or aliases."
             },
@@ -741,8 +741,8 @@
               "signature": "load(path: str | Path) -> FrozenRun",
               "source": {
                 "line": 313,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L313"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L313"
               },
               "summary": "Read a plan written by :meth:save, verifying its intent hash."
             },
@@ -760,8 +760,8 @@
               "signature": "config(*, model: str | Path | None = None, host: Mapping[str, Any] | None = None) -> ProfileConfig",
               "source": {
                 "line": 327,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L327"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L327"
               },
               "summary": "The :class:ProfileConfig this plan describes, on this host."
             },
@@ -779,8 +779,8 @@
               "signature": "build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild",
               "source": {
                 "line": 376,
-                "path": "src/helia_profiler/frozen_run.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L376"
+                "path": "src/helia_profiler/runs/plan.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L376"
               },
               "summary": "Compile this plan for fixture's pinned inputs; see :func:~heliaprofiler.build."
             }
@@ -792,8 +792,8 @@
           "signature": "FrozenRun(\n    settings: Mapping[str, Any],\n    model: FrozenModel,\n    baseline_id: str,\n    baseline_fingerprint: str,\n    qualification: str,\n    overrides: tuple[str, ...],\n    local_inputs: tuple[LocalInput, ...],\n    environment: Mapping[str, str],\n    toolchain: ToolchainIdentity,\n    runtime: FrozenRuntime | None,\n    hpx_version: str,\n) -> None",
           "source": {
             "line": 174,
-            "path": "src/helia_profiler/frozen_run.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/frozen_run.py#L174"
+            "path": "src/helia_profiler/runs/plan.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L174"
           },
           "summary": "A resolved, replayable run plan."
         }

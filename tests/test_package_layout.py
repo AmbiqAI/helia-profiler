@@ -438,7 +438,7 @@ def test_modelcost_closure_is_sibling_only() -> None:
     assert not offenders, f"modelcost/ gained hpx imports: {offenders}"
 
 
-def _run_contract_import_offenders(source: str) -> list[str]:
+def _run_contract_import_offenders(source: str, *, package: str = "helia_profiler") -> list[str]:
     tree = ast.parse(source)
     type_only = {
         id(child)
@@ -456,7 +456,7 @@ def _run_contract_import_offenders(source: str) -> list[str]:
         elif isinstance(node, ast.ImportFrom):
             base = node.module or ""
             if node.level:
-                base = resolve_name("." * node.level + base, "helia_profiler")
+                base = resolve_name("." * node.level + base, package)
             targets = [base, *(f"{base}.{alias.name}" for alias in node.names)]
         else:
             continue
@@ -464,7 +464,10 @@ def _run_contract_import_offenders(source: str) -> list[str]:
             parts = target.split(".")
             if len(parts) < 2 or parts[0] != "helia_profiler":
                 continue
-            if parts[1] in {"compiled_build", "run_record"} or (
+            if any(
+                target == owner or target.startswith(owner + ".")
+                for owner in ("helia_profiler.runs.compiled", "helia_profiler.runs.record")
+            ) or (
                 id(node) not in type_only
                 and any(
                     target == owner or target.startswith(owner + ".")
@@ -481,16 +484,18 @@ def _run_contract_import_offenders(source: str) -> list[str]:
 
 
 def test_shared_run_rules_do_not_depend_on_their_callers_or_device_orchestration():
-    path = Path(__file__).resolve().parent.parent / "src/helia_profiler/_run_contracts.py"
-    assert not _run_contract_import_offenders(path.read_text(encoding="utf-8"))
+    path = Path(__file__).resolve().parent.parent / "src/helia_profiler/runs/contracts.py"
+    assert not _run_contract_import_offenders(
+        path.read_text(encoding="utf-8"), package="helia_profiler.runs"
+    )
 
 
 @pytest.mark.parametrize(
     "source",
     [
-        "from .compiled_build import CompiledBuild",
-        "from . import run_record",
-        "if TYPE_CHECKING:\n    from .compiled_build import CompiledBuild",
+        "from .runs.compiled import CompiledBuild",
+        "from .runs import record",
+        "if TYPE_CHECKING:\n    from .runs.compiled import CompiledBuild",
         "def lazy():\n    from .fixtures.capture import capture_fixture",
         "import helia_profiler.target.probe",
         "from .fixtures.build import build_fixed_fixture",
@@ -548,8 +553,8 @@ def _fixture_io_import_offenders(
                         "helia_profiler.fixtures.record",
                         "helia_profiler.fixtures.capabilities",
                         "helia_profiler.fixtures.types",
-                        "helia_profiler.compiled_build",
-                        "helia_profiler.run_record",
+                        "helia_profiler.runs.compiled",
+                        "helia_profiler.runs.record",
                         "helia_profiler.fixtures.capture",
                         "helia_profiler.pipeline",
                         "helia_profiler.target",
@@ -604,4 +609,43 @@ def test_fixture_io_guard_covers_reverse_edges_and_allowed_values(source, consum
     ],
 )
 def test_fixture_io_guard_resolves_nested_package_imports(source):
+    assert _fixture_io_import_offenders(source, package="helia_profiler.fixtures")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .compiled import CompiledBuild",
+        "from . import record",
+        "if TYPE_CHECKING:\n    from .compiled import RunResult",
+        "def lazy():\n    from ..fixtures.capture import capture_fixture",
+        "from helia_profiler.runs.record import load_run",
+        "import helia_profiler.runs.compiled",
+    ],
+)
+def test_shared_run_guard_rejects_nested_reverse_edges(source):
+    assert _run_contract_import_offenders(source, package="helia_profiler.runs")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from ..identity import EnergyFacts",
+        "from ..fixtures.types import FixtureBuild",
+        "if TYPE_CHECKING:\n    from ..fixtures.capture import FixtureCaptureResult",
+    ],
+)
+def test_shared_run_guard_allows_nested_values(source):
+    assert not _run_contract_import_offenders(source, package="helia_profiler.runs")
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from ..runs.compiled import CompiledBuild",
+        "from ..runs import record",
+        "def lazy():\n    import helia_profiler.runs.compiled",
+    ],
+)
+def test_fixture_io_guard_rejects_nested_run_callers(source):
     assert _fixture_io_import_offenders(source, package="helia_profiler.fixtures")

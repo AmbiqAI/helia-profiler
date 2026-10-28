@@ -8,7 +8,7 @@ from typing import Any
 from ._semantic_hash import semantic_hash
 from .fixtures.power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
 from .identity import Unknown
-from .run_record import RunResultRecord
+from .runs.record import RunResultRecord
 
 MAPPING_VERSION = "hpx-run-2"
 _RESULT = "native-result"

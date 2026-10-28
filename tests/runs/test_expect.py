@@ -14,7 +14,14 @@ import pytest
 from helia_profiler._files import FixtureFile
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
-from helia_profiler.expect import (
+from helia_profiler.fixtures.analysis import (
+    FixtureTensor,
+    PerAxisQuantization,
+    PerTensorQuantization,
+)
+from helia_profiler.fixtures.capture import FixtureCaptureResult
+from helia_profiler.fixtures.types import FixtureIO, FixtureTimingScope
+from helia_profiler.runs.expect import (
     Expect,
     ReferenceOrigin,
     ReferenceOutputs,
@@ -23,15 +30,8 @@ from helia_profiler.expect import (
     compare_outputs,
     host_reference,
 )
-from helia_profiler.fixtures.analysis import (
-    FixtureTensor,
-    PerAxisQuantization,
-    PerTensorQuantization,
-)
-from helia_profiler.fixtures.capture import FixtureCaptureResult
-from helia_profiler.fixtures.types import FixtureIO, FixtureTimingScope
 
-TINY_CNN = Path(__file__).resolve().parents[1] / "src/helia_profiler/data/models/tiny_cnn.tflite"
+TINY_CNN = Path(__file__).resolve().parents[2] / "src/helia_profiler/data/models/tiny_cnn.tflite"
 TINY_INPUT = FixtureTensor("input", 0, "int8", (1, 8, 8, 1), PerTensorQuantization(0.1, 0))
 TINY_OUTPUT = FixtureTensor(
     "probabilities", 13, "int8", (1, 4), PerTensorQuantization(0.00390625, -128)

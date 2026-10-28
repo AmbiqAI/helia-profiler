@@ -25,7 +25,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
-| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`run_record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
+| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`runs/record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and

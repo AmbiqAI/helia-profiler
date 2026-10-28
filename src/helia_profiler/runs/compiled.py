@@ -22,32 +22,32 @@ from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Mapping, TypeAlias
 
-from ._files import write_text_atomically
-from ._run_contracts import (
+from .._files import write_text_atomically
+from .._semantic_hash import require, semantic_hash
+from ..errors import CaptureError, ConfigError
+from ..lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
+from .contracts import (
     check_capture_counts,
     check_power_request,
     enrich_identity,
     require_power_route,
 )
-from ._semantic_hash import require, semantic_hash
-from .errors import CaptureError, ConfigError
-from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
 if TYPE_CHECKING:
-    from ._files import FixtureFile
-    from .expect import Expect, Verification
-    from .fixtures.capture import FixtureCaptureGuard, FixtureCaptureResult
-    from .fixtures.power import (
+    from .._files import FixtureFile
+    from ..fixtures.capture import FixtureCaptureGuard, FixtureCaptureResult
+    from ..fixtures.power import (
         FixtureBoardPowerRequest,
         FixturePowerGuard,
         FixtureRailEnergy,
         FixtureRailPowerRequest,
     )
-    from .fixtures.target import FixtureTarget
-    from .fixtures.types import FixtureBuild, FixtureMethod, TypedFixture
-    from .frozen_run import FrozenRun
-    from .identity import RunIdentity
-    from .runtime.archive import PreparedUpstreamRuntime
+    from ..fixtures.target import FixtureTarget
+    from ..fixtures.types import FixtureBuild, FixtureMethod, TypedFixture
+    from ..identity import RunIdentity
+    from ..runtime.archive import PreparedUpstreamRuntime
+    from .expect import Expect, Verification
+    from .plan import FrozenRun
 
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
@@ -74,7 +74,7 @@ class CompiledBuild:
     @property
     def identity(self) -> RunIdentity:
         """The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs."""
-        from .fixtures.identity import fixture_run_identity
+        from ..fixtures.identity import fixture_run_identity
 
         return enrich_identity(
             fixture_run_identity(self.build), self.lifecycle, self.plan.intent_hash
@@ -99,8 +99,8 @@ class CompiledBuild:
         Raises:
             ConfigError: Naming the first fact that does not match.
         """
-        from .fixtures.record import verify_fixture_build
-        from .frozen_run import FrozenRun
+        from ..fixtures.record import verify_fixture_build
+        from .plan import FrozenRun
 
         try:
             verify_fixture_build(self.build)
@@ -196,7 +196,7 @@ class CompiledBuild:
 
     def save(self, path: str | Path, *, roots: Mapping[str, Path]) -> Path:
         """Write the build as JSON with paths relative to *roots* and return its path."""
-        from .fixtures.record import dump_fixture_build
+        from ..fixtures.record import dump_fixture_build
 
         self.verify()
         try:
@@ -222,9 +222,9 @@ class CompiledBuild:
     @classmethod
     def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
         """Read and verify a build written by :meth:`save`, resolving paths under *roots*."""
-        from ._files import read_json
-        from .fixtures.record import load_fixture_build
-        from .frozen_run import FrozenRun
+        from .._files import read_json
+        from ..fixtures.record import load_fixture_build
+        from .plan import FrozenRun
 
         source = Path(path).expanduser()
         try:
@@ -293,11 +293,11 @@ class CompiledBuild:
                 rail-energy route.
             CaptureError: The device reports counts other than the build's.
         """
+        from ..fixtures.capture import capture_fixture
+        from ..fixtures.identity import fixture_run_identity
+        from ..fixtures.power import FixtureRailPowerRequest
+        from ..fixtures.record import fixture_capture_request
         from .expect import check_fixture_expectation, compare_fixture_outputs
-        from .fixtures.capture import capture_fixture
-        from .fixtures.identity import fixture_run_identity
-        from .fixtures.power import FixtureRailPowerRequest
-        from .fixtures.record import fixture_capture_request
 
         self.verify()
         self._check_power(power, power_guard, settle_seconds)
@@ -353,8 +353,8 @@ class CompiledBuild:
         settle_seconds: float,
     ) -> None:
         """Refuse a power request this build or the run API's rail-energy route cannot take."""
-        from .fixtures.capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
-        from .fixtures.power import FixtureRailPowerRequest
+        from ..fixtures.capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
+        from ..fixtures.power import FixtureRailPowerRequest
 
         check_power_request(self.build, self.lifecycle, power)
         if power is None:
@@ -452,7 +452,7 @@ class RunResult:
                 missing or changed, a path is under no root, or the identity
                 or verification does not recompute from the build and capture.
         """
-        from .run_record import save_run
+        from .record import save_run
 
         return save_run(self, path, roots=roots, build=build)
 
@@ -483,7 +483,7 @@ def build(
     plan names is taken from the HPX cache (``hpx runtimes prepare``), never
     downloaded or built. The result is verified before it is returned.
     """
-    from .fixtures.build import build_fixed_fixture
+    from ..fixtures.build import build_fixed_fixture
 
     if fixture.model.sha256 != plan.model.sha256:
         raise ConfigError(
@@ -559,7 +559,7 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
     a saved build keeps verifying after this HPX's default changes; a new
     build links the default.
     """
-    from .runtime.records import runtime
+    from ..runtime.records import runtime
 
     planned = plan.runtime
     if planned is None:
@@ -583,9 +583,9 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
 
 def _prepared_runtime(plan: FrozenRun) -> PreparedUpstreamRuntime | None:
     """The cached prepared runtime a fixture build of *plan* links, for heliaRT and LiteRT."""
-    from .engines import EngineType, get_adapter
-    from .engines.base import PreparedRuntimeAdapter
-    from .runtime.prepare import prepared_runtime
+    from ..engines import EngineType, get_adapter
+    from ..engines.base import PreparedRuntimeAdapter
+    from ..runtime.prepare import prepared_runtime
 
     engine = EngineType(plan.settings["engine"]["type"])
     if not isinstance(get_adapter(engine), PreparedRuntimeAdapter):
@@ -632,8 +632,8 @@ def _value(member: StrEnum | None) -> str | None:
 
 def prepared_runtime_hint(path: Path, cache: Path) -> str:
     """How to restore the prepared runtime the build saved in *path* links."""
-    from .errors import HpxError
-    from .frozen_run import FrozenRun
+    from ..errors import HpxError
+    from .plan import FrozenRun
 
     try:
         document = json.loads(path.read_text(encoding="utf-8"))

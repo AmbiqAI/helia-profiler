@@ -29,16 +29,16 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
-from ._files import RootedPaths, read_json, write_bytes_atomically, write_text_atomically
-from .errors import ConfigError
+from .._files import RootedPaths, read_json, write_bytes_atomically, write_text_atomically
+from ..errors import ConfigError
 
 if TYPE_CHECKING:
-    from ._files import FixtureFile
-    from .compiled_build import CompiledBuild, RunResult
+    from .._files import FixtureFile
+    from ..fixtures.capture import FixtureCaptureResult
+    from ..fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from ..identity import RunIdentity
+    from .compiled import CompiledBuild, RunResult
     from .expect import ReferenceOutputs, Verification
-    from .fixtures.capture import FixtureCaptureResult
-    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
-    from .identity import RunIdentity
 
 RUN_RESULT_SCHEMA = "hpx.run-result"
 RUN_RESULT_SCHEMA_VERSION = 1
@@ -119,7 +119,7 @@ def read_run(path: Path, raw: bytes) -> RunResultRecord:
     path leads back to, which :func:`load_run`'s checks confirm; ``cache``
     is this host's HPX cache, as for ``hpx run``.
     """
-    from .hostenv.cache_dirs import hpx_cache_root
+    from ..hostenv.cache_dirs import hpx_cache_root
 
     data = _document(raw)
     location = _fields(data["location"], ("root", "path"), "location")
@@ -142,9 +142,9 @@ def save_run(
     result: RunResult, path: str | Path, *, roots: Mapping[str, Path], build: str | Path
 ) -> Path:
     """Write *result* as a run result; see :meth:`RunResult.save`."""
-    from ._run_contracts import check_capture_counts
-    from ._version import __version__
-    from .compiled_build import load_build
+    from .._version import __version__
+    from .compiled import load_build
+    from .contracts import check_capture_counts
 
     target = Path(path).expanduser()
     build_path = Path(build).expanduser()
@@ -206,8 +206,8 @@ def save_run(
 
 
 def _load(source: Path, raw: bytes, roots: Mapping[str, Path]) -> RunResultRecord:
-    from ._run_contracts import check_capture_counts
-    from .compiled_build import RunResult, load_build, missing_runtime_hint
+    from .compiled import RunResult, load_build, missing_runtime_hint
+    from .contracts import check_capture_counts
 
     data = _document(raw)
     files = _Files(roots)
@@ -335,7 +335,7 @@ class _Files:
         return path
 
     def fixture_file(self, value: Any) -> FixtureFile:
-        from ._files import FixtureFile
+        from .._files import FixtureFile
 
         path = self.check(value, "evidence file")
         return FixtureFile(path, value["sha256"])
@@ -354,7 +354,7 @@ def _fields(value: Any, names: tuple[str, ...] | list[str], label: str) -> dict[
 
 def _encode(value: Any, file: Callable[[FixtureFile], Any]) -> Any:
     """*value* as JSON-ready data, each pinned file through *file*."""
-    from ._files import FixtureFile
+    from .._files import FixtureFile
 
     if isinstance(value, FixtureFile):
         return file(value)
@@ -368,10 +368,10 @@ def _encode(value: Any, file: Callable[[FixtureFile], Any]) -> Any:
 
 
 def _decode_capture(value: Any, file: Callable[[Any], FixtureFile]) -> FixtureCaptureResult:
-    from .fixtures.capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
-    from .fixtures.power import FixtureBatchCompletion, FixtureRailEnergy
-    from .fixtures.psram import FixturePsramObservation
-    from .fixtures.types import FixtureTimingScope
+    from ..fixtures.capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
+    from ..fixtures.power import FixtureBatchCompletion, FixtureRailEnergy
+    from ..fixtures.psram import FixturePsramObservation
+    from ..fixtures.types import FixtureTimingScope
 
     def optional(decode: Callable[[Any], Any]) -> Callable[[Any], Any]:
         return lambda item: None if item is None else decode(item)
@@ -428,7 +428,7 @@ def _record(cls: Any, value: Any, label: str, **decode: Callable[[Any], Any]) ->
 
 
 def _encode_power(power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None) -> Any:
-    from .fixtures.power import FixtureRailPowerRequest
+    from ..fixtures.power import FixtureRailPowerRequest
 
     if power is None:
         return None
@@ -437,7 +437,7 @@ def _encode_power(power: FixtureRailPowerRequest | FixtureBoardPowerRequest | No
 
 
 def _decode_power(value: Any) -> FixtureRailPowerRequest | FixtureBoardPowerRequest | None:
-    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from ..fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
 
     if value is None:
         return None
@@ -456,9 +456,9 @@ def _identity(
     power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
 ) -> RunIdentity:
     """The identity :meth:`CompiledBuild.run` gives *capture* under *power*."""
-    from ._run_contracts import enrich_identity
-    from .fixtures.identity import fixture_run_identity
-    from .fixtures.power import FixtureRailPowerRequest
+    from ..fixtures.identity import fixture_run_identity
+    from ..fixtures.power import FixtureRailPowerRequest
+    from .contracts import enrich_identity
 
     rail = power.rail if isinstance(power, FixtureRailPowerRequest) else None
     return enrich_identity(
@@ -510,8 +510,8 @@ def _check_power(
     capture: FixtureCaptureResult,
     power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
 ) -> None:
-    from ._run_contracts import check_power_request
-    from .fixtures.power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
+    from ..fixtures.power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
+    from .contracts import check_power_request
 
     check_power_request(compiled.build, compiled.lifecycle, power)
     try:

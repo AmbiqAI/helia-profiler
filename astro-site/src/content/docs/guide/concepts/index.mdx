@@ -48,7 +48,7 @@ and writes a result bundle. Four rules shape every package:
 |---|---|---|
 | Immutable configuration | `ProfileConfig` is resolved once from the CLI and YAML, then frozen; every stage reads the same object and none mutates it | `config/__init__.py` (frozen pydantic models with `extra="forbid"`) |
 | One engine per run | the engine is explicit; comparing engines means two runs and `hpx compare` | `engines/__init__.py` (`get_adapter` takes one `EngineType`) |
-| Typed stage boundaries | domain handoffs use typed, frozen dataclasses owned by their subsystem, not bare dicts; fields can contain mappings such as `LayerResult.counters`. `PipelineContext` separately owns mutable orchestration state | `results/`, `engines/base.py` (`EngineArtifacts`), `fixtures/build.py` (`FixtureRenderSpec`), `pipeline.py` |
+| Typed stage boundaries | domain handoffs use typed, frozen dataclasses owned by their subsystem, not bare dicts; fields can contain mappings such as `LayerResult.counters`. `PipelineContext` separately owns mutable orchestration state | `results/`, `engines/base.py` (`EngineArtifacts`), `fixtures/types.py` (`FixtureRenderSpec`), `pipeline.py` |
 | Subprocess isolation | GCC, CMake, J-Link and the heliaAOT compiler run through `subprocess.run()` with argument lists, never a shell | `deps/nsx.py`, `target/probe/jlink.py`, `engines/helia_aot/compile.py` |
 
 ### Two objects flow through everything
@@ -77,7 +77,7 @@ captures from it without rebuilding and returns a `RunResult`, saved as
 `hpx.run-result` and read with `load_run` or `api.load_result`. The
 `hpx freeze`, `hpx build` and `hpx run` commands drive the same flow. Its
 types are exported from the package root, which is the whole public Python
-contract; the `fixture_*` and `_fixture_*` modules behind it are internal.
+contract; the `runs/`, `fixtures/` and `runtime/` packages behind it are internal.
 
 The retained build reuses the profile path's platform resolution, engine
 preparation, memory planning, firmware generation and build stages. It adds
@@ -118,7 +118,7 @@ page.
 | Block | Path under `src/helia_profiler/` |
 |---|---|
 | Entry points | `cli/`, `api.py`, `session.py` |
-| Run API | `frozen_run.py`, `compiled_build.py`, `run_record.py`, `records.py`, and the internal `_fixture_*.py` and `fixture_*.py` modules |
+| Run API | `runs/`, `fixtures/`, and the retained reader `records.py` |
 | Configuration | `config/`, `vocab.py`, `placement.py` |
 | Pipeline | `pipeline.py`, `profiler.py`, `stages/` |
 | Engines | `engines/` |

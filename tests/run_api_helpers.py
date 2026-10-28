@@ -7,11 +7,11 @@ from pathlib import Path
 
 import helia_profiler as hpx
 from helia_profiler import FixtureBuild
-from helia_profiler.compiled_build import CompiledBuild, _binding
 from helia_profiler.fixtures.record import compiled_fixture_identity
-from helia_profiler.frozen_run import FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.results.models import ToolchainInfo
+from helia_profiler.runs.compiled import CompiledBuild, _binding
+from helia_profiler.runs.plan import FrozenRun
 
 ATFE_VERSION = "clang version 22.1.0"
 #: What ``clang --version`` prints for the ATfE the plans are frozen against.

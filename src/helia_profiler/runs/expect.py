@@ -21,13 +21,13 @@ from typing import TYPE_CHECKING, Literal, get_args
 
 import numpy as np
 
-from ._files import FixtureFile
-from .errors import ConfigError, EngineError
-from .fixtures.analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
+from .._files import FixtureFile
+from ..errors import ConfigError, EngineError
+from ..fixtures.analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
 
 if TYPE_CHECKING:
-    from .fixtures.capture import FixtureCaptureResult
-    from .fixtures.types import FixtureBuild
+    from ..fixtures.capture import FixtureCaptureResult
+    from ..fixtures.types import FixtureBuild
 
 #: LiteRT op resolvers a host reference can run with.
 LiteRtResolver = Literal["BUILTIN_REF", "BUILTIN", "BUILTIN_WITHOUT_DEFAULT_DELEGATES"]
@@ -260,7 +260,7 @@ def check_fixture_expectation(build: FixtureBuild, expect: Expect) -> None:
     Run before a capture, so a missing or mis-sized reference costs no
     device time.
     """
-    from .engines import EngineType
+    from ..engines import EngineType
 
     tensors = build.output_tensors
     if build.model is None or not build.inputs or not tensors:

@@ -31,7 +31,7 @@ board and lock it passes its own
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_guard.py:14`
+Source: `src/helia_profiler/runs/guard.py:14`
 
 ### helia_profiler.OperatorGuard.board
 
@@ -41,7 +41,7 @@ Source: `src/helia_profiler/run_guard.py:14`
 board: str
 ```
 
-Source: `src/helia_profiler/run_guard.py:28`
+Source: `src/helia_profiler/runs/guard.py:28`
 
 ### helia_profiler.OperatorGuard.jlink_serial
 
@@ -51,7 +51,7 @@ Source: `src/helia_profiler/run_guard.py:28`
 jlink_serial: str
 ```
 
-Source: `src/helia_profiler/run_guard.py:29`
+Source: `src/helia_profiler/runs/guard.py:29`
 
 ### helia_profiler.OperatorGuard.check
 
@@ -63,7 +63,7 @@ check(*, require_free: bool, remaining_s: float) -> None
 
 Allow the step: the operator holds the board for the whole capture.
 
-Source: `src/helia_profiler/run_guard.py:37`
+Source: `src/helia_profiler/runs/guard.py:37`
 
 ### helia_profiler.OperatorGuard.verify_target
 
@@ -81,7 +81,7 @@ Refuse a target board or probe serial other than the operator's.
 | --- | --- |
 | ConfigError | The board or the serial differs from the operator's. |
 
-Source: `src/helia_profiler/run_guard.py:41`
+Source: `src/helia_profiler/runs/guard.py:41`
 
 ## helia_profiler.FixtureTarget
 

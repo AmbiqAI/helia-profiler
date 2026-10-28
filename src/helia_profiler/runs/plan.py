@@ -21,15 +21,15 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
-from ._files import write_text_atomically
-from ._semantic_hash import require, semantic_hash
-from .errors import ConfigError
+from .._files import write_text_atomically
+from .._semantic_hash import require, semantic_hash
+from ..errors import ConfigError
 
 if TYPE_CHECKING:
-    from .compiled_build import CompiledBuild
-    from .config import ProfileConfig
-    from .deps.compatibility import CompatibilityResolution
-    from .fixtures.types import TypedFixture
+    from ..config import ProfileConfig
+    from ..deps.compatibility import CompatibilityResolution
+    from ..fixtures.types import TypedFixture
+    from .compiled import CompiledBuild
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
 FROZEN_RUN_SCHEMA_VERSION = 2
@@ -342,8 +342,8 @@ class FrozenRun:
         engine runtime. Only the model can move; other local files must be
         at their recorded paths.
         """
-        from .config import deep_merge, load_config
-        from .deps.compatibility import load_compatibility_baseline
+        from ..config import deep_merge, load_config
+        from ..deps.compatibility import load_compatibility_baseline
 
         baseline = load_compatibility_baseline()
         if baseline.fingerprint != self.baseline_fingerprint:
@@ -375,15 +375,15 @@ class FrozenRun:
 
     def build(self, fixture: TypedFixture, **options: Any) -> CompiledBuild:
         """Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`."""
-        from .compiled_build import build
+        from .compiled import build
 
         return build(self, fixture, **options)
 
 
 def freeze_config(config: ProfileConfig) -> FrozenRun:
     """Capture a resolved :class:`ProfileConfig` as a :class:`FrozenRun`."""
-    from ._version import __version__
-    from .pipeline import serialize_config
+    from .._version import __version__
+    from ..pipeline import serialize_config
 
     settings = {
         key: value
@@ -420,7 +420,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
 
 
 def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
-    from .engines import EngineType
+    from ..engines import EngineType
 
     candidates: list[tuple[str, str]] = []
     if config.engine.type is EngineType.EXECUTORCH:
@@ -450,12 +450,12 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     Follows each reader's precedence: an explicit setting beats its variable,
     and a variable counts only for the engine and kernel provider that read it.
     """
-    from .deps.compatibility import (
+    from ..deps.compatibility import (
         cmsis_nn_provider_module,
         heliart_environment,
         select_cmsis_nn_override,
     )
-    from .engines import EngineType
+    from ..engines import EngineType
 
     environment = {variable: os.environ.get(variable) or "" for variable in _SOURCE_VARIABLES}
     engine = config.engine.type
@@ -479,7 +479,7 @@ def _environment() -> dict[str, str]:
 
 def _heliart_source_build(config: ProfileConfig) -> bool:
     """Whether heliaRT builds from a source tree, which wins over any distribution."""
-    from .engines import EngineType
+    from ..engines import EngineType
 
     return config.engine.type is EngineType.HELIA_RT and bool(
         config.engine.config.get("source_path")
@@ -488,7 +488,7 @@ def _heliart_source_build(config: ProfileConfig) -> bool:
 
 
 def _uses_rtt(config: ProfileConfig) -> bool:
-    from .vocab import Transport
+    from ..vocab import Transport
 
     return config.target.transport == Transport.RTT
 
@@ -502,7 +502,7 @@ def _compatibility(config: ProfileConfig) -> CompatibilityResolution | None:
     backend = _effective_backend(config)
     if config.compatibility is None or backend == config.engine.backend:
         return config.compatibility
-    from .deps.compatibility import resolve_compatibility
+    from ..deps.compatibility import resolve_compatibility
 
     return resolve_compatibility(
         config.compatibility_baseline,
@@ -517,11 +517,11 @@ def _compatibility(config: ProfileConfig) -> CompatibilityResolution | None:
 
 def _effective_backend(config: ProfileConfig) -> str | None:
     """``engine.backend``, or for ExecuTorch the provider its PTE sidecar selects."""
-    from .engines import EngineType
+    from ..engines import EngineType
 
     if config.engine.type is not EngineType.EXECUTORCH or config.engine.backend:
         return config.engine.backend
-    from .engines.executorch import _load_pte_sidecar
+    from ..engines.executorch import _load_pte_sidecar
 
     sidecar = _load_pte_sidecar(Path(config.model.path)) or {}
     return sidecar.get("kernel_provider") or "arm"
@@ -629,8 +629,8 @@ def _check_host_overlay(host: Mapping[str, Any], prefix: tuple[str, ...] = ()) -
 
 
 def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
-    from .hostenv._proc import tool_output
-    from .hostenv.toolchain_probe import _compiler_command
+    from ..hostenv._proc import tool_output
+    from ..hostenv.toolchain_probe import _compiler_command
 
     name = str(config.target.toolchain)
     try:
@@ -651,11 +651,11 @@ def _toolchain_identity(config: ProfileConfig) -> ToolchainIdentity:
 
 
 def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
-    from .engines import EngineType
-    from .engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
-    from .engines.helia_rt.artifacts import HELIART_MODULE
-    from .engines.litert import TFLITE_MICRO_MODULE
-    from .runtime.records import runtime
+    from ..engines import EngineType
+    from ..engines.cmsis_nn import ARM_CMSIS_NN_MODULE, CMSIS_NN_MODULE
+    from ..engines.helia_rt.artifacts import HELIART_MODULE
+    from ..engines.litert import TFLITE_MICRO_MODULE
+    from ..runtime.records import runtime
 
     baseline = config.compatibility_baseline
     resolution = _compatibility(config)
@@ -717,7 +717,7 @@ def _frozen_runtime(config: ProfileConfig) -> FrozenRuntime | None:
             commit,
         )
     if engine is EngineType.HELIA_AOT:
-        from .results.dependencies import installed_aot_source
+        from ..results.dependencies import installed_aot_source
 
         source = installed_aot_source()
         module, commit = kernels(CMSIS_NN_MODULE)

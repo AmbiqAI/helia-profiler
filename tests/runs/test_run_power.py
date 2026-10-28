@@ -24,7 +24,6 @@ from helia_profiler import (
     FixtureTimingScope,
     TypedFixture,
 )
-from helia_profiler.compiled_build import CompiledBuild, _binding
 from helia_profiler.engines import EngineType
 from helia_profiler.errors import ConfigError
 from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
@@ -32,6 +31,7 @@ from helia_profiler.fixtures.capture import FixtureCaptureRequest
 from helia_profiler.fixtures.target import fixture_target_for_board
 from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.runs.compiled import CompiledBuild, _binding
 from helia_profiler.runtime.records import runtime
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
@@ -518,7 +518,7 @@ def test_a_power_plan_compiles_without_the_profile_power_section(tmp_path, build
     ids=["no-engine", "engine", "no-board", "board"],
 )
 def test_route_refusals_name_what_is_missing_and_what_to_do(engine, board, message, hint):
-    from helia_profiler._run_contracts import require_power_route
+    from helia_profiler.runs.contracts import require_power_route
 
     with pytest.raises(ConfigError, match=message) as raised:
         require_power_route(engine, board, Lifecycle.CARRY)
