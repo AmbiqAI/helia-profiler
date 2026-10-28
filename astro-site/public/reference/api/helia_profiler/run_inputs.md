@@ -20,7 +20,7 @@ IO tensor element types a fixture can declare.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_io.py:15`
+Source: `src/helia_profiler/fixtures/io.py:15`
 
 ### helia_profiler.FixtureDType.INT8
 
@@ -30,7 +30,7 @@ Source: `src/helia_profiler/_fixture_io.py:15`
 INT8 = 'int8'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:18`
+Source: `src/helia_profiler/fixtures/io.py:18`
 
 ### helia_profiler.FixtureDType.INT16
 
@@ -40,7 +40,7 @@ Source: `src/helia_profiler/_fixture_io.py:18`
 INT16 = 'int16'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:19`
+Source: `src/helia_profiler/fixtures/io.py:19`
 
 ### helia_profiler.FixtureDType.INT32
 
@@ -50,7 +50,7 @@ Source: `src/helia_profiler/_fixture_io.py:19`
 INT32 = 'int32'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:20`
+Source: `src/helia_profiler/fixtures/io.py:20`
 
 ### helia_profiler.FixtureDType.FLOAT16
 
@@ -60,7 +60,7 @@ Source: `src/helia_profiler/_fixture_io.py:20`
 FLOAT16 = 'float16'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:21`
+Source: `src/helia_profiler/fixtures/io.py:21`
 
 ### helia_profiler.FixtureDType.FLOAT32
 
@@ -70,7 +70,7 @@ Source: `src/helia_profiler/_fixture_io.py:21`
 FLOAT32 = 'float32'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:22`
+Source: `src/helia_profiler/fixtures/io.py:22`
 
 ## helia_profiler.FixtureFile
 
@@ -118,6 +118,44 @@ read() -> bytes
 
 Source: `src/helia_profiler/_files.py:23`
 
+## helia_profiler.FixtureTimingScope
+
+`class` · `python`
+
+```python
+FixtureTimingScope()
+```
+
+What the timed span covers.
+
+``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets
+the timed loop, so restoring the fixed inputs before each invocation is
+inside the span.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/types.py:24`
+
+### helia_profiler.FixtureTimingScope.INVOKE_ONLY
+
+`constant` · `python`
+
+```python
+INVOKE_ONLY = 'invoke_only'
+```
+
+Source: `src/helia_profiler/fixtures/types.py:32`
+
+### helia_profiler.FixtureTimingScope.RESTORE_AND_INVOKE
+
+`constant` · `python`
+
+```python
+RESTORE_AND_INVOKE = 'restore_and_invoke'
+```
+
+Source: `src/helia_profiler/fixtures/types.py:33`
+
 ## helia_profiler.analyze_run_model
 
 `function` · `python`
@@ -151,6 +189,64 @@ Read a LiteRT model's public inputs and outputs without selecting an engine.
 
 Source: `src/helia_profiler/run_inputs.py:34`
 
+## helia_profiler.FixtureStatePolicy
+
+`class` · `python`
+
+```python
+FixtureStatePolicy()
+```
+
+Internal state behavior; input restoration is independent of this policy.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/types.py:36`
+
+### helia_profiler.FixtureStatePolicy.CARRY
+
+`constant` · `python`
+
+```python
+CARRY = 'carry'
+```
+
+Source: `src/helia_profiler/fixtures/types.py:39`
+
+## helia_profiler.FixtureRole
+
+`class` · `python`
+
+```python
+FixtureRole()
+```
+
+Role of one fixture tensor; outputs are always ``SIGNAL``.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/types.py:42`
+
+### helia_profiler.FixtureRole.SIGNAL
+
+`constant` · `python`
+
+```python
+SIGNAL = 'signal'
+```
+
+Source: `src/helia_profiler/fixtures/types.py:45`
+
+### helia_profiler.FixtureRole.AUX
+
+`constant` · `python`
+
+```python
+AUX = 'aux'
+```
+
+Source: `src/helia_profiler/fixtures/types.py:46`
+
 ## helia_profiler.PerTensorQuantization
 
 `class` · `python`
@@ -163,7 +259,7 @@ PerTensorQuantization(scale: float, zero_point: int) -> None
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_analysis.py:47`
+Source: `src/helia_profiler/fixtures/analysis.py:44`
 
 ### helia_profiler.PerTensorQuantization.scale
 
@@ -173,7 +269,7 @@ Source: `src/helia_profiler/fixture_analysis.py:47`
 scale: float
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:49`
+Source: `src/helia_profiler/fixtures/analysis.py:46`
 
 ### helia_profiler.PerTensorQuantization.zero_point
 
@@ -183,7 +279,63 @@ Source: `src/helia_profiler/fixture_analysis.py:49`
 zero_point: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:50`
+Source: `src/helia_profiler/fixtures/analysis.py:47`
+
+## helia_profiler.FixtureMethod
+
+`class` · `python`
+
+```python
+FixtureMethod(
+    timing_scope: FixtureTimingScope,
+    state_policy: FixtureStatePolicy | None = None,
+    power_sync: FixturePowerSync | None = None,
+) -> None
+```
+
+`dataclass`
+
+Select input-restoration timing and, optionally, the internal-state policy.
+
+Carry initializes the engine once, then retains internal state through
+warmups and measurements. It is how fixtures always run, so a build of a
+model with internal state records it when no policy is given. Fixed external
+inputs are still restored each invocation; no internal reset or
+source-initializer equivalence is implied.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/types.py:49`
+
+### helia_profiler.FixtureMethod.timing_scope
+
+`attribute` · `python`
+
+```python
+timing_scope: FixtureTimingScope
+```
+
+Source: `src/helia_profiler/fixtures/types.py:60`
+
+### helia_profiler.FixtureMethod.state_policy
+
+`attribute` · `python`
+
+```python
+state_policy: FixtureStatePolicy | None = None
+```
+
+Source: `src/helia_profiler/fixtures/types.py:61`
+
+### helia_profiler.FixtureMethod.power_sync
+
+`attribute` · `python`
+
+```python
+power_sync: FixturePowerSync | None = None
+```
+
+Source: `src/helia_profiler/fixtures/types.py:62`
 
 ## helia_profiler.PerAxisQuantization
 
@@ -197,7 +349,7 @@ PerAxisQuantization(axis: int, scales: tuple[float, ...], zero_points: tuple[int
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_analysis.py:53`
+Source: `src/helia_profiler/fixtures/analysis.py:50`
 
 ### helia_profiler.PerAxisQuantization.axis
 
@@ -207,7 +359,7 @@ Source: `src/helia_profiler/fixture_analysis.py:53`
 axis: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:55`
+Source: `src/helia_profiler/fixtures/analysis.py:52`
 
 ### helia_profiler.PerAxisQuantization.scales
 
@@ -217,7 +369,7 @@ Source: `src/helia_profiler/fixture_analysis.py:55`
 scales: tuple[float, ...]
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:56`
+Source: `src/helia_profiler/fixtures/analysis.py:53`
 
 ### helia_profiler.PerAxisQuantization.zero_points
 
@@ -227,7 +379,7 @@ Source: `src/helia_profiler/fixture_analysis.py:56`
 zero_points: tuple[int, ...]
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:57`
+Source: `src/helia_profiler/fixtures/analysis.py:54`
 
 ## helia_profiler.analyze_run_model_for_engine
 
@@ -283,7 +435,7 @@ One named model input or output with its dtype, shape and quantization.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_analysis.py:60`
+Source: `src/helia_profiler/fixtures/analysis.py:57`
 
 ### helia_profiler.FixtureTensor.name
 
@@ -293,7 +445,7 @@ Source: `src/helia_profiler/fixture_analysis.py:60`
 name: str
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:64`
+Source: `src/helia_profiler/fixtures/analysis.py:61`
 
 ### helia_profiler.FixtureTensor.index
 
@@ -303,7 +455,7 @@ Source: `src/helia_profiler/fixture_analysis.py:64`
 index: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:65`
+Source: `src/helia_profiler/fixtures/analysis.py:62`
 
 ### helia_profiler.FixtureTensor.dtype
 
@@ -313,7 +465,7 @@ Source: `src/helia_profiler/fixture_analysis.py:65`
 dtype: str
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:66`
+Source: `src/helia_profiler/fixtures/analysis.py:63`
 
 ### helia_profiler.FixtureTensor.shape
 
@@ -323,7 +475,7 @@ Source: `src/helia_profiler/fixture_analysis.py:66`
 shape: tuple[int, ...]
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:67`
+Source: `src/helia_profiler/fixtures/analysis.py:64`
 
 ### helia_profiler.FixtureTensor.quantization
 
@@ -333,7 +485,7 @@ Source: `src/helia_profiler/fixture_analysis.py:67`
 quantization: PerTensorQuantization | PerAxisQuantization | None
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:68`
+Source: `src/helia_profiler/fixtures/analysis.py:65`
 
 ### helia_profiler.FixtureTensor.size_bytes
 
@@ -343,159 +495,79 @@ Source: `src/helia_profiler/fixture_analysis.py:68`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:102`
+Source: `src/helia_profiler/fixtures/analysis.py:99`
 
-## helia_profiler.FixtureTimingScope
-
-`class` · `python`
-
-```python
-FixtureTimingScope()
-```
-
-What the timed span covers.
-
-``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets
-the timed loop, so restoring the fixed inputs before each invocation is
-inside the span.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:61`
-
-### helia_profiler.FixtureTimingScope.INVOKE_ONLY
-
-`constant` · `python`
-
-```python
-INVOKE_ONLY = 'invoke_only'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:69`
-
-### helia_profiler.FixtureTimingScope.RESTORE_AND_INVOKE
-
-`constant` · `python`
-
-```python
-RESTORE_AND_INVOKE = 'restore_and_invoke'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:70`
-
-## helia_profiler.FixtureStatePolicy
+## helia_profiler.FixtureIO
 
 `class` · `python`
 
 ```python
-FixtureStatePolicy()
-```
-
-Internal state behavior; input restoration is independent of this policy.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:73`
-
-### helia_profiler.FixtureStatePolicy.CARRY
-
-`constant` · `python`
-
-```python
-CARRY = 'carry'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:76`
-
-## helia_profiler.FixtureRole
-
-`class` · `python`
-
-```python
-FixtureRole()
-```
-
-Role of one fixture tensor; outputs are always ``SIGNAL``.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:79`
-
-### helia_profiler.FixtureRole.SIGNAL
-
-`constant` · `python`
-
-```python
-SIGNAL = 'signal'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:82`
-
-### helia_profiler.FixtureRole.AUX
-
-`constant` · `python`
-
-```python
-AUX = 'aux'
-```
-
-Source: `src/helia_profiler/_fixture_build.py:83`
-
-## helia_profiler.FixtureMethod
-
-`class` · `python`
-
-```python
-FixtureMethod(
-    timing_scope: FixtureTimingScope,
-    state_policy: FixtureStatePolicy | None = None,
-    power_sync: FixturePowerSync | None = None,
-) -> None
+FixtureIO(tensor: FixtureTensor, data: FixtureFile, role: FixtureRole = FixtureRole.SIGNAL) -> None
 ```
 
 `dataclass`
 
-Select input-restoration timing and, optionally, the internal-state policy.
-
-Carry initializes the engine once, then retains internal state through
-warmups and measurements. It is how fixtures always run, so a build of a
-model with internal state records it when no policy is given. Fixed external
-inputs are still restored each invocation; no internal reset or
-source-initializer equivalence is implied.
+One model input with its fixed bytes, or one output with its expected bytes.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_build.py:86`
+Source: `src/helia_profiler/fixtures/types.py:115`
 
-### helia_profiler.FixtureMethod.timing_scope
-
-`attribute` · `python`
-
-```python
-timing_scope: FixtureTimingScope
-```
-
-Source: `src/helia_profiler/_fixture_build.py:97`
-
-### helia_profiler.FixtureMethod.state_policy
+### helia_profiler.FixtureIO.tensor
 
 `attribute` · `python`
 
 ```python
-state_policy: FixtureStatePolicy | None = None
+tensor: FixtureTensor
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:98`
+Source: `src/helia_profiler/fixtures/types.py:119`
 
-### helia_profiler.FixtureMethod.power_sync
+### helia_profiler.FixtureIO.data
 
 `attribute` · `python`
 
 ```python
-power_sync: FixturePowerSync | None = None
+data: FixtureFile
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:99`
+Source: `src/helia_profiler/fixtures/types.py:120`
+
+### helia_profiler.FixtureIO.role
+
+`attribute` · `python`
+
+```python
+role: FixtureRole = FixtureRole.SIGNAL
+```
+
+Source: `src/helia_profiler/fixtures/types.py:121`
+
+## helia_profiler.FixtureOutput
+
+`class` · `python`
+
+```python
+FixtureOutput(tensor: FixtureTensor) -> None
+```
+
+`dataclass`
+
+One complete output declaration, without a reference answer.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/types.py:124`
+
+### helia_profiler.FixtureOutput.tensor
+
+`attribute` · `python`
+
+```python
+tensor: FixtureTensor
+```
+
+Source: `src/helia_profiler/fixtures/types.py:128`
 
 ## helia_profiler.TypedFixtureModelAnalysis
 
@@ -521,7 +593,7 @@ A model's public inputs and outputs in model order, with its graph facts.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_analysis.py:127`
+Source: `src/helia_profiler/fixtures/analysis.py:124`
 
 ### helia_profiler.TypedFixtureModelAnalysis.inputs
 
@@ -531,7 +603,7 @@ Source: `src/helia_profiler/fixture_analysis.py:127`
 inputs: tuple[FixtureTensor, ...]
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:131`
+Source: `src/helia_profiler/fixtures/analysis.py:128`
 
 ### helia_profiler.TypedFixtureModelAnalysis.outputs
 
@@ -541,7 +613,7 @@ Source: `src/helia_profiler/fixture_analysis.py:131`
 outputs: tuple[FixtureTensor, ...]
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:132`
+Source: `src/helia_profiler/fixtures/analysis.py:129`
 
 ### helia_profiler.TypedFixtureModelAnalysis.has_float16
 
@@ -551,7 +623,7 @@ Source: `src/helia_profiler/fixture_analysis.py:132`
 has_float16: bool
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:134`
+Source: `src/helia_profiler/fixtures/analysis.py:131`
 
 ### helia_profiler.TypedFixtureModelAnalysis.analysis
 
@@ -561,7 +633,7 @@ Source: `src/helia_profiler/fixture_analysis.py:134`
 analysis: ModelAnalysis
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:135`
+Source: `src/helia_profiler/fixtures/analysis.py:132`
 
 ### helia_profiler.TypedFixtureModelAnalysis.resolver
 
@@ -571,7 +643,7 @@ Source: `src/helia_profiler/fixture_analysis.py:135`
 resolver: ResolverPlan
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:136`
+Source: `src/helia_profiler/fixtures/analysis.py:133`
 
 ### helia_profiler.TypedFixtureModelAnalysis.has_internal_state
 
@@ -581,7 +653,7 @@ Source: `src/helia_profiler/fixture_analysis.py:136`
 has_internal_state: bool = False
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:137`
+Source: `src/helia_profiler/fixtures/analysis.py:134`
 
 ### helia_profiler.TypedFixtureModelAnalysis.has_initializer
 
@@ -591,7 +663,7 @@ Source: `src/helia_profiler/fixture_analysis.py:137`
 has_initializer: bool = False
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:138`
+Source: `src/helia_profiler/fixtures/analysis.py:135`
 
 ### helia_profiler.TypedFixtureModelAnalysis.subgraph_count
 
@@ -601,7 +673,7 @@ Source: `src/helia_profiler/fixture_analysis.py:138`
 subgraph_count: int = 1
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:139`
+Source: `src/helia_profiler/fixtures/analysis.py:136`
 
 ### helia_profiler.TypedFixtureModelAnalysis.resource_variable_count
 
@@ -611,7 +683,7 @@ Source: `src/helia_profiler/fixture_analysis.py:139`
 resource_variable_count: int = 0
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:140`
+Source: `src/helia_profiler/fixtures/analysis.py:137`
 
 ### helia_profiler.TypedFixtureModelAnalysis.input_bytes
 
@@ -621,7 +693,7 @@ Source: `src/helia_profiler/fixture_analysis.py:140`
 input_bytes: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:143`
+Source: `src/helia_profiler/fixtures/analysis.py:140`
 
 ### helia_profiler.TypedFixtureModelAnalysis.output_bytes
 
@@ -631,79 +703,7 @@ Source: `src/helia_profiler/fixture_analysis.py:143`
 output_bytes: int
 ```
 
-Source: `src/helia_profiler/fixture_analysis.py:147`
-
-## helia_profiler.FixtureIO
-
-`class` · `python`
-
-```python
-FixtureIO(tensor: FixtureTensor, data: FixtureFile, role: FixtureRole = FixtureRole.SIGNAL) -> None
-```
-
-`dataclass`
-
-One model input with its fixed bytes, or one output with its expected bytes.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:152`
-
-### helia_profiler.FixtureIO.tensor
-
-`attribute` · `python`
-
-```python
-tensor: FixtureTensor
-```
-
-Source: `src/helia_profiler/_fixture_build.py:156`
-
-### helia_profiler.FixtureIO.data
-
-`attribute` · `python`
-
-```python
-data: FixtureFile
-```
-
-Source: `src/helia_profiler/_fixture_build.py:157`
-
-### helia_profiler.FixtureIO.role
-
-`attribute` · `python`
-
-```python
-role: FixtureRole = FixtureRole.SIGNAL
-```
-
-Source: `src/helia_profiler/_fixture_build.py:158`
-
-## helia_profiler.FixtureOutput
-
-`class` · `python`
-
-```python
-FixtureOutput(tensor: FixtureTensor) -> None
-```
-
-`dataclass`
-
-One complete output declaration, without a reference answer.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_fixture_build.py:161`
-
-### helia_profiler.FixtureOutput.tensor
-
-`attribute` · `python`
-
-```python
-tensor: FixtureTensor
-```
-
-Source: `src/helia_profiler/_fixture_build.py:165`
+Source: `src/helia_profiler/fixtures/analysis.py:144`
 
 ## helia_profiler.TypedFixture
 
@@ -726,7 +726,7 @@ bytes are not needed for measurement; legacy identities remain unchanged.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_build.py:168`
+Source: `src/helia_profiler/fixtures/types.py:131`
 
 ### helia_profiler.TypedFixture.model
 
@@ -736,7 +736,7 @@ Source: `src/helia_profiler/_fixture_build.py:168`
 model: FixtureFile
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:176`
+Source: `src/helia_profiler/fixtures/types.py:139`
 
 ### helia_profiler.TypedFixture.inputs
 
@@ -746,7 +746,7 @@ Source: `src/helia_profiler/_fixture_build.py:176`
 inputs: tuple[FixtureIO, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:177`
+Source: `src/helia_profiler/fixtures/types.py:140`
 
 ### helia_profiler.TypedFixture.outputs
 
@@ -756,7 +756,7 @@ Source: `src/helia_profiler/_fixture_build.py:177`
 outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:178`
+Source: `src/helia_profiler/fixtures/types.py:141`
 
 ### helia_profiler.TypedFixture.expected
 
@@ -766,7 +766,7 @@ Source: `src/helia_profiler/_fixture_build.py:178`
 expected: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:198`
+Source: `src/helia_profiler/fixtures/types.py:161`
 
 ### helia_profiler.TypedFixture.identity
 
@@ -776,7 +776,7 @@ Source: `src/helia_profiler/_fixture_build.py:198`
 identity: str
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:203`
+Source: `src/helia_profiler/fixtures/types.py:166`
 
 ### helia_profiler.TypedFixture.verify
 
@@ -786,4 +786,4 @@ Source: `src/helia_profiler/_fixture_build.py:203`
 verify() -> None
 ```
 
-Source: `src/helia_profiler/_fixture_build.py:180`
+Source: `src/helia_profiler/fixtures/types.py:143`

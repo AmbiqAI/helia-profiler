@@ -20,7 +20,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/run_guard.json)
 
-<RefMembers label="On this page" items={[{"id":"helia_profiler.OperatorGuard","name":"OperatorGuard","kind":"class","summary":"Capture authority from an operator who names the board and the J-Link probe on it."},{"id":"helia_profiler.FixtureTarget","name":"FixtureTarget","kind":"class","summary":"The board a fixture image runs on, its J-Link device and the image's load address."},{"id":"helia_profiler.FixtureBoardPowerRequest","name":"FixtureBoardPowerRequest","kind":"class","summary":"Explicit station-owned supply path; enabling it does not request energy measurement."},{"id":"helia_profiler.FixtureCaptureGuard","name":"FixtureCaptureGuard","kind":"class","summary":"Caller-owned authorization and remaining-window checks."},{"id":"helia_profiler.FixtureRailPowerRequest","name":"FixtureRailPowerRequest","kind":"class","summary":"Station-selected instrument/rail and channels, separate from firmware wiring."},{"id":"helia_profiler.FixturePowerGuard","name":"FixturePowerGuard","kind":"class","summary":"Station authority for the board and measured instrument/rail."}]} />
+<RefMembers label="On this page" items={[{"id":"helia_profiler.OperatorGuard","name":"OperatorGuard","kind":"class","summary":"Capture authority from an operator who names the board and the J-Link probe on it."},{"id":"helia_profiler.FixtureTarget","name":"FixtureTarget","kind":"class","summary":"The board a fixture image runs on, its J-Link device and the image's load address."},{"id":"helia_profiler.FixtureCaptureGuard","name":"FixtureCaptureGuard","kind":"class","summary":"Caller-owned authorization and remaining-window checks."},{"id":"helia_profiler.FixtureBoardPowerRequest","name":"FixtureBoardPowerRequest","kind":"class","summary":"Explicit station-owned supply path; enabling it does not request energy measurement."},{"id":"helia_profiler.FixtureRailPowerRequest","name":"FixtureRailPowerRequest","kind":"class","summary":"Station-selected instrument/rail and channels, separate from firmware wiring."},{"id":"helia_profiler.FixturePowerGuard","name":"FixturePowerGuard","kind":"class","summary":"Station authority for the board and measured instrument/rail."}]} />
 
 <RefSymbol
   id={"helia_profiler.OperatorGuard"}
@@ -125,7 +125,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FixtureTarget(board: str, device: str, load_address: int) -> None"}
   level={2}
   summary={"The board a fixture image runs on, its J-Link device and the image's load address."}
-  source={{"path":"src/helia_profiler/fixture_target.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L19"}}
+  source={{"path":"src/helia_profiler/fixtures/target.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L19"}}
 >
 
   `dataclass`
@@ -141,7 +141,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"board: str"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_target.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L23"}}
+    source={{"path":"src/helia_profiler/fixtures/target.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L23"}}
   >
 
 
@@ -155,7 +155,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"device: str"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_target.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L24"}}
+    source={{"path":"src/helia_profiler/fixtures/target.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L24"}}
   >
 
 
@@ -169,7 +169,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"load_address: int"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_target.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L25"}}
+    source={{"path":"src/helia_profiler/fixtures/target.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L25"}}
   >
 
 
@@ -183,68 +183,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"verify() -> None"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_target.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_target.py#L27"}}
-  >
-
-
-
-  </RefSymbol>
-
-</RefSymbol>
-
-<RefSymbol
-  id={"helia_profiler.FixtureBoardPowerRequest"}
-  name={"FixtureBoardPowerRequest"}
-  kind={"class"}
-  language={"python"}
-  signature={"FixtureBoardPowerRequest(driver: str, serial: str, rail: str) -> None"}
-  level={2}
-  summary={"Explicit station-owned supply path; enabling it does not request energy measurement."}
-  source={{"path":"src/helia_profiler/fixture_power.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L42"}}
->
-
-  `dataclass`
-
-  Explicit station-owned supply path; enabling it does not request energy measurement.
-
-  **API tier:** `experimental`
-
-  <RefSymbol
-    id={"helia_profiler.FixtureBoardPowerRequest.driver"}
-    name={"driver"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"driver: str"}
-    level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L46"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.FixtureBoardPowerRequest.serial"}
-    name={"serial"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"serial: str"}
-    level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L47"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.FixtureBoardPowerRequest.rail"}
-    name={"rail"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"rail: str"}
-    level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L48"}}
+    source={{"path":"src/helia_profiler/fixtures/target.py","line":27,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L27"}}
   >
 
 
@@ -261,7 +200,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FixtureCaptureGuard()"}
   level={2}
   summary={"Caller-owned authorization and remaining-window checks."}
-  source={{"path":"src/helia_profiler/fixture_capture.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L46"}}
+  source={{"path":"src/helia_profiler/fixtures/capture.py","line":38,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L38"}}
 >
 
   Caller-owned authorization and remaining-window checks.
@@ -275,7 +214,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"check(*, require_free: bool, remaining_s: float) -> None"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_capture.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L49"}}
+    source={{"path":"src/helia_profiler/fixtures/capture.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L41"}}
   >
 
 
@@ -290,13 +229,74 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"verify_target(*, target: FixtureTarget, jlink_serial: str) -> None"}
     level={3}
     summary={"Require caller-verified physical board/serial identity and exclusive ownership."}
-    source={{"path":"src/helia_profiler/fixture_capture.py","line":51,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_capture.py#L51"}}
+    source={{"path":"src/helia_profiler/fixtures/capture.py","line":43,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L43"}}
   >
 
     Require caller-verified physical board/serial identity and exclusive ownership.
 
     Core CPUID and probe enumeration cannot establish the physical board.
     Reject if the caller has no current independent board/serial evidence.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureBoardPowerRequest"}
+  name={"FixtureBoardPowerRequest"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureBoardPowerRequest(driver: str, serial: str, rail: str) -> None"}
+  level={2}
+  summary={"Explicit station-owned supply path; enabling it does not request energy measurement."}
+  source={{"path":"src/helia_profiler/fixtures/power.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L42"}}
+>
+
+  `dataclass`
+
+  Explicit station-owned supply path; enabling it does not request energy measurement.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.driver"}
+    name={"driver"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"driver: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.serial"}
+    name={"serial"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"serial: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L47"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureBoardPowerRequest.rail"}
+    name={"rail"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"rail: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L48"}}
+  >
+
+
 
   </RefSymbol>
 
@@ -310,7 +310,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FixtureRailPowerRequest(\n    serial: str,\n    rail: str,\n    io_voltage: float,\n    sync_gpio_pin: int,\n    state_gpio_pin: int,\n    go_gpio_pin: int,\n    sync_input_index: int = 0,\n    state_input_index: int = 1,\n    go_output_index: int = 0,\n    stats_rate_hz: int = 1000,\n) -> None"}
   level={2}
   summary={"Station-selected instrument/rail and channels, separate from firmware wiring."}
-  source={{"path":"src/helia_profiler/fixture_power.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L57"}}
+  source={{"path":"src/helia_profiler/fixtures/power.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L57"}}
 >
 
   `dataclass`
@@ -326,7 +326,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"serial: str"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L61"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L61"}}
   >
 
 
@@ -340,7 +340,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"rail: str"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L62"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L62"}}
   >
 
 
@@ -354,7 +354,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"io_voltage: float"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L63"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":63,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L63"}}
   >
 
 
@@ -368,7 +368,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"sync_gpio_pin: int"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L64"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":64,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L64"}}
   >
 
 
@@ -382,7 +382,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"state_gpio_pin: int"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L65"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L65"}}
   >
 
 
@@ -396,7 +396,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"go_gpio_pin: int"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L66"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L66"}}
   >
 
 
@@ -410,7 +410,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"sync_input_index: int = 0"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L67"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L67"}}
   >
 
 
@@ -424,7 +424,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"state_input_index: int = 1"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L68"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L68"}}
   >
 
 
@@ -438,7 +438,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"go_output_index: int = 0"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L69"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L69"}}
   >
 
 
@@ -452,7 +452,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"stats_rate_hz: int = 1000"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L70"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L70"}}
   >
 
 
@@ -466,7 +466,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"firmware_wiring() -> FixturePowerSync"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L93"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L93"}}
   >
 
 
@@ -483,7 +483,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FixturePowerGuard()"}
   level={2}
   summary={"Station authority for the board and measured instrument/rail."}
-  source={{"path":"src/helia_profiler/fixture_power.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L97"}}
+  source={{"path":"src/helia_profiler/fixtures/power.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L97"}}
 >
 
   Station authority for the board and measured instrument/rail.
@@ -497,7 +497,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"check(*, require_free: bool, remaining_s: float) -> None"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L100"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":100,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L100"}}
   >
 
 
@@ -511,7 +511,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"verify_power_device(*, serial: str, rail: str) -> None"}
     level={3}
-    source={{"path":"src/helia_profiler/fixture_power.py","line":102,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_power.py#L102"}}
+    source={{"path":"src/helia_profiler/fixtures/power.py","line":102,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/power.py#L102"}}
   >
 
 

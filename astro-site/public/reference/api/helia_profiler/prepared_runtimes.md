@@ -68,7 +68,7 @@ The kernel library a build linked: ``ns-cmsis-nn`` or ``arm-cmsis-nn``.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_sources.py:19`
+Source: `src/helia_profiler/fixtures/sources.py:19`
 
 ### helia_profiler.FixtureKernelSource.name
 
@@ -78,7 +78,7 @@ Source: `src/helia_profiler/fixture_sources.py:19`
 name: str
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:23`
+Source: `src/helia_profiler/fixtures/sources.py:23`
 
 ### helia_profiler.FixtureKernelSource.url
 
@@ -88,7 +88,7 @@ Source: `src/helia_profiler/fixture_sources.py:23`
 url: str | None
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:24`
+Source: `src/helia_profiler/fixtures/sources.py:24`
 
 ### helia_profiler.FixtureKernelSource.version
 
@@ -98,7 +98,7 @@ Source: `src/helia_profiler/fixture_sources.py:24`
 version: str | None
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:26`
+Source: `src/helia_profiler/fixtures/sources.py:26`
 
 ### helia_profiler.FixtureKernelSource.commit
 
@@ -108,7 +108,7 @@ Source: `src/helia_profiler/fixture_sources.py:26`
 commit: str | None
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:27`
+Source: `src/helia_profiler/fixtures/sources.py:27`
 
 ## helia_profiler.FixtureRuntimeSource
 
@@ -124,7 +124,7 @@ The prepared runtime archive a build linked: ``helia-rt`` or ``tflite-micro``.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixture_sources.py:30`
+Source: `src/helia_profiler/fixtures/sources.py:30`
 
 ### helia_profiler.FixtureRuntimeSource.name
 
@@ -134,7 +134,7 @@ Source: `src/helia_profiler/fixture_sources.py:30`
 name: str
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:34`
+Source: `src/helia_profiler/fixtures/sources.py:34`
 
 ### helia_profiler.FixtureRuntimeSource.url
 
@@ -144,7 +144,7 @@ Source: `src/helia_profiler/fixture_sources.py:34`
 url: str
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:35`
+Source: `src/helia_profiler/fixtures/sources.py:35`
 
 ### helia_profiler.FixtureRuntimeSource.version
 
@@ -154,7 +154,7 @@ Source: `src/helia_profiler/fixture_sources.py:35`
 version: str | None
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:38`
+Source: `src/helia_profiler/fixtures/sources.py:38`
 
 ### helia_profiler.FixtureRuntimeSource.commit
 
@@ -164,7 +164,7 @@ Source: `src/helia_profiler/fixture_sources.py:38`
 commit: str
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:39`
+Source: `src/helia_profiler/fixtures/sources.py:39`
 
 ### helia_profiler.FixtureRuntimeSource.archive_sha256
 
@@ -174,7 +174,7 @@ Source: `src/helia_profiler/fixture_sources.py:39`
 archive_sha256: str
 ```
 
-Source: `src/helia_profiler/fixture_sources.py:40`
+Source: `src/helia_profiler/fixtures/sources.py:40`
 
 ## helia_profiler.RuntimeProvider
 

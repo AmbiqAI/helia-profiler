@@ -111,8 +111,8 @@
               "signature": "name: str",
               "source": {
                 "line": 23,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L23"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L23"
               },
               "summary": ""
             },
@@ -130,8 +130,8 @@
               "signature": "url: str | None",
               "source": {
                 "line": 24,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L24"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L24"
               },
               "summary": ""
             },
@@ -149,8 +149,8 @@
               "signature": "version: str | None",
               "source": {
                 "line": 26,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L26"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L26"
               },
               "summary": ""
             },
@@ -168,8 +168,8 @@
               "signature": "commit: str | None",
               "source": {
                 "line": 27,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L27"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L27"
               },
               "summary": ""
             }
@@ -181,8 +181,8 @@
           "signature": "FixtureKernelSource(name: str, url: str | None, version: str | None, commit: str | None) -> None",
           "source": {
             "line": 19,
-            "path": "src/helia_profiler/fixture_sources.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L19"
+            "path": "src/helia_profiler/fixtures/sources.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L19"
           },
           "summary": "The kernel library a build linked: ns-cmsis-nn or arm-cmsis-nn."
         },
@@ -207,8 +207,8 @@
               "signature": "name: str",
               "source": {
                 "line": 34,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L34"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L34"
               },
               "summary": ""
             },
@@ -226,8 +226,8 @@
               "signature": "url: str",
               "source": {
                 "line": 35,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L35"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L35"
               },
               "summary": ""
             },
@@ -245,8 +245,8 @@
               "signature": "version: str | None",
               "source": {
                 "line": 38,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L38"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L38"
               },
               "summary": ""
             },
@@ -264,8 +264,8 @@
               "signature": "commit: str",
               "source": {
                 "line": 39,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L39"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L39"
               },
               "summary": ""
             },
@@ -283,8 +283,8 @@
               "signature": "archive_sha256: str",
               "source": {
                 "line": 40,
-                "path": "src/helia_profiler/fixture_sources.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L40"
+                "path": "src/helia_profiler/fixtures/sources.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L40"
               },
               "summary": ""
             }
@@ -296,8 +296,8 @@
           "signature": "FixtureRuntimeSource(name: str, url: str, version: str | None, commit: str, archive_sha256: str) -> None",
           "source": {
             "line": 30,
-            "path": "src/helia_profiler/fixture_sources.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixture_sources.py#L30"
+            "path": "src/helia_profiler/fixtures/sources.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/sources.py#L30"
           },
           "summary": "The prepared runtime archive a build linked: helia-rt or tflite-micro."
         },
