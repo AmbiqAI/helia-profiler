@@ -11,11 +11,11 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19.2`:
+The current baseline is `hpx-neuralspotx-0.9.0-2026-10-27.1`:
 
 | Identity | Qualified reference |
 | --- | --- |
-| `neuralspotx` package | `0.8.1`, wheel SHA-256 `7aac6f1b…9094`, tag peeled to `2dbe12a2…901f` |
+| `neuralspotx` package | `0.9.0`, wheel SHA-256 `ba2dff46…146a`, tag peeled to `ffb7339b…0962` |
 | `nsx-ambiq-sdk` | `v5.2.25`, peeled commit `aefce2ca…de7c` |
 | `nsx-ethos-u-driver` | `f0f99bb1…5a8` (peeled from `nsx-ethos-u-driver-v0.1.2`; pulled transitively by `nsx-npu`) |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
@@ -26,7 +26,7 @@ The current baseline is `hpx-neuralspotx-0.8.1-2026-10-19.2`:
 | `nsx-sensors` | `c219a2bc…3e25` (`v0.3.0`, peeled) |
 | heliaRT | runtime records `1.21.3`, `2.1.0`, `2.2.0`, `2.2.2` (default, commit `7fe6dfdb…0f0`; min supported `1.16.0`, from `HELIART_MIN_VERSION` in code) |
 | heliaAOT | runtime record `0.33.0` (default); accepted range `>=0.33.0,<2.0.0` |
-| litert | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `litert` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.8.1 registry lock fixes at `7c1b162c` (helia-rt v1.17.0) |
+| litert | profile path: governed by the `nsx-tflite-micro` and `arm-cmsis-nn` module refs above (the `litert` runtime record describes the fixed fixture's prepared upstream archive instead); `nsx-tflite-micro` builds TFLM from the `helia-rt-source` project, which the baseline does not list and the neuralSPOT-X 0.9.0 registry lock fixes at `helia-rt-v2.1.1` (`0e061ff7`) |
 | executorch | `0.1.0`, commit `5514ac1e…b48e`, from the runtime record (a checkout's `version.txt` and commit are verified against it) |
 
 Every baseline project and module ref is immutable by policy: only a full
@@ -97,6 +97,15 @@ completed result bundle.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+On 2026-10-27, neuralSPOT-X moves `0.8.1 → 0.9.0` for AmbiqAI/neuralspotx#254,
+which adds `atfe` to the `apollo4l_evb` and `apollo4l_blue_evb` board modules.
+hpx reads that list, so the `apollo4l_blue_evb` ATfE validation cases stop
+being skipped. hpx still pins every listed project, so 0.9.0's registry moves
+(`nsx-ambiq-sdk v5.2.26`, `ns-cmsis-nn v7.46.0`, `helia-rt-v2.1.1`) do not
+reach those projects. The unlisted `helia-rt-source` project does move, from
+`7c1b162c` to `helia-rt-v2.1.1`, so LiteRT builds TFLM from newer sources on
+every board.
 
 On 2026-10-19, heliaAOT 0.33.0 (`d31bf222…06b`), which heliaAOT will
 republish unchanged as 1.0.0, becomes the default, the locked release and the

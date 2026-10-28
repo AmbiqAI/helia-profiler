@@ -24,12 +24,12 @@ hpx doctor
 | Item | Pinned by | Version in this commit |
 |---|---|---|
 | nixpkgs, Python, CMake, Ninja, uv | `flake.lock` (nixpkgs) | Python 3.12, CMake 4.3, Ninja 1.13, uv 0.11 |
-| Python packages | `uv.lock` | for example neuralspotx 0.8.1, ai-edge-litert 2.2.0 |
+| Python packages | `uv.lock` | for example neuralspotx 0.9.0, ai-edge-litert 2.2.0 |
 | heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 0.33.0 |
 | Arm GNU Toolchain | `flake.lock` (nixpkgs `gcc-arm-embedded`) | 15.2.Rel1 |
 | Arm Toolchain for Embedded (ATfE) | `nix/atfe.nix` | 22.1.0 |
 | SEGGER J-Link software | `nix/jlink.nix` | 9.62 |
-| ns-cmsis-nn (CORE), NSX SDK and modules (including the `nsx-tflite-micro` LiteRT Micro module), heliaRT | `src/helia_profiler/data/compatibility-baseline-v1.json`, plus the neuralSPOT-X registry lock it names | ns-cmsis-nn v7.47.0, heliaRT 2.2.2 and the other refs listed there; LiteRT Micro source helia-rt v1.17.0 (`7c1b162c`) through the neuralSPOT-X 0.8.1 registry |
+| ns-cmsis-nn (CORE), NSX SDK and modules (including the `nsx-tflite-micro` LiteRT Micro module), heliaRT | `src/helia_profiler/data/compatibility-baseline-v1.json`, plus the neuralSPOT-X registry lock it names | ns-cmsis-nn v7.47.0, heliaRT 2.2.2 and the other refs listed there; LiteRT Micro source helia-rt v2.1.1 (`0e061ff7`) through the neuralSPOT-X 0.9.0 registry |
 
 The last row is not chosen by the flake. hpx fetches those modules at the pinned commits when it builds firmware, through the same baseline on every install path. Selecting a different heliaAOT release does not move any of them.
 

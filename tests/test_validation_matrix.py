@@ -256,41 +256,41 @@ class TestCaseValidity:
 class TestBuildMatrix:
     def test_full_matrix_default(self):
         cases = build_matrix()
-        # Four models: 277 combinations per ordinary engine, plus 64
+        # Four models: 293 combinations per ordinary engine, plus 64
         # ExecuTorch combinations on each of the three Cortex-M55 boards.
-        assert len(cases) == 4092
+        assert len(cases) == 4284
 
     def test_power_on_keeps_executorch_unpowered(self):
         # ExecuTorch remains unpowered until its dedicated firmware implements
-        # the GPIO READY/GO/gate protocol, so power="on" flips only the 3324
+        # the GPIO READY/GO/gate protocol, so power="on" flips only the 3516
         # non-ExecuTorch cases and leaves the case count unchanged.
         cases = build_matrix(power="on")
-        assert len(cases) == 4092
-        assert sum(1 for case in cases if case.power) == 3324
+        assert len(cases) == 4284
+        assert sum(1 for case in cases if case.power) == 3516
 
     def test_power_both_adds_powered_variants(self):
         # "both" adds a powered variant for each powerable case:
-        # 4092 unpowered + 3324 powered.
+        # 4284 unpowered + 3516 powered.
         cases = build_matrix(power="both")
-        assert len(cases) == 7416
-        assert sum(1 for case in cases if case.power) == 3324
+        assert len(cases) == 7800
+        assert sum(1 for case in cases if case.power) == 3516
 
     def test_repeat_multiplies_matrix(self):
-        assert len(build_matrix(power="off", repeat=3)) == 12276
+        assert len(build_matrix(power="off", repeat=3)) == 12852
 
     def test_model_filter(self):
         cases = build_matrix(models=["kws"], power="off")
-        assert len(cases) == 1023
+        assert len(cases) == 1071
         assert {c.model.id for c in cases} == {"kws"}
 
     def test_engine_filter(self):
         cases = build_matrix(engines=["helia-aot"], power="off")
-        assert len(cases) == 1108
+        assert len(cases) == 1172
         assert all(c.engine is EngineType.HELIA_AOT for c in cases)
 
     def test_litert_engine_filter(self):
         cases = build_matrix(engines=["litert"], power="off")
-        assert len(cases) == 1108
+        assert len(cases) == 1172
         assert all(c.engine is EngineType.LITERT for c in cases)
 
     @pytest.mark.parametrize(
@@ -298,7 +298,7 @@ class TestBuildMatrix:
         [
             ("apollo3p_evb", 3 * 3 * 5, 0),
             ("apollo4p_blue_kxr_evb", 3 * 4 * 4, 0),
-            ("apollo4l_blue_evb", 1 * 4 * 4, 0),
+            ("apollo4l_blue_evb", 2 * 4 * 4, 0),
             ("apollo510_evb", 3 * 4 * 5, 2 * 2 * 4 * 4),
             ("apollo330mP_evb", 3 * 4 * 5, 2 * 2 * 4 * 4),
             ("apollo510dL_evb", 3 * 4 * 4, 2 * 2 * 4 * 4),
@@ -403,8 +403,8 @@ class TestBuildMatrix:
         )
 
     def test_default_axis_drops_toolchains_the_nsx_board_module_omits(self):
-        # The packaged apollo4l_blue_evb module declares only
-        # arm-none-eabi-gcc, so the board-default axis is that one toolchain.
+        # The packaged apollo4l_blue_evb module omits armclang,
+        # so the board-default axis drops it.
         cases = build_matrix(
             models=["kws"],
             engines=["helia-rt"],
@@ -412,7 +412,7 @@ class TestBuildMatrix:
             transports=["rtt"],
             memories=["auto"],
         )
-        assert [case.toolchain for case in cases] == [Toolchain.ARM_NONE_EABI_GCC]
+        assert [case.toolchain for case in cases] == [Toolchain.ARM_NONE_EABI_GCC, Toolchain.ATFE]
         assert all(case_validity(case) is None for case in cases)
 
     def test_explicit_undeclared_toolchain_enumerates_with_a_named_skip(self):
@@ -422,13 +422,13 @@ class TestBuildMatrix:
             models=["kws"],
             engines=["helia-rt"],
             boards=["apollo4l_blue_evb"],
-            toolchains=["atfe"],
+            toolchains=["armclang"],
             transports=["rtt"],
             memories=["auto"],
         )
-        assert [case.toolchain for case in cases] == [Toolchain.ATFE]
+        assert [case.toolchain for case in cases] == [Toolchain.ARMCLANG]
         assert case_validity(cases[0]) == (
-            "NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain"
+            "NSX board module nsx-board-apollo4l-blue-evb does not declare the armclang toolchain"
         )
 
     def test_no_nsx_contract_leaves_the_default_axis_alone(self, monkeypatch):

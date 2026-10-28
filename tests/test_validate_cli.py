@@ -41,7 +41,7 @@ class TestValidateList:
             "--boards",
             "apollo4l_blue_evb",
             "--toolchains",
-            "gcc,atfe",
+            "gcc,armclang",
             "--power",
             "off",
         )
@@ -49,8 +49,8 @@ class TestValidateList:
         assert "2 case(s) would run" in proc.stdout
         lines = {line.split()[0]: line for line in proc.stdout.splitlines() if "apollo4l" in line}
         assert "skip:" not in lines["apollo4l_blue_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto"]
-        assert lines["apollo4l_blue_evb-kws-rt-ns-atfe-rtt-auto"].endswith(
-            "skip: NSX board module nsx-board-apollo4l-blue-evb does not declare the atfe toolchain"
+        assert lines["apollo4l_blue_evb-kws-rt-ns-armclang-rtt-auto"].endswith(
+            "skip: NSX board module nsx-board-apollo4l-blue-evb does not declare the armclang toolchain"
         )
 
     def test_list_engine_alias_aot(self):

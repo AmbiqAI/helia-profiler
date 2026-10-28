@@ -145,7 +145,7 @@ class TestBoardModuleCompatibility:
     def test_reads_the_qualified_boards_toolchain_declaration(self) -> None:
         assert nsx.board_module_compatibility("apollo4l_blue_evb") == (
             "nsx-board-apollo4l-blue-evb",
-            ("arm-none-eabi-gcc",),
+            ("arm-none-eabi-gcc", "atfe"),
         )
         declared = nsx.board_module_compatibility("apollo3p_evb")
         assert declared is not None
