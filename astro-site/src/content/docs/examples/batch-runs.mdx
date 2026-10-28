@@ -146,7 +146,9 @@ An ID may not reuse a built-in model ID (`kws`, `vww`, `ic`, `ad`).
 `validation_manifest.json` but not its case ID. Custom models have no
 ExecuTorch PTE contract, so the matrix enumerates no ExecuTorch cases for
 them. A model with a FLOAT16 tensor lists its LiteRT cases as skips,
-because upstream TFLM refuses such models.
+because upstream TFLM refuses such models. A model whose kernels read
+FLOAT16 also lists its helia-rt and helia-aot cases as skips on boards
+without an MVE (Helium) core, which have no fp16 kernels.
 
 ## Validated on
 
