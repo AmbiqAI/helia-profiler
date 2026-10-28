@@ -256,14 +256,13 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
         f"wheel/source module drift: only-in-wheel={sorted(wheel_modules - source_modules)} "
         f"only-in-source={sorted(source_modules - wheel_modules)}"
     )
+    assert not any("vendor/segger_rtt" in name for name in names)
+    assert "helia_profiler/firmware/segger.py" not in names
     assert "helia_profiler/data/compatibility-baseline-v1.json" in names
     assert "helia_profiler/data/run_summary.schema.v1.json" in names
     assert "helia_profiler/data/run_metadata.schema.v1.json" in names
     assert "helia_profiler/data/profile_results.schema.v1.json" in names
     assert "helia_profiler/data/session_intent.schema.v1.json" in names
-    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.c" in names
-    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.h" in names
-    assert "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h" in names
 
     installed = tmp_path / "installed"
     subprocess.run(
@@ -304,7 +303,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert probe.stdout.splitlines() == [
         "0.9.0",
         "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
-        "711f7ebd3e74d04f5777a1e2cad4f6f00729524451bfe82c356daa421918518c",
+        "471181f088083a1e30e317bd977f481a350f433315e6aafd7c36731bad6bd36f",
     ]
 
 

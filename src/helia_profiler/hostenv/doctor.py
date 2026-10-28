@@ -194,8 +194,6 @@ def inspect_environment(
     toolchain: Toolchain = Toolchain.ARM_NONE_EABI_GCC,
     transport: Transport = Transport.RTT,
     engine: EngineType = EngineType.HELIA_RT,
-    require_segger_rtt: bool = False,
-    segger_rtt_path: Path | None = None,
     include_versions: bool = False,
     joulescope_devices: tuple[str, ...] | None = None,
 ) -> DoctorResult:
@@ -209,30 +207,6 @@ def inspect_environment(
     results = [
         _inspect_dependency(spec) for spec in _dependency_specs(toolchain, transport, engine)
     ]
-    if require_segger_rtt:
-        from ..errors import FirmwareError
-        from ..firmware import find_segger_rtt_dir
-
-        try:
-            resolved_rtt = find_segger_rtt_dir(segger_rtt_path)
-        except FirmwareError:
-            results.append(
-                DoctorCheck(
-                    "SEGGER RTT source checkout",
-                    "SEGGER_RTT_PATH",
-                    False,
-                    hint="Reinstall helia-profiler or set target.segger_rtt_path.",
-                )
-            )
-        else:
-            results.append(
-                DoctorCheck(
-                    "SEGGER RTT source checkout",
-                    "SEGGER_RTT_PATH",
-                    True,
-                    path=str(resolved_rtt),
-                )
-            )
     env = _environment(joulescope_devices)
     versions = tuple(spec.probe(env) for spec in _ENVIRONMENT_CHECKS if spec.applies(env))
     if include_versions:

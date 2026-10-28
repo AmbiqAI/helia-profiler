@@ -142,8 +142,8 @@ jobs:
           fi
           uv pip install --python .release-venv/bin/python "${packages[0]}"
           .release-venv/bin/hpx --version | grep -F "hpx ${PACKAGE_VERSION}"
-          env -u SEGGER_RTT_PATH .release-venv/bin/python -c \
-            'from helia_profiler.firmware import find_segger_rtt_dir; assert find_segger_rtt_dir().name == "segger_rtt"'
+          .release-venv/bin/python -c \
+            'from helia_profiler.deps.compatibility import load_compatibility_baseline; b = load_compatibility_baseline(); assert b.module("nsx-segger-rtt").ref == b.project("nsx-segger-rtt").ref'
 
   publish-pypi:
     if: needs.release-please.outputs.release_created == 'true' && needs.verify-install.result == 'success'

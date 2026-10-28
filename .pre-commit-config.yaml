@@ -6,7 +6,7 @@ repos:
     rev: v5.0.0  # commit cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b
     hooks:
       # Excludes vendored/generated content whose whitespace we don't own:
-      # SEGGER's vendored RTT sources, an upstream NSX patch file, and
+      # an upstream NSX patch file, and
       # captured tool output used as test fixtures, and the result
       # bundles shipped for the documentation examples (their manifests hash
       # every byte). Scoped to these two
@@ -20,8 +20,7 @@ repos:
             nix/patches/.*|
             tests/fixtures/.*|
             examples/results/hardware-validation-.*|
-            examples/results/run-api-synthetic/.*|
-            src/helia_profiler/vendor/segger_rtt/.*
+            examples/results/run-api-synthetic/.*
           )$
       - id: end-of-file-fixer
         exclude: |
@@ -29,8 +28,7 @@ repos:
             nix/patches/.*|
             tests/fixtures/.*|
             examples/results/hardware-validation-.*|
-            examples/results/run-api-synthetic/.*|
-            src/helia_profiler/vendor/segger_rtt/.*
+            examples/results/run-api-synthetic/.*
           )$
       - id: check-merge-conflict
       - id: check-added-large-files

@@ -31,7 +31,7 @@ REFUSED = {
     ("engines/helia_rt/artifacts.py", "HELIART_DIST_PATH"),
     ("engines/helia_rt/artifacts.py", "HELIART_SOURCE_PATH"),
     ("firmware/launcher.py", "HPX_COMPILER_LAUNCHER"),
-    ("firmware/segger.py", "SEGGER_RTT_PATH"),
+    ("config/__init__.py", "SEGGER_RTT_PATH"),
 }
 
 #: Reads in this package that cannot change fixture firmware, with the reason.

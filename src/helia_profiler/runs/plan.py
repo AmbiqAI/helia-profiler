@@ -56,7 +56,7 @@ _HOST_LOCAL_SETTINGS = (
 )
 
 #: Environment variables that can point a build at local sources.
-_SOURCE_VARIABLES = ("SEGGER_RTT_PATH", "CMSIS_NN_PATH")
+_SOURCE_VARIABLES = ("CMSIS_NN_PATH",)
 
 #: Environment variables the compilers, CMake or NSX read that change what is
 #: built. Compiler launchers are host-local and excluded. Values are recorded
@@ -427,8 +427,6 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
         sidecar = Path(f"{config.model.path}.json")
         if sidecar.is_file():
             candidates.append((_SIDECAR, str(sidecar)))
-    if config.target.segger_rtt_path is not None and _uses_rtt(config):
-        candidates.append(("target.segger_rtt_path", str(config.target.segger_rtt_path)))
     if config.engine.config_path is not None:
         candidates.append(("engine.config_path", str(config.engine.config_path)))
     for key in _SOURCE_ENGINE_KEYS:
@@ -461,8 +459,6 @@ def _source_environment(config: ProfileConfig) -> dict[str, str]:
     engine = config.engine.type
     engine_config = config.engine.config
     effective: dict[str, str] = {}
-    if config.target.segger_rtt_path is None and _uses_rtt(config):
-        effective["SEGGER_RTT_PATH"] = environment["SEGGER_RTT_PATH"]
     if engine is not EngineType.LITERT:
         provider = cmsis_nn_provider_module(engine.value, _effective_backend(config))
         selected = select_cmsis_nn_override(engine_config, provider_module=provider)
@@ -485,12 +481,6 @@ def _heliart_source_build(config: ProfileConfig) -> bool:
         config.engine.config.get("source_path")
         or "HELIART_SOURCE_PATH" in _source_environment(config)
     )
-
-
-def _uses_rtt(config: ProfileConfig) -> bool:
-    from ..vocab import Transport
-
-    return config.target.transport == Transport.RTT
 
 
 def _compatibility(config: ProfileConfig) -> CompatibilityResolution | None:

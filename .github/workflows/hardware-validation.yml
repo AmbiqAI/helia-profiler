@@ -115,7 +115,6 @@ env:
   # ccache: the runner exports a per-board CCACHE_DIR; hpx's
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
-  SEGGER_RTT_PATH: ${{ github.workspace }}/segger-rtt
   HPX_NSX_EXECUTORCH_REF: 5514ac1ea8439b3fe615d180bf68c75a9dabb48e
   # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
   # with the manual defaults, except that nightly validation covers the full suite.
@@ -393,13 +392,6 @@ jobs:
             echo "- nsx-executorch: \`${resolved_commit}\`"
             echo "- ExecuTorch: \`${executorch_commit}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Fetch SEGGER RTT sources
-        run: |
-          if [[ ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.c" || ! -f "${SEGGER_RTT_PATH}/RTT/SEGGER_RTT.h" || ! -f "${SEGGER_RTT_PATH}/Config/SEGGER_RTT_Conf.h" ]]; then
-            rm -rf "${SEGGER_RTT_PATH}"
-            git clone --depth 1 https://github.com/SEGGERMicro/RTT.git "${SEGGER_RTT_PATH}"
-          fi
 
       - name: Configure ATFE_ROOT override
         env:

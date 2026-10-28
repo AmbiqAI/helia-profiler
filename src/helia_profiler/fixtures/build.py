@@ -119,8 +119,6 @@ def _refuse_overrides(config: ProfileConfig) -> None:
     )
     overrides = {*resolution.module_overrides, *resolution.engine_overrides}
     overrides.update(f"env.{name}" for name in FIXTURE_REFUSED_ENVIRONMENT if os.environ.get(name))
-    if config.target.segger_rtt_path is not None:
-        overrides.add("target.segger_rtt_path")
     launcher, source = os.environ.get("HPX_COMPILER_LAUNCHER"), "env.HPX_COMPILER_LAUNCHER"
     if launcher is None:
         launcher, source = config.build.compiler_launcher, "build.compiler_launcher"

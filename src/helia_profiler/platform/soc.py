@@ -475,8 +475,7 @@ _register_soc(
         c_define="AM_PART_APOLLO510",
         cmsis_header="apollo510.h",
         # On the cache-coherent M55 parts RTT is pinned to non-cached TCM
-        # (default .bss), NOT .sram_bss — see firmware/__init__.py and
-        # SEGGER_RTT_Conf.h. DTCM is based at 0x20000000 (512 KB), so the
+        # (default .bss) by nsx-segger-rtt. DTCM is based at 0x20000000 (512 KB), so the
         # fallback scan covers that window. The known-address fast path (nm/map)
         # is the primary route and skips scanning entirely.
         rtt_scan_ranges=((0x20000000, 0x80000),),

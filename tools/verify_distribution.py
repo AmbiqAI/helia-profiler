@@ -13,14 +13,7 @@ from pathlib import Path
 
 PACKAGE_NAME = "helia-profiler"
 REQUIRES_PYTHON = ">=3.11"
-REQUIRED_PACKAGE_FILES = {
-    "helia_profiler/vendor/segger_rtt/LICENSE.md",
-    "helia_profiler/vendor/segger_rtt/SOURCE.md",
-    "helia_profiler/vendor/segger_rtt/Config/SEGGER_RTT_Conf.h",
-    "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.c",
-    "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT.h",
-    "helia_profiler/vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h",
-}
+REQUIRED_PACKAGE_FILES = {"helia_profiler/data/compatibility-baseline-v1.json"}
 #: Directories that must never reach the wheel.
 #:
 #: ``tools/docs`` generates the published CLI, configuration and issue-code
@@ -28,8 +21,9 @@ REQUIRED_PACKAGE_FILES = {
 #: distribution and out of the documented public API; ``packages.find
 #: where=["src"]`` is what keeps it there, and this is the assertion that the
 #: packaging configuration has not quietly changed.
-EXCLUDED_WHEEL_PREFIXES = ("tools/",)
+EXCLUDED_WHEEL_PREFIXES = ("tools/", "helia_profiler/vendor/segger_rtt/")
 OBSOLETE_WHEEL_FILES = {
+    "helia_profiler/firmware/segger.py",
     "helia_profiler/artifacts.py",
     "helia_profiler/comparability.py",
     "helia_profiler/compare.py",
@@ -103,7 +97,6 @@ def _verify_wheel(wheel: Path, expected_version: str) -> None:
     required_license_suffixes = {
         "/LICENSE",
         "/THIRD_PARTY_NOTICES.md",
-        "/src/helia_profiler/vendor/segger_rtt/LICENSE.md",
     }
     missing_licenses = {
         suffix

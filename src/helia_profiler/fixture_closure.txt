@@ -103,7 +103,6 @@ firmware/launcher.py
 firmware/op_resolver.py
 firmware/project.py
 firmware/render.py
-firmware/segger.py
 firmware/templates/CMakeLists.txt.j2
 firmware/templates/_ble_reset.j2
 firmware/templates/_busy_loop_calibration.j2
@@ -294,12 +293,6 @@ validation/matrix.py
 validation/plan.py
 validation/report.py
 validation/runner.py
-vendor/segger_rtt/Config/SEGGER_RTT_Conf.h
-vendor/segger_rtt/LICENSE.md
-vendor/segger_rtt/RTT/SEGGER_RTT.c
-vendor/segger_rtt/RTT/SEGGER_RTT.h
-vendor/segger_rtt/RTT/SEGGER_RTT_ConfDefaults.h
-vendor/segger_rtt/SOURCE.md
 vocab.py
 wire/__init__.py
 wire/_faults.py

@@ -184,11 +184,11 @@ def test_local_sources_are_content_identified_and_checked_on_replay(session, tmp
     rtt.mkdir()
     aot = tmp_path / "aot.yaml"
     aot.write_text("memory: {}\n", encoding="utf-8")
-    plan = session.with_target(segger_rtt_path=str(rtt)).freeze()
+    plan = session.with_build(nsx_modules={"nsx-segger-rtt": {"path": str(rtt)}}).freeze()
     aot_plan = session.with_engine("helia-aot", config_path=str(aot)).freeze()
 
     assert [(i.setting, i.kind) for i in plan.local_inputs] == [
-        ("target.segger_rtt_path", "directory")
+        ("build.nsx_modules.nsx-segger-rtt.path", "directory")
     ]
     assert not plan.portable and plan.intent_hash != session.freeze().intent_hash
     file_input = aot_plan.local_inputs[0]
@@ -423,14 +423,13 @@ def test_explicit_settings_beat_the_variables_they_replace(session, tmp_path, mo
     rtt, source = tmp_path / "rtt", tmp_path / "rt"
     rtt.mkdir()
     source.mkdir()
-    monkeypatch.setenv("SEGGER_RTT_PATH", str(tmp_path))
     monkeypatch.setenv("HELIART_DIST_PATH", str(tmp_path))
-    plan = session.with_target(segger_rtt_path=str(rtt)).with_engine(
+    plan = session.with_build(nsx_modules={"nsx-segger-rtt": {"path": str(rtt)}}).with_engine(
         "helia-rt", config={"source_path": str(source)}
     )
     assert [i.setting for i in plan.freeze().local_inputs] == [
-        "target.segger_rtt_path",
         "engine.config.source_path",
+        "build.nsx_modules.nsx-segger-rtt.path",
     ]
 
 
@@ -519,7 +518,9 @@ def test_the_arm_provider_ignores_cmsis_nn_path(tmp_path, monkeypatch):
 
 def test_a_missing_local_input_is_refused_at_freeze(session, tmp_path):
     with pytest.raises(ConfigError, match="does not exist"):
-        session.with_target(segger_rtt_path=str(tmp_path / "absent")).freeze()
+        session.with_build(
+            nsx_modules={"nsx-segger-rtt": {"path": str(tmp_path / "absent")}}
+        ).freeze()
 
 
 def test_heliart_runtime_selectors_are_separate_from_kernel_overrides(
@@ -564,7 +565,7 @@ def test_a_plan_field_of_the_wrong_type_is_refused(session, tmp_path, section, k
 def test_a_local_input_without_a_known_kind_is_refused(session, tmp_path):
     rtt = tmp_path / "rtt"
     rtt.mkdir()
-    data = session.with_target(segger_rtt_path=str(rtt)).freeze().to_dict()
+    data = session.with_build(nsx_modules={"nsx-segger-rtt": {"path": str(rtt)}}).freeze().to_dict()
     data["local_inputs"][0]["kind"] = "missing"
     with pytest.raises(ConfigError, match="Malformed frozen run plan: local input"):
         FrozenRun.from_dict(data)
@@ -620,8 +621,7 @@ def test_a_corrupted_sidecar_is_a_config_error_on_replay(tmp_path):
 def test_a_relative_source_path_is_recorded_resolved(session, tmp_path, monkeypatch):
     (tmp_path / "rtt").mkdir()
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setenv("SEGGER_RTT_PATH", "rtt")
-    plan = session.freeze()
+    plan = session.with_build(nsx_modules={"nsx-segger-rtt": {"path": "rtt"}}).freeze()
     assert [i.path for i in plan.local_inputs] == [str((tmp_path / "rtt").resolve())]
     elsewhere = tmp_path / "elsewhere"
     (elsewhere / "rtt").mkdir(parents=True)
@@ -654,7 +654,7 @@ def test_compiler_environment_is_part_of_the_intent_and_checked_on_replay(sessio
 
 def test_rtt_sources_count_only_for_the_rtt_transport(session, tmp_path, monkeypatch):
     monkeypatch.setenv("SEGGER_RTT_PATH", str(tmp_path / "absent"))
-    uart = session.with_target(transport="uart", segger_rtt_path=str(tmp_path / "gone"))
+    uart = session.with_target(transport="uart")
     assert uart.freeze().local_inputs == ()
 
 
@@ -720,3 +720,43 @@ def test_a_custom_heliart_release_is_not_portable(session, source):
 def test_a_non_finite_setting_is_refused_at_freeze(session):
     with pytest.raises(ConfigError, match="cannot hold a non-finite number"):
         session.with_power(io_voltage=float("nan")).freeze()
+
+
+@pytest.mark.parametrize("legacy_path", [None, "/old/raw-rtt"])
+def test_previous_baseline_plan_remains_readable_before_settings_validation(session, legacy_path):
+    current = session.freeze()
+    settings = current.to_dict()["settings"]
+    settings["target"]["segger_rtt_path"] = legacy_path
+    old = replace(current, settings=settings, baseline_fingerprint="0" * 64)
+    loaded = FrozenRun.from_dict(old.to_dict())
+    assert loaded.settings["target"]["segger_rtt_path"] == legacy_path
+    assert loaded.intent_hash == old.intent_hash
+    with pytest.raises(ConfigError, match="frozen against baseline"):
+        loaded.config()
+
+
+@pytest.mark.parametrize("value", ["raw-rtt", " "])
+def test_legacy_rtt_environment_is_rejected_before_freeze(session, monkeypatch, value):
+    monkeypatch.setenv("SEGGER_RTT_PATH", value)
+    with pytest.raises(ConfigError, match="build.nsx_modules.nsx-segger-rtt.path"):
+        session.freeze()
+
+
+def test_empty_legacy_rtt_environment_is_inactive(session, monkeypatch):
+    monkeypatch.setenv("SEGGER_RTT_PATH", "")
+    assert session.freeze().portable
+
+
+def test_rtt_module_override_replays_and_requires_its_directory(session, tmp_path):
+    module = tmp_path / "module"
+    module.mkdir()
+    source = module / "nsx-module.yaml"
+    source.write_text("module:\n  name: nsx-segger-rtt\n")
+    plan = session.with_build(nsx_modules={"nsx-segger-rtt": {"path": module}}).freeze()
+    assert plan.qualification == "development-overrides"
+    assert "nsx-segger-rtt" in plan.overrides
+    assert plan.config().build.nsx_modules["nsx-segger-rtt"].path == module
+    source.unlink()
+    module.rmdir()
+    with pytest.raises(ConfigError, match="does not exist on this host"):
+        plan.config()

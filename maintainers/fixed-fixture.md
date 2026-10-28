@@ -128,7 +128,7 @@ model metadata before build; engine failures still propagate.
 
 Run builds take pinned inputs only. The build boundary refuses any
 module, engine or CMSIS-NN override the compatibility classifier reports,
-plus `SEGGER_RTT_PATH`, `target.segger_rtt_path`, the variables CMake and
+plus `SEGGER_RTT_PATH`, the variables CMake and
 the compilers read that change compiled output (`CFLAGS`, `CPATH`,
 `CMAKE_BUILD_TYPE` and the rest of `FIXTURE_REFUSED_ENVIRONMENT`), NSX's
 check bypasses, and explicit compiler launchers (`auto` and disabled stay

@@ -62,7 +62,7 @@ def test_environment_overrides_are_refused(
 @pytest.mark.parametrize(
     ("sections", "named"),
     [
-        ({"target": {"segger_rtt_path": "/opt/rtt"}}, "target.segger_rtt_path"),
+        ({"build": {"nsx_modules": {"nsx-segger-rtt": {"path": "/opt/rtt"}}}}, "nsx-segger-rtt"),
         ({"build": {"compiler_launcher": "ccache"}}, "build.compiler_launcher"),
         ({"build": {"nsx_modules": {"nsx-core": {"ref": "feat/x"}}}}, "nsx-core"),
         ({"engine": {"config": {"cmsis_nn_ref": "main"}}}, "cmsis-nn"),

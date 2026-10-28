@@ -35,6 +35,12 @@ set(CMAKE_CXX_COMPILER_LAUNCHER "{{ compiler_launcher }}")
 set(CMAKE_ASM_COMPILER_LAUNCHER "{{ compiler_launcher }}")
 {% endif %}
 
+{% if transport == "rtt" %}
+# Channel 0 is allocated by the module; refresh sizes on reconfiguration.
+set(NSX_SEGGER_RTT_BUFFER_SIZE_UP {{ rtt_buffer_size_up }} CACHE STRING "RTT up buffer bytes" FORCE)
+set(NSX_SEGGER_RTT_BUFFER_SIZE_DOWN 16 CACHE STRING "RTT down buffer bytes" FORCE)
+{% endif %}
+
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/modules.cmake)
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/nsx/nsx_app_bootstrap.cmake)
 
@@ -58,6 +64,9 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
+{% if transport == "rtt" %}
+    nsx::segger_rtt
+{% endif %}
 {% if power_sync_enabled %}
     nsx::gpio
 {% endif %}
@@ -76,47 +85,25 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::psram
 {% endif %}
 )
-{% if transport == "rtt" %}
-target_sources(hpx_profiler PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
-)
-target_include_directories(hpx_profiler PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
-)
-# ConfigUpBuffer(0) cannot change buffer-0's pointer/size (SEGGER design).
-# Override the compile-time default so _DoInit() allocates the requested
-# transport buffer size.
-target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
-{% endif %}
 {% if power_binary_enabled %}
 
 # --- Dedicated power binary ---
-# Same AOT model + link deps as hpx_profiler, minus any transport (SEGGER
-# RTT / USB): main_power.cc (power_only=true render) never references a
-# transport symbol, so no transport sources/defines are added here.
+# Transport is used only for the terminal record after the measurement gate closes.
 add_executable(hpx_profiler_power EXCLUDE_FROM_ALL
     src/main_power.cc
-{% if transport == "rtt" %}
-    src/rtt/SEGGER_RTT.c
-{% endif %}
 )
 
 target_include_directories(hpx_profiler_power PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
-{% if transport == "rtt" %}
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
-{% endif %}
 )
-{% if transport == "rtt" %}
-target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
-{% endif %}
 
 target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
+{% if transport == "rtt" %}
+    nsx::segger_rtt
+{% endif %}
 {% if power_binary_needs_gpio %}
     nsx::gpio
 {% endif %}
@@ -154,6 +141,9 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
+{% if transport == "rtt" %}
+    nsx::segger_rtt
+{% endif %}
 {% if power_sync_enabled %}
     nsx::gpio
 {% endif %}
@@ -176,46 +166,26 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::psram
 {% endif %}
 )
-{% if transport == "rtt" %}
-target_sources(hpx_profiler PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/SEGGER_RTT.c
-)
-target_include_directories(hpx_profiler PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
-)
-target_compile_definitions(hpx_profiler PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
-{% endif %}
 {% if power_binary_enabled %}
 
 # --- Dedicated power binary ---
-# Same TFLM/heliaRT model + profiler sources as hpx_profiler, minus any
-# transport (SEGGER RTT / USB): main_power.cc (power_only=true render) never
-# references a transport symbol, so no transport sources/defines are added
-# here — that is the whole point of the dedicated binary.
+# Transport is used only for the terminal record after the measurement gate closes.
 add_executable(hpx_profiler_power EXCLUDE_FROM_ALL
     src/main_power.cc
     src/hpx_pmu_profiler.cc
-{% if transport == "rtt" %}
-    src/rtt/SEGGER_RTT.c
-{% endif %}
 )
 
 target_include_directories(hpx_profiler_power PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
-{% if transport == "rtt" %}
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt
-    ${CMAKE_CURRENT_LIST_DIR}/src/rtt/Config
-{% endif %}
 )
-{% if transport == "rtt" %}
-target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP={{ rtt_buffer_size_up }})
-{% endif %}
 
 target_link_libraries(hpx_profiler_power PRIVATE
     nsx::board
     nsx::runtime_core
     nsx::cmsis_core
+{% if transport == "rtt" %}
+    nsx::segger_rtt
+{% endif %}
 {% if power_binary_needs_gpio %}
     nsx::gpio
 {% endif %}

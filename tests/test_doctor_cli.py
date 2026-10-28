@@ -225,7 +225,7 @@ def test_doctor_config_selects_checks_and_flags_override_it(monkeypatch, tmp_pat
     assert seen[0].intent_dict()["target"] == {"toolchain": "armclang", "transport": "rtt"}
 
 
-def test_doctor_checks_segger_rtt_sources_like_session(monkeypatch) -> None:
+def test_doctor_checks_host_dependencies_like_session(monkeypatch) -> None:
     monkeypatch.setattr("helia_profiler.hostenv.doctor.shutil.which", lambda name: name)
     monkeypatch.setattr("helia_profiler.hostenv.doctor.find_jlink_exe", lambda: "JLinkExe")
     monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
@@ -234,7 +234,7 @@ def test_doctor_checks_segger_rtt_sources_like_session(monkeypatch) -> None:
 
     assert result.exit_code == 0, result.output
     names = [check["name"] for check in json.loads(result.output)["checks"]]
-    assert "SEGGER_RTT_PATH" in names
+    assert "SEGGER_RTT_PATH" not in names
     assert names == [check.name for check in Session().doctor().checks]
 
 

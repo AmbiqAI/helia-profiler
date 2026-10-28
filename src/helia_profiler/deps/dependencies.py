@@ -333,11 +333,6 @@ def create_workspace(ctx: PipelineContext) -> DependencyWorkspace:
                 "transport": ctx.config.target.transport,
                 "psram": ctx.config.target.psram,
                 "clock": ctx.config.target.clock,
-                "segger_rtt_source_hash": (
-                    _digest_path(ctx.config.target.segger_rtt_path).to_dict()
-                    if ctx.config.target.segger_rtt_path is not None
-                    else None
-                ),
             },
             "engine": {
                 "type": ctx.config.engine.type,

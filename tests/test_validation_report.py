@@ -404,7 +404,11 @@ def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path,
 
 @pytest.mark.parametrize("version", [18, 20, None])
 @pytest.mark.parametrize("writer", [build_manifest, write_validation_reports])
-def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer):
+def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer, monkeypatch):
+    monkeypatch.setattr(
+        "helia_profiler.validation.report._repo_metadata",
+        lambda _root: {"sha": None, "branch": None, "dirty": None},
+    )
     from helia_profiler.errors import ReportError
 
     result = _case(tmp_path)
@@ -419,7 +423,11 @@ def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer
 
 
 @pytest.mark.parametrize("contents", ['{"schema":', "[]", None])
-def test_failed_case_with_malformed_summary_keeps_aggregate_report(tmp_path, contents):
+def test_failed_case_with_malformed_summary_keeps_aggregate_report(tmp_path, contents, monkeypatch):
+    monkeypatch.setattr(
+        "helia_profiler.validation.report._repo_metadata",
+        lambda _root: {"sha": None, "branch": None, "dirty": None},
+    )
     failed = _case(tmp_path / "failed")
     failed.status = "fail"
     failed.case_id = "failed"

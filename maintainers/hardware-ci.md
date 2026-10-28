@@ -46,11 +46,9 @@ uv run hpx validate \
   --output-dir results/local-validation-dual
 ```
 
-The smoke suite uses RTT. No local SEGGER RTT checkout is required: hpx
-resolves RTT sources from `target.segger_rtt_path` in config, then the
-`SEGGER_RTT_PATH` environment variable, and otherwise falls back to the
-bundled copy in `src/helia_profiler/vendor/segger_rtt/`. Set the config key
-or environment variable only to override the bundled version.
+The smoke suite uses the pinned `nsx-segger-rtt` module. No local SEGGER RTT
+checkout is required. Development runs can override the NSX module through
+`build.nsx_modules.nsx-segger-rtt`; pinned fixture runs reject overrides.
 
 Optional Joulescope capture uses the same artifact layout:
 
