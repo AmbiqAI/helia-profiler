@@ -34,8 +34,8 @@
               "signature": "board: str",
               "source": {
                 "line": 28,
-                "path": "src/helia_profiler/run_guard.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L28"
+                "path": "src/helia_profiler/runs/guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/guard.py#L28"
               },
               "summary": ""
             },
@@ -53,8 +53,8 @@
               "signature": "jlink_serial: str",
               "source": {
                 "line": 29,
-                "path": "src/helia_profiler/run_guard.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L29"
+                "path": "src/helia_profiler/runs/guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/guard.py#L29"
               },
               "summary": ""
             },
@@ -72,8 +72,8 @@
               "signature": "check(*, require_free: bool, remaining_s: float) -> None",
               "source": {
                 "line": 37,
-                "path": "src/helia_profiler/run_guard.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L37"
+                "path": "src/helia_profiler/runs/guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/guard.py#L37"
               },
               "summary": "Allow the step: the operator holds the board for the whole capture."
             },
@@ -96,8 +96,8 @@
               "signature": "verify_target(*, target: FixtureTarget, jlink_serial: str) -> None",
               "source": {
                 "line": 41,
-                "path": "src/helia_profiler/run_guard.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L41"
+                "path": "src/helia_profiler/runs/guard.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/guard.py#L41"
               },
               "summary": "Refuse a target board or probe serial other than the operator's."
             }
@@ -109,8 +109,8 @@
           "signature": "OperatorGuard(board: str, jlink_serial: str) -> None",
           "source": {
             "line": 14,
-            "path": "src/helia_profiler/run_guard.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_guard.py#L14"
+            "path": "src/helia_profiler/runs/guard.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/guard.py#L14"
           },
           "summary": "Capture authority from an operator who names the board and the J-Link probe on it."
         },

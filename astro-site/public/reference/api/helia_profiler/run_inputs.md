@@ -187,7 +187,7 @@ Read a LiteRT model's public inputs and outputs without selecting an engine.
 | --- | --- |
 | ConfigError | The model is unreadable, or a run cannot pin inputs for it, for example because an input or output shape is dynamic. |
 
-Source: `src/helia_profiler/run_inputs.py:34`
+Source: `src/helia_profiler/runs/inputs.py:34`
 
 ## helia_profiler.FixtureStatePolicy
 
@@ -413,7 +413,7 @@ Read a model's public inputs and outputs as *engine*'s fixture integration admit
 | --- | --- |
 | ConfigError | *engine* is not an engine name, the model is unreadable, or the engine does not admit the model. |
 
-Source: `src/helia_profiler/run_inputs.py:56`
+Source: `src/helia_profiler/runs/inputs.py:56`
 
 ## helia_profiler.FixtureTensor
 

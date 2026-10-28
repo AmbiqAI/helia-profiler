@@ -139,7 +139,7 @@ qualified on a board; :func:`~helia_profiler.qualification` answers that.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_inputs.py:23`
+Source: `src/helia_profiler/runs/inputs.py:23`
 
 ## helia_profiler.FixtureCapability
 

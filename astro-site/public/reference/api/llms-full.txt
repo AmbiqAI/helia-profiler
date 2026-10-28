@@ -838,7 +838,7 @@ and lifecycle it was compiled from; :func:`build` computes it and
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:60`
+Source: `src/helia_profiler/runs/compiled.py:60`
 
 ### helia_profiler.CompiledBuild.plan
 
@@ -848,7 +848,7 @@ Source: `src/helia_profiler/compiled_build.py:60`
 plan: FrozenRun
 ```
 
-Source: `src/helia_profiler/compiled_build.py:69`
+Source: `src/helia_profiler/runs/compiled.py:69`
 
 ### helia_profiler.CompiledBuild.build
 
@@ -858,7 +858,7 @@ Source: `src/helia_profiler/compiled_build.py:69`
 build: FixtureBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:70`
+Source: `src/helia_profiler/runs/compiled.py:70`
 
 ### helia_profiler.CompiledBuild.lifecycle
 
@@ -868,7 +868,7 @@ Source: `src/helia_profiler/compiled_build.py:70`
 lifecycle: Lifecycle
 ```
 
-Source: `src/helia_profiler/compiled_build.py:71`
+Source: `src/helia_profiler/runs/compiled.py:71`
 
 ### helia_profiler.CompiledBuild.binding
 
@@ -878,7 +878,7 @@ Source: `src/helia_profiler/compiled_build.py:71`
 binding: str
 ```
 
-Source: `src/helia_profiler/compiled_build.py:72`
+Source: `src/helia_profiler/runs/compiled.py:72`
 
 ### helia_profiler.CompiledBuild.identity
 
@@ -890,7 +890,7 @@ identity: RunIdentity
 
 The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs.
 
-Source: `src/helia_profiler/compiled_build.py:75`
+Source: `src/helia_profiler/runs/compiled.py:75`
 
 ### helia_profiler.CompiledBuild.verify
 
@@ -921,7 +921,7 @@ profile builds from source, which a fixture build does not link.
 | --- | --- |
 | ConfigError | Naming the first fact that does not match. |
 
-Source: `src/helia_profiler/compiled_build.py:83`
+Source: `src/helia_profiler/runs/compiled.py:83`
 
 ### helia_profiler.CompiledBuild.save
 
@@ -933,7 +933,7 @@ save(path: str | Path, *, roots: Mapping[str, Path]) -> Path
 
 Write the build as JSON with paths relative to *roots* and return its path.
 
-Source: `src/helia_profiler/compiled_build.py:197`
+Source: `src/helia_profiler/runs/compiled.py:197`
 
 ### helia_profiler.CompiledBuild.load
 
@@ -947,7 +947,7 @@ load(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild
 
 Read and verify a build written by :meth:`save`, resolving paths under *roots*.
 
-Source: `src/helia_profiler/compiled_build.py:222`
+Source: `src/helia_profiler/runs/compiled.py:222`
 
 ### helia_profiler.CompiledBuild.run
 
@@ -988,7 +988,7 @@ the device is touched.
 | ConfigError | The build does not verify, *expect* cannot be compared, or *power* does not fit the build or the run API's rail-energy route. |
 | CaptureError | The device reports counts other than the build's. |
 
-Source: `src/helia_profiler/compiled_build.py:264`
+Source: `src/helia_profiler/runs/compiled.py:264`
 
 ## helia_profiler.RunResultError
 
@@ -1012,7 +1012,7 @@ cannot take).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_record.py:62`
+Source: `src/helia_profiler/runs/record.py:62`
 
 ### helia_profiler.RunResultError.code
 
@@ -1022,7 +1022,7 @@ Source: `src/helia_profiler/run_record.py:62`
 code = code
 ```
 
-Source: `src/helia_profiler/run_record.py:77`
+Source: `src/helia_profiler/runs/record.py:77`
 
 ## helia_profiler.RunResultRecord
 
@@ -1050,7 +1050,7 @@ run it records.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_record.py:81`
+Source: `src/helia_profiler/runs/record.py:81`
 
 ### helia_profiler.RunResultRecord.path
 
@@ -1060,7 +1060,7 @@ Source: `src/helia_profiler/run_record.py:81`
 path: Path
 ```
 
-Source: `src/helia_profiler/run_record.py:91`
+Source: `src/helia_profiler/runs/record.py:91`
 
 ### helia_profiler.RunResultRecord.size_bytes
 
@@ -1070,7 +1070,7 @@ Source: `src/helia_profiler/run_record.py:91`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/run_record.py:92`
+Source: `src/helia_profiler/runs/record.py:92`
 
 ### helia_profiler.RunResultRecord.sha256
 
@@ -1080,7 +1080,7 @@ Source: `src/helia_profiler/run_record.py:92`
 sha256: str
 ```
 
-Source: `src/helia_profiler/run_record.py:93`
+Source: `src/helia_profiler/runs/record.py:93`
 
 ### helia_profiler.RunResultRecord.hpx_version
 
@@ -1090,7 +1090,7 @@ Source: `src/helia_profiler/run_record.py:93`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/run_record.py:94`
+Source: `src/helia_profiler/runs/record.py:94`
 
 ### helia_profiler.RunResultRecord.result
 
@@ -1100,7 +1100,7 @@ Source: `src/helia_profiler/run_record.py:94`
 result: RunResult
 ```
 
-Source: `src/helia_profiler/run_record.py:95`
+Source: `src/helia_profiler/runs/record.py:95`
 
 ### helia_profiler.RunResultRecord.document
 
@@ -1110,7 +1110,7 @@ Source: `src/helia_profiler/run_record.py:95`
 document: Mapping[str, Any]
 ```
 
-Source: `src/helia_profiler/run_record.py:96`
+Source: `src/helia_profiler/runs/record.py:96`
 
 ## helia_profiler.load_run
 
@@ -1130,7 +1130,7 @@ Read and verify a run result saved by :meth:`RunResult.save`, resolving paths un
 | --- | --- |
 | RunResultError | A ``ConfigError`` naming the first check that fails: the schema or version, the compiled build, a pinned file, the identity or the output comparison. |
 
-Source: `src/helia_profiler/run_record.py:99`
+Source: `src/helia_profiler/runs/record.py:99`
 
 ## helia_profiler.RunResult
 
@@ -1154,7 +1154,7 @@ One capture from a :class:`CompiledBuild`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:411`
+Source: `src/helia_profiler/runs/compiled.py:411`
 
 ### helia_profiler.RunResult.compiled
 
@@ -1164,7 +1164,7 @@ Source: `src/helia_profiler/compiled_build.py:411`
 compiled: CompiledBuild
 ```
 
-Source: `src/helia_profiler/compiled_build.py:418`
+Source: `src/helia_profiler/runs/compiled.py:418`
 
 ### helia_profiler.RunResult.capture
 
@@ -1174,7 +1174,7 @@ Source: `src/helia_profiler/compiled_build.py:418`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/compiled_build.py:419`
+Source: `src/helia_profiler/runs/compiled.py:419`
 
 ### helia_profiler.RunResult.identity
 
@@ -1184,7 +1184,7 @@ Source: `src/helia_profiler/compiled_build.py:419`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/compiled_build.py:420`
+Source: `src/helia_profiler/runs/compiled.py:420`
 
 ### helia_profiler.RunResult.verification
 
@@ -1194,7 +1194,7 @@ Source: `src/helia_profiler/compiled_build.py:420`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:421`
+Source: `src/helia_profiler/runs/compiled.py:421`
 
 ### helia_profiler.RunResult.power
 
@@ -1204,7 +1204,7 @@ Source: `src/helia_profiler/compiled_build.py:421`
 power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
 ```
 
-Source: `src/helia_profiler/compiled_build.py:422`
+Source: `src/helia_profiler/runs/compiled.py:422`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -1216,7 +1216,7 @@ succeeded: bool
 
 True only for a ``success`` capture.
 
-Source: `src/helia_profiler/compiled_build.py:425`
+Source: `src/helia_profiler/runs/compiled.py:425`
 
 ### helia_profiler.RunResult.energy
 
@@ -1234,7 +1234,7 @@ hash-pinned raw instrument trace, and the protocol-2 READY, GO,
 gate and DONE samples in ``completion``. A failed capture measures
 none.
 
-Source: `src/helia_profiler/compiled_build.py:430`
+Source: `src/helia_profiler/runs/compiled.py:430`
 
 ### helia_profiler.RunResult.save
 
@@ -1258,7 +1258,7 @@ one of *roots*. :func:`load_run` reads it back.
 | --- | --- |
 | ConfigError | *build* is not this run's compiled build, a file is missing or changed, a path is under no root, or the identity or verification does not recompute from the build and capture. |
 
-Source: `src/helia_profiler/compiled_build.py:441`
+Source: `src/helia_profiler/runs/compiled.py:441`
 
 ## helia_profiler.build
 
@@ -1295,7 +1295,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:460`
+Source: `src/helia_profiler/runs/compiled.py:460`
 
 ## helia_profiler.load_build
 
@@ -1309,7 +1309,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:666`
+Source: `src/helia_profiler/runs/compiled.py:666`
 
 ## helia_profiler.run_build
 
@@ -1334,7 +1334,7 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/compiled_build.py:671`
+Source: `src/helia_profiler/runs/compiled.py:671`
 
 ---
 
@@ -5097,7 +5097,7 @@ tolerance applies to every output tensor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:45`
+Source: `src/helia_profiler/runs/expect.py:45`
 
 ### helia_profiler.Tolerance.max_abs_error
 
@@ -5107,7 +5107,7 @@ Source: `src/helia_profiler/expect.py:45`
 max_abs_error: float = 0.0
 ```
 
-Source: `src/helia_profiler/expect.py:53`
+Source: `src/helia_profiler/runs/expect.py:53`
 
 ## helia_profiler.ReferenceOrigin
 
@@ -5131,7 +5131,7 @@ how many times the model was invoked on the inputs.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:60`
+Source: `src/helia_profiler/runs/expect.py:60`
 
 ### helia_profiler.ReferenceOrigin.kind
 
@@ -5141,7 +5141,7 @@ Source: `src/helia_profiler/expect.py:60`
 kind: ReferenceKind
 ```
 
-Source: `src/helia_profiler/expect.py:68`
+Source: `src/helia_profiler/runs/expect.py:68`
 
 ### helia_profiler.ReferenceOrigin.litert_version
 
@@ -5151,7 +5151,7 @@ Source: `src/helia_profiler/expect.py:68`
 litert_version: str | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:69`
+Source: `src/helia_profiler/runs/expect.py:69`
 
 ### helia_profiler.ReferenceOrigin.resolver
 
@@ -5161,7 +5161,7 @@ Source: `src/helia_profiler/expect.py:69`
 resolver: str | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:70`
+Source: `src/helia_profiler/runs/expect.py:70`
 
 ### helia_profiler.ReferenceOrigin.invocations
 
@@ -5171,7 +5171,7 @@ Source: `src/helia_profiler/expect.py:70`
 invocations: int | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:71`
+Source: `src/helia_profiler/runs/expect.py:71`
 
 ## helia_profiler.ReferenceOutputs
 
@@ -5187,7 +5187,7 @@ Reference bytes for every output, in model order, and their origin.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:74`
+Source: `src/helia_profiler/runs/expect.py:74`
 
 ### helia_profiler.ReferenceOutputs.origin
 
@@ -5197,7 +5197,7 @@ Source: `src/helia_profiler/expect.py:74`
 origin: ReferenceOrigin
 ```
 
-Source: `src/helia_profiler/expect.py:78`
+Source: `src/helia_profiler/runs/expect.py:78`
 
 ### helia_profiler.ReferenceOutputs.outputs
 
@@ -5207,7 +5207,7 @@ Source: `src/helia_profiler/expect.py:78`
 outputs: tuple[bytes, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:79`
+Source: `src/helia_profiler/runs/expect.py:79`
 
 ## helia_profiler.Expect
 
@@ -5230,7 +5230,7 @@ Build with :meth:`host_litert`, :meth:`from_build` or :meth:`from_files`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:82`
+Source: `src/helia_profiler/runs/expect.py:82`
 
 ### helia_profiler.Expect.source
 
@@ -5240,7 +5240,7 @@ Source: `src/helia_profiler/expect.py:82`
 source: ReferenceKind
 ```
 
-Source: `src/helia_profiler/expect.py:89`
+Source: `src/helia_profiler/runs/expect.py:89`
 
 ### helia_profiler.Expect.files
 
@@ -5250,7 +5250,7 @@ Source: `src/helia_profiler/expect.py:89`
 files: tuple[FixtureFile | Path, ...] = ()
 ```
 
-Source: `src/helia_profiler/expect.py:90`
+Source: `src/helia_profiler/runs/expect.py:90`
 
 ### helia_profiler.Expect.resolver
 
@@ -5260,7 +5260,7 @@ Source: `src/helia_profiler/expect.py:90`
 resolver: LiteRtResolver = 'BUILTIN_REF'
 ```
 
-Source: `src/helia_profiler/expect.py:91`
+Source: `src/helia_profiler/runs/expect.py:91`
 
 ### helia_profiler.Expect.tolerance
 
@@ -5270,7 +5270,7 @@ Source: `src/helia_profiler/expect.py:91`
 tolerance: Tolerance | None = None
 ```
 
-Source: `src/helia_profiler/expect.py:92`
+Source: `src/helia_profiler/runs/expect.py:92`
 
 ### helia_profiler.Expect.host_litert
 
@@ -5284,7 +5284,7 @@ host_litert(*, resolver: LiteRtResolver = 'BUILTIN_REF', tolerance: Tolerance | 
 
 Run the model with host LiteRT on the run's input bytes (LiteRT models only).
 
-Source: `src/helia_profiler/expect.py:94`
+Source: `src/helia_profiler/runs/expect.py:94`
 
 ### helia_profiler.Expect.from_build
 
@@ -5298,7 +5298,7 @@ from_build(*, tolerance: Tolerance | None = None) -> Expect
 
 Use the expected outputs the fixture build carries.
 
-Source: `src/helia_profiler/expect.py:102`
+Source: `src/helia_profiler/runs/expect.py:102`
 
 ### helia_profiler.Expect.from_files
 
@@ -5312,7 +5312,7 @@ from_files(*files: FixtureFile | str | Path = (), tolerance: Tolerance | None = 
 
 Compare with caller bytes, one file per output in model order.
 
-Source: `src/helia_profiler/expect.py:107`
+Source: `src/helia_profiler/runs/expect.py:107`
 
 ## helia_profiler.TensorComparison
 
@@ -5345,7 +5345,7 @@ is ``None`` when no tolerance was given.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:118`
+Source: `src/helia_profiler/runs/expect.py:118`
 
 ### helia_profiler.TensorComparison.name
 
@@ -5355,7 +5355,7 @@ Source: `src/helia_profiler/expect.py:118`
 name: str
 ```
 
-Source: `src/helia_profiler/expect.py:128`
+Source: `src/helia_profiler/runs/expect.py:128`
 
 ### helia_profiler.TensorComparison.index
 
@@ -5365,7 +5365,7 @@ Source: `src/helia_profiler/expect.py:128`
 index: int
 ```
 
-Source: `src/helia_profiler/expect.py:129`
+Source: `src/helia_profiler/runs/expect.py:129`
 
 ### helia_profiler.TensorComparison.dtype
 
@@ -5375,7 +5375,7 @@ Source: `src/helia_profiler/expect.py:129`
 dtype: str
 ```
 
-Source: `src/helia_profiler/expect.py:130`
+Source: `src/helia_profiler/runs/expect.py:130`
 
 ### helia_profiler.TensorComparison.shape
 
@@ -5385,7 +5385,7 @@ Source: `src/helia_profiler/expect.py:130`
 shape: tuple[int, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:131`
+Source: `src/helia_profiler/runs/expect.py:131`
 
 ### helia_profiler.TensorComparison.reference_sha256
 
@@ -5395,7 +5395,7 @@ Source: `src/helia_profiler/expect.py:131`
 reference_sha256: str
 ```
 
-Source: `src/helia_profiler/expect.py:132`
+Source: `src/helia_profiler/runs/expect.py:132`
 
 ### helia_profiler.TensorComparison.observed_sha256
 
@@ -5405,7 +5405,7 @@ Source: `src/helia_profiler/expect.py:132`
 observed_sha256: str
 ```
 
-Source: `src/helia_profiler/expect.py:133`
+Source: `src/helia_profiler/runs/expect.py:133`
 
 ### helia_profiler.TensorComparison.elements
 
@@ -5415,7 +5415,7 @@ Source: `src/helia_profiler/expect.py:133`
 elements: int
 ```
 
-Source: `src/helia_profiler/expect.py:134`
+Source: `src/helia_profiler/runs/expect.py:134`
 
 ### helia_profiler.TensorComparison.mismatched_elements
 
@@ -5425,7 +5425,7 @@ Source: `src/helia_profiler/expect.py:134`
 mismatched_elements: int
 ```
 
-Source: `src/helia_profiler/expect.py:135`
+Source: `src/helia_profiler/runs/expect.py:135`
 
 ### helia_profiler.TensorComparison.max_abs_error
 
@@ -5435,7 +5435,7 @@ Source: `src/helia_profiler/expect.py:135`
 max_abs_error: float
 ```
 
-Source: `src/helia_profiler/expect.py:136`
+Source: `src/helia_profiler/runs/expect.py:136`
 
 ### helia_profiler.TensorComparison.max_abs_error_real
 
@@ -5445,7 +5445,7 @@ Source: `src/helia_profiler/expect.py:136`
 max_abs_error_real: float | None
 ```
 
-Source: `src/helia_profiler/expect.py:137`
+Source: `src/helia_profiler/runs/expect.py:137`
 
 ### helia_profiler.TensorComparison.within_tolerance
 
@@ -5455,7 +5455,7 @@ Source: `src/helia_profiler/expect.py:137`
 within_tolerance: bool | None
 ```
 
-Source: `src/helia_profiler/expect.py:138`
+Source: `src/helia_profiler/runs/expect.py:138`
 
 ### helia_profiler.TensorComparison.identical
 
@@ -5465,7 +5465,7 @@ Source: `src/helia_profiler/expect.py:138`
 identical: bool
 ```
 
-Source: `src/helia_profiler/expect.py:141`
+Source: `src/helia_profiler/runs/expect.py:141`
 
 ## helia_profiler.Verification
 
@@ -5481,7 +5481,7 @@ Per-tensor comparison facts, the reference they used and an optional verdict.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:145`
+Source: `src/helia_profiler/runs/expect.py:145`
 
 ### helia_profiler.Verification.reference
 
@@ -5491,7 +5491,7 @@ Source: `src/helia_profiler/expect.py:145`
 reference: ReferenceOutputs
 ```
 
-Source: `src/helia_profiler/expect.py:149`
+Source: `src/helia_profiler/runs/expect.py:149`
 
 ### helia_profiler.Verification.tensors
 
@@ -5501,7 +5501,7 @@ Source: `src/helia_profiler/expect.py:149`
 tensors: tuple[TensorComparison, ...]
 ```
 
-Source: `src/helia_profiler/expect.py:150`
+Source: `src/helia_profiler/runs/expect.py:150`
 
 ### helia_profiler.Verification.tolerance
 
@@ -5511,7 +5511,7 @@ Source: `src/helia_profiler/expect.py:150`
 tolerance: Tolerance | None
 ```
 
-Source: `src/helia_profiler/expect.py:151`
+Source: `src/helia_profiler/runs/expect.py:151`
 
 ### helia_profiler.Verification.matched
 
@@ -5523,7 +5523,7 @@ matched: bool | None
 
 Whether every tensor is within tolerance; ``None`` when no tolerance was given.
 
-Source: `src/helia_profiler/expect.py:154`
+Source: `src/helia_profiler/runs/expect.py:154`
 
 ## helia_profiler.host_reference
 
@@ -5548,7 +5548,7 @@ invocation, as the fixture firmware does, so internal state carries across
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:161`
+Source: `src/helia_profiler/runs/expect.py:161`
 
 ## helia_profiler.compare_outputs
 
@@ -5567,7 +5567,7 @@ Compare observed output bytes with reference outputs, tensor by tensor.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:235`
+Source: `src/helia_profiler/runs/expect.py:235`
 
 ## helia_profiler.compare_fixture_outputs
 
@@ -5584,7 +5584,7 @@ times as the firmware invokes it (warmups, then timed iterations).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/expect.py:304`
+Source: `src/helia_profiler/runs/expect.py:304`
 
 ---
 
@@ -5729,7 +5729,7 @@ qualified on a board; :func:`~helia_profiler.qualification` answers that.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_inputs.py:23`
+Source: `src/helia_profiler/runs/inputs.py:23`
 
 ## helia_profiler.FixtureCapability
 
@@ -7312,7 +7312,7 @@ The model a plan was frozen against, identified by content.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:104`
+Source: `src/helia_profiler/runs/plan.py:104`
 
 ### helia_profiler.FrozenModel.path
 
@@ -7322,7 +7322,7 @@ Source: `src/helia_profiler/frozen_run.py:104`
 path: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:108`
+Source: `src/helia_profiler/runs/plan.py:108`
 
 ### helia_profiler.FrozenModel.sha256
 
@@ -7332,7 +7332,7 @@ Source: `src/helia_profiler/frozen_run.py:108`
 sha256: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:109`
+Source: `src/helia_profiler/runs/plan.py:109`
 
 ### helia_profiler.FrozenModel.size_bytes
 
@@ -7342,7 +7342,7 @@ Source: `src/helia_profiler/frozen_run.py:109`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/frozen_run.py:110`
+Source: `src/helia_profiler/runs/plan.py:110`
 
 ## helia_profiler.ToolchainIdentity
 
@@ -7362,7 +7362,7 @@ it is ``None`` when the compiler could not be run, with the reason in
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:116`
+Source: `src/helia_profiler/runs/plan.py:116`
 
 ### helia_profiler.ToolchainIdentity.name
 
@@ -7372,7 +7372,7 @@ Source: `src/helia_profiler/frozen_run.py:116`
 name: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:125`
+Source: `src/helia_profiler/runs/plan.py:125`
 
 ### helia_profiler.ToolchainIdentity.version
 
@@ -7382,7 +7382,7 @@ Source: `src/helia_profiler/frozen_run.py:125`
 version: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:126`
+Source: `src/helia_profiler/runs/plan.py:126`
 
 ### helia_profiler.ToolchainIdentity.unavailable_reason
 
@@ -7392,7 +7392,7 @@ Source: `src/helia_profiler/frozen_run.py:126`
 unavailable_reason: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:127`
+Source: `src/helia_profiler/runs/plan.py:127`
 
 ### helia_profiler.ToolchainIdentity.lines
 
@@ -7404,7 +7404,7 @@ lines: tuple[str, ...]
 
 The version-bearing lines ``version`` joins, or none when it is unknown.
 
-Source: `src/helia_profiler/frozen_run.py:130`
+Source: `src/helia_profiler/runs/plan.py:130`
 
 ## helia_profiler.FrozenRuntime
 
@@ -7431,7 +7431,7 @@ engine links no kernel library or its provider is overridden.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:135`
+Source: `src/helia_profiler/runs/plan.py:135`
 
 ### helia_profiler.FrozenRuntime.name
 
@@ -7441,7 +7441,7 @@ Source: `src/helia_profiler/frozen_run.py:135`
 name: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:144`
+Source: `src/helia_profiler/runs/plan.py:144`
 
 ### helia_profiler.FrozenRuntime.version
 
@@ -7451,7 +7451,7 @@ Source: `src/helia_profiler/frozen_run.py:144`
 version: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:145`
+Source: `src/helia_profiler/runs/plan.py:145`
 
 ### helia_profiler.FrozenRuntime.source_commit
 
@@ -7461,7 +7461,7 @@ Source: `src/helia_profiler/frozen_run.py:145`
 source_commit: str | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:146`
+Source: `src/helia_profiler/runs/plan.py:146`
 
 ### helia_profiler.FrozenRuntime.kernels_module
 
@@ -7471,7 +7471,7 @@ Source: `src/helia_profiler/frozen_run.py:146`
 kernels_module: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:147`
+Source: `src/helia_profiler/runs/plan.py:147`
 
 ### helia_profiler.FrozenRuntime.kernels_commit
 
@@ -7481,7 +7481,7 @@ Source: `src/helia_profiler/frozen_run.py:147`
 kernels_commit: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:148`
+Source: `src/helia_profiler/runs/plan.py:148`
 
 ### helia_profiler.FrozenRuntime.unavailable_reason
 
@@ -7491,7 +7491,7 @@ Source: `src/helia_profiler/frozen_run.py:148`
 unavailable_reason: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:149`
+Source: `src/helia_profiler/runs/plan.py:149`
 
 ## helia_profiler.LocalInput
 
@@ -7510,7 +7510,7 @@ a plan with one is not portable to another host.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:152`
+Source: `src/helia_profiler/runs/plan.py:152`
 
 ### helia_profiler.LocalInput.setting
 
@@ -7520,7 +7520,7 @@ Source: `src/helia_profiler/frozen_run.py:152`
 setting: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:160`
+Source: `src/helia_profiler/runs/plan.py:160`
 
 ### helia_profiler.LocalInput.path
 
@@ -7530,7 +7530,7 @@ Source: `src/helia_profiler/frozen_run.py:160`
 path: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:161`
+Source: `src/helia_profiler/runs/plan.py:161`
 
 ### helia_profiler.LocalInput.kind
 
@@ -7540,7 +7540,7 @@ Source: `src/helia_profiler/frozen_run.py:161`
 kind: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:162`
+Source: `src/helia_profiler/runs/plan.py:162`
 
 ### helia_profiler.LocalInput.sha256
 
@@ -7550,7 +7550,7 @@ Source: `src/helia_profiler/frozen_run.py:162`
 sha256: str | None = None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:163`
+Source: `src/helia_profiler/runs/plan.py:163`
 
 ## helia_profiler.FrozenRun
 
@@ -7578,7 +7578,7 @@ A resolved, replayable run plan. Build it with :meth:`Session.freeze`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/frozen_run.py:174`
+Source: `src/helia_profiler/runs/plan.py:174`
 
 ### helia_profiler.FrozenRun.settings
 
@@ -7588,7 +7588,7 @@ Source: `src/helia_profiler/frozen_run.py:174`
 settings: Mapping[str, Any]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:178`
+Source: `src/helia_profiler/runs/plan.py:178`
 
 ### helia_profiler.FrozenRun.model
 
@@ -7598,7 +7598,7 @@ Source: `src/helia_profiler/frozen_run.py:178`
 model: FrozenModel
 ```
 
-Source: `src/helia_profiler/frozen_run.py:179`
+Source: `src/helia_profiler/runs/plan.py:179`
 
 ### helia_profiler.FrozenRun.baseline_id
 
@@ -7608,7 +7608,7 @@ Source: `src/helia_profiler/frozen_run.py:179`
 baseline_id: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:180`
+Source: `src/helia_profiler/runs/plan.py:180`
 
 ### helia_profiler.FrozenRun.baseline_fingerprint
 
@@ -7618,7 +7618,7 @@ Source: `src/helia_profiler/frozen_run.py:180`
 baseline_fingerprint: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:181`
+Source: `src/helia_profiler/runs/plan.py:181`
 
 ### helia_profiler.FrozenRun.qualification
 
@@ -7628,7 +7628,7 @@ Source: `src/helia_profiler/frozen_run.py:181`
 qualification: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:182`
+Source: `src/helia_profiler/runs/plan.py:182`
 
 ### helia_profiler.FrozenRun.overrides
 
@@ -7638,7 +7638,7 @@ Source: `src/helia_profiler/frozen_run.py:182`
 overrides: tuple[str, ...]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:183`
+Source: `src/helia_profiler/runs/plan.py:183`
 
 ### helia_profiler.FrozenRun.local_inputs
 
@@ -7648,7 +7648,7 @@ Source: `src/helia_profiler/frozen_run.py:183`
 local_inputs: tuple[LocalInput, ...]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:184`
+Source: `src/helia_profiler/runs/plan.py:184`
 
 ### helia_profiler.FrozenRun.environment
 
@@ -7658,7 +7658,7 @@ Source: `src/helia_profiler/frozen_run.py:184`
 environment: Mapping[str, str]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:185`
+Source: `src/helia_profiler/runs/plan.py:185`
 
 ### helia_profiler.FrozenRun.toolchain
 
@@ -7668,7 +7668,7 @@ Source: `src/helia_profiler/frozen_run.py:185`
 toolchain: ToolchainIdentity
 ```
 
-Source: `src/helia_profiler/frozen_run.py:186`
+Source: `src/helia_profiler/runs/plan.py:186`
 
 ### helia_profiler.FrozenRun.runtime
 
@@ -7678,7 +7678,7 @@ Source: `src/helia_profiler/frozen_run.py:186`
 runtime: FrozenRuntime | None
 ```
 
-Source: `src/helia_profiler/frozen_run.py:187`
+Source: `src/helia_profiler/runs/plan.py:187`
 
 ### helia_profiler.FrozenRun.hpx_version
 
@@ -7688,7 +7688,7 @@ Source: `src/helia_profiler/frozen_run.py:187`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/frozen_run.py:188`
+Source: `src/helia_profiler/runs/plan.py:188`
 
 ### helia_profiler.FrozenRun.intent_hash
 
@@ -7700,7 +7700,7 @@ intent_hash: str
 
 The ``hpx.intent`` hash of what this plan asks for; the HPX release is not part of it.
 
-Source: `src/helia_profiler/frozen_run.py:199`
+Source: `src/helia_profiler/runs/plan.py:199`
 
 ### helia_profiler.FrozenRun.portable
 
@@ -7717,7 +7717,7 @@ files it may name are not tracked, and so do a dependency selector
 that names a branch, tag or version rather than a commit and a custom
 heliaRT release, whose archive is not content-identified.
 
-Source: `src/helia_profiler/frozen_run.py:204`
+Source: `src/helia_profiler/runs/plan.py:204`
 
 ### helia_profiler.FrozenRun.to_dict
 
@@ -7727,7 +7727,7 @@ Source: `src/helia_profiler/frozen_run.py:204`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/frozen_run.py:218`
+Source: `src/helia_profiler/runs/plan.py:218`
 
 ### helia_profiler.FrozenRun.from_dict
 
@@ -7739,7 +7739,7 @@ from_dict(data: Mapping[str, Any]) -> FrozenRun
 
 `classmethod`
 
-Source: `src/helia_profiler/frozen_run.py:235`
+Source: `src/helia_profiler/runs/plan.py:235`
 
 ### helia_profiler.FrozenRun.save
 
@@ -7751,7 +7751,7 @@ save(path: str | Path) -> Path
 
 Write the plan as JSON, refusing its source model path or aliases.
 
-Source: `src/helia_profiler/frozen_run.py:295`
+Source: `src/helia_profiler/runs/plan.py:295`
 
 ### helia_profiler.FrozenRun.load
 
@@ -7765,7 +7765,7 @@ load(path: str | Path) -> FrozenRun
 
 Read a plan written by :meth:`save`, verifying its intent hash.
 
-Source: `src/helia_profiler/frozen_run.py:313`
+Source: `src/helia_profiler/runs/plan.py:313`
 
 ### helia_profiler.FrozenRun.config
 
@@ -7787,7 +7787,7 @@ variable set, unset or changed, another compiler version, or another
 engine runtime. Only the model can move; other local files must be
 at their recorded paths.
 
-Source: `src/helia_profiler/frozen_run.py:327`
+Source: `src/helia_profiler/runs/plan.py:327`
 
 ### helia_profiler.FrozenRun.build
 
@@ -7799,7 +7799,7 @@ build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild
 
 Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`.
 
-Source: `src/helia_profiler/frozen_run.py:376`
+Source: `src/helia_profiler/runs/plan.py:376`
 
 ---
 
@@ -12113,7 +12113,7 @@ board and lock it passes its own
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/run_guard.py:14`
+Source: `src/helia_profiler/runs/guard.py:14`
 
 ### helia_profiler.OperatorGuard.board
 
@@ -12123,7 +12123,7 @@ Source: `src/helia_profiler/run_guard.py:14`
 board: str
 ```
 
-Source: `src/helia_profiler/run_guard.py:28`
+Source: `src/helia_profiler/runs/guard.py:28`
 
 ### helia_profiler.OperatorGuard.jlink_serial
 
@@ -12133,7 +12133,7 @@ Source: `src/helia_profiler/run_guard.py:28`
 jlink_serial: str
 ```
 
-Source: `src/helia_profiler/run_guard.py:29`
+Source: `src/helia_profiler/runs/guard.py:29`
 
 ### helia_profiler.OperatorGuard.check
 
@@ -12145,7 +12145,7 @@ check(*, require_free: bool, remaining_s: float) -> None
 
 Allow the step: the operator holds the board for the whole capture.
 
-Source: `src/helia_profiler/run_guard.py:37`
+Source: `src/helia_profiler/runs/guard.py:37`
 
 ### helia_profiler.OperatorGuard.verify_target
 
@@ -12163,7 +12163,7 @@ Refuse a target board or probe serial other than the operator's.
 | --- | --- |
 | ConfigError | The board or the serial differs from the operator's. |
 
-Source: `src/helia_profiler/run_guard.py:41`
+Source: `src/helia_profiler/runs/guard.py:41`
 
 ## helia_profiler.FixtureTarget
 
@@ -12668,7 +12668,7 @@ Read a LiteRT model's public inputs and outputs without selecting an engine.
 | --- | --- |
 | ConfigError | The model is unreadable, or a run cannot pin inputs for it, for example because an input or output shape is dynamic. |
 
-Source: `src/helia_profiler/run_inputs.py:34`
+Source: `src/helia_profiler/runs/inputs.py:34`
 
 ## helia_profiler.FixtureStatePolicy
 
@@ -12894,7 +12894,7 @@ Read a model's public inputs and outputs as *engine*'s fixture integration admit
 | --- | --- |
 | ConfigError | *engine* is not an engine name, the model is unreadable, or the engine does not admit the model. |
 
-Source: `src/helia_profiler/run_inputs.py:56`
+Source: `src/helia_profiler/runs/inputs.py:56`
 
 ## helia_profiler.FixtureTensor
 

@@ -218,8 +218,8 @@
           "signature": "capabilities() -> FixtureCapabilities",
           "source": {
             "line": 23,
-            "path": "src/helia_profiler/run_inputs.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/run_inputs.py#L23"
+            "path": "src/helia_profiler/runs/inputs.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/inputs.py#L23"
           },
           "summary": "The targets, engines and IO element types a run can be built and captured with."
         },
