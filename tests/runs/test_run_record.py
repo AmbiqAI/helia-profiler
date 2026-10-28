@@ -38,7 +38,7 @@ from helia_profiler.runs.expect import (
 )
 from helia_profiler.runs.record import RunResultError, RunResultRecord, _identity
 from tests.fixtures_api.test_fixture_record import _build, _pin
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
 from tests.runs.test_run_power import _energy, _powered, _rail
 
 CONTRACT = Path(__file__).parents[1] / "fixtures" / "result_contract_v1"
@@ -657,7 +657,7 @@ def test_an_unknown_fact_matches_whatever_its_reason(root, record):
 
 
 def test_a_missing_prepared_runtime_is_named_with_its_prepare_command(tmp_path, root):
-    from tests.run_api_helpers import linking
+    from tests.runs.helpers import linking
     from tests.runs.test_compiled_build_runtime import LITERT
 
     assert LITERT.kernels is not None

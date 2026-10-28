@@ -34,7 +34,7 @@ from helia_profiler.runs.compiled import (
 )
 from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES, FrozenRun
 from tests.fixtures_api.test_fixture_record import _build, _pin
-from tests.run_api_helpers import (
+from tests.runs.helpers import (
     ATFE_OUTPUT,
     ATFE_VERSION,
     atfe_build,

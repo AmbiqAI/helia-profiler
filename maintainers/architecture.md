@@ -72,7 +72,28 @@ coordinates its execution. `runs/record.py` verifies saved run evidence, while
 `runs/directory.py` coordinates directory persistence and summaries. Shared
 admission rules belong to `runs/contracts.py`, below their execution and record
 callers; output comparison belongs to `runs/expect.py`. The package initializer
-performs no work. Direct retained-run tests live in `tests/runs/`.
+performs no work. Retained-run unit, CLI and example integration tests live in `tests/runs/`;
+`tests/runs/helpers.py` supplies their shared plan/build setup.
+
+## Package and test navigation
+
+| Implementation owner | Tests and support |
+| --- | --- |
+| `runtime/`: release facts, archive verification and preparation | [`tests/runtime/`](../tests/runtime/) |
+| `fixtures/`: fixed-input build and capture contracts | [`tests/fixtures_api/`](../tests/fixtures_api/); `requests.py` supplies test request construction, also used by shared lifecycle and rendering tests |
+| `runs/`: retained plans, builds, execution and persistence | [`tests/runs/`](../tests/runs/), including CLI and retained/conformance examples |
+| `readers/`: native verification and portable projections | [`tests/readers/`](../tests/readers/) |
+
+`readers/native.py` dispatches native loading; `readers/profile_view.py` owns
+profile observations and the dispatcher, and `readers/run_view.py` owns saved-run
+observations. Native run serialization stays in `runs/record.py`, report writers
+in `report/`, and shared result types in `results/`.
+
+Shared lifecycle, identity, public API and general CLI tests remain at the test
+root. [`tests/contracts/`](../tests/contracts/) owns cross-cutting firmware and
+schema contracts. [`tests/fixtures/`](../tests/fixtures/) contains assets, not
+fixture API tests; `test_float_fixtures.py` checks model asset content. The root
+`tests/conftest.py` supplies common fixtures to all four test packages.
 
 ## Shared work and verification owners
 

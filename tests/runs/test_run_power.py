@@ -34,7 +34,7 @@ from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runs.compiled import CompiledBuild, _binding
 from helia_profiler.runtime.records import runtime
 from tests.fixtures_api.test_fixture_record import _build, _pin
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
 
 _WIRING = FixturePowerSync(29, 36, 14)
 _POWER_METHOD = FixtureMethod(FixtureTimingScope.RESTORE_AND_INVOKE, power_sync=_WIRING)

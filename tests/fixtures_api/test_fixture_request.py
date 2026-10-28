@@ -25,7 +25,7 @@ from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
 from helia_profiler.fixtures.capabilities import fixture_capabilities
 from helia_profiler.fixtures.capture import FIXTURE_CPU_HZ, FIXTURE_SETTLE_TICKS, FIXTURE_TIMER_HZ
 from helia_profiler.fixtures.target import supported_fixture_target
-from tests.fixture_requests import (
+from tests.fixtures_api.requests import (
     FixtureBackend,
     FixtureBuildRequest,
     FixturePlacement,

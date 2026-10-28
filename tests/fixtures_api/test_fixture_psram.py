@@ -29,8 +29,8 @@ from helia_profiler.fixtures.psram import (
 )
 from helia_profiler.fixtures.target import fixture_app_region
 from helia_profiler.platform.memory_map import MemoryRegion
-from tests.fixture_requests import FixtureBackend, FixtureBuildRequest, FixturePlacement
 from tests.fixtures_api import test_fixture_capture as capture_helpers
+from tests.fixtures_api.requests import FixtureBackend, FixtureBuildRequest, FixturePlacement
 from tests.fixtures_api.test_fixture_capture import _SINKS, image_files
 from tests.fixtures_api.test_fixture_capture import rig as rig
 

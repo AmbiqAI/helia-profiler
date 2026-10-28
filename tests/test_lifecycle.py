@@ -29,7 +29,7 @@ from helia_profiler.lifecycle import (
     lifecycle_invocations,
     require_lifecycle,
 )
-from tests.fixture_requests import FixtureBackend, FixtureBuildRequest
+from tests.fixtures_api.requests import FixtureBackend, FixtureBuildRequest
 
 #: What each engine's firmware runs today. ExecuTorch reloads its program on
 #: every invocation, so it cannot carry state.

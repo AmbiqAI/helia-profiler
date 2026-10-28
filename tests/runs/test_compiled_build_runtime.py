@@ -22,7 +22,7 @@ from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES
 from helia_profiler.runtime.records import RuntimeRecord, runtime
 from tests.fixtures_api.test_fixture_record import _build
-from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
+from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
 
 
 def _record(name: str, version: str | None = None) -> RuntimeRecord:

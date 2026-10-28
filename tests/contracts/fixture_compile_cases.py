@@ -32,7 +32,7 @@ from helia_profiler.modelcost import ModelAnalysis
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.results.models import NsxModuleRef
-from tests.fixture_requests import FixturePlacement
+from tests.fixtures_api.requests import FixturePlacement
 
 FIXTURE_KINDS = ("tcn", "kws", "typed")
 FIXTURE_ENGINES = ("litert", "helia-rt", "helia-aot")
