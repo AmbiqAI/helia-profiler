@@ -18,8 +18,8 @@ from helia_profiler.fixtures.types import (
     FixtureTimingScope,
     TypedFixture,
 )
-from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES
 from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES
 from helia_profiler.runtime.records import RuntimeRecord, runtime
 from tests.fixtures_api.test_fixture_record import _build
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, linking, plan_for, reseal
@@ -159,7 +159,7 @@ def test_a_helia_aot_vcs_install_compares_the_commit(tmp_path):
 
 
 def test_a_plan_without_a_recorded_release_names_why_it_links_nothing(tmp_path):
-    from helia_profiler.compiled_build import _prepared_runtime
+    from helia_profiler.runs.compiled import _prepared_runtime
 
     base = atfe_build(_build(tmp_path / "run"))
     plan = plan_for(base, tmp_path / "model.tflite", engine="helia-rt")

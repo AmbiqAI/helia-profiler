@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ._semantic_hash import SemanticHash
     from ._version import __version__
     from .api import profile
-    from .compiled_build import CompiledBuild, RunResult, build, load_build, run_build
     from .config import (
         BuildConfig,
         ClockSelection,
@@ -77,17 +76,6 @@ if TYPE_CHECKING:
         evaluate_comparison_profile,
         evaluate_run,
     )
-    from .expect import (
-        Expect,
-        ReferenceOrigin,
-        ReferenceOutputs,
-        TensorComparison,
-        Tolerance,
-        Verification,
-        compare_fixture_outputs,
-        compare_outputs,
-        host_reference,
-    )
     from .firmware.op_resolver import ResolverPlan
     from .fixtures.analysis import (
         FixtureTensor,
@@ -128,7 +116,6 @@ if TYPE_CHECKING:
         FixtureTimingScope,
         TypedFixture,
     )
-    from .frozen_run import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
     from .hostenv.cache_dirs import hpx_cache_root
     from .hostenv.doctor import DoctorCheck, DoctorResult, DoctorVersionCheck
     from .hostenv.elf_inventory import (
@@ -185,9 +172,22 @@ if TYPE_CHECKING:
         load_result_manifest,
     )
     from .results.models import MemoryPlan, ToolchainInfo
-    from .run_guard import OperatorGuard
-    from .run_inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
-    from .run_record import RunResultError, RunResultRecord, load_run
+    from .runs.compiled import CompiledBuild, RunResult, build, load_build, run_build
+    from .runs.expect import (
+        Expect,
+        ReferenceOrigin,
+        ReferenceOutputs,
+        TensorComparison,
+        Tolerance,
+        Verification,
+        compare_fixture_outputs,
+        compare_outputs,
+        host_reference,
+    )
+    from .runs.guard import OperatorGuard
+    from .runs.inputs import analyze_run_model, analyze_run_model_for_engine, capabilities
+    from .runs.plan import FrozenModel, FrozenRun, FrozenRuntime, LocalInput, ToolchainIdentity
+    from .runs.record import RunResultError, RunResultRecord, load_run
     from .runtime.archive import (
         PreparedUpstreamRuntime,
         RuntimeABI,
@@ -280,15 +280,15 @@ _EXPORTS = {
     "assess_comparability": (".evaluation", "assess_comparability", "experimental"),
     "evaluate_comparison_profile": (".evaluation", "evaluate_comparison_profile", "experimental"),
     "evaluate_run": (".evaluation", "evaluate_run", "experimental"),
-    "Expect": (".expect", "Expect", "experimental"),
-    "Tolerance": (".expect", "Tolerance", "experimental"),
-    "ReferenceOutputs": (".expect", "ReferenceOutputs", "experimental"),
-    "ReferenceOrigin": (".expect", "ReferenceOrigin", "experimental"),
-    "TensorComparison": (".expect", "TensorComparison", "experimental"),
-    "Verification": (".expect", "Verification", "experimental"),
-    "compare_outputs": (".expect", "compare_outputs", "experimental"),
-    "host_reference": (".expect", "host_reference", "experimental"),
-    "compare_fixture_outputs": (".expect", "compare_fixture_outputs", "experimental"),
+    "Expect": (".runs.expect", "Expect", "experimental"),
+    "Tolerance": (".runs.expect", "Tolerance", "experimental"),
+    "ReferenceOutputs": (".runs.expect", "ReferenceOutputs", "experimental"),
+    "ReferenceOrigin": (".runs.expect", "ReferenceOrigin", "experimental"),
+    "TensorComparison": (".runs.expect", "TensorComparison", "experimental"),
+    "Verification": (".runs.expect", "Verification", "experimental"),
+    "compare_outputs": (".runs.expect", "compare_outputs", "experimental"),
+    "host_reference": (".runs.expect", "host_reference", "experimental"),
+    "compare_fixture_outputs": (".runs.expect", "compare_fixture_outputs", "experimental"),
     "DoctorCheck": (".hostenv.doctor", "DoctorCheck", "implementation"),
     "DoctorResult": (".hostenv.doctor", "DoctorResult", "implementation"),
     "DoctorVersionCheck": (".hostenv.doctor", "DoctorVersionCheck", "implementation"),
@@ -337,18 +337,18 @@ _EXPORTS = {
     "qualification": (".runtime.records", "qualification", "experimental"),
     "runtimes": (".runtime.records", "runtimes", "experimental"),
     "Session": (".session", "Session", "stable"),
-    "FrozenRun": (".frozen_run", "FrozenRun", "experimental"),
-    "FrozenModel": (".frozen_run", "FrozenModel", "experimental"),
-    "FrozenRuntime": (".frozen_run", "FrozenRuntime", "experimental"),
-    "ToolchainIdentity": (".frozen_run", "ToolchainIdentity", "experimental"),
-    "CompiledBuild": (".compiled_build", "CompiledBuild", "experimental"),
-    "RunResult": (".compiled_build", "RunResult", "experimental"),
-    "build": (".compiled_build", "build", "experimental"),
-    "load_build": (".compiled_build", "load_build", "experimental"),
-    "run_build": (".compiled_build", "run_build", "experimental"),
-    "RunResultRecord": (".run_record", "RunResultRecord", "experimental"),
-    "RunResultError": (".run_record", "RunResultError", "experimental"),
-    "load_run": (".run_record", "load_run", "experimental"),
+    "FrozenRun": (".runs.plan", "FrozenRun", "experimental"),
+    "FrozenModel": (".runs.plan", "FrozenModel", "experimental"),
+    "FrozenRuntime": (".runs.plan", "FrozenRuntime", "experimental"),
+    "ToolchainIdentity": (".runs.plan", "ToolchainIdentity", "experimental"),
+    "CompiledBuild": (".runs.compiled", "CompiledBuild", "experimental"),
+    "RunResult": (".runs.compiled", "RunResult", "experimental"),
+    "build": (".runs.compiled", "build", "experimental"),
+    "load_build": (".runs.compiled", "load_build", "experimental"),
+    "run_build": (".runs.compiled", "run_build", "experimental"),
+    "RunResultRecord": (".runs.record", "RunResultRecord", "experimental"),
+    "RunResultError": (".runs.record", "RunResultError", "experimental"),
+    "load_run": (".runs.record", "load_run", "experimental"),
     "hpx_cache_root": (".hostenv.cache_dirs", "hpx_cache_root", "experimental"),
     "TypedFixture": (".fixtures.types", "TypedFixture", "experimental"),
     "FixtureIO": (".fixtures.types", "FixtureIO", "experimental"),
@@ -404,10 +404,14 @@ _EXPORTS = {
     "EnergyFacts": (".identity", "EnergyFacts", "experimental"),
     "KernelIdentity": (".identity", "KernelIdentity", "experimental"),
     "RuntimeIdentity": (".identity", "RuntimeIdentity", "experimental"),
-    "capabilities": (".run_inputs", "capabilities", "experimental"),
-    "analyze_run_model": (".run_inputs", "analyze_run_model", "experimental"),
-    "analyze_run_model_for_engine": (".run_inputs", "analyze_run_model_for_engine", "experimental"),
-    "OperatorGuard": (".run_guard", "OperatorGuard", "experimental"),
+    "capabilities": (".runs.inputs", "capabilities", "experimental"),
+    "analyze_run_model": (".runs.inputs", "analyze_run_model", "experimental"),
+    "analyze_run_model_for_engine": (
+        ".runs.inputs",
+        "analyze_run_model_for_engine",
+        "experimental",
+    ),
+    "OperatorGuard": (".runs.guard", "OperatorGuard", "experimental"),
     "Lifecycle": (".lifecycle", "Lifecycle", "experimental"),
     "CanonicalEngine": (".identity", "CanonicalEngine", "experimental"),
     "CanonicalKernel": (".identity", "CanonicalKernel", "experimental"),
@@ -415,7 +419,7 @@ _EXPORTS = {
     "SemanticHash": ("._semantic_hash", "SemanticHash", "experimental"),
     "canonical_engine": (".identity", "canonical_engine", "experimental"),
     "canonical_kernel": (".identity", "canonical_kernel", "experimental"),
-    "LocalInput": (".frozen_run", "LocalInput", "experimental"),
+    "LocalInput": (".runs.plan", "LocalInput", "experimental"),
     "ResetStrategy": (".target.lifecycle", "ResetStrategy", "stable"),
     "JLinkProbe": (".target.probe.jlink", "JLinkProbe", "implementation"),
     "JLinkProbeMatch": (".target.probe.jlink", "JLinkProbeMatch", "implementation"),

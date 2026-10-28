@@ -39,7 +39,7 @@ ALLOWED = {
     ("fixtures/build.py", "<name>"): "the fixture refusal check itself",
     ("fixtures/build.py", "HPX_COMPILER_LAUNCHER"): "the fixture refusal check itself",
     (
-        "frozen_run.py",
+        "runs/plan.py",
         "<variable>",
     ): "records source-path variables in a frozen plan; never a build input",
     ("engines/helia_rt/download.py", "GITHUB_TOKEN"): "download auth; archives are hash-verified",

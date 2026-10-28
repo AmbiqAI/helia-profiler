@@ -5,10 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from .errors import ConfigError
+from ..errors import ConfigError
 
 if TYPE_CHECKING:
-    from .fixtures.target import FixtureTarget
+    from ..fixtures.target import FixtureTarget
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 """Implementations of ``hpx freeze``, ``hpx build``, ``hpx validate build`` and ``hpx run``.
 
-Each one calls the run API (``helia_profiler.run_directory`` lays out the run
+Each one calls the run API (``helia_profiler.runs.directory`` lays out the run
 directory), prints its JSON summary on stdout, and reports an error through
 the console on stderr with exit status 1.
 """
@@ -18,7 +18,7 @@ import typer
 from ..console.json import print_json
 
 if TYPE_CHECKING:
-    from ..expect import Expect
+    from ..runs.expect import Expect
 
 #: ``hpx run``: the capture succeeded but its outputs did not match.
 EXIT_MISMATCH = 3
@@ -86,9 +86,9 @@ def _cmd_build(
     work_dir: Path | None,
     verbose: int,
 ) -> None:
-    from ..frozen_run import FrozenRun
     from ..lifecycle import Lifecycle
-    from ..run_directory import build_into, build_summary
+    from ..runs.directory import build_into, build_summary
+    from ..runs.plan import FrozenRun
 
     with _reported(verbose):
         compiled = build_into(
@@ -109,7 +109,7 @@ def _cmd_build(
 
 
 def _cmd_validate_build(*, directory: Path, verbose: int) -> None:
-    from ..run_directory import build_summary, load_from, run_directory_of
+    from ..runs.directory import build_summary, load_from, run_directory_of
 
     directory = run_directory_of(directory)
     with _reported(verbose):
@@ -129,14 +129,14 @@ def _cmd_run(
     evidence_dir: Path | None,
     verbose: int,
 ) -> None:
-    from ..run_directory import (
+    from ..runs.directory import (
         RESULT_FILE,
         fresh_evidence_dir,
         run_directory_of,
         run_from,
         run_summary,
     )
-    from ..run_guard import OperatorGuard
+    from ..runs.guard import OperatorGuard
 
     directory = run_directory_of(directory)
     expectation = _expectation(expect, tolerance, references)
@@ -160,7 +160,7 @@ def _cmd_run(
 
 def _expectation(kind: str | None, tolerance: float, references: list[Path]) -> Expect | None:
     """The ``Expect`` that ``--expect``, ``--tolerance`` and ``--reference`` name."""
-    from ..expect import Expect, Tolerance
+    from ..runs.expect import Expect, Tolerance
 
     if references and kind is not None:
         raise typer.BadParameter(

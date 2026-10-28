@@ -379,7 +379,7 @@ or when the capture failed, `verification` is `None`. `RunResult.succeeded` is t
 for a `success` capture. A failed capture is returned, not raised; errors raised while
 capturing propagate. A very short `SINGLE` invocation can hit the one-tick floor described
 under [Timing windows by route](#timing-windows-by-route).
-`RunResult.save(path, roots=..., build=...)` (`run_record.py`) writes the run as a
+`RunResult.save(path, roots=..., build=...)` (`runs/record.py`) writes the run as a
 `hpx.run-result` v1 and `load_run(path, roots=...)` reads it back as a `RunResultRecord`. Save
 refuses a run whose identity or verification does not recompute from its build and capture,
 so a saved result always loads. The document pins the saved `build.json` and every
@@ -400,7 +400,7 @@ arena of explicit size, MRAM weights), the build works under the host's
 and the saved build names the HPX cache as a second root. Its
 `PlaceholderGuard` refuses every capture; a harness passes its own guard.
 
-Shared run admission and identity rules live in `_run_contracts.py`; execution and
+Shared run admission and identity rules live in `runs/contracts.py`; execution and
 saved-run readers use the same count, route and identity enrichment policy. See
 [the contributor map](architecture.md#shared-work-and-verification-owners) for
 the separate owners of execution authority and retained-evidence verification.
@@ -486,16 +486,16 @@ documented route: `TypedFixture`, `FixtureIO`, `FixtureTensor` and its
 quantization, `FixtureBuild`, `FixtureCaptureResult` with its timing, memory,
 power and PSRAM parts, the power requests and `FixturePowerGuard`,
 `RunIdentity` and its facts, the prepared runtime records, `Expect`,
-`Tolerance` and the other run types retain their documented API tiers. `test_run_inputs.py` walks the run API's annotations
+`Tolerance` and the other run types retain their documented API tiers. `tests/runs/test_run_inputs.py` walks the run API's annotations
 and fails on a reachable type the package does not export.
 `hpx.capabilities()` returns the supported target and dtype facts.
 `analyze_run_model(path)` and `analyze_run_model_for_engine(path, engine)`
-(`run_inputs.py`) return the `TypedFixtureModelAnalysis` of
+(`runs/inputs.py`) return the `TypedFixtureModelAnalysis` of
 `analyze_typed_fixture_model` and its per-engine form; they take an engine name as well as an `EngineType`, and
 raise `ConfigError` where those internal helpers raise `ValueError`.
 
 The command line drives the same flow over a run directory
-(`run_directory.py`): `build.json`, the model and one `input_<index>.bin` per
+(`runs/directory.py`): `build.json`, the model and one `input_<index>.bin` per
 model input under `inputs/`, the firmware under `work/` unless `--work-dir`
 names another directory inside it, and one `evidence-<N>` per capture. The
 build is saved with the roots `run` (the directory) and `cache`
@@ -522,12 +522,12 @@ the `hpx runtimes prepare` command that restores it.
   when no subcommand is given; suite options given with `build` are refused
   as a usage error rather than ignored.
 - `hpx run DIR --board B --jlink-serial S` captures under an
-  `OperatorGuard(board, jlink_serial)` (`run_guard.py`): the operator vouches
+  `OperatorGuard(board, jlink_serial)` (`runs/guard.py`): the operator vouches
   for the physical board, as `hpx profile` assumes. Its `verify_target`
   refuses a `--board` other than the build's board, or another serial, and
   `check()` allows every step; HPX cannot check the physical board. The run
   summary records `"authority": "operator"` and the saved result's path.
-  `run_directory.run_from` asks the guard about the build's target before
+  `runs.directory.run_from` asks the guard about the build's target before
   `run_build`, and refuses an existing `--evidence-dir` or one outside the run
   directory, so neither touches a device; after the capture it saves
   `result.json` in the evidence directory under the run directory's roots. `--expect
@@ -562,7 +562,7 @@ facts; the identity builders copy them.
   sums one STIMER bracket per invocation; `restore_and_invoke` takes one
   bracket around the timed loop, input copies included. `deployment_timing`
   reports the total ticks (`timing_statistic="total"`) at `timer_hz`.
-- **Run API** (`compiled_build.py`): the fixture firmware with the build's
+- **Run API** (`runs/compiled.py`): the fixture firmware with the build's
   lifecycle counts. `CARRY` keeps the plan's iterations and warmups;
   `SINGLE` times one invocation with no warmup, so `first_invoke_window` is
   `measured`. `RunResult.identity` also states the plan's `intent_hash`.

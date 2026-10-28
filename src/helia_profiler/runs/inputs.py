@@ -12,12 +12,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .errors import ConfigError
+from ..errors import ConfigError
 
 if TYPE_CHECKING:
-    from .engines import EngineType
-    from .fixtures.analysis import TypedFixtureModelAnalysis
-    from .fixtures.capabilities import FixtureCapabilities
+    from ..engines import EngineType
+    from ..fixtures.analysis import TypedFixtureModelAnalysis
+    from ..fixtures.capabilities import FixtureCapabilities
 
 
 def capabilities() -> FixtureCapabilities:
@@ -26,7 +26,7 @@ def capabilities() -> FixtureCapabilities:
     It reports what this HPX implements, not whether a runtime release is
     qualified on a board; :func:`~helia_profiler.qualification` answers that.
     """
-    from .fixtures.capabilities import fixture_capabilities
+    from ..fixtures.capabilities import fixture_capabilities
 
     return fixture_capabilities()
 
@@ -45,7 +45,7 @@ def analyze_run_model(path: str | Path) -> TypedFixtureModelAnalysis:
         ConfigError: The model is unreadable, or a run cannot pin inputs for
             it, for example because an input or output shape is dynamic.
     """
-    from .fixtures.analysis import analyze_typed_fixture_model
+    from ..fixtures.analysis import analyze_typed_fixture_model
 
     try:
         return analyze_typed_fixture_model(Path(path))
@@ -70,8 +70,8 @@ def analyze_run_model_for_engine(
         ConfigError: *engine* is not an engine name, the model is unreadable,
             or the engine does not admit the model.
     """
-    from .engines import EngineType
-    from .fixtures.analysis import analyze_typed_fixture_model_for_engine
+    from ..engines import EngineType
+    from ..fixtures.analysis import analyze_typed_fixture_model_for_engine
 
     try:
         selected = EngineType(engine)

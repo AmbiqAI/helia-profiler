@@ -24,24 +24,24 @@ from helia_profiler import (
     FixtureTiming,
 )
 from helia_profiler.api import export_result, inspect_result, load_result, observations
-from helia_profiler.compiled_build import CompiledBuild, RunResult
 from helia_profiler.errors import ConfigError
-from helia_profiler.expect import (
+from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
+from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.records import ResultReadError
+from helia_profiler.runs.compiled import CompiledBuild, RunResult
+from helia_profiler.runs.expect import (
     ReferenceOrigin,
     ReferenceOutputs,
     Tolerance,
     Verification,
     compare_outputs,
 )
-from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
-from helia_profiler.lifecycle import Lifecycle
-from helia_profiler.records import ResultReadError
-from helia_profiler.run_record import RunResultError, RunResultRecord, _identity
+from helia_profiler.runs.record import RunResultError, RunResultRecord, _identity
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
-from tests.test_run_power import _energy, _powered, _rail
+from tests.runs.test_run_power import _energy, _powered, _rail
 
-CONTRACT = Path(__file__).parent / "fixtures" / "result_contract_v1"
+CONTRACT = Path(__file__).parents[1] / "fixtures" / "result_contract_v1"
 _SUPPLY = FixtureBoardPowerRequest("joulescope", "JS320-001", "VDD")
 _Power = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
@@ -504,7 +504,7 @@ def test_an_unknown_engine_version_stays_null_with_its_reason(root, record):
 
 def _linked_record(tmp_path: Path, engine: str) -> tuple[RunResultRecord, str]:
     """A loaded run of an *engine* build, and the release its engine version must come from."""
-    from tests.test_compiled_build_runtime import LITERT, _linked
+    from tests.runs.test_compiled_build_runtime import LITERT, _linked
 
     plan, build = _linked(tmp_path, engine)
     loaded = load_result(
@@ -658,7 +658,7 @@ def test_an_unknown_fact_matches_whatever_its_reason(root, record):
 
 def test_a_missing_prepared_runtime_is_named_with_its_prepare_command(tmp_path, root):
     from tests.run_api_helpers import linking
-    from tests.test_compiled_build_runtime import LITERT
+    from tests.runs.test_compiled_build_runtime import LITERT
 
     assert LITERT.kernels is not None
     cache = hpx.hpx_cache_root()
@@ -800,7 +800,7 @@ def test_timing_and_supply_only_runs_cannot_retain_energy(root, record, power, o
         with pytest.raises(ConfigError, match="successful rail capture"):
             _save(replace(result, capture=replace(result.capture, rail_energy=energy)))
     else:
-        from helia_profiler.run_record import _encode, _Files
+        from helia_profiler.runs.record import _encode, _Files
 
         path = _save(result)
         encoded = _encode(energy, _Files(_roots(root)).file)
@@ -896,7 +896,7 @@ def test_capture_error_must_be_text_or_null(root, record, error, operation):
 def test_replacement_publication_preserves_previous_record_on_failure(
     root, record, monkeypatch, failure
 ):
-    from helia_profiler import run_record
+    from helia_profiler.runs import record as run_record
 
     original = _run(record)
     path = _save(original)
@@ -955,7 +955,7 @@ def test_successful_saved_run_requires_build_timing_counts(root, record, power, 
         with pytest.raises(ConfigError, match="timed iterations and warmups"):
             _save(changed)
     else:
-        from helia_profiler.run_record import _encode, _Files
+        from helia_profiler.runs.record import _encode, _Files
 
         path = _save(result)
         _edit(
@@ -1162,7 +1162,7 @@ def test_cpu_timing_source_has_no_duplicate_clock_roles(record, root):
 @pytest.mark.parametrize("field", ["missing", "iterations", "warmups"])
 def test_live_and_saved_count_errors_keep_their_caller_context(root, record, monkeypatch, field):
     from helia_profiler.errors import CaptureError
-    from tests.test_run_power import _Authority
+    from tests.runs.test_run_power import _Authority
 
     result = _run(record, verified=False)
     timing = result.capture.timing

@@ -25,7 +25,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
-| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`run_record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
+| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`runs/record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
@@ -382,7 +382,7 @@ directory moves as a unit.
 | Field | Holds |
 |---|---|
 | `location` | where the result itself sits, under its root |
-| `compiled_build` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
+| `runs.compiled` | the saved build's `root`, `path`, `sha256` and `size_bytes` |
 | `capture` | the capture's facts (`state`, `timing`, `memory`, `rail_energy`, `error` and the rest); every file it references (outputs, terminal snapshots, the rail trace) as `root`, `path`, `sha256` and `size_bytes` |
 | `power` | `null`, or the request with `kind` `rail` or `supply` |
 | `verification` | `null`, or the reference origin, `tolerance`, `matched`, the per-tensor facts and `reference_files`, the reference outputs written beside the result as `<stem>.reference_<index>.<publication>.bin` |

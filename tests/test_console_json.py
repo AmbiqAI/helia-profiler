@@ -36,8 +36,8 @@ def test_json_write_errors_propagate(monkeypatch):
 def test_command_emission_errors_stay_outside_reported_boundary(tmp_path, monkeypatch, error):
     from helia_profiler.cli.run_cmds import _cmd_validate_build
 
-    monkeypatch.setattr("helia_profiler.run_directory.load_from", lambda path: object())
-    monkeypatch.setattr("helia_profiler.run_directory.build_summary", lambda *args: {})
+    monkeypatch.setattr("helia_profiler.runs.directory.load_from", lambda path: object())
+    monkeypatch.setattr("helia_profiler.runs.directory.build_summary", lambda *args: {})
 
     def refuse(*args):
         raise error

@@ -22,12 +22,12 @@ if TYPE_CHECKING:
 
     from .engines import EngineType
     from .evaluation import CompareResult, ComparisonProfile
-    from .frozen_run import FrozenRun
     from .hostenv.doctor import DoctorResult
     from .modelcost import ModelAnalysis
     from .pipeline import ProgressUpdate
     from .platform import BoardDef
     from .platform.counters import PmuCounter
+    from .runs.plan import FrozenRun
     from .target.probe.jlink import JLinkProbe, JLinkProbeMatch
     from .transport.ports import SerialPortInfo
 
@@ -228,7 +228,7 @@ class Session:
 
     def freeze(self, model: str | Path | None = None) -> FrozenRun:
         """Resolve this session into a replayable :class:`FrozenRun` plan."""
-        from .frozen_run import freeze_config
+        from .runs.plan import freeze_config
 
         return freeze_config(self.resolve(model))
 

@@ -17,8 +17,10 @@ import helia_profiler as hpx
 from helia_profiler import FixtureBuild, FixtureCaptureResult, FixtureTiming
 from helia_profiler.api import load_result
 from helia_profiler.cli.app import app
-from helia_profiler.compiled_build import RunResult
-from helia_profiler.expect import (
+from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.runs.compiled import RunResult
+from helia_profiler.runs.directory import run_roots
+from helia_profiler.runs.expect import (
     Expect,
     ReferenceOrigin,
     ReferenceOutputs,
@@ -26,10 +28,8 @@ from helia_profiler.expect import (
     Tolerance,
     Verification,
 )
-from helia_profiler.frozen_run import _ENVIRONMENT_VARIABLES, FrozenRun
-from helia_profiler.lifecycle import Lifecycle
-from helia_profiler.run_directory import run_roots
-from helia_profiler.run_guard import OperatorGuard
+from helia_profiler.runs.guard import OperatorGuard
+from helia_profiler.runs.plan import _ENVIRONMENT_VARIABLES, FrozenRun
 from tests.fixtures_api.test_fixture_record import _build
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
 
@@ -103,7 +103,7 @@ def calls(monkeypatch: pytest.MonkeyPatch, build: FixtureBuild) -> list[dict[str
     analysis = SimpleNamespace(
         inputs=tuple(io.tensor for io in build.inputs), outputs=build.output_tensors
     )
-    monkeypatch.setattr("helia_profiler.run_inputs.analyze_run_model", lambda path: analysis)
+    monkeypatch.setattr("helia_profiler.runs.inputs.analyze_run_model", lambda path: analysis)
     seen: list[dict[str, Any]] = []
 
     def build_fixed_fixture(config, fixture, **options):
@@ -479,7 +479,7 @@ def rt_plan_file(tmp_path, build, monkeypatch) -> Path:
     analysis = SimpleNamespace(
         inputs=tuple(io.tensor for io in build.inputs), outputs=build.output_tensors
     )
-    monkeypatch.setattr("helia_profiler.run_inputs.analyze_run_model", lambda path: analysis)
+    monkeypatch.setattr("helia_profiler.runs.inputs.analyze_run_model", lambda path: analysis)
     monkeypatch.setattr(
         "helia_profiler.runtime.prepare.prepared_runtime",
         lambda name, version=None: SimpleNamespace(runtime=None),
@@ -650,7 +650,7 @@ def test_a_result_that_cannot_be_saved_names_the_intact_evidence(out, plan, buil
     def refuse(result, path, **options):
         raise hpx.ConfigError("Cannot save the run result: disk full")
 
-    monkeypatch.setattr("helia_profiler.run_record.save_run", refuse)
+    monkeypatch.setattr("helia_profiler.runs.record.save_run", refuse)
     result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
 
     assert result.exit_code == 1
@@ -704,7 +704,7 @@ def unsaved(monkeypatch: pytest.MonkeyPatch) -> list[Path]:
         paths.append(Path(path))
         return Path(path)
 
-    monkeypatch.setattr("helia_profiler.run_record.save_run", save_run)
+    monkeypatch.setattr("helia_profiler.runs.record.save_run", save_run)
     return paths
 
 
@@ -718,7 +718,7 @@ def runs(monkeypatch: pytest.MonkeyPatch, out, plan, build, unsaved) -> list[dic
         seen.append({"compiled": compiled, **options})
         return RunResult(compiled, _capture(build), record.identity, None)
 
-    monkeypatch.setattr("helia_profiler.compiled_build.run_build", run_build)
+    monkeypatch.setattr("helia_profiler.runs.compiled.run_build", run_build)
     return seen
 
 
@@ -845,7 +845,7 @@ def test_run_exit_status_follows_the_capture_and_the_verification(
         )
     )
     monkeypatch.setattr(
-        "helia_profiler.compiled_build.run_build",
+        "helia_profiler.runs.compiled.run_build",
         lambda compiled, **options: RunResult(
             compiled, _capture(build, state=state), record.identity, verification
         ),
@@ -891,7 +891,7 @@ def test_run_reports_a_non_finite_error_as_null_and_exits_3(
 ):
     record = _saved(out, plan, build)
     monkeypatch.setattr(
-        "helia_profiler.compiled_build.run_build",
+        "helia_profiler.runs.compiled.run_build",
         lambda compiled, **options: RunResult(
             compiled, _capture(build), record.identity, _mismatch(build, error)
         ),
@@ -958,7 +958,7 @@ def test_run_reports_a_value_or_os_error_without_a_traceback(out, plan, build, m
     def run_build(compiled, **options):
         raise error
 
-    monkeypatch.setattr("helia_profiler.compiled_build.run_build", run_build)
+    monkeypatch.setattr("helia_profiler.runs.compiled.run_build", run_build)
 
     result = _invoke("run", out, "--board", BOARD, "--jlink-serial", SERIAL, "--expect", "none")
 
@@ -993,7 +993,7 @@ def test_the_operator_guard_is_a_capture_guard():
 
 
 def test_the_summary_of_a_refused_terminal_states_no_latency(tmp_path, plan, build):
-    from helia_profiler.run_directory import run_summary
+    from helia_profiler.runs.directory import run_summary
 
     record = compiled(plan, build, Lifecycle.CARRY)
     refused = FixtureCaptureResult(
@@ -1026,7 +1026,7 @@ def test_an_os_error_naming_a_bracketed_path_prints_it_verbatim(out, monkeypatch
     def refuse(*args: object, **kwargs: object) -> None:
         raise error
 
-    monkeypatch.setattr("helia_profiler.run_directory.load_from", refuse)
+    monkeypatch.setattr("helia_profiler.runs.directory.load_from", refuse)
     result = _invoke("validate", "build", out)
 
     assert result.exit_code == 1 and "/data/[dataset]/plan.json" in _plain(result.output)
