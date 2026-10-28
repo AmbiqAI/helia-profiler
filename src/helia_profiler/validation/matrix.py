@@ -13,6 +13,7 @@ from __future__ import annotations
 import functools
 import re
 import struct
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -23,8 +24,13 @@ import yaml
 from ..config import Toolchain, Transport
 from ..deps import nsx as nsx_cli
 from ..engines import EngineType
+from ..engines.cmsis_nn import has_fp16_kernels
 from ..hostenv.toolchains import get_toolchain_spec
-from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_tensor_types
+from ..modelcost._tflite_reader import (
+    TENSOR_TYPE_FLOAT16,
+    read_float_compute_types,
+    read_tensor_types,
+)
 from ..platform import SocFamily, get_soc_for_board
 from ..runtime.records import runtime
 
@@ -201,10 +207,10 @@ def _fixture_file(case: CaseSpec) -> Path:
 
 
 @functools.lru_cache(maxsize=None)
-def _has_float16(path: Path) -> bool:
-    """Whether any tensor is FLOAT16; unreadable means no."""
+def _reads_float16(path: Path, reader: Callable[[bytes], set[int]]) -> bool:
+    """Whether the reader finds FLOAT16; unreadable means no."""
     try:
-        return TENSOR_TYPE_FLOAT16 in read_tensor_types(path.read_bytes())
+        return TENSOR_TYPE_FLOAT16 in reader(path.read_bytes())
     except (OSError, struct.error, IndexError):
         return False
 
@@ -231,10 +237,16 @@ def case_validity(case: CaseSpec) -> str | None:
         return "psram weights require the rtt transport"
     if case.transport is Transport.USB_CDC and case.transport not in case.board.transports:
         return "usb_cdc not supported on this board"
-    if case.engine is EngineType.LITERT and _has_float16(_fixture_file(case)):
+    if case.engine is EngineType.LITERT and _reads_float16(_fixture_file(case), read_tensor_types):
         record = runtime("litert")
         if record is not None and (reason := record.precisions.get("fp16")):
             return reason
+    if (
+        case.engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
+        and not has_fp16_kernels(soc)
+        and _reads_float16(_fixture_file(case), read_float_compute_types)
+    ):
+        return "fp16 kernels need an MVE (Helium) core"
     # Statically infeasible TCM profile: arena and weights both use DTCM,
     # AND weights into DTCM, which cannot fit when their combined size
     # exceeds it (e.g. KWS's 32 KB arena + ~53 KB weights vs Apollo3's

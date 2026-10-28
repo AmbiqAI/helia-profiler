@@ -18,7 +18,7 @@ from ..config import ProfileConfig
 from ..deps.compatibility import CmsisNnOverride, select_cmsis_nn_override
 from ..errors import EngineError
 from ..modelcost._tflite_reader import TENSOR_TYPE_FLOAT16, read_float_compute_types
-from ..platform import get_soc_for_board
+from ..platform import SocDef, get_soc_for_board
 from ..results import NsxModuleRef
 
 log = logging.getLogger("hpx")
@@ -39,6 +39,11 @@ def _float_compute_types(config: ProfileConfig) -> set[int] | None:
         return read_float_compute_types(Path(config.model.path).read_bytes())
     except (OSError, struct.error, IndexError):
         return None
+
+
+def has_fp16_kernels(soc: SocDef) -> bool:
+    """Whether ns-cmsis-nn builds fp16 kernels here."""
+    return soc.has_mve
 
 
 def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
@@ -62,7 +67,7 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     if float_types is None or float_types:
         cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
-    if soc.has_mve and float_types and TENSOR_TYPE_FLOAT16 in float_types:
+    if has_fp16_kernels(soc) and float_types and TENSOR_TYPE_FLOAT16 in float_types:
         cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
     return cmake_vars
 

@@ -230,6 +230,22 @@ class TestCaseValidity:
         case = self._case(model=_fixture_model(_FIXTURES / "kws_float_fp16.tflite"), engine=engine)
         assert case_validity(case) is None
 
+    @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.HELIA_AOT])
+    def test_helia_engines_skip_float16_without_mve(self, engine):
+        case = self._case(
+            model=_fixture_model(_FIXTURES / "kws_float_fp16.tflite"),
+            engine=engine,
+            board=BOARDS["apollo3p_evb"],
+        )
+        assert case_validity(case) == "fp16 kernels need an MVE (Helium) core"
+
+    @pytest.mark.parametrize(
+        "fixture", ["kws_float_fp32.tflite", "mlperf_tiny/kws/kws_ref_model.tflite"]
+    )
+    def test_helia_engines_run_non_float16_without_mve(self, fixture):
+        case = self._case(model=_fixture_model(_FIXTURES / fixture), board=BOARDS["apollo3p_evb"])
+        assert case_validity(case) is None
+
     def test_litert_runs_unreadable_model(self, tmp_path):
         model = tmp_path / "broken.tflite"
         model.write_bytes(b"not a flatbuffer")
