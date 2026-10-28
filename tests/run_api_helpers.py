@@ -7,8 +7,8 @@ from pathlib import Path
 
 import helia_profiler as hpx
 from helia_profiler import FixtureBuild
-from helia_profiler._fixture_record import compiled_fixture_identity
 from helia_profiler.compiled_build import CompiledBuild, _binding
+from helia_profiler.fixtures.record import compiled_fixture_identity
 from helia_profiler.frozen_run import FrozenRun
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.results.models import ToolchainInfo
@@ -79,13 +79,13 @@ def linking(
     import json
     from dataclasses import asdict
 
-    from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
     from helia_profiler.engines import EngineType
     from helia_profiler.engines.base import EngineSource
-    from helia_profiler.fixture_sources import pinned_sources
+    from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
+    from helia_profiler.fixtures.sources import pinned_sources
     from helia_profiler.results.dependencies import ContentDigest, DependencyModule
-    from tests.unit.test_fixture_record import _pin
-    from tests.unit.test_heliart_fixture import runtime as prepared
+    from tests.fixtures_api.test_fixture_record import _pin
+    from tests.fixtures_api.test_heliart_fixture import runtime as prepared
 
     selected = EngineType(engine)
     change: dict[str, object] = {

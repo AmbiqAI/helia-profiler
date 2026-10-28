@@ -23,11 +23,11 @@ import numpy as np
 
 from ._files import FixtureFile
 from .errors import ConfigError, EngineError
-from .fixture_analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
+from .fixtures.analysis import FixtureTensor, PerAxisQuantization, PerTensorQuantization
 
 if TYPE_CHECKING:
-    from ._fixture_build import FixtureBuild
-    from .fixture_capture import FixtureCaptureResult
+    from .fixtures.capture import FixtureCaptureResult
+    from .fixtures.types import FixtureBuild
 
 #: LiteRT op resolvers a host reference can run with.
 LiteRtResolver = Literal["BUILTIN_REF", "BUILTIN", "BUILTIN_WITHOUT_DEFAULT_DELEGATES"]

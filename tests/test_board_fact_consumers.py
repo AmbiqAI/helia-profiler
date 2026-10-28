@@ -47,7 +47,7 @@ def test_atomiq_trace_reference_is_independent_of_cpu():
 
 @pytest.mark.parametrize("engine", ("litert", "helia-rt", "helia-aot"))
 def test_fixture_clock_reads_fixed_low_platform_fact(monkeypatch, engine):
-    from helia_profiler import fixture_target
+    from helia_profiler.fixtures import target as fixture_target
 
     soc = get_soc_for_board(fixture_target.FIXTURE_BOARD)
     low = ClockSpeed("lp", 125, PerfTier.LOW)

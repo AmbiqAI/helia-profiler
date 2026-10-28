@@ -17,10 +17,10 @@ from helia_profiler import (
     TypedFixture,
 )
 from helia_profiler import lifecycle as lifecycle_module
-from helia_profiler._fixture_build import _validate
 from helia_profiler.engines import EngineType, get_adapter
 from helia_profiler.engines.base import EngineAdapter
 from helia_profiler.errors import EngineError
+from helia_profiler.fixtures.build import _validate
 from helia_profiler.identity import Unknown
 from helia_profiler.lifecycle import (
     InstanceBoundary,

@@ -37,9 +37,9 @@ from helia_profiler.identity import CanonicalEngine, RuntimeIdentity
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.records import ResultReadError
 from helia_profiler.run_record import RunResultError, RunResultRecord, _identity
+from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
 from tests.test_run_power import _energy, _powered, _rail
-from tests.unit.test_fixture_record import _build, _pin
 
 CONTRACT = Path(__file__).parent / "fixtures" / "result_contract_v1"
 _SUPPLY = FixtureBoardPowerRequest("joulescope", "JS320-001", "VDD")
@@ -1169,7 +1169,7 @@ def test_live_and_saved_count_errors_keep_their_caller_context(root, record, mon
     assert timing is not None
     timing = None if field == "missing" else replace(timing, **{field: getattr(timing, field) + 1})
     capture = replace(result.capture, timing=timing)
-    monkeypatch.setattr("helia_profiler.fixture_capture.capture_fixture", lambda *a, **kw: capture)
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", lambda *a, **kw: capture)
     with pytest.raises(CaptureError) as live:
         record.run(
             jlink_serial="1160002255",

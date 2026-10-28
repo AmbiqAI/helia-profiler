@@ -26,10 +26,10 @@ from .lifecycle import Lifecycle
 
 if TYPE_CHECKING:
     from ._files import FixtureFile
-    from ._fixture_build import FixtureTimingScope, TypedFixture
     from .compiled_build import CompiledBuild, RunResult
     from .expect import Expect
-    from .fixture_capture import FixtureCaptureGuard
+    from .fixtures.capture import FixtureCaptureGuard
+    from .fixtures.types import FixtureTimingScope, TypedFixture
     from .frozen_run import FrozenRun
 
 BUILD_FILE = "build.json"
@@ -74,7 +74,7 @@ def pin_fixture(
             *model_sha256*, or the inputs do not match the model's input
             count or byte sizes.
     """
-    from ._fixture_build import FixtureIO, FixtureOutput, TypedFixture
+    from .fixtures.types import FixtureIO, FixtureOutput, TypedFixture
     from .run_inputs import analyze_run_model
 
     target = _absolute(directory) / INPUTS_DIR
@@ -136,8 +136,8 @@ def build_into(
         ConfigError: *directory* holds files, *work_dir* is outside it, or
             the model or inputs do not fit the plan.
     """
-    from ._fixture_build import FixtureMethod, FixtureTimingScope
     from .compiled_build import build
+    from .fixtures.types import FixtureMethod, FixtureTimingScope
 
     root = _absolute(directory)
     work = _absolute(work_dir) if work_dir is not None else root / WORK_DIR

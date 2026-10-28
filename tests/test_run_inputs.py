@@ -19,45 +19,45 @@ from helia_profiler.errors import ConfigError
 
 #: Each run-API type exported by ``helia_profiler``, and the module that defines it.
 _RUN_INPUT_TYPES = {
-    "TypedFixture": "_fixture_build",
-    "FixtureIO": "_fixture_build",
-    "FixtureOutput": "_fixture_build",
-    "FixtureRole": "_fixture_build",
-    "FixtureMethod": "_fixture_build",
-    "FixtureTimingScope": "_fixture_build",
-    "FixtureDType": "_fixture_build",
-    "FixtureCapability": "_fixture_build",
-    "FixtureStatePolicy": "_fixture_build",
-    "FixtureBuild": "_fixture_build",
-    "FixtureCapabilities": "_fixture_facts",
-    "QualifiedFixtureTarget": "_fixture_facts",
-    "EngineDTypeCapability": "_fixture_facts",
-    "FixtureTensor": "fixture_analysis",
-    "TypedFixtureModelAnalysis": "fixture_analysis",
-    "PerTensorQuantization": "fixture_analysis",
-    "PerAxisQuantization": "fixture_analysis",
-    "FixtureCaptureGuard": "fixture_capture",
-    "FixtureCaptureResult": "fixture_capture",
-    "FixtureTiming": "fixture_capture",
-    "FixtureMemory": "fixture_capture",
-    "FixturePowerSync": "fixture_power",
-    "FixtureRailEnergy": "fixture_power",
-    "FixtureBatchCompletion": "fixture_power",
-    "FixtureRailPowerRequest": "fixture_power",
-    "FixtureBoardPowerRequest": "fixture_power",
-    "FixturePowerGuard": "fixture_power",
-    "FixturePsramWeights": "fixture_psram",
-    "FixturePsramPayload": "fixture_psram",
-    "FixturePsramObservation": "fixture_psram",
+    "TypedFixture": "fixtures.types",
+    "FixtureIO": "fixtures.types",
+    "FixtureOutput": "fixtures.types",
+    "FixtureRole": "fixtures.types",
+    "FixtureMethod": "fixtures.types",
+    "FixtureTimingScope": "fixtures.types",
+    "FixtureDType": "fixtures.io",
+    "FixtureCapability": "fixtures.io",
+    "FixtureStatePolicy": "fixtures.types",
+    "FixtureBuild": "fixtures.types",
+    "FixtureCapabilities": "fixtures.capabilities",
+    "QualifiedFixtureTarget": "fixtures.capabilities",
+    "EngineDTypeCapability": "fixtures.capabilities",
+    "FixtureTensor": "fixtures.analysis",
+    "TypedFixtureModelAnalysis": "fixtures.analysis",
+    "PerTensorQuantization": "fixtures.analysis",
+    "PerAxisQuantization": "fixtures.analysis",
+    "FixtureCaptureGuard": "fixtures.capture",
+    "FixtureCaptureResult": "fixtures.capture",
+    "FixtureTiming": "fixtures.capture",
+    "FixtureMemory": "fixtures.capture",
+    "FixturePowerSync": "fixtures.power",
+    "FixtureRailEnergy": "fixtures.power",
+    "FixtureBatchCompletion": "fixtures.power",
+    "FixtureRailPowerRequest": "fixtures.power",
+    "FixtureBoardPowerRequest": "fixtures.power",
+    "FixturePowerGuard": "fixtures.power",
+    "FixturePsramWeights": "fixtures.psram",
+    "FixturePsramPayload": "fixtures.psram",
+    "FixturePsramObservation": "fixtures.psram",
     "FixtureFile": "_files",
     "PreparedUpstreamRuntime": "runtime.archive",
     "VerifiedPreparedRuntime": "runtime.archive",
     "RuntimeABI": "runtime.archive",
     "RuntimeHeader": "runtime.archive",
     "RuntimeProvider": "runtime.archive",
-    "FixtureKernelSource": "fixture_sources",
-    "FixtureRuntimeSource": "fixture_sources",
-    "FixtureTarget": "fixture_target",
+    "FixtureKernelSource": "fixtures.sources",
+    "FixtureRuntimeSource": "fixtures.sources",
+    "FixtureTarget": "fixtures.target",
     "EngineSource": "engines.base",
     "ToolchainInfo": "results.models",
     "MemoryPlan": "results.models",
@@ -101,16 +101,18 @@ _RUN_API_MODULES = {
     f"helia_profiler.{name}"
     for name in (
         "compiled_build",
-        "_fixture_build",
-        "_fixture_facts",
-        "fixture_analysis",
-        "fixture_capture",
-        "fixture_power",
-        "fixture_psram",
+        "fixtures.build",
+        "fixtures.types",
+        "fixtures.io",
+        "fixtures.capabilities",
+        "fixtures.analysis",
+        "fixtures.capture",
+        "fixtures.power",
+        "fixtures.psram",
         "runtime.archive",
         "_files",
-        "fixture_sources",
-        "fixture_target",
+        "fixtures.sources",
+        "fixtures.target",
         "frozen_run",
         "identity",
         "expect",
@@ -203,7 +205,7 @@ def test_every_type_the_run_api_reaches_is_importable_from_helia_profiler():
 
 
 def test_capabilities_reports_the_producer_capabilities():
-    from helia_profiler._fixture_facts import fixture_capabilities
+    from helia_profiler.fixtures.capabilities import fixture_capabilities
 
     reported = hpx.capabilities()
     assert reported == fixture_capabilities()
@@ -219,7 +221,7 @@ def test_analyze_run_model_reads_the_typed_analysis(monkeypatch, tmp_path):
         seen.append(path)
         return analysis
 
-    monkeypatch.setattr("helia_profiler.fixture_analysis.analyze_typed_fixture_model", analyze)
+    monkeypatch.setattr("helia_profiler.fixtures.analysis.analyze_typed_fixture_model", analyze)
     assert hpx.analyze_run_model(str(tmp_path / "m.tflite")) is analysis
     assert seen == [tmp_path / "m.tflite"]
 
@@ -228,7 +230,7 @@ def test_a_model_a_run_cannot_pin_is_a_config_error(monkeypatch, tmp_path):
     def analyze(path: Path) -> object:
         raise ValueError("Dynamic fixture tensor shapes are unsupported")
 
-    monkeypatch.setattr("helia_profiler.fixture_analysis.analyze_typed_fixture_model", analyze)
+    monkeypatch.setattr("helia_profiler.fixtures.analysis.analyze_typed_fixture_model", analyze)
     with pytest.raises(ConfigError, match="Dynamic fixture tensor shapes"):
         hpx.analyze_run_model(tmp_path / "m.tflite")
 
@@ -243,7 +245,7 @@ def test_analyze_run_model_for_engine_takes_an_engine_name(monkeypatch, tmp_path
         return "analysis"
 
     monkeypatch.setattr(
-        "helia_profiler.fixture_analysis.analyze_typed_fixture_model_for_engine", analyze
+        "helia_profiler.fixtures.analysis.analyze_typed_fixture_model_for_engine", analyze
     )
     assert hpx.analyze_run_model_for_engine(tmp_path / "m.tflite", "litert") == "analysis"
     assert hpx.analyze_run_model_for_engine(tmp_path / "m.tflite", EngineType.HELIA_AOT)
@@ -269,7 +271,7 @@ def test_analyze_run_model_matches_the_fixture_analysis_of_a_real_model():
     pytest.importorskip("ai_edge_litert")
     model = hpx.examples.tiny_cnn()
     analysis = hpx.analyze_run_model(model)
-    from helia_profiler.fixture_analysis import analyze_typed_fixture_model
+    from helia_profiler.fixtures.analysis import analyze_typed_fixture_model
 
     expected = analyze_typed_fixture_model(model)
     assert isinstance(analysis, hpx.TypedFixtureModelAnalysis)

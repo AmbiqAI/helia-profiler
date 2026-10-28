@@ -8,23 +8,6 @@ Every name on this page is imported from `helia_profiler`.
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
-## helia_profiler.capabilities
-
-`function` · `python`
-
-```python
-capabilities() -> FixtureCapabilities
-```
-
-The targets, engines and IO element types a run can be built and captured with.
-
-It reports what this HPX implements, not whether a runtime release is
-qualified on a board; :func:`~helia_profiler.qualification` answers that.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/run_inputs.py:23`
-
 ## helia_profiler.QualifiedFixtureTarget
 
 `class` · `python`
@@ -49,7 +32,7 @@ A supported fixture build and capture target, not model qualification.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_facts.py:25`
+Source: `src/helia_profiler/fixtures/capabilities.py:20`
 
 ### helia_profiler.QualifiedFixtureTarget.board
 
@@ -59,7 +42,7 @@ Source: `src/helia_profiler/_fixture_facts.py:25`
 board: str
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:29`
+Source: `src/helia_profiler/fixtures/capabilities.py:24`
 
 ### helia_profiler.QualifiedFixtureTarget.clock_profile
 
@@ -69,7 +52,7 @@ Source: `src/helia_profiler/_fixture_facts.py:29`
 clock_profile: str
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:30`
+Source: `src/helia_profiler/fixtures/capabilities.py:25`
 
 ### helia_profiler.QualifiedFixtureTarget.cpu_hz
 
@@ -79,7 +62,7 @@ Source: `src/helia_profiler/_fixture_facts.py:30`
 cpu_hz: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:31`
+Source: `src/helia_profiler/fixtures/capabilities.py:26`
 
 ### helia_profiler.QualifiedFixtureTarget.device
 
@@ -89,7 +72,7 @@ Source: `src/helia_profiler/_fixture_facts.py:31`
 device: str
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:32`
+Source: `src/helia_profiler/fixtures/capabilities.py:27`
 
 ### helia_profiler.QualifiedFixtureTarget.load_address
 
@@ -99,7 +82,7 @@ Source: `src/helia_profiler/_fixture_facts.py:32`
 load_address: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:33`
+Source: `src/helia_profiler/fixtures/capabilities.py:28`
 
 ### helia_profiler.QualifiedFixtureTarget.timer_hz
 
@@ -109,7 +92,7 @@ Source: `src/helia_profiler/_fixture_facts.py:33`
 timer_hz: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:34`
+Source: `src/helia_profiler/fixtures/capabilities.py:29`
 
 ### helia_profiler.QualifiedFixtureTarget.image_limit
 
@@ -119,7 +102,7 @@ Source: `src/helia_profiler/_fixture_facts.py:34`
 image_limit: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:35`
+Source: `src/helia_profiler/fixtures/capabilities.py:30`
 
 ### helia_profiler.QualifiedFixtureTarget.settle_ticks
 
@@ -129,7 +112,7 @@ Source: `src/helia_profiler/_fixture_facts.py:35`
 settle_ticks: tuple[int, int]
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:36`
+Source: `src/helia_profiler/fixtures/capabilities.py:31`
 
 ### helia_profiler.QualifiedFixtureTarget.engines
 
@@ -139,7 +122,24 @@ Source: `src/helia_profiler/_fixture_facts.py:36`
 engines: tuple[EngineType, ...] = ()
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:37`
+Source: `src/helia_profiler/fixtures/capabilities.py:32`
+
+## helia_profiler.capabilities
+
+`function` · `python`
+
+```python
+capabilities() -> FixtureCapabilities
+```
+
+The targets, engines and IO element types a run can be built and captured with.
+
+It reports what this HPX implements, not whether a runtime release is
+qualified on a board; :func:`~helia_profiler.qualification` answers that.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/run_inputs.py:23`
 
 ## helia_profiler.FixtureCapability
 
@@ -153,7 +153,7 @@ Producer-declared status of one engine and IO dtype for fixed fixtures.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_io.py:25`
+Source: `src/helia_profiler/fixtures/io.py:25`
 
 ### helia_profiler.FixtureCapability.QUALIFIED
 
@@ -163,7 +163,7 @@ Source: `src/helia_profiler/_fixture_io.py:25`
 QUALIFIED = 'qualified'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:28`
+Source: `src/helia_profiler/fixtures/io.py:28`
 
 ### helia_profiler.FixtureCapability.SUPPORTED
 
@@ -173,7 +173,7 @@ Source: `src/helia_profiler/_fixture_io.py:28`
 SUPPORTED = 'supported'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:29`
+Source: `src/helia_profiler/fixtures/io.py:29`
 
 ### helia_profiler.FixtureCapability.UNSUPPORTED
 
@@ -183,7 +183,7 @@ Source: `src/helia_profiler/_fixture_io.py:29`
 UNSUPPORTED = 'unsupported'
 ```
 
-Source: `src/helia_profiler/_fixture_io.py:30`
+Source: `src/helia_profiler/fixtures/io.py:30`
 
 ## helia_profiler.EngineDTypeCapability
 
@@ -199,7 +199,7 @@ Producer status of one engine and IO element type.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_facts.py:40`
+Source: `src/helia_profiler/fixtures/capabilities.py:35`
 
 ### helia_profiler.EngineDTypeCapability.engine
 
@@ -209,7 +209,7 @@ Source: `src/helia_profiler/_fixture_facts.py:40`
 engine: EngineType
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:44`
+Source: `src/helia_profiler/fixtures/capabilities.py:39`
 
 ### helia_profiler.EngineDTypeCapability.dtype
 
@@ -219,7 +219,7 @@ Source: `src/helia_profiler/_fixture_facts.py:44`
 dtype: FixtureDType
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:45`
+Source: `src/helia_profiler/fixtures/capabilities.py:40`
 
 ### helia_profiler.EngineDTypeCapability.capability
 
@@ -229,7 +229,7 @@ Source: `src/helia_profiler/_fixture_facts.py:45`
 capability: FixtureCapability
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:46`
+Source: `src/helia_profiler/fixtures/capabilities.py:41`
 
 ## helia_profiler.FixtureCapabilities
 
@@ -249,7 +249,7 @@ Targets, engine and dtype status, and limits of this heliaPROFILER's runs.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/_fixture_facts.py:49`
+Source: `src/helia_profiler/fixtures/capabilities.py:44`
 
 ### helia_profiler.FixtureCapabilities.targets
 
@@ -259,7 +259,7 @@ Source: `src/helia_profiler/_fixture_facts.py:49`
 targets: tuple[QualifiedFixtureTarget, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:53`
+Source: `src/helia_profiler/fixtures/capabilities.py:48`
 
 ### helia_profiler.FixtureCapabilities.engines
 
@@ -269,7 +269,7 @@ Source: `src/helia_profiler/_fixture_facts.py:53`
 engines: tuple[EngineDTypeCapability, ...]
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:54`
+Source: `src/helia_profiler/fixtures/capabilities.py:49`
 
 ### helia_profiler.FixtureCapabilities.readback_budget
 
@@ -279,4 +279,4 @@ Source: `src/helia_profiler/_fixture_facts.py:54`
 readback_budget: int
 ```
 
-Source: `src/helia_profiler/_fixture_facts.py:55`
+Source: `src/helia_profiler/fixtures/capabilities.py:50`

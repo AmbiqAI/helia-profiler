@@ -78,7 +78,7 @@ def test_hardware_workflow_uses_default_executorch_commit() -> None:
 
 
 def test_fixture_integration_capability_table() -> None:
-    from helia_profiler._fixture_build import FIXTURE_CAPABILITIES
+    from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
 
     table = {
         engine.value: {str(dtype): status.value for dtype, status in statuses.items()}
@@ -113,7 +113,7 @@ def test_generic_fixture_io_support_does_not_inherit_release_qualification(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from helia_profiler import EngineType, FixtureCapability
-    from helia_profiler._fixture_facts import fixture_capabilities
+    from helia_profiler.fixtures.capabilities import fixture_capabilities
     from helia_profiler.runtime import records as runtime_records
 
     aot = {"name": "helia-aot", "source": {"repo": "AmbiqAI/helia-aot", "commit": _COMMIT}}
@@ -372,7 +372,7 @@ def test_fixture_io_capabilities_ignore_qualification_records(monkeypatch, state
     import importlib.util
     import sys
 
-    from helia_profiler import _fixture_build
+    from helia_profiler.fixtures import build as _fixture_build
     from helia_profiler.runtime import records as runtime_records
 
     calls = []
@@ -382,7 +382,7 @@ def test_fixture_io_capabilities_ignore_qualification_records(monkeypatch, state
         return runtime_records.Qualification(state, "no matching selected-runtime evidence", None)
 
     monkeypatch.setattr(runtime_records, "qualification", qualification_answer)
-    name = "helia_profiler._fixture_capability_probe"
+    name = "helia_profiler.fixtures._capability_probe"
     spec = importlib.util.spec_from_file_location(name, _fixture_build.__file__)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)

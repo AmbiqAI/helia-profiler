@@ -35,16 +35,16 @@ from .lifecycle import Lifecycle, lifecycle_invocations, require_lifecycle
 
 if TYPE_CHECKING:
     from ._files import FixtureFile
-    from ._fixture_build import FixtureBuild, FixtureMethod, TypedFixture
     from .expect import Expect, Verification
-    from .fixture_capture import FixtureCaptureGuard, FixtureCaptureResult
-    from .fixture_power import (
+    from .fixtures.capture import FixtureCaptureGuard, FixtureCaptureResult
+    from .fixtures.power import (
         FixtureBoardPowerRequest,
         FixturePowerGuard,
         FixtureRailEnergy,
         FixtureRailPowerRequest,
     )
-    from .fixture_target import FixtureTarget
+    from .fixtures.target import FixtureTarget
+    from .fixtures.types import FixtureBuild, FixtureMethod, TypedFixture
     from .frozen_run import FrozenRun
     from .identity import RunIdentity
     from .runtime.archive import PreparedUpstreamRuntime
@@ -74,7 +74,7 @@ class CompiledBuild:
     @property
     def identity(self) -> RunIdentity:
         """The build's identity, with its plan's ``intent_hash``; ``observation_hash`` is ``None`` until it runs."""
-        from .fixture_identity import fixture_run_identity
+        from .fixtures.identity import fixture_run_identity
 
         return enrich_identity(
             fixture_run_identity(self.build), self.lifecycle, self.plan.intent_hash
@@ -99,7 +99,7 @@ class CompiledBuild:
         Raises:
             ConfigError: Naming the first fact that does not match.
         """
-        from ._fixture_record import verify_fixture_build
+        from .fixtures.record import verify_fixture_build
         from .frozen_run import FrozenRun
 
         try:
@@ -196,7 +196,7 @@ class CompiledBuild:
 
     def save(self, path: str | Path, *, roots: Mapping[str, Path]) -> Path:
         """Write the build as JSON with paths relative to *roots* and return its path."""
-        from ._fixture_record import dump_fixture_build
+        from .fixtures.record import dump_fixture_build
 
         self.verify()
         try:
@@ -223,7 +223,7 @@ class CompiledBuild:
     def load(cls, path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild:
         """Read and verify a build written by :meth:`save`, resolving paths under *roots*."""
         from ._files import read_json
-        from ._fixture_record import load_fixture_build
+        from .fixtures.record import load_fixture_build
         from .frozen_run import FrozenRun
 
         source = Path(path).expanduser()
@@ -293,11 +293,11 @@ class CompiledBuild:
                 rail-energy route.
             CaptureError: The device reports counts other than the build's.
         """
-        from ._fixture_record import fixture_capture_request
         from .expect import check_fixture_expectation, compare_fixture_outputs
-        from .fixture_capture import capture_fixture
-        from .fixture_identity import fixture_run_identity
-        from .fixture_power import FixtureRailPowerRequest
+        from .fixtures.capture import capture_fixture
+        from .fixtures.identity import fixture_run_identity
+        from .fixtures.power import FixtureRailPowerRequest
+        from .fixtures.record import fixture_capture_request
 
         self.verify()
         self._check_power(power, power_guard, settle_seconds)
@@ -353,8 +353,8 @@ class CompiledBuild:
         settle_seconds: float,
     ) -> None:
         """Refuse a power request this build or the run API's rail-energy route cannot take."""
-        from .fixture_capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
-        from .fixture_power import FixtureRailPowerRequest
+        from .fixtures.capture import _RAIL_SETTLE_LIMIT_S, _SETTLE_LIMIT_S
+        from .fixtures.power import FixtureRailPowerRequest
 
         check_power_request(self.build, self.lifecycle, power)
         if power is None:
@@ -483,7 +483,7 @@ def build(
     plan names is taken from the HPX cache (``hpx runtimes prepare``), never
     downloaded or built. The result is verified before it is returned.
     """
-    from ._fixture_build import build_fixed_fixture
+    from .fixtures.build import build_fixed_fixture
 
     if fixture.model.sha256 != plan.model.sha256:
         raise ConfigError(

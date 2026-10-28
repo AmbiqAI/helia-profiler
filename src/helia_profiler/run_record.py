@@ -36,8 +36,8 @@ if TYPE_CHECKING:
     from ._files import FixtureFile
     from .compiled_build import CompiledBuild, RunResult
     from .expect import ReferenceOutputs, Verification
-    from .fixture_capture import FixtureCaptureResult
-    from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from .fixtures.capture import FixtureCaptureResult
+    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
     from .identity import RunIdentity
 
 RUN_RESULT_SCHEMA = "hpx.run-result"
@@ -368,10 +368,10 @@ def _encode(value: Any, file: Callable[[FixtureFile], Any]) -> Any:
 
 
 def _decode_capture(value: Any, file: Callable[[Any], FixtureFile]) -> FixtureCaptureResult:
-    from ._fixture_build import FixtureTimingScope
-    from .fixture_capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
-    from .fixture_power import FixtureBatchCompletion, FixtureRailEnergy
-    from .fixture_psram import FixturePsramObservation
+    from .fixtures.capture import FixtureCaptureResult, FixtureMemory, FixtureTiming
+    from .fixtures.power import FixtureBatchCompletion, FixtureRailEnergy
+    from .fixtures.psram import FixturePsramObservation
+    from .fixtures.types import FixtureTimingScope
 
     def optional(decode: Callable[[Any], Any]) -> Callable[[Any], Any]:
         return lambda item: None if item is None else decode(item)
@@ -428,7 +428,7 @@ def _record(cls: Any, value: Any, label: str, **decode: Callable[[Any], Any]) ->
 
 
 def _encode_power(power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None) -> Any:
-    from .fixture_power import FixtureRailPowerRequest
+    from .fixtures.power import FixtureRailPowerRequest
 
     if power is None:
         return None
@@ -437,7 +437,7 @@ def _encode_power(power: FixtureRailPowerRequest | FixtureBoardPowerRequest | No
 
 
 def _decode_power(value: Any) -> FixtureRailPowerRequest | FixtureBoardPowerRequest | None:
-    from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
 
     if value is None:
         return None
@@ -457,8 +457,8 @@ def _identity(
 ) -> RunIdentity:
     """The identity :meth:`CompiledBuild.run` gives *capture* under *power*."""
     from ._run_contracts import enrich_identity
-    from .fixture_identity import fixture_run_identity
-    from .fixture_power import FixtureRailPowerRequest
+    from .fixtures.identity import fixture_run_identity
+    from .fixtures.power import FixtureRailPowerRequest
 
     rail = power.rail if isinstance(power, FixtureRailPowerRequest) else None
     return enrich_identity(
@@ -511,7 +511,7 @@ def _check_power(
     power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None,
 ) -> None:
     from ._run_contracts import check_power_request
-    from .fixture_power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
+    from .fixtures.power import GROSS_RAIL_SCOPE, NO_SUBTRACTION, FixtureRailPowerRequest
 
     check_power_request(compiled.build, compiled.lifecycle, power)
     try:

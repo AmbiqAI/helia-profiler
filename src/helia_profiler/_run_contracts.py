@@ -9,9 +9,9 @@ from .errors import ConfigError
 from .lifecycle import Lifecycle
 
 if TYPE_CHECKING:
-    from ._fixture_build import FixtureBuild
-    from .fixture_capture import FixtureCaptureResult
-    from .fixture_power import FixtureBoardPowerRequest, FixturePowerSync, FixtureRailPowerRequest
+    from .fixtures.capture import FixtureCaptureResult
+    from .fixtures.power import FixtureBoardPowerRequest, FixturePowerSync, FixtureRailPowerRequest
+    from .fixtures.types import FixtureBuild
     from .identity import RunIdentity
 
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
@@ -50,7 +50,7 @@ def check_capture_counts(build: FixtureBuild, capture: FixtureCaptureResult) -> 
 
 def check_power_request(build: FixtureBuild, lifecycle: Lifecycle, power: _PowerRequest) -> None:
     """Validate power admission without acquiring device authority."""
-    from .fixture_power import FixtureBoardPowerRequest, FixtureRailPowerRequest
+    from .fixtures.power import FixtureBoardPowerRequest, FixtureRailPowerRequest
 
     wiring = build.power_sync
     if power is None:

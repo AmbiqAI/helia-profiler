@@ -152,7 +152,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         return "heliaRT"
 
     def prepare_fixture_model(self, path: Path, *, single_io: bool) -> FixtureModelPreparation:
-        from ...fixture_analysis import litert_fixture_resolver, prepare_litert_fixture
+        from ...fixtures.analysis import litert_fixture_resolver, prepare_litert_fixture
 
         return prepare_litert_fixture(path, single_io=single_io, resolver=litert_fixture_resolver)
 

@@ -201,7 +201,7 @@ def _stage_helia_rt(
     record: RuntimeRecord, kernels: RuntimeSource, dist: Path, staging: Path
 ) -> None:
     from ..engines.helia_rt.artifacts import _core_tag, _library_name, _toolchain_tag
-    from ..fixture_target import FIXTURE_BOARD
+    from ..fixtures.target import FIXTURE_BOARD
 
     include = staging / "include"
     headers = {}

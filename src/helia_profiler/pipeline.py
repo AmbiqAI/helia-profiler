@@ -49,7 +49,7 @@ from .results import (
 from .target.probe.base import ResetController
 
 if TYPE_CHECKING:
-    from ._fixture_build import FixtureRenderSpec
+    from .fixtures.types import FixtureRenderSpec
 
 log = logging.getLogger("hpx")
 

@@ -16,8 +16,8 @@ from helia_profiler.engines import EngineType
 from helia_profiler.expect import host_reference
 from helia_profiler.lifecycle import Lifecycle
 from helia_profiler.placement import Placement
+from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.run_api_helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for, reseal
-from tests.unit.test_fixture_record import _build, _pin
 
 _EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "run_api_conformance.py"
 
@@ -79,7 +79,7 @@ def _device_capture(build: FixtureBuild, root: Path) -> FixtureCaptureResult:
 
 def _fake_capture(monkeypatch: pytest.MonkeyPatch, root: Path, build: list[FixtureBuild]) -> None:
     monkeypatch.setattr(
-        "helia_profiler.fixture_capture.capture_fixture",
+        "helia_profiler.fixtures.capture.capture_fixture",
         lambda request, *, guard: _device_capture(build[0], root),
     )
 
@@ -144,7 +144,7 @@ def _patch_build(monkeypatch, out: Path, cache: Path, engine: str, prepared: obj
         built.append(build)
         return build
 
-    for owner in ("_fixture_build", "compiled_build"):
+    for owner in ("fixtures.build", "compiled_build"):
         monkeypatch.setattr(
             f"helia_profiler.{owner}.build_fixed_fixture", build_fixed_fixture, raising=False
         )

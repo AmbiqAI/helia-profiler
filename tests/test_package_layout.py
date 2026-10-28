@@ -466,7 +466,15 @@ def _run_contract_import_offenders(source: str) -> list[str]:
                 continue
             if parts[1] in {"compiled_build", "run_record"} or (
                 id(node) not in type_only
-                and parts[1] in {"fixture_capture", "_fixture_build", "target", "capture"}
+                and any(
+                    target == owner or target.startswith(owner + ".")
+                    for owner in (
+                        "helia_profiler.fixtures.capture",
+                        "helia_profiler.fixtures.build",
+                        "helia_profiler.target",
+                        "helia_profiler.capture",
+                    )
+                )
             ):
                 offenders.append(f"{node.lineno}: {target}")
     return offenders
@@ -483,9 +491,9 @@ def test_shared_run_rules_do_not_depend_on_their_callers_or_device_orchestration
         "from .compiled_build import CompiledBuild",
         "from . import run_record",
         "if TYPE_CHECKING:\n    from .compiled_build import CompiledBuild",
-        "def lazy():\n    from .fixture_capture import capture_fixture",
+        "def lazy():\n    from .fixtures.capture import capture_fixture",
         "import helia_profiler.target.probe",
-        "from ._fixture_build import build_fixed_fixture",
+        "from .fixtures.build import build_fixed_fixture",
     ],
 )
 def test_run_contract_guard_rejects_reverse_and_device_dependencies(source):
@@ -495,17 +503,19 @@ def test_run_contract_guard_rejects_reverse_and_device_dependencies(source):
 @pytest.mark.parametrize(
     "source",
     [
-        "from .fixture_power import FixtureRailPowerRequest",
+        "from .fixtures.power import FixtureRailPowerRequest",
         "from .identity import EnergyFacts",
-        "if TYPE_CHECKING:\n    from .fixture_capture import FixtureCaptureResult",
-        "if TYPE_CHECKING:\n    from ._fixture_build import FixtureBuild",
+        "if TYPE_CHECKING:\n    from .fixtures.capture import FixtureCaptureResult",
+        "if TYPE_CHECKING:\n    from .fixtures.build import FixtureBuild",
     ],
 )
 def test_run_contract_guard_allows_values_and_type_only_references(source):
     assert _run_contract_import_offenders(source) == []
 
 
-def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list[str]:
+def _fixture_io_import_offenders(
+    source: str, *, consumer: bool = False, package: str = "helia_profiler"
+) -> list[str]:
     policy_names = {
         "FixtureDType",
         "FixtureCapability",
@@ -520,7 +530,7 @@ def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list
         elif isinstance(node, ast.ImportFrom):
             base = node.module or ""
             if node.level:
-                base = resolve_name("." * node.level + base, "helia_profiler")
+                base = resolve_name("." * node.level + base, package)
             targets = [f"{base}.{alias.name}" for alias in node.names]
         else:
             continue
@@ -529,20 +539,23 @@ def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list
             if len(parts) < 2 or parts[0] != "helia_profiler":
                 continue
             forbidden = (
-                parts[1] == "_fixture_build" and parts[-1] in policy_names
+                target.startswith("helia_profiler.fixtures.build.") and parts[-1] in policy_names
                 if consumer
-                else parts[1]
-                in {
-                    "_fixture_build",
-                    "_fixture_record",
-                    "_fixture_facts",
-                    "compiled_build",
-                    "run_record",
-                    "fixture_capture",
-                    "pipeline",
-                    "target",
-                    "capture",
-                }
+                else any(
+                    target == owner or target.startswith(owner + ".")
+                    for owner in (
+                        "helia_profiler.fixtures.build",
+                        "helia_profiler.fixtures.record",
+                        "helia_profiler.fixtures.capabilities",
+                        "helia_profiler.fixtures.types",
+                        "helia_profiler.compiled_build",
+                        "helia_profiler.run_record",
+                        "helia_profiler.fixtures.capture",
+                        "helia_profiler.pipeline",
+                        "helia_profiler.target",
+                        "helia_profiler.capture",
+                    )
+                )
             )
             if forbidden:
                 offenders.append(f"{node.lineno}: {target}")
@@ -551,26 +564,44 @@ def _fixture_io_import_offenders(source: str, *, consumer: bool = False) -> list
 
 def test_fixture_io_policy_sits_below_its_consumers():
     root = Path(__file__).resolve().parent.parent / "src/helia_profiler"
-    assert not _fixture_io_import_offenders((root / "_fixture_io.py").read_text(encoding="utf-8"))
-    for name in ("_fixture_record.py", "_fixture_facts.py"):
+    assert not _fixture_io_import_offenders(
+        (root / "fixtures/io.py").read_text(encoding="utf-8"), package="helia_profiler.fixtures"
+    )
+    for name in ("fixtures/record.py", "fixtures/capabilities.py"):
         assert not _fixture_io_import_offenders(
-            (root / name).read_text(encoding="utf-8"), consumer=True
+            (root / name).read_text(encoding="utf-8"),
+            consumer=True,
+            package="helia_profiler.fixtures",
         )
 
 
 @pytest.mark.parametrize(
     ("source", "consumer", "bad"),
     [
-        ("def lazy():\n    from ._fixture_build import FixtureDType", False, True),
-        ("from . import _fixture_record", False, True),
-        ("import helia_profiler.fixture_capture", False, True),
-        ("from .fixture_analysis import FixtureTensor", False, False),
+        ("def lazy():\n    from .fixtures.build import FixtureDType", False, True),
+        ("from .fixtures import record", False, True),
+        ("import helia_profiler.fixtures.capture", False, True),
+        ("from .fixtures.analysis import FixtureTensor", False, False),
         ("from .engines import EngineType", False, False),
-        ("from ._fixture_build import FIXTURE_CAPABILITIES", True, True),
-        ("from helia_profiler._fixture_build import _io_capabilities", True, True),
-        ("from ._fixture_build import FixtureBuild", True, False),
-        ("from ._fixture_io import FixtureCapability", True, False),
+        ("from .fixtures.build import FIXTURE_CAPABILITIES", True, True),
+        ("from helia_profiler.fixtures.build import _io_capabilities", True, True),
+        ("from .fixtures.build import FixtureBuild", True, False),
+        ("from .fixtures.io import FixtureCapability", True, False),
     ],
 )
 def test_fixture_io_guard_covers_reverse_edges_and_allowed_values(source, consumer, bad):
     assert bool(_fixture_io_import_offenders(source, consumer=consumer)) is bad
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "from .build import build_fixed_fixture",
+        "from . import capture",
+        "def lazy():\n    from .record import load_fixture_build",
+        "if TYPE_CHECKING:\n    from .types import FixtureBuild",
+        "from ..fixtures.capabilities import fixture_capabilities",
+    ],
+)
+def test_fixture_io_guard_resolves_nested_package_imports(source):
+    assert _fixture_io_import_offenders(source, package="helia_profiler.fixtures")
