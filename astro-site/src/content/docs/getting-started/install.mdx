@@ -238,7 +238,9 @@ build:
 ```
 
 The path must contain `nsx-module.yaml`, not just a raw SEGGER source tree.
-Use `ref` or `version` instead of `path` for a remote override. Overrides are
+Use `ref` instead of `path` for a remote override, for example `ref: v0.1.3`.
+The RTT module does not support the `version` selector; use a released tag or
+commit through `ref`. Overrides are
 recorded as `development-overrides` and refused by pinned fixture builds.
 
 **Breaking migration:** `target.segger_rtt_path` was removed, including from the

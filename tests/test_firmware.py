@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from neuralspotx.metadata import registry_entry_for_module
 from neuralspotx.models import AppConfig
 
 from helia_profiler.config import load_config
@@ -2228,20 +2229,25 @@ def test_rtt_module_is_selected_only_for_rtt(tmp_path, fake_dist, transport):
             "revision": pin.ref,
         }
         assert ctx.config.compatibility_baseline.module("nsx-segger-rtt").ref == pin.ref
+        parsed = AppConfig.from_mapping(manifest)
+        parsed_rtt = next(m for m in parsed.modules if m.name == "nsx-segger-rtt")
+        assert parsed_rtt.revision == pin.ref
+        effective_registry = parsed.registry_overrides.merge_into({"projects": {}, "modules": {}})
+        assert registry_entry_for_module(effective_registry, "nsx-segger-rtt").revision == pin.ref
         assert cmake.index("set(NSX_SEGGER_RTT_BUFFER_SIZE_UP") < cmake.index("nsx_bootstrap_app(")
         assert '32768 CACHE STRING "RTT up buffer bytes" FORCE)' in cmake
         assert '16 CACHE STRING "RTT down buffer bytes" FORCE)' in cmake
 
 
-@pytest.mark.parametrize("selector,value", [("ref", "feature/rtt"), ("version", "0.1.3")])
-def test_rtt_remote_override_reaches_manifest(tmp_path, fake_dist, selector, value):
+@pytest.mark.parametrize("value", ["feature/rtt", "v0.1.3"])
+def test_rtt_ref_override_reaches_nsx_registry(tmp_path, fake_dist, value):
     from helia_profiler.config import NsxModuleOverride
 
     ctx = _make_ctx(tmp_path, fake_dist)
     ctx.config = replace(
         ctx.config,
         build=replace(
-            ctx.config.build, nsx_modules={"nsx-segger-rtt": NsxModuleOverride(**{selector: value})}
+            ctx.config.build, nsx_modules={"nsx-segger-rtt": NsxModuleOverride(ref=value)}
         ),
     )
     ResolvePlatformStage().run(ctx)
@@ -2249,13 +2255,17 @@ def test_rtt_remote_override_reaches_manifest(tmp_path, fake_dist, selector, val
     app = generate_app(ctx)
     manifest = yaml.safe_load((app / "nsx.yml").read_text())
     module = next(m for m in manifest["modules"] if m["name"] == "nsx-segger-rtt")
-    assert module["revision" if selector == "ref" else "version"] == value
+    assert module["revision"] == value
+    parsed = AppConfig.from_mapping(manifest)
+    parsed_rtt = next(module for module in parsed.modules if module.name == "nsx-segger-rtt")
+    assert parsed_rtt.revision == value
     assert ctx.config.compatibility is not None
     assert ctx.config.compatibility.qualification.value == "development-overrides"
     registry = manifest["module_registry"]
     assert registry["projects"]["nsx-segger-rtt"]["url"].endswith("/nsx-segger-rtt.git")
-    if selector == "ref":
-        assert registry["modules"]["nsx-segger-rtt"]["revision"] == value
+    effective_registry = parsed.registry_overrides.merge_into({"projects": {}, "modules": {}})
+    assert registry_entry_for_module(effective_registry, "nsx-segger-rtt").revision == value
+    assert registry["projects"]["nsx-segger-rtt"]["revision"] == value
 
 
 @pytest.mark.parametrize("exists", [False, True])
@@ -2282,3 +2292,47 @@ def test_rtt_raw_or_missing_module_override_fails(tmp_path, fake_dist, exists):
     message = "nsx-module.yaml" if exists else "does not exist"
     with pytest.raises(error, match=message):
         generate_app(ctx)
+
+
+@pytest.mark.parametrize("transport", ["rtt", "uart"])
+def test_rtt_version_override_is_rejected_during_config_resolution(tmp_path, transport):
+    from helia_profiler.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="nsx-segger-rtt.version is not supported") as error:
+        load_config(
+            None,
+            {
+                "model": {"path": str(tmp_path / "model.tflite")},
+                "target": {"transport": transport},
+                "build": {"nsx_modules": {"nsx-segger-rtt": {"version": "0.1.3"}}},
+            },
+        )
+    assert "nsx-segger-rtt.ref" in str(error.value)
+    assert "released tag or commit" in str(error.value)
+
+
+def test_rtt_local_override_reaches_nsx_parser(tmp_path, fake_dist):
+    from helia_profiler.config import NsxModuleOverride
+
+    module_root = tmp_path / "rtt-module"
+    module_root.mkdir()
+    metadata = "module:\n  name: nsx-segger-rtt\n"
+    (module_root / "nsx-module.yaml").write_text(metadata)
+    ctx = _make_ctx(tmp_path, fake_dist)
+    ctx.config = replace(
+        ctx.config,
+        build=replace(
+            ctx.config.build,
+            nsx_modules={
+                "nsx-segger-rtt": NsxModuleOverride(path=module_root),
+            },
+        ),
+    )
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    app = generate_app(ctx)
+    manifest = yaml.safe_load((app / "nsx.yml").read_text())
+    parsed = AppConfig.from_mapping(manifest)
+    parsed_rtt = next(module for module in parsed.modules if module.name == "nsx-segger-rtt")
+    assert parsed_rtt.source.vendored
+    assert (app / "modules" / "nsx-segger-rtt" / "nsx-module.yaml").read_text() == metadata

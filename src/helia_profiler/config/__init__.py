@@ -683,7 +683,14 @@ class ProfileConfig:
             raise ConfigError(
                 "SEGGER_RTT_PATH is no longer supported",
                 hint="Unset SEGGER_RTT_PATH and use build.nsx_modules.nsx-segger-rtt.path "
-                "with an NSX module root, or ref/version for a published module.",
+                "with an NSX module root, or ref for a published tag or commit.",
+            )
+        rtt_override = self.build.nsx_modules.get("nsx-segger-rtt")
+        if rtt_override is not None and rtt_override.version is not None:
+            raise ConfigError(
+                "build.nsx_modules.nsx-segger-rtt.version is not supported",
+                hint="Use build.nsx_modules.nsx-segger-rtt.ref with a released tag or commit, "
+                "or path with an NSX module root.",
             )
         if self.target.board not in self.platform_registry.boards:
             raise ConfigError(
