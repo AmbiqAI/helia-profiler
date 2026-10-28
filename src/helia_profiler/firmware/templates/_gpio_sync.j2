@@ -8,28 +8,27 @@
        hpx_sync_wait_go()        block until host arms (go line) — no bus chatter
        hpx_sync_window_begin()   open the measured window (gate high)
        hpx_sync_window_end()     close the measured window (gate low)
-       hpx_sync_fault(code)      latch FAULT and blink-code forever
 
    Three wires (AutoDeploy-compatible), each optional:
        gate  (device -> host)  measured-window strobe        kSyncGpioPin
-       state (device -> host)  ready / fault flag            kStateGpioPin
+       state (device -> host)  ready flag                    kStateGpioPin
        go    (host -> device)  host-armed release            kGoGpioPin
 
    Profiles, smallest to largest, selected entirely at render time:
        power off       : every call is a no-op
        1-wire (gate)   : window begin/end toggle the gate, no handshake
-       3-wire lockstep : + state line + wait-for-go release + fault blink
+       3-wire lockstep : + state line + wait-for-go release
 
    The pin read/write/init primitives are the single seam where a future
    transport could specialise; everything above is wiring-agnostic. #}
 // --- Host/device sync for external power measurement ---
 static constexpr bool     kPowerSyncEnabled = {{ power_sync_enabled | lower }};
-static constexpr bool     kSyncLockstep     = {{ (power_sync_enabled and (lockstep | default(false))) | lower }};
 static constexpr uint32_t kSyncGpioPin      = {{ sync_gpio_pin }};
-static constexpr uint32_t kStateGpioPin     = {{ state_gpio_pin | default(0) }};
-static constexpr uint32_t kGoGpioPin        = {{ go_gpio_pin | default(0) }};
 
 {% if power_sync_enabled %}
+static constexpr bool     kSyncLockstep     = {{ (power_sync_enabled and (lockstep | default(false))) | lower }};
+static constexpr uint32_t kStateGpioPin     = {{ state_gpio_pin | default(0) }};
+static constexpr uint32_t kGoGpioPin        = {{ go_gpio_pin | default(0) }};
 // Pin primitives — the only place that touches the GPIO API.  Roles compose
 // from these so the FSM helpers below read as pure intent.
 static inline void hpx_pin_out(uint32_t pin) {
@@ -105,23 +104,13 @@ static inline bool hpx_sync_wait_go(void) {
 static inline void hpx_sync_window_begin(void) { hpx_pin_set(kSyncGpioPin, true); }
 static inline void hpx_sync_window_end(void)   { hpx_pin_set(kSyncGpioPin, false); }
 
-static inline void hpx_sync_fault(uint32_t code) {
-    if constexpr (kSyncLockstep) {
-        for (;;) {
-            for (uint32_t i = 0; i < code; i++) {
-                hpx_pin_set(kStateGpioPin, true);  nsx_delay_us(120000U);
-                hpx_pin_set(kStateGpioPin, false); nsx_delay_us(120000U);
-            }
-            nsx_delay_us(600000U);
-        }
-    }
-}
 {% else %}
 static inline void hpx_sync_init(void) {}
 static inline void hpx_sync_ready(void) {}
+{% if power_only | default(false) %}
 static inline void hpx_sync_not_ready(void) {}
+{% endif %}
 static inline bool hpx_sync_wait_go(void) { return true; }
 static inline void hpx_sync_window_begin(void) {}
 static inline void hpx_sync_window_end(void) {}
-static inline void hpx_sync_fault(uint32_t code) { (void)code; }
 {% endif %}
