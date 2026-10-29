@@ -176,10 +176,6 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
         elif override.ref is not None:
             inputs[name] = {"mode": "ref", "requested": override.ref}
             provenance.append(DependencyOverride("module", name, "ref", override.ref))
-        else:
-            assert override.version is not None
-            inputs[name] = {"mode": "version", "requested": override.version}
-            provenance.append(DependencyOverride("module", name, "version", override.version))
 
     engine_config = ctx.config.engine.config
     source_build = ctx.config.engine.type.value == "helia-rt" and bool(
@@ -728,10 +724,9 @@ def _collect_provenance(
     for name, override in sorted(ctx.config.build.nsx_modules.items()):
         if override.path is not None or name not in by_module:
             continue
-        mode_name = "ref" if override.ref is not None else "version"
-        requested = override.ref if override.ref is not None else override.version
+        requested = override.ref
         assert requested is not None
-        project_overrides.add((by_module[name].project, mode_name, requested))
+        project_overrides.add((by_module[name].project, "ref", requested))
     override_list.extend(
         DependencyOverride("project", project, mode_name, requested)
         for project, mode_name, requested in sorted(project_overrides)

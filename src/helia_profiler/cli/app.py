@@ -272,10 +272,10 @@ def profile_command(
             help=(
                 "Override an NSX module's source. Repeatable. "
                 "Engine-owned nsx-helia-rt/nsx-cmsis-nn use engine.config instead. "
-                "Keys: path (local dir), ref (git ref/tag), version (pin). "
+                "Keys: path (local dir), ref (owning project Git tag/SHA). "
                 "Examples: --nsx-module nsx-core:path=/my/nsx-core "
                 "--nsx-module nsx-cmsis-core:ref=feat/new-cmsis "
-                "--nsx-module nsx-gpio:version=2.0.0"
+                "--nsx-module nsx-gpio:ref=actual-project-tag"
             ),
             rich_help_panel=G_BUILD,
         ),

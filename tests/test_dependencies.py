@@ -1014,3 +1014,54 @@ def test_optional_aot_metadata_read_failure_remains_unknown(tmp_path, monkeypatc
         "version": "0.25.0",
         "commit": None,
     }
+
+
+def test_missing_explicit_ref_propagates_without_default_retry(tmp_path, monkeypatch):
+    from neuralspotx.nsx_lock._resolution import ResolutionError
+
+    ctx = _context(tmp_path, build={"nsx_modules": {"nsx-core": {"ref": "absent-ref"}}})
+    calls = []
+
+    def fail(app_dir, **kwargs):
+        calls.append((app_dir, kwargs))
+        raise ResolutionError("Unable to resolve revision 'absent-ref'")
+
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.lock", fail)
+    monkeypatch.setattr(
+        "helia_profiler.deps.dependencies.nsx_cli.sync",
+        lambda *args, **kwargs: pytest.fail("must not sync after resolution failed"),
+    )
+    with pytest.raises(ResolutionError, match="absent-ref"):
+        prepare_locked_dependencies(ctx)
+    assert len(calls) == 1
+    assert not (ctx.resolved_firmware_dir / "nsx.lock").exists()
+
+
+def test_historical_version_provenance_is_read_without_reinterpreting(tmp_path, monkeypatch):
+    ctx = _context(tmp_path)
+    _write_valid_lock(ctx)
+    monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
+    prepare_locked_dependencies(ctx)
+    state_path = ctx.resolved_firmware_dir / "hpx-dependencies.json"
+    state = json.loads(state_path.read_text())
+    state["overrides"] = [
+        {
+            "scope": scope,
+            "name": name,
+            "mode": "version",
+            "requested": "2.0.0",
+            "content_hash": None,
+        }
+        for scope, name in (("module", "nsx-core"), ("project", "nsx-ambiq-sdk"))
+    ]
+    state["qualification"] = "development-overrides"
+    state_path.write_text(json.dumps(state))
+    original = state_path.read_bytes()
+    surface = read_dependency_lock_provenance(state_path)
+    assert surface.overrides == (
+        DependencyOverride("module", "nsx-core", "version", "2.0.0"),
+        DependencyOverride("project", "nsx-ambiq-sdk", "version", "2.0.0"),
+    )
+    assert surface.resolved[0].peeled_commit == "a" * 40
+    assert surface.qualification is QualificationState.DEVELOPMENT_OVERRIDES
+    assert state_path.read_bytes() == original

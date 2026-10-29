@@ -412,11 +412,8 @@ def test_build_config_nsx_module_version_override():
             },
         },
     }
-    config = load_config(None, cli)
-    override = config.build.nsx_modules["nsx-gpio"]
-    assert override.version == "2.0.0"
-    assert override.path is None
-    assert override.ref is None
+    with pytest.raises(ConfigError, match="version is no longer supported"):
+        load_config(None, cli)
 
 
 def test_build_config_multiple_overrides():
@@ -428,7 +425,7 @@ def test_build_config_multiple_overrides():
             "nsx_modules": {
                 "nsx-core": {"path": "/dev/nsx-core"},
                 "nsx-cmsis-core": {"ref": "main"},
-                "nsx-gpio": {"version": "3.0.0"},
+                "nsx-gpio": {"ref": "sdk-tag"},
             },
         },
     }
@@ -437,7 +434,7 @@ def test_build_config_multiple_overrides():
     assert len(config.build.nsx_modules) == 3
     assert config.build.nsx_modules["nsx-core"].path == Path("/dev/nsx-core")
     assert config.build.nsx_modules["nsx-cmsis-core"].ref == "main"
-    assert config.build.nsx_modules["nsx-gpio"].version == "3.0.0"
+    assert config.build.nsx_modules["nsx-gpio"].ref == "sdk-tag"
 
 
 def test_nsx_module_override_rejects_no_mode():
@@ -451,8 +448,10 @@ def test_nsx_module_override_rejects_multiple_modes():
 
 
 def test_nsx_module_override_rejects_all_three():
-    with pytest.raises(ConfigError, match="only one"):
-        NsxModuleOverride(path=Path("/x"), ref="main", version="1.0.0")
+    with pytest.raises(ConfigError, match="version is no longer supported"):
+        NsxModuleOverride(
+            path=Path("/x"), ref="main", version="1.0.0"
+        )  # ty: ignore[invalid-argument-type]
 
 
 def test_build_config_invalid_channel():
@@ -893,3 +892,35 @@ def test_placement_strings_resolve_to_placement_members():
     )
     assert config.model.arena_location is Placement.SRAM
     assert config.model.weights_location is Placement.MRAM
+
+
+@pytest.mark.parametrize("value", ["2.0.0", "", 0, False, [], {}])
+@pytest.mark.parametrize("selector", [{}, {"ref": "sdk-tag"}, {"path": "/module"}])
+def test_nsx_module_version_rejected_at_constructor(value, selector):
+    with pytest.raises(ConfigError, match="version is no longer supported"):
+        NsxModuleOverride(**selector, version=value)
+
+
+def test_nsx_module_null_version_preserves_signature_and_schema():
+    from dataclasses import fields
+
+    from pydantic import TypeAdapter
+
+    assert [f.name for f in fields(NsxModuleOverride)] == ["path", "ref", "version"]
+    assert fields(NsxModuleOverride)[2].default is None
+    assert NsxModuleOverride(None, "sdk-tag", None).ref == "sdk-tag"
+    with pytest.raises(ConfigError, match="exactly one"):
+        NsxModuleOverride(version=None)
+    schema = TypeAdapter(NsxModuleOverride).json_schema()["properties"]["version"]
+    assert schema["type"] == "null" and schema["deprecated"] is True
+
+
+@pytest.mark.parametrize("module", ["nsx-core", "nsx-helia-rt", "unknown-module"])
+def test_yaml_retired_module_version_is_rejected_even_for_ignored_modules(tmp_path, module):
+    config = tmp_path / "config.yaml"
+    config.write_text(
+        f"model:\n  path: missing.tflite\nbuild:\n  nsx_modules:\n    {module}:\n"
+        "      version: 2.0.0\n"
+    )
+    with pytest.raises(ConfigError, match="version is no longer supported"):
+        load_config(config, {})

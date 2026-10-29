@@ -122,7 +122,7 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   channel, and hpx pins the verified commits for `neuralspotx` and
   `nsx-ambiq-sdk` recorded in the compatibility baseline
   (`src/helia_profiler/data/compatibility-baseline-v1.json`).
-- `build.nsx_modules.<module>.ref` or `.version` overrides that default
+- `build.nsx_modules.<module>.ref` overrides that default
   for the owning project; `.path` installs a local checkout for that module
   and bypasses registry resolution for it alone.
 - Engine-owned `nsx-helia-rt` and `nsx-cmsis-nn` sources are selected by
@@ -144,6 +144,41 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   over the compatibility baseline and registry hashes, target and
   toolchain, engine backend, variant and version, overrides (including
   local content hashes) and the module-relevant build settings.
+
+#### Migrating module version overrides
+
+Non-null `build.nsx_modules.<module>.version`,
+`--nsx-module NAME:version=...`, and Python
+`NsxModuleOverride(version=...)` are no longer supported. The dependency
+resolver did not honor this selector, so a recorded version request did not
+prove which source was selected. Use `ref` with the owning project's actual
+Git tag or commit SHA, or `path` with a local NSX module root. A module's
+semantic version need not be a tag in its owning SDK repository; do not
+convert it by simply adding a `v` prefix. For example:
+
+```yaml
+build:
+  nsx_modules:
+    nsx-core:
+      ref: <actual-project-tag-or-commit-SHA>
+```
+
+The equivalent CLI option is `--nsx-module nsx-core:ref=<actual-project-tag-or-commit-SHA>`;
+in Python use `NsxModuleOverride(ref="<actual-project-tag-or-commit-SHA>")`.
+Modules in the same project must select the same ref. NSX resolves that ref;
+an unavailable ref fails instead of falling back to the baseline.
+
+The deprecated Python/config field `version` accepts only `None`/`null` to
+preserve existing serialized plans. A path or ref is still required when
+an override is present. Historical default, path and ref plans retain their
+stored hashes and replay behavior. Historical non-null version plans and
+provenance remain readable with their original fields, hashes and bindings,
+but converting those plans to current configuration or rebuilding them fails
+with migration guidance. Select the actual project ref and freeze a new plan
+to rebuild. Already compiled artifacts still support verification and running
+under the existing artifact and capture guards; that does not establish that
+the old version request was honored. Reading these records does not rewrite
+the source artifact or reinterpret the old selector.
 
 #### Compiler launcher
 

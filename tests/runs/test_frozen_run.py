@@ -760,3 +760,30 @@ def test_rtt_module_override_replays_and_requires_its_directory(session, tmp_pat
     module.rmdir()
     with pytest.raises(ConfigError, match="does not exist on this host"):
         plan.config()
+
+
+@pytest.mark.parametrize("mode", ["default", "ref", "path", "version"])
+def test_pre_retirement_module_plans_keep_stored_identity(mode, tmp_path, monkeypatch):
+    from helia_profiler.runs.plan import freeze_config
+
+    source = Path(__file__).parents[1] / "fixtures" / "module_override_plans" / f"{mode}.json"
+    original = source.read_bytes()
+    stored = json.loads(original)
+    plan = FrozenRun.load(source)
+    assert plan.to_dict() == stored
+    assert FrozenRun.load(plan.save(tmp_path / "copy.json")).intent_hash == stored["intent_hash"]
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"TFL3" + bytes(64))
+    monkeypatch.setattr(
+        "helia_profiler.hostenv._proc.tool_output", lambda *a, **k: "historical-test-compiler\n"
+    )
+    # The historical paths are host-independent fixture names, not live directories.
+    monkeypatch.setattr("helia_profiler.runs.plan._check_local_input", lambda item: None)
+    monkeypatch.setattr("helia_profiler.runs.plan._local_inputs", lambda config: plan.local_inputs)
+    if mode == "version":
+        with pytest.raises(ConfigError, match="version is no longer supported"):
+            plan.config(model=model)
+    else:
+        replayed = plan.config(model=model)
+        assert freeze_config(replayed).intent_hash == stored["intent_hash"]
+    assert source.read_bytes() == original

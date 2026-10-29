@@ -28,7 +28,7 @@ class TestNsxModuleParsing:
     def test_invalid_key(self):
         r = _run_hpx("--nsx-module", "nsx-core:branch=main")
         assert r.returncode != 0
-        assert "'path', 'ref', or 'version'" in r.stderr
+        assert "'path' or 'ref'" in r.stderr
 
     def test_valid_path(self):
         """Only checks parse-time success; missing-model failure comes later."""
@@ -40,6 +40,8 @@ class TestNsxModuleParsing:
         r = _run_hpx("--nsx-module", "nsx-cmsis-core:ref=feat/new-cmsis")
         assert "NAME:KEY=VALUE" not in r.stderr
 
-    def test_valid_version(self):
+    def test_retired_version(self):
         r = _run_hpx("--nsx-module", "nsx-gpio:version=2.0.0")
-        assert "NAME:KEY=VALUE" not in r.stderr
+        assert r.returncode != 0
+        assert "version is no longer supported" in r.stderr
+        assert "actual Git tag or commit SHA" in r.stderr

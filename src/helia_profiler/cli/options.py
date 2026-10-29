@@ -68,15 +68,22 @@ def _parse_nsx_modules(specs: list[str]) -> dict[str, dict[str, str]]:
         if "=" not in kv:
             print(
                 f"Error: --nsx-module value must be KEY=VALUE "
-                f"(e.g. path=/my/bsp, ref=feat/new-soc, version=2.0.0). "
+                f"(e.g. path=/my/bsp, ref=feat/new-soc). "
                 f"Got: '{kv}'",
                 file=sys.stderr,
             )
             sys.exit(1)
         key, val = kv.split("=", 1)
-        if key not in ("path", "ref", "version"):
+        if key == "version":
             print(
-                f"Error: --nsx-module key must be 'path', 'ref', or 'version'. Got: '{key}'",
+                "Error: --nsx-module version is no longer supported. Use ref with the "
+                "owning project's actual Git tag or commit SHA, or path with a local module.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        if key not in ("path", "ref"):
+            print(
+                f"Error: --nsx-module key must be 'path' or 'ref'. Got: '{key}'",
                 file=sys.stderr,
             )
             sys.exit(1)

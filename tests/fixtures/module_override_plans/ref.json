@@ -1,0 +1,117 @@
+{
+  "baseline": {
+    "fingerprint": "471181f088083a1e30e317bd977f481a350f433315e6aafd7c36731bad6bd36f",
+    "id": "hpx-neuralspotx-0.9.0-2026-10-28.1"
+  },
+  "environment": {},
+  "hpx_version": "0.4.1",
+  "intent_hash": "hpx.intent/1:sha256:56e266c623029c9357605094152bdf5abd66cd09d1d7782a86713f11c7b81230",
+  "local_inputs": [],
+  "model": {
+    "path": "/historical/model.tflite",
+    "sha256": "656766f13164f89eddaabbea81f595d983854b42fb9a42f6f002e4b8a73a5c7e",
+    "size_bytes": 68
+  },
+  "overrides": [
+    "nsx-core"
+  ],
+  "qualification": "development-overrides",
+  "runtime": {
+    "kernels_commit": null,
+    "kernels_module": null,
+    "name": "litert",
+    "source_commit": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
+    "unavailable_reason": null,
+    "version": null
+  },
+  "schema": "hpx.frozen-run",
+  "schema_version": 2,
+  "settings": {
+    "build": {
+      "channel": null,
+      "nsx_modules": {
+        "nsx-core": {
+          "path": null,
+          "ref": "sdk-release",
+          "version": null
+        }
+      },
+      "update_dependencies": false
+    },
+    "engine": {
+      "allow_unsupported_version": false,
+      "backend": null,
+      "config": {},
+      "config_path": null,
+      "type": "litert"
+    },
+    "model": {
+      "arena_location": null,
+      "arena_size": null,
+      "path": "/historical/model.tflite",
+      "weights_location": null
+    },
+    "power": {
+      "driver": "joulescope",
+      "duration_s": null,
+      "enabled": false,
+      "firmware": "dedicated",
+      "go_gpio_pin": 14,
+      "go_output_index": 0,
+      "ina228": null,
+      "io_voltage": 1.8,
+      "lockstep": null,
+      "mode": "external",
+      "reset_strategy": "auto",
+      "state_gpio_pin": 36,
+      "state_input_index": 1,
+      "stats_rate_hz": 1000,
+      "sync_gpio_pin": 29,
+      "sync_input_index": 0
+    },
+    "profiling": {
+      "aggregation": "median",
+      "clean_window_probe": "infer",
+      "clean_window_trace": false,
+      "extreme_mode": false,
+      "force_shared_sram": false,
+      "iterations": 100,
+      "per_layer": true,
+      "pmu_counters": {
+        "cpu": "default"
+      },
+      "warmup": 5,
+      "window_max": 500000,
+      "window_min": 10,
+      "window_mode": "auto",
+      "window_target_ms": 1000
+    },
+    "target": {
+      "board": "apollo510_evb",
+      "clock": {
+        "cpu": null
+      },
+      "custom_boards": null,
+      "custom_socs": null,
+      "ensure_board_powered": false,
+      "heartbeat": {
+        "enabled": true,
+        "every_ms": 2000,
+        "every_n_ops": 8,
+        "host_timeout_s": 30,
+        "overall_timeout_s": null
+      },
+      "psram": {
+        "clock_hz": 48000000
+      },
+      "rtt_buffer_size_up": null,
+      "toolchain": "arm-none-eabi-gcc",
+      "transport": "rtt"
+    }
+  },
+  "toolchain": {
+    "name": "arm-none-eabi-gcc",
+    "unavailable_reason": "arm-none-eabi-gcc --version reported no version",
+    "version": null
+  }
+}

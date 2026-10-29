@@ -159,7 +159,7 @@ def _module_project(name: str, profile: dict[str, Any]) -> str:
 
 def _render_module_registry(
     profile: dict[str, Any],
-    project_ref_overrides: dict[str, tuple[str, str]],
+    project_ref_overrides: dict[str, str],
     module_ref_overrides: dict[str, tuple[str, str]],
     app_modules: dict[str, str] | None = None,
 ) -> str:
@@ -184,9 +184,7 @@ def _render_module_registry(
             "metadata": "modules/nsx-segger-rtt/nsx-module.yaml",
         }
     ref_overrides_by_project: dict[str, str] = {}
-    for project, (mode, value) in project_ref_overrides.items():
-        if mode != "ref":
-            continue
+    for project, value in project_ref_overrides.items():
         override = dict(project_overrides.get(project) or {})
         if not override:
             override = nsx_cli.registry_project(project) or {"name": project}
@@ -288,33 +286,32 @@ def _resolve_project_overrides(
     module_specs: list[NsxModuleSpec],
     nsx_overrides: dict[str, Any],
     baseline: CompatibilityBaseline,
-) -> dict[str, tuple[str, str]]:
-    """Collapse module-targeted ref/version overrides onto owning projects.
+) -> dict[str, str]:
+    """Collapse module-targeted ref overrides onto owning projects.
 
-    Monorepo-backed SDK modules share a project, so ref/version overrides must
+    Monorepo-backed SDK modules share a project, so ref overrides must
     resolve coherently at the project level. ``path`` overrides remain module-
     local because they install a concrete local module directory.
     """
     by_name = {spec.name: spec for spec in module_specs}
-    project_overrides: dict[str, tuple[str, str]] = {}
+    project_overrides: dict[str, str] = {}
     for name, override in nsx_overrides.items():
         spec = by_name.get(name)
         if spec is None or override.path is not None:
             continue
-        mode = "ref" if override.ref is not None else "version"
-        value = override.ref if override.ref is not None else override.version
+        value = override.ref
         if value is None:
             continue
         existing = project_overrides.get(spec.project)
-        if existing is not None and existing != (mode, value):
+        if existing is not None and existing != value:
             raise ConfigError(
                 f"Conflicting build.nsx_modules overrides for project '{spec.project}'",
                 hint=(
-                    "Modules from the same NSX project must use the same ref/version. "
+                    "Modules from the same NSX project must use the same ref. "
                     f"Conflicting module names: '{name}' and another module in '{spec.project}'."
                 ),
             )
-        project_overrides[spec.project] = (mode, value)
+        project_overrides[spec.project] = value
     # sorted(): this order becomes nsx.yml's module_registry block; bare set
     # iteration varied the rendered bytes with PYTHONHASHSEED (#174). The
     # workspace manifest hash is unaffected (hash_manifest re-serialises with
@@ -324,7 +321,7 @@ def _resolve_project_overrides(
         if project in project_overrides:
             continue
         if any(qualified.name == project for qualified in baseline.projects):
-            project_overrides[project] = ("ref", baseline.project(project).ref)
+            project_overrides[project] = baseline.project(project).ref
     return dict(sorted(project_overrides.items()))
 
 
