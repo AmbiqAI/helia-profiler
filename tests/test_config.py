@@ -450,8 +450,10 @@ def test_nsx_module_override_rejects_multiple_modes():
 def test_nsx_module_override_rejects_all_three():
     with pytest.raises(ConfigError, match="version is no longer supported"):
         NsxModuleOverride(
-            path=Path("/x"), ref="main", version="1.0.0"
-        )  # ty: ignore[invalid-argument-type]
+            path=Path("/x"),
+            ref="main",
+            version="1.0.0",  # ty: ignore[invalid-argument-type]
+        )
 
 
 def test_build_config_invalid_channel():
