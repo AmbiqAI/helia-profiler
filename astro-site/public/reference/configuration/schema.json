@@ -296,7 +296,7 @@
         },
         {
           "name": "version",
-          "pythonType": "str | None",
+          "pythonType": "Annotated[NoneType, FieldInfo(annotation=NoneType, required=True, deprecated=True)]",
           "required": false,
           "default": null,
           "defaultFromFactory": false
@@ -1006,7 +1006,7 @@
     },
     "BuildConfig": {
       "additionalProperties": false,
-      "description": "NSX build-system overrides.\n\nControls how the generated firmware's NSX manifest resolves modules.\nDefault behaviour keeps the selected board's default NSX channel, and\ngenerated manifests pin the qualified compatibility baseline's full commit\nSHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the\nuser overrides those modules.\n\nAdvanced users can pin individual modules to a version, point them at\na local checkout, or select a custom git ref — useful for SoC/board\nbring-up before changes land in the stable channel.\n\n``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``\nor ``ccache``) that wraps every compile to cache object output and speed\nup repeated builds.  ``\"auto\"`` (the default) uses ``sccache`` then\n``ccache`` if either is on ``PATH`` and otherwise does nothing — so the\nmere presence of the binary is the opt-in.  ``\"none\"`` disables it; an\nexplicit tool name or path requires that the launcher be found.\n\nOrdinary profiles reuse a structurally compatible ``nsx.lock`` byte for\nbyte and always materialize with frozen sync. ``update_dependencies`` is\nthe only mode that intentionally advances refs. ``offline`` additionally\nrequires the exact lock and all locked module trees to already exist.",
+      "description": "NSX build-system overrides.\n\nControls how the generated firmware's NSX manifest resolves modules.\nDefault behaviour keeps the selected board's default NSX channel, and\ngenerated manifests pin the qualified compatibility baseline's full commit\nSHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the\nuser overrides those modules.\n\nAdvanced users can select an owning project Git ref or a local module\ncheckout for SoC/board bring-up before changes land in the stable channel.\n\n``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``\nor ``ccache``) that wraps every compile to cache object output and speed\nup repeated builds.  ``\"auto\"`` (the default) uses ``sccache`` then\n``ccache`` if either is on ``PATH`` and otherwise does nothing — so the\nmere presence of the binary is the opt-in.  ``\"none\"`` disables it; an\nexplicit tool name or path requires that the launcher be found.\n\nOrdinary profiles reuse a structurally compatible ``nsx.lock`` byte for\nbyte and always materialize with frozen sync. ``update_dependencies`` is\nthe only mode that intentionally advances refs. ``offline`` additionally\nrequires the exact lock and all locked module trees to already exist.",
       "properties": {
         "channel": {
           "anyOf": [
@@ -1600,7 +1600,7 @@
     },
     "NsxModuleOverride": {
       "additionalProperties": false,
-      "description": "Override resolution for a single NSX module.\n\nExactly one mode must be set:\n* *path* — use a local directory as the module source (``local: true``).\n* *ref* — resolve the module's project at a specific git ref/tag.\n* *version* — pin the module to an exact version constraint.\n\nOnly applies to modules NSX resolves itself (e.g. ``nsx-core``,\n``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,\n``nsx-cmsis-nn``) are configured through ``engine.config``\n(``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —\nan entry here targeting one of those names is ignored with a warning.",
+      "description": "Override resolution for a single NSX module.\n\nExactly one mode must be set:\n* *path* — use a local directory as the module source (``local: true``).\n* *ref* — resolve the module's project at a specific git ref/tag.\n\n``version`` is deprecated and accepts only ``None`` to preserve stored plans.\nSelect remote sources with the owning project's actual Git tag or SHA in ``ref``.\n\nOnly applies to modules NSX resolves itself (e.g. ``nsx-core``,\n``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,\n``nsx-cmsis-nn``) are configured through ``engine.config``\n(``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —\nan entry here targeting one of those names is ignored with a warning.",
       "properties": {
         "path": {
           "anyOf": [
@@ -1628,16 +1628,10 @@
           "title": "Ref"
         },
         "version": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
           "default": null,
-          "title": "Version"
+          "deprecated": true,
+          "title": "Version",
+          "type": "null"
         }
       },
       "title": "NsxModuleOverride",

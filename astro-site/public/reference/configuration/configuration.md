@@ -312,9 +312,8 @@ generated manifests pin the qualified compatibility baseline's full commit
 SHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
 user overrides those modules.
 
-Advanced users can pin individual modules to a version, point them at
-a local checkout, or select a custom git ref — useful for SoC/board
-bring-up before changes land in the stable channel.
+Advanced users can select an owning project Git ref or a local module
+checkout for SoC/board bring-up before changes land in the stable channel.
 
 ``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``
 or ``ccache``) that wraps every compile to cache object output and speed
@@ -347,7 +346,9 @@ Override resolution for a single NSX module.
 Exactly one mode must be set:
 * *path* — use a local directory as the module source (``local: true``).
 * *ref* — resolve the module's project at a specific git ref/tag.
-* *version* — pin the module to an exact version constraint.
+
+``version`` is deprecated and accepts only ``None`` to preserve stored plans.
+Select remote sources with the owning project's actual Git tag or SHA in ``ref``.
 
 Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
 ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
@@ -359,7 +360,7 @@ an entry here targeting one of those names is ignored with a warning.
 | --- | --- | --- | --- |
 | `path` | `Path \| None` |  | Path |
 | `ref` | `str \| None` |  | Ref |
-| `version` | `str \| None` |  | Version |
+| `version` | `Annotated[NoneType, FieldInfo(annotation=NoneType, required=True, deprecated=True)]` |  | Version |
 
 ## MonitorBoardPreset
 

@@ -1842,31 +1842,6 @@ class TestNsxModuleOverrides:
         assert registry["modules"]["nsx-gpio"]["project"] == "nsx-ambiq-sdk"
         assert registry["modules"]["nsx-interrupt"]["project"] == "nsx-ambiq-sdk"
 
-    def test_version_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
-        ctx = self._make_ctx_with_overrides(
-            tmp_path,
-            fake_dist,
-            {"nsx_modules": {"nsx-core": {"version": "2.0.0"}}},
-        )
-        ResolvePlatformStage().run(ctx)
-        PrepareEngineStage().run(ctx)
-        app_dir = generate_app(ctx)
-
-        nsx_yml = (app_dir / "nsx.yml").read_text()
-        assert 'version: "2.0.0"' in nsx_yml
-        assert "project: nsx-ambiq-sdk" in nsx_yml
-        # A version override targets the whole owning project, so every module
-        # vendored by nsx-ambiq-sdk receives it.
-        sdk_module_count = sum(
-            1 for spec in _resolve_module_specs("apollo510_evb") if spec.project == "nsx-ambiq-sdk"
-        )
-        assert nsx_yml.count('version: "2.0.0"') == sdk_module_count
-        manifest = yaml.safe_load(nsx_yml)
-        assert (
-            manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
-        )
-
     def test_ref_override_in_nsx_yml(self, tmp_path: Path, fake_dist: Path):
         ctx = self._make_ctx_with_overrides(
             tmp_path,
@@ -2151,7 +2126,7 @@ class TestResolveProjectOverrides:
 
         baseline = self._baseline()
         overrides = _resolve_project_overrides(self._specs(), {}, baseline)
-        assert overrides["nsx-ambiq-sdk"] == ("ref", baseline.project("nsx-ambiq-sdk").ref)
+        assert overrides["nsx-ambiq-sdk"] == baseline.project("nsx-ambiq-sdk").ref
 
     def test_user_override_outranks_baseline(self):
         from types import SimpleNamespace
@@ -2160,7 +2135,7 @@ class TestResolveProjectOverrides:
 
         user = {"nsx-npu": SimpleNamespace(path=None, ref="my-branch", version=None)}
         overrides = _resolve_project_overrides(self._specs(), user, self._baseline())
-        assert overrides["nsx-ambiq-sdk"] == ("ref", "my-branch")
+        assert overrides["nsx-ambiq-sdk"] == "my-branch"
 
 
 def test_executorch_power_binary_has_no_main_template():
@@ -2298,7 +2273,9 @@ def test_rtt_raw_or_missing_module_override_fails(tmp_path, fake_dist, exists):
 def test_rtt_version_override_is_rejected_during_config_resolution(tmp_path, transport):
     from helia_profiler.errors import ConfigError
 
-    with pytest.raises(ConfigError, match="nsx-segger-rtt.version is not supported") as error:
+    with pytest.raises(
+        ConfigError, match="NsxModuleOverride.version is no longer supported"
+    ) as error:
         load_config(
             None,
             {
@@ -2307,8 +2284,8 @@ def test_rtt_version_override_is_rejected_during_config_resolution(tmp_path, tra
                 "build": {"nsx_modules": {"nsx-segger-rtt": {"version": "0.1.3"}}},
             },
         )
-    assert "nsx-segger-rtt.ref" in str(error.value)
-    assert "released tag or commit" in str(error.value)
+    assert "Use ref" in str(error.value)
+    assert "actual Git tag or commit SHA" in str(error.value)
 
 
 def test_rtt_local_override_reaches_nsx_parser(tmp_path, fake_dist):
@@ -2336,3 +2313,91 @@ def test_rtt_local_override_reaches_nsx_parser(tmp_path, fake_dist):
     parsed_rtt = next(module for module in parsed.modules if module.name == "nsx-segger-rtt")
     assert parsed_rtt.source.vendored
     assert (app / "modules" / "nsx-segger-rtt" / "nsx-module.yaml").read_text() == metadata
+
+
+@pytest.mark.host_integration
+@pytest.mark.parametrize("selection", ["default", "sha", "tag", "missing"])
+def test_module_ref_reaches_nsx_parser_and_resolver(tmp_path, fake_dist, monkeypatch, selection):
+    import subprocess
+
+    from neuralspotx.metadata import registry_entry_for_module
+    from neuralspotx.models import AppConfig
+    from neuralspotx.nsx_lock import _resolution
+    from neuralspotx.operations._lock import _effective_registry
+
+    from helia_profiler.deps import nsx as nsx_cli
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        return subprocess.run(
+            ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    git("init")
+    git(
+        "-c",
+        "user.name=HPX Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "first",
+    )
+    first = git("rev-parse", "HEAD")
+    git("tag", "sdk-release")
+    git(
+        "-c",
+        "user.name=HPX Test",
+        "-c",
+        "user.email=test@example.invalid",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "second",
+    )
+    second = git("rev-parse", "HEAD")
+    assert first != second
+    refs = {"sha": second, "tag": "sdk-release", "missing": "absent-project-ref"}
+    overrides = (
+        {} if selection == "default" else {"nsx_modules": {"nsx-core": {"ref": refs[selection]}}}
+    )
+    ctx = TestNsxModuleOverrides()._make_ctx_with_overrides(tmp_path, fake_dist, overrides)
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    manifest = yaml.safe_load((generate_app(ctx) / "nsx.yml").read_text())
+    parsed = AppConfig.from_mapping(manifest)
+    registry = _effective_registry(nsx_cli.load_registry(), manifest)
+    expected = refs.get(selection, ctx.config.compatibility_baseline.project("nsx-ambiq-sdk").ref)
+    for module in parsed.modules:
+        if module.project == "nsx-ambiq-sdk":
+            assert module.revision == expected
+            assert registry["modules"][module.name]["revision"] == expected
+            assert "version" not in (module.extra or {})
+    assert registry_entry_for_module(registry, "nsx-core").revision == expected
+    if selection == "default":
+        return
+
+    # NSX forbids file transports; substitute only transport with a local Git fixture.
+    def local_remote(url, *patterns):
+        assert url == registry["projects"]["nsx-ambiq-sdk"]["url"]
+        return subprocess.run(
+            ["git", "ls-remote", str(repo), *patterns], check=True, capture_output=True, text=True
+        )
+
+    monkeypatch.setattr(_resolution, "git_ls_remote", local_remote)
+    monkeypatch.setattr("neuralspotx._resolve_cache.put", lambda *args: None)
+    entry = registry_entry_for_module(registry, "nsx-core")
+    if selection == "missing":
+        with pytest.raises(_resolution.ResolutionError, match="absent-project-ref"):
+            _resolution.resolve_ref(
+                registry["projects"][entry.project]["url"], entry.revision, bypass_cache=True
+            )
+    else:
+        commit, kind = _resolution.resolve_ref(
+            registry["projects"][entry.project]["url"], entry.revision, bypass_cache=True
+        )
+        assert commit == (first if selection == "tag" else second)
+        assert kind == selection

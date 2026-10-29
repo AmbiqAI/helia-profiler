@@ -17,9 +17,6 @@ modules:
 {% elif m.ref is defined and m.ref %}
   project: {{ m.project }}
   revision: {{ m.ref }}
-{% elif m.version is defined and m.version %}
-  project: {{ m.project }}
-  version: "{{ m.version }}"
 {% else %}
   project: {{ m.project }}
 {% endif %}

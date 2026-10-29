@@ -183,9 +183,13 @@ def generate_app(ctx: PipelineContext) -> Path:
                 for name, override_spec in nsx_overrides.items()
                 if override_spec.path is None and name in module_names_by_project[spec.project]
             )
-            mode, value = project_override
             modules.append(
-                {"name": spec.name, "project": spec.project, "local": False, mode: value}
+                {
+                    "name": spec.name,
+                    "project": spec.project,
+                    "local": False,
+                    "ref": project_override,
+                }
             )
         else:
             modules.append({"name": spec.name, "project": spec.project, "local": False})

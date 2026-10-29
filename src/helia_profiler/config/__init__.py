@@ -8,9 +8,16 @@ import re
 from dataclasses import field, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
-from pydantic import ConfigDict, TypeAdapter, ValidationError, field_validator, model_validator
+from pydantic import (
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from pydantic.types import StrictBool
 
@@ -532,7 +539,9 @@ class NsxModuleOverride:
     Exactly one mode must be set:
     * *path* — use a local directory as the module source (``local: true``).
     * *ref* — resolve the module's project at a specific git ref/tag.
-    * *version* — pin the module to an exact version constraint.
+
+    ``version`` is deprecated and accepts only ``None`` to preserve stored plans.
+    Select remote sources with the owning project's actual Git tag or SHA in ``ref``.
 
     Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
     ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
@@ -543,16 +552,27 @@ class NsxModuleOverride:
 
     path: Path | None = None
     ref: str | None = None
-    version: str | None = None
+    version: Annotated[None, Field(deprecated=True)] = None
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def _reject_version(cls, value: Any) -> None:
+        if value is not None:
+            raise ConfigError(
+                "NsxModuleOverride.version is no longer supported",
+                hint="Use ref with the owning project's actual Git tag or commit SHA, "
+                "or path with a local NSX module root. Module versions are not project tags.",
+            )
+        return None
 
     @model_validator(mode="after")
     def _validate(self) -> NsxModuleOverride:
-        modes = sum(x is not None for x in (self.path, self.ref, self.version))
+        modes = sum(x is not None for x in (self.path, self.ref))
         if modes == 0:
-            raise ConfigError("NsxModuleOverride requires exactly one of path, ref, or version")
+            raise ConfigError("NsxModuleOverride requires exactly one of path or ref")
         if modes > 1:
             raise ConfigError(
-                f"NsxModuleOverride accepts only one of path, ref, or version (got {modes})",
+                f"NsxModuleOverride accepts only one of path or ref (got {modes})",
                 hint="Remove the extra keys so only one override mode is set.",
             )
         return self
@@ -571,9 +591,8 @@ class BuildConfig:
     SHAs for the ``neuralspotx`` and ``nsx-ambiq-sdk`` projects unless the
     user overrides those modules.
 
-    Advanced users can pin individual modules to a version, point them at
-    a local checkout, or select a custom git ref — useful for SoC/board
-    bring-up before changes land in the stable channel.
+    Advanced users can select an owning project Git ref or a local module
+    checkout for SoC/board bring-up before changes land in the stable channel.
 
     ``compiler_launcher`` selects a CMake compiler launcher (e.g. ``sccache``
     or ``ccache``) that wraps every compile to cache object output and speed
@@ -628,7 +647,7 @@ class BuildConfig:
                 continue
             raise ConfigError(
                 f"build.nsx_modules.{name} must be a mapping (got {type(spec).__name__})",
-                hint="Use path: /dir, ref: branch, or version: X.Y.Z",
+                hint="Use path: /dir or ref: actual-project-tag-or-SHA",
             )
         return value
 
@@ -684,13 +703,6 @@ class ProfileConfig:
                 "SEGGER_RTT_PATH is no longer supported",
                 hint="Unset SEGGER_RTT_PATH and use build.nsx_modules.nsx-segger-rtt.path "
                 "with an NSX module root, or ref for a published tag or commit.",
-            )
-        rtt_override = self.build.nsx_modules.get("nsx-segger-rtt")
-        if rtt_override is not None and rtt_override.version is not None:
-            raise ConfigError(
-                "build.nsx_modules.nsx-segger-rtt.version is not supported",
-                hint="Use build.nsx_modules.nsx-segger-rtt.ref with a released tag or commit, "
-                "or path with an NSX module root.",
             )
         if self.target.board not in self.platform_registry.boards:
             raise ConfigError(

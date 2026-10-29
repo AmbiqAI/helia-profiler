@@ -574,3 +574,48 @@ def test_historical_compiled_record_keeps_its_plan_readable(
     assert loaded.plan.settings["target"]["segger_rtt_path"] == legacy_path
     with pytest.raises(ConfigError, match="frozen against baseline"):
         loaded.plan.config()
+
+
+def test_historical_version_plan_can_verify_and_capture_but_cannot_rebuild(
+    plan, build, fixture, root, tmp_path, monkeypatch
+):
+    historical = json.loads(
+        (
+            Path(__file__).parents[1] / "fixtures" / "module_override_plans" / "version.json"
+        ).read_text()
+    )
+    settings = plan.to_dict()["settings"]
+    settings["build"]["nsx_modules"] = historical["settings"]["build"]["nsx_modules"]
+    old_plan = replace(plan, settings=settings, qualification="custom", overrides=("nsx-core",))
+    record = compiled(old_plan, build, Lifecycle.CARRY)
+    saved = record.save(tmp_path / "historical-build.json", roots={"run": root})
+    original = saved.read_bytes()
+    loaded = CompiledBuild.load(saved, roots={"run": root})
+    loaded.verify()
+    assert loaded.binding == record.binding
+    assert loaded.plan.intent_hash == old_plan.intent_hash
+    with pytest.raises(ConfigError, match="version is no longer supported"):
+        loaded.plan.build(fixture, method=_METHOD, lifecycle=Lifecycle.CARRY)
+
+    class CaptureReached(Exception):
+        pass
+
+    class Guard:
+        def check(self, *, require_free: bool, remaining_s: float) -> None:
+            pytest.fail("capture is mocked")
+
+        def verify_target(self, *, target, jlink_serial: str) -> None:
+            pytest.fail("capture is mocked")
+
+    def capture(request, **kwargs):
+        raise CaptureReached
+
+    monkeypatch.setattr("helia_profiler.fixtures.capture.capture_fixture", capture)
+    with pytest.raises(CaptureReached):
+        loaded.run(
+            evidence_dir=tmp_path / "capture",
+            jlink_serial="mock-probe",
+            guard=Guard(),
+            settle_seconds=0,
+        )
+    assert saved.read_bytes() == original
