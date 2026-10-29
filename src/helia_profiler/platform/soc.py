@@ -563,9 +563,8 @@ _register_soc(
         memory=MemoryLayout(
             # Values match this Rev1 EVB's NSX linker script
             # (nsx-core/src/apollo330P/gcc/linker_script_sbl.ld): MCU_TCM
-            # 240 KB, SHARED_SRAM 1792 KB, MCU_MRAM 1984 KB app-usable
-            # (post-SBL). No separate ITCM region is declared -- TCM is
-            # unified into MCU_TCM, so itcm_kb=0.
+            # 240 KB, SHARED_SRAM 1792 KB. No separate ITCM region is
+            # declared -- TCM is unified into MCU_TCM, so itcm_kb=0.
             #
             # dtcm_kb/sram_kb/mram_kb are direct arena/weights placement
             # CAPACITY CHECKS (plan_memory.py, validation/matrix.py), so
@@ -575,7 +574,8 @@ _register_soc(
             # DTCM_MAX_SIZE). memory_map.py records that aperture
             # separately (#176); do not cite this block as
             # "hardware-confirmed 240".
-            mram_kb=1984,
+            # Measured flashable MRAM; the top is erase-protected.
+            mram_kb=1552,
             sram_kb=1792,
             dtcm_kb=240,
             itcm_kb=0,
@@ -645,6 +645,7 @@ _register_soc(
         has_mve=True,
         # Same linked memory map as apollo330P; boards decide if PSRAM is fitted.
         memory=MemoryLayout(
+            # Linker MRAM; flashable limit not yet measured.
             mram_kb=1984,
             sram_kb=1792,
             dtcm_kb=240,

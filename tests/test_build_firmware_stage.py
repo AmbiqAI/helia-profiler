@@ -236,3 +236,122 @@ def test_find_target_binary_tiebreak_is_filesystem_order_independent(
     monkeypatch.setattr("helia_profiler.firmware.glob.glob", reversed_glob)
     found = find_target_binary(tmp_path, "hpx_profiler")
     assert found == tmp_path / "aaa" / "hpx_profiler.axf"
+
+
+def _mram_regions(load_image: int, app_length: int = 1_589_248):
+    from helia_profiler.platform.placement import MemoryRegion
+    from helia_profiler.results import MeasuredMemoryRegions, MeasuredRegion
+
+    mram = MeasuredRegion(
+        region=MemoryRegion.MRAM,
+        window_start=0x00410000,
+        window_length=app_length,
+        app_start=0x00410000,
+        app_length=app_length,
+        used=load_image,
+        reserved=0,
+        load_image=load_image,
+    )
+    return MeasuredMemoryRegions(link_family="gnu", linker_profile="default", regions=(mram,))
+
+
+def test_image_past_flashable_mram_is_refused() -> None:
+    from helia_profiler.errors import BuildError, ImageTooLargeError
+    from helia_profiler.stages.build_firmware import check_image_fits
+
+    with pytest.raises(ImageTooLargeError, match="by 11,656 bytes") as exc:
+        check_image_fits(_mram_regions(1_600_904), has_psram=True)
+    assert isinstance(exc.value, BuildError)
+    assert exc.value.hint is not None and "PSRAM" in exc.value.hint
+
+
+def test_oversize_hint_omits_psram_without_it() -> None:
+    from helia_profiler.errors import ImageTooLargeError
+    from helia_profiler.stages.build_firmware import check_image_fits
+
+    with pytest.raises(ImageTooLargeError) as exc:
+        check_image_fits(_mram_regions(1_600_904), has_psram=False)
+    assert exc.value.hint == "Use a smaller model."
+
+
+@pytest.mark.parametrize(("tail_size", "too_large"), [(0, False), (16, True)])
+def test_segment_past_flashable_mram_is_caught(monkeypatch, tail_size, too_large) -> None:
+    """A segment starting at the flashable limit still counts."""
+    import helia_profiler.hostenv.memory_measurement as mm
+    from helia_profiler.errors import ImageTooLargeError
+    from helia_profiler.hostenv.memory_measurement import measure_memory_regions
+    from helia_profiler.hostenv.toolchain_probe import ElfSection, LoadSegment, SectionInventory
+    from helia_profiler.platform import get_soc
+    from helia_profiler.stages.build_firmware import check_image_fits
+
+    inventory = SectionInventory(
+        sections=(ElfSection(".text", 0x00410000, 1_589_248, False, True, index=1),),
+        segments=(
+            LoadSegment(0x00410000, 0x00410000, 1_589_248, 1_589_248),
+            LoadSegment(0x20080000, 0x00594000, tail_size, tail_size),
+        ),
+    )
+    monkeypatch.setattr(mm, "section_inventory", lambda *a, **k: inventory)
+    regions = measure_memory_regions(Path("fw.elf"), "arm-none-eabi-gcc", get_soc("apollo330P"))
+    assert regions is not None
+    assert regions.unattributed_load_bytes == 0
+
+    if too_large:
+        with pytest.raises(ImageTooLargeError, match="by 16 bytes"):
+            check_image_fits(regions, has_psram=True)
+    else:
+        check_image_fits(regions, has_psram=True)
+
+
+@pytest.mark.parametrize("load_image", [0, 1_589_248])
+def test_image_that_fits_passes(load_image: int) -> None:
+    from helia_profiler.stages.build_firmware import check_image_fits
+
+    check_image_fits(_mram_regions(load_image), has_psram=True)
+
+
+def test_unmeasured_image_is_not_guessed() -> None:
+    from helia_profiler.results import MeasuredMemoryRegions
+    from helia_profiler.stages.build_firmware import check_image_fits
+
+    check_image_fits(None, has_psram=True)
+    empty = MeasuredMemoryRegions(link_family="gnu", linker_profile="default", regions=())
+    check_image_fits(empty, has_psram=True)
+
+
+def test_oversized_image_stops_before_publish(tmp_path: Path, monkeypatch) -> None:
+    from helia_profiler.errors import ImageTooLargeError
+    from helia_profiler.platform import get_soc
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model)},
+            "engine": {"type": "helia-rt"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ctx.soc = get_soc("apollo330P")
+    ctx.firmware_dir = tmp_path / "app"
+    ctx.firmware_dir.mkdir(parents=True)
+    ctx.progress_sink = lambda *_a, **_k: None
+
+    monkeypatch.setattr(
+        "helia_profiler.firmware.build_app",
+        lambda _ctx: (tmp_path / "build", tmp_path / "build" / "fw"),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.binary_sections",
+        lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        "helia_profiler.stages.build_firmware.measure_memory_regions",
+        lambda *_a, **_k: _mram_regions(1_589_249),
+    )
+
+    with pytest.raises(ImageTooLargeError):
+        BuildFirmwareStage().run(ctx)
+    assert ctx.profile_run is None

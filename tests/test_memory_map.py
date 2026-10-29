@@ -121,13 +121,19 @@ _EXPECTED_LEGACY_VS_VERIFIED = {
     "apollo510": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo510b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
-    "apollo330P": (0x00410000, (2_031_616, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
+    # apollo330P: legacy = flashable MRAM; verified window = linker region.
+    "apollo330P": (0x00410000, (1_589_248, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
     # atomiq110's legacy table already carries the real (FPGA-emulated)
     # bases, so its only divergence is the TCM length: legacy = the 496 KB
     # gcc script region, verified window = the 512 KB hardware aperture.
     "atomiq110": (0x22000000, (4_194_304, 4_194_304), (507_904, 524_288), (3_145_728, 3_145_728)),
 }
-_EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = _EXPECTED_LEGACY_VS_VERIFIED["apollo330P"]
+_EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = (
+    0x00410000,
+    (2_031_616, 2_031_616),
+    (245_760, 262_144),
+    (1_835_008, 1_835_008),
+)
 
 
 def test_known_divergences_from_the_legacy_placement_table_are_pinned():
@@ -381,8 +387,8 @@ _EXPECTED_APP_WINDOWS = {
     },
     "apollo330P": {
         MemoryRegion.MRAM: {
-            LinkFamily.GNU: (0x00410000, 2_031_616),
-            LinkFamily.ARMLINK: (0x00410000, 2_031_616),
+            LinkFamily.GNU: (0x00410000, 1_589_248),
+            LinkFamily.ARMLINK: (0x00410000, 1_589_248),
         },
         MemoryRegion.DTCM: {
             LinkFamily.GNU: (0x20000000, 245_760),
@@ -398,8 +404,15 @@ _EXPECTED_APP_WINDOWS = {
 _EXPECTED_APP_WINDOWS["apollo4l"] = _EXPECTED_APP_WINDOWS["apollo4p"]
 _EXPECTED_APP_WINDOWS["apollo510b"] = _EXPECTED_APP_WINDOWS["apollo510"]
 _EXPECTED_APP_WINDOWS["apollo5b"] = _EXPECTED_APP_WINDOWS["apollo510"]
-# apollo510L links against apollo330P's byte-identical scripts.
-_EXPECTED_APP_WINDOWS["apollo510L"] = _EXPECTED_APP_WINDOWS["apollo330P"]
+# apollo510L links against apollo330P's byte-identical scripts, but
+# keeps the linker's full MRAM: only apollo330P's top is erase-protected.
+_EXPECTED_APP_WINDOWS["apollo510L"] = {
+    **_EXPECTED_APP_WINDOWS["apollo330P"],
+    MemoryRegion.MRAM: {
+        LinkFamily.GNU: (0x00410000, 2_031_616),
+        LinkFamily.ARMLINK: (0x00410000, 2_031_616),
+    },
+}
 _EXPECTED_APP_WINDOWS["atomiq110"] = {
     MemoryRegion.ITCM: {
         LinkFamily.GNU: (0x00000000, 262_144),
@@ -492,3 +505,14 @@ def test_unknown_toolchain_raises_with_the_known_set():
 
     with pytest.raises(ValueError, match="not a supported toolchain"):
         link_family_for_toolchain("mystery-cc")
+
+
+def test_apollo330P_mram_extent_is_measured_flashable():
+    """The window stays the linker region so overflow still classifies."""
+    by_region = {w.region: w for w in linked_memory_map(get_soc("apollo330P"))}
+    mram = by_region[MemoryRegion.MRAM]
+    assert mram.window == MemoryRange(0x00410000, 2_031_616)
+    assert mram.app_provenance == "measured-flashable"
+    assert classify_address(0x00594000, tuple(by_region.values())) is MemoryRegion.MRAM
+    ap510l = {w.region: w for w in linked_memory_map(get_soc("apollo510L"))}
+    assert ap510l[MemoryRegion.MRAM].app_provenance == "linker-script"

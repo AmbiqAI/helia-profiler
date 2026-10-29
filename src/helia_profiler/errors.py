@@ -132,3 +132,16 @@ class ReportError(HpxError):
 
 class ValidationBundleError(ReportError):
     """Malformed, unsupported, or unsafe validation bundle."""
+
+
+class ImageTooLargeError(BuildError):
+    """The linked image does not fit the flashable MRAM.
+
+    Raised after the build and before flashing, from the measured load
+    image. No retry or rebuild changes it, so ``hpx profile`` exits
+    :data:`EXIT_IMAGE_TOO_LARGE` and ``hpx validate`` reports a skip.
+    """
+
+
+#: ``hpx profile``: the image does not fit flash.
+EXIT_IMAGE_TOO_LARGE = 4

@@ -78,4 +78,7 @@ def test_mlperf_tiny_case(
         ns_cmsis_nn_ref=request.config.getoption("--mlperf-ns-cmsis-nn-ref") or None,
     )
     results_accumulator.append(result)
+    if result.status == "skip":
+        assert result.error is not None
+        pytest.skip(result.error)
     assert_healthy(result)

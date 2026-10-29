@@ -9,6 +9,7 @@ import yaml
 
 from helia_profiler.config import Toolchain, Transport
 from helia_profiler.engines import EngineType
+from helia_profiler.errors import EXIT_IMAGE_TOO_LARGE
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 from helia_profiler.validation.matrix import (
     BOARDS,
@@ -608,3 +609,32 @@ def test_run_case_carries_model_labels_on_every_path(tmp_path: Path, monkeypatch
         result = run_case(case=case, repo_root=tmp_path, output_root=tmp_path / status, timeout_s=1)
         assert result.status == status
         assert (result.family, result.precision, result.source) == labels
+
+
+@pytest.mark.parametrize(
+    ("returncode", "status", "error"),
+    [
+        (EXIT_IMAGE_TOO_LARGE, "skip", "image exceeds flashable MRAM"),
+        (1, "fail", "hpx profile exited 1"),
+    ],
+)
+def test_run_case_skips_image_too_large(
+    tmp_path: Path, monkeypatch, returncode: int, status: str, error: str
+):
+    case = CaseSpec(
+        model=MODELS["ad"],
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo330mP_evb"],
+    )
+
+    def fake_run(cmd, cwd, capture_output, text, timeout, check, env):
+        del cwd, capture_output, text, timeout, check, env
+        return subprocess.CompletedProcess(cmd, returncode, stdout="", stderr="")
+
+    monkeypatch.setattr("helia_profiler.validation.runner.subprocess.run", fake_run)
+
+    result = run_case(case=case, repo_root=tmp_path, output_root=tmp_path / "out", timeout_s=30)
+
+    assert (result.status, result.error) == (status, error)
+    assert result.health_issues == ()

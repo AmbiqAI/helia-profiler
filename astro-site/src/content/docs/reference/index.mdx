@@ -73,8 +73,9 @@ the [User guide](../guide/); to see it done, [Examples](../examples/).
   the resolved configuration is recorded in the run's `run_metadata.json`.
 - `-v` adds `INFO` logs and `-vv` adds `DEBUG`; every subcommand accepts
   `--help`.
-- Exit codes: 0 on success, non-zero on any `HpxError`, and 3 for an
-  invalid run under `--fail-on-invalid`.
+- Exit codes: 0 on success, non-zero on any `HpxError`, 3 for an
+  invalid run under `--fail-on-invalid`, and 4 when `hpx profile` builds
+  an image too large for the board's flashable MRAM.
 - Machine-readable copies of the generated surfaces sit beside each page
   (`cli.json`, `schema.json`, `issues.json`, the Markdown renditions and
   `llms.txt`), and every content page has a Markdown rendition at the same
