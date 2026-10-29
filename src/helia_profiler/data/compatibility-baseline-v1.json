@@ -1,7 +1,7 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.9.0-2026-10-27.1",
+  "baseline_id": "hpx-neuralspotx-0.9.0-2026-10-28.1",
   "neuralspotx": {
     "package": "neuralspotx",
     "version": "0.9.0",
@@ -47,6 +47,10 @@
     "nsx-sensors": {
       "url": "https://github.com/AmbiqAI/nsx-sensors.git",
       "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+    },
+    "nsx-segger-rtt": {
+      "url": "https://github.com/AmbiqAI/nsx-segger-rtt.git",
+      "ref": "9b5fe942de1607365a19bab1b6ed549541ff71c6"
     }
   },
   "modules": {
@@ -85,6 +89,10 @@
     "nsx-sensors": {
       "project": "nsx-sensors",
       "ref": "c219a2bc98c62f96819fae20ab6c8911fcea3e25"
+    },
+    "nsx-segger-rtt": {
+      "project": "nsx-segger-rtt",
+      "ref": "9b5fe942de1607365a19bab1b6ed549541ff71c6"
     }
   }
 }

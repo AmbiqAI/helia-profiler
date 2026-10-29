@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import os
 import re
 from dataclasses import field, replace
 from enum import StrEnum
@@ -347,7 +348,6 @@ class TargetConfig:
     jlink_serial: str | None = None  # select J-Link by S/N (None = auto)
     transport: Transport = DEFAULT_TRANSPORT
     usb_port: str | None = None
-    segger_rtt_path: Path | None = None
     rtt_buffer_size_up: int | None = None
     clock: ClockSelection = field(default_factory=ClockSelection)
     psram: PsramConfig = field(default_factory=PsramConfig)
@@ -679,6 +679,19 @@ class ProfileConfig:
     verbose: int = 0
 
     def __post_init__(self) -> None:
+        if self.target.transport is Transport.RTT and os.environ.get("SEGGER_RTT_PATH"):
+            raise ConfigError(
+                "SEGGER_RTT_PATH is no longer supported",
+                hint="Unset SEGGER_RTT_PATH and use build.nsx_modules.nsx-segger-rtt.path "
+                "with an NSX module root, or ref for a published tag or commit.",
+            )
+        rtt_override = self.build.nsx_modules.get("nsx-segger-rtt")
+        if rtt_override is not None and rtt_override.version is not None:
+            raise ConfigError(
+                "build.nsx_modules.nsx-segger-rtt.version is not supported",
+                hint="Use build.nsx_modules.nsx-segger-rtt.ref with a released tag or commit, "
+                "or path with an NSX module root.",
+            )
         if self.target.board not in self.platform_registry.boards:
             raise ConfigError(
                 f"Unknown board '{self.target.board}'.",

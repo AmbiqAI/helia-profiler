@@ -288,7 +288,6 @@ class Session:
         Set *include_versions* to also compare installed tool and package
         versions against the HPX compatibility baseline.
         """
-        from .config import Transport
         from .hostenv.doctor import inspect_environment
 
         config = self._utility_config()
@@ -296,8 +295,6 @@ class Session:
             toolchain=config.target.toolchain,
             transport=config.target.transport,
             engine=config.engine.type,
-            require_segger_rtt=config.target.transport is Transport.RTT,
-            segger_rtt_path=config.target.segger_rtt_path,
             include_versions=include_versions,
         )
 

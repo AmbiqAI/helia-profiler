@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 from contextlib import nullcontext
@@ -12,20 +11,19 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from neuralspotx.metadata import registry_entry_for_module
 from neuralspotx.models import AppConfig
 
 from helia_profiler.config import load_config
 from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
-from helia_profiler.errors import BuildError, FirmwareError
+from helia_profiler.errors import BuildError, DependencyError, FirmwareError
 from helia_profiler.firmware import (
     _board_module_name,
-    _is_segger_rtt_root,
     _model_to_header,
     _resolve_module_specs,
     _resolved_aot_arena_regions,
     build_app,
-    find_segger_rtt_dir,
     generate_app,
     render_power_source,
 )
@@ -228,151 +226,6 @@ def fake_nsx_registry(monkeypatch: pytest.MonkeyPatch) -> None:
         "helia_profiler.firmware.nsx_cli.registry_project",
         lambda name: projects.get(name),
     )
-
-
-@pytest.fixture(autouse=True)
-def fake_segger_rtt_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Provide the explicit SEGGER_RTT_PATH required by firmware generation."""
-    rtt_root = tmp_path / "segger-rtt"
-    rtt_dir = rtt_root / "RTT"
-    config_dir = rtt_root / "Config"
-    rtt_dir.mkdir(parents=True)
-    config_dir.mkdir()
-    (rtt_dir / "SEGGER_RTT.c").write_text(
-        '#include "SEGGER_RTT.h"\n'
-        "\n"
-        "#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-        "  #if ((defined __GNUC__) || (defined __clang__))\n"
-        "    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-        "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-        "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-        "  #elif (defined __ICCARM__)\n"
-        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-        "    SEGGER_RTT_CB _SEGGER_RTT;\n"
-        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-        "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n"
-        "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-        "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n"
-        "  #else\n"
-        '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
-        "  #endif\n"
-        "#else\n"
-        "  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n"
-        "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n"
-        "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n"
-        "#endif\n"
-    )
-    (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
-    (rtt_dir / "SEGGER_RTT_ConfDefaults.h").write_text("// fake RTT conf defaults\n")
-    (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
-    monkeypatch.setenv("SEGGER_RTT_PATH", str(rtt_root))
-
-
-def _make_fake_rtt_root(path: Path) -> Path:
-    rtt_dir = path / "RTT"
-    config_dir = path / "Config"
-    rtt_dir.mkdir(parents=True)
-    config_dir.mkdir()
-    (rtt_dir / "SEGGER_RTT.c").write_text("// fake RTT source\n")
-    (rtt_dir / "SEGGER_RTT.h").write_text("// fake RTT header\n")
-    (config_dir / "SEGGER_RTT_Conf.h").write_text("// fake RTT config\n")
-    return path
-
-
-def test_find_segger_rtt_dir_prefers_explicit_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    explicit = _make_fake_rtt_root(tmp_path / "explicit")
-    monkeypatch.setenv("SEGGER_RTT_PATH", str(explicit))
-
-    assert find_segger_rtt_dir() == explicit
-
-
-def test_find_segger_rtt_dir_prefers_config_over_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    configured = _make_fake_rtt_root(tmp_path / "configured")
-    environment = _make_fake_rtt_root(tmp_path / "environment")
-    monkeypatch.setenv("SEGGER_RTT_PATH", str(environment))
-
-    assert find_segger_rtt_dir(configured) == configured
-
-
-def test_find_segger_rtt_dir_rejects_invalid_config_path(tmp_path: Path) -> None:
-    invalid = tmp_path / "not-rtt"
-    invalid.mkdir()
-
-    with pytest.raises(FirmwareError, match="target.segger_rtt_path"):
-        find_segger_rtt_dir(invalid)
-
-
-def test_find_segger_rtt_dir_expands_explicit_env_user_home(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    home = tmp_path / "home"
-    home.mkdir()
-    explicit = _make_fake_rtt_root(home / "explicit")
-    # ``~`` expansion is platform-dependent: POSIX's expanduser() consults
-    # $HOME, but Windows' ntpath.expanduser() checks %USERPROFILE% first
-    # and never looks at $HOME at all. Set whichever variable(s) the
-    # current platform's expanduser() actually reads so this test exercises
-    # the real expansion path on every CI runner instead of silently
-    # resolving against the runner's own home directory on Windows.
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("USERPROFILE", str(home))
-    monkeypatch.setenv("SEGGER_RTT_PATH", "~/explicit")
-
-    assert find_segger_rtt_dir() == explicit.resolve()
-
-
-def test_find_segger_rtt_dir_uses_bundled_sources_by_default(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
-
-    bundled = find_segger_rtt_dir()
-
-    assert bundled.name == "segger_rtt"
-    assert _is_segger_rtt_root(bundled)
-    assert (bundled / "LICENSE.md").is_file()
-    source = (bundled / "SOURCE.md").read_text()
-    assert "V8.58.0" in source
-    assert "4d8feab3150f86f37a9d323ddc88d6cdf5673072" in source
-    implementation = (bundled / "RTT" / "SEGGER_RTT.c").read_text(encoding="utf-8")
-    assert "SEGGER_RTT_PUT_CB_SECTION" in implementation
-    assert "SEGGER_RTT_PUT_BUFFER_SECTION" in implementation
-
-
-def test_bundled_segger_rtt_file_integrity(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("SEGGER_RTT_PATH", raising=False)
-    bundled = find_segger_rtt_dir()
-    expected = {
-        "LICENSE.md": "e033779c697246a7a89eb411eca41cabb791dbf0b23619cfbd6d42429191baa8",
-        "RTT/SEGGER_RTT.c": "caf3d20bc2def30e176f937a56c878a363dec3cd805334ea8173f22e097f1106",
-        "RTT/SEGGER_RTT.h": "b8b6c29abd72c42082502306fe7cdaa0ca90ca2a9b7821dceaa3b023b75f4d95",
-        "RTT/SEGGER_RTT_ConfDefaults.h": (
-            "d2af82ee107fba25157e850109ed9da38243d234f5b70a1039a5c37a0579a054"
-        ),
-        "Config/SEGGER_RTT_Conf.h": (
-            "d02ef83f826dd29cddb466adca6c75dbdd71128f18bc6bef1113ca0127944d6f"
-        ),
-    }
-
-    actual = {
-        relative: hashlib.sha256((bundled / relative).read_bytes()).hexdigest()
-        for relative in expected
-    }
-
-    assert actual == expected
-
-
-def test_find_segger_rtt_dir_rejects_invalid_explicit_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-):
-    invalid = tmp_path / "not-rtt"
-    invalid.mkdir()
-    monkeypatch.setenv("SEGGER_RTT_PATH", str(invalid))
-
-    with pytest.raises(FirmwareError, match="SEGGER_RTT_PATH"):
-        find_segger_rtt_dir()
 
 
 def _make_ctx(
@@ -1006,7 +859,7 @@ class TestGenerateApp:
         assert "add_executable(hpx_profiler_power EXCLUDE_FROM_ALL" in cmake
         assert "nsx_finalize_app(hpx_profiler_power)" in cmake
         assert "src/main_power.cc" in cmake
-        assert ("target_compile_definitions(hpx_profiler_power PRIVATE BUFFER_SIZE_UP=") in cmake
+        assert cmake.count("    nsx::segger_rtt") == 2
         # RTT diagnostics are configured only after the measured gate closes.
         assert main_power_cc.index("hpx_sync_window_end();") < main_power_cc.rindex(
             "hpx_power_terminal_report("
@@ -1207,7 +1060,7 @@ class TestGenerateApp:
             "SEGGER_RTT_Write(0, line_buf, (unsigned)n);\n            HPX_CLEAN_DCACHE();"
             in main_cc
         )
-        assert "BUFFER_SIZE_UP=32768" in cmake
+        assert "NSX_SEGGER_RTT_BUFFER_SIZE_UP 32768" in cmake
 
     def test_apollo4_rtt_generation_avoids_ap5_dcache_calls(self, tmp_path: Path, fake_dist: Path):
         ctx = _make_ctx(tmp_path, fake_dist)
@@ -1232,74 +1085,7 @@ class TestGenerateApp:
         app_dir = generate_app(ctx)
 
         cmake = (app_dir / "CMakeLists.txt").read_text()
-        assert "BUFFER_SIZE_UP=12288" in cmake
-
-    def test_rtt_generation_places_segger_buffers_by_cache_family(
-        self, tmp_path: Path, fake_dist: Path
-    ):
-        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
-        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
-            '#include "SEGGER_RTT.h"\n'
-            "\n"
-            "#if SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-            "  #if ((defined __GNUC__) || (defined __clang__))\n"
-            "    SEGGER_RTT_CB _SEGGER_RTT                                                             __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-            "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)]   __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-            "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)] __attribute__ ((aligned (SEGGER_RTT_CPU_CACHE_LINE_SIZE)));\n"
-            "  #elif (defined __ICCARM__)\n"
-            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-            "    SEGGER_RTT_CB _SEGGER_RTT;\n"
-            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-            "    static char   _acUpBuffer  [SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_UP)];\n"
-            "    #pragma data_alignment=SEGGER_RTT_CPU_CACHE_LINE_SIZE\n"
-            "    static char   _acDownBuffer[SEGGER_RTT__ROUND_UP_2_CACHE_LINE_SIZE(BUFFER_SIZE_DOWN)];\n"
-            "  #else\n"
-            '    #error "Don\'t know how to place _SEGGER_RTT, _acUpBuffer, _acDownBuffer cache-line aligned"\n'
-            "  #endif\n"
-            "#else\n"
-            "  SEGGER_RTT_PUT_CB_SECTION(SEGGER_RTT_CB_ALIGN(SEGGER_RTT_CB _SEGGER_RTT));\n"
-            "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acUpBuffer  [BUFFER_SIZE_UP]));\n"
-            "  SEGGER_RTT_PUT_BUFFER_SECTION(SEGGER_RTT_BUFFER_ALIGN(static char _acDownBuffer[BUFFER_SIZE_DOWN]));\n"
-            "#endif\n"
-        )
-
-        ctx = _make_ctx(tmp_path, fake_dist)
-        ResolvePlatformStage().run(ctx)
-        PrepareEngineStage().run(ctx)
-        app_dir = generate_app(ctx)
-
-        # The SEGGER source is copied verbatim — placement is driven entirely by
-        # the generated config header. Cache-coherent Cortex-M55 parts keep the
-        # buffers in non-cached TCM (no SEGGER_RTT_SECTION override) so SWD reads
-        # stay coherent; cacheless Cortex-M4 parts fall through to .sram_bss.
-        rtt_c = (app_dir / "src" / "rtt" / "SEGGER_RTT.c").read_text(encoding="utf-8")
-        assert "SEGGER_RTT_PUT_CB_SECTION(" in rtt_c
-        assert "SEGGER_RTT_PUT_BUFFER_SECTION(" in rtt_c
-
-        conf = (app_dir / "src" / "rtt" / "Config" / "SEGGER_RTT_Conf.h").read_text()
-        assert '#include "nsx_mem.h"' in conf
-        # M55 / Apollo5 family is gated to non-cached TCM (.bss default).
-        assert "defined(AM_PART_APOLLO510)" in conf
-        assert "defined(AM_PART_APOLLO330P)" in conf
-        assert "defined(AM_PART_ATOMIQ110)" in conf
-        # Cacheless parts still relocate the buffers into shared SRAM.
-        assert "#elif NSX_MEM__HAS_SRAM_BSS" in conf
-        assert "#define SEGGER_RTT_SECTION NSX_MEM__SEC_SRAM_BSS" in conf
-
-    def test_rtt_generation_raises_when_segger_layout_is_unexpected(
-        self, tmp_path: Path, fake_dist: Path
-    ):
-        rtt_root = Path(os.environ["SEGGER_RTT_PATH"])
-        (rtt_root / "RTT" / "SEGGER_RTT.c").write_text(
-            '#include "SEGGER_RTT.h"\nstatic int not_the_expected_layout = 1;\n'
-        )
-
-        ctx = _make_ctx(tmp_path, fake_dist)
-        ResolvePlatformStage().run(ctx)
-        PrepareEngineStage().run(ctx)
-
-        with pytest.raises(FirmwareError, match="Failed to patch SEGGER_RTT.c"):
-            generate_app(ctx)
+        assert "NSX_SEGGER_RTT_BUFFER_SIZE_UP 12288" in cmake
 
     def test_gpio_sync_not_enabled_for_internal(self, tmp_path: Path, fake_dist: Path):
         model = tmp_path / "model.tflite"
@@ -2412,3 +2198,141 @@ def test_resolved_aot_arena_regions_follow_user_memory_config_flag(
 
     (region,) = _resolved_aot_arena_regions(ctx)
     assert region.placement is expected
+
+
+@pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])
+def test_rtt_module_is_selected_only_for_rtt(tmp_path, fake_dist, transport):
+    ctx = _make_ctx(tmp_path, fake_dist)
+    ctx.config = replace(ctx.config, target=replace(ctx.config.target, transport=transport))
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    app = generate_app(ctx)
+    manifest = yaml.safe_load((app / "nsx.yml").read_text())
+    registry = manifest["module_registry"]
+    names = {module["name"] for module in manifest["modules"]}
+    cmake = (app / "CMakeLists.txt").read_text()
+    assert ("nsx-segger-rtt" in names) == (transport == "rtt")
+    assert ("nsx-segger-rtt" in registry["projects"]) == (transport == "rtt")
+    assert ("nsx::segger_rtt" in cmake) == (transport == "rtt")
+    assert not (app / "src" / "rtt").exists()
+    if transport == "rtt":
+        pin = ctx.config.compatibility_baseline.project("nsx-segger-rtt")
+        assert registry["projects"]["nsx-segger-rtt"] == {
+            "name": "nsx-segger-rtt",
+            "url": pin.url,
+            "path": "modules/nsx-segger-rtt",
+            "revision": pin.ref,
+        }
+        assert registry["modules"]["nsx-segger-rtt"] == {
+            "project": "nsx-segger-rtt",
+            "metadata": "modules/nsx-segger-rtt/nsx-module.yaml",
+            "revision": pin.ref,
+        }
+        assert ctx.config.compatibility_baseline.module("nsx-segger-rtt").ref == pin.ref
+        parsed = AppConfig.from_mapping(manifest)
+        parsed_rtt = next(m for m in parsed.modules if m.name == "nsx-segger-rtt")
+        assert parsed_rtt.revision == pin.ref
+        effective_registry = parsed.registry_overrides.merge_into({"projects": {}, "modules": {}})
+        assert registry_entry_for_module(effective_registry, "nsx-segger-rtt").revision == pin.ref
+        assert cmake.index("set(NSX_SEGGER_RTT_BUFFER_SIZE_UP") < cmake.index("nsx_bootstrap_app(")
+        assert '32768 CACHE STRING "RTT up buffer bytes" FORCE)' in cmake
+        assert '16 CACHE STRING "RTT down buffer bytes" FORCE)' in cmake
+
+
+@pytest.mark.parametrize("value", ["feature/rtt", "v0.1.3"])
+def test_rtt_ref_override_reaches_nsx_registry(tmp_path, fake_dist, value):
+    from helia_profiler.config import NsxModuleOverride
+
+    ctx = _make_ctx(tmp_path, fake_dist)
+    ctx.config = replace(
+        ctx.config,
+        build=replace(
+            ctx.config.build, nsx_modules={"nsx-segger-rtt": NsxModuleOverride(ref=value)}
+        ),
+    )
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    app = generate_app(ctx)
+    manifest = yaml.safe_load((app / "nsx.yml").read_text())
+    module = next(m for m in manifest["modules"] if m["name"] == "nsx-segger-rtt")
+    assert module["revision"] == value
+    parsed = AppConfig.from_mapping(manifest)
+    parsed_rtt = next(module for module in parsed.modules if module.name == "nsx-segger-rtt")
+    assert parsed_rtt.revision == value
+    assert ctx.config.compatibility is not None
+    assert ctx.config.compatibility.qualification.value == "development-overrides"
+    registry = manifest["module_registry"]
+    assert registry["projects"]["nsx-segger-rtt"]["url"].endswith("/nsx-segger-rtt.git")
+    effective_registry = parsed.registry_overrides.merge_into({"projects": {}, "modules": {}})
+    assert registry_entry_for_module(effective_registry, "nsx-segger-rtt").revision == value
+    assert registry["projects"]["nsx-segger-rtt"]["revision"] == value
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_rtt_raw_or_missing_module_override_fails(tmp_path, fake_dist, exists):
+    from helia_profiler.config import NsxModuleOverride
+
+    root = tmp_path / "raw-rtt"
+    if exists:
+        root.mkdir()
+        (root / "SEGGER_RTT.c").write_text("/* raw tree is not an NSX module */")
+    ctx = _make_ctx(tmp_path, fake_dist)
+    ctx.config = replace(
+        ctx.config,
+        build=replace(
+            ctx.config.build,
+            nsx_modules={
+                "nsx-segger-rtt": NsxModuleOverride(path=root),
+            },
+        ),
+    )
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    error = FirmwareError if exists else DependencyError
+    message = "nsx-module.yaml" if exists else "does not exist"
+    with pytest.raises(error, match=message):
+        generate_app(ctx)
+
+
+@pytest.mark.parametrize("transport", ["rtt", "uart"])
+def test_rtt_version_override_is_rejected_during_config_resolution(tmp_path, transport):
+    from helia_profiler.errors import ConfigError
+
+    with pytest.raises(ConfigError, match="nsx-segger-rtt.version is not supported") as error:
+        load_config(
+            None,
+            {
+                "model": {"path": str(tmp_path / "model.tflite")},
+                "target": {"transport": transport},
+                "build": {"nsx_modules": {"nsx-segger-rtt": {"version": "0.1.3"}}},
+            },
+        )
+    assert "nsx-segger-rtt.ref" in str(error.value)
+    assert "released tag or commit" in str(error.value)
+
+
+def test_rtt_local_override_reaches_nsx_parser(tmp_path, fake_dist):
+    from helia_profiler.config import NsxModuleOverride
+
+    module_root = tmp_path / "rtt-module"
+    module_root.mkdir()
+    metadata = "module:\n  name: nsx-segger-rtt\n"
+    (module_root / "nsx-module.yaml").write_text(metadata)
+    ctx = _make_ctx(tmp_path, fake_dist)
+    ctx.config = replace(
+        ctx.config,
+        build=replace(
+            ctx.config.build,
+            nsx_modules={
+                "nsx-segger-rtt": NsxModuleOverride(path=module_root),
+            },
+        ),
+    )
+    ResolvePlatformStage().run(ctx)
+    PrepareEngineStage().run(ctx)
+    app = generate_app(ctx)
+    manifest = yaml.safe_load((app / "nsx.yml").read_text())
+    parsed = AppConfig.from_mapping(manifest)
+    parsed_rtt = next(module for module in parsed.modules if module.name == "nsx-segger-rtt")
+    assert parsed_rtt.source.vendored
+    assert (app / "modules" / "nsx-segger-rtt" / "nsx-module.yaml").read_text() == metadata

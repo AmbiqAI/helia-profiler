@@ -458,11 +458,7 @@ def _usb_region(family: SocFamily) -> MemoryRegion:
 
 
 def _rtt_region(family: SocFamily) -> MemoryRegion:
-    """Where the RTT statics land per the SEGGER_RTT_SECTION snippet hpx
-    writes (firmware/__init__.py): AP4 pins ``.sram_bss`` -> SRAM; AP3
-    reaches SRAM through plain ``.bss`` (its default .bss IS main SRAM);
-    the AP5 family (incl. apollo330P) leaves the default ``.bss`` ->
-    DTCM — on exactly the parts where DTCM is scarcest."""
+    """Predict nsx-segger-rtt placement: SRAM on M4, non-cached DTCM on M55."""
     return MemoryRegion.SRAM if family in (SocFamily.AP3, SocFamily.AP4) else MemoryRegion.DTCM
 
 

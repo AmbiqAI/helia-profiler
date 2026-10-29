@@ -557,3 +557,20 @@ def test_load_refuses_an_edited_binding(plan, build, root, tmp_path, binding, me
     path.write_text(json.dumps(data))
     with pytest.raises(ConfigError, match=message):
         hpx.load_build(path, roots={"run": root})
+
+
+@pytest.mark.parametrize("legacy_path", [None, "/old/raw-rtt"])
+def test_historical_compiled_record_keeps_its_plan_readable(
+    plan, build, root, tmp_path, legacy_path
+):
+    settings = plan.to_dict()["settings"]
+    settings["target"]["segger_rtt_path"] = legacy_path
+    old_plan = replace(plan, settings=settings, baseline_fingerprint="0" * 64)
+    record = compiled(old_plan, build, Lifecycle.CARRY)
+    path = record.save(tmp_path / "historical-build.json", roots={"run": root})
+    loaded = CompiledBuild.load(path, roots={"run": root})
+    loaded.verify()
+    assert loaded.plan.intent_hash == old_plan.intent_hash
+    assert loaded.plan.settings["target"]["segger_rtt_path"] == legacy_path
+    with pytest.raises(ConfigError, match="frozen against baseline"):
+        loaded.plan.config()

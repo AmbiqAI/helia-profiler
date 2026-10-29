@@ -134,8 +134,8 @@ its own, and module revisions come from the compatibility baseline
 (`data/compatibility-baseline-v1.json`). `firmware/headers.py` embeds the
 model bytes as a C array (interpreter and ExecuTorch paths) and any
 constant blob; `firmware/op_resolver.py` plans which operator kernels the
-interpreter engines register; `firmware/segger.py` vendors the SEGGER RTT
-sources when the transport is RTT; local engine modules are copied under
+interpreter engines register; RTT selects the pinned `nsx-segger-rtt` module,
+which owns its sources and buffer placement; local engine modules are copied under
 `modules/`. The work directory after a render:
 
 ```
@@ -148,7 +148,6 @@ work_dir/
   src/model_data.h           interpreter and ExecuTorch paths
   src/hpx_pmu_profiler.cc    interpreter paths
   src/hpx_pmu_profiler.h
-  src/rtt/                   RTT transport only
   modules/<name>/            local engine modules, for example the heliaAOT model module
 ```
 
@@ -196,7 +195,7 @@ The host side of that stream is on [Data capture](../capture/).
 | render context | `firmware/context.py` |
 | templates | `firmware/templates/`, `firmware/render.py`, template selection in `firmware/__init__.py` (`generate_app()`, `render_power_source()`) |
 | project files | `firmware/project.py` |
-| generated sources | `firmware/headers.py`, `firmware/op_resolver.py`, `firmware/segger.py` |
+| generated sources | `firmware/headers.py`, `firmware/op_resolver.py` |
 | build | `firmware/build.py`, `firmware/launcher.py`, `deps/nsx.py` |
 | identity | `firmware/image.py`, `firmware/fingerprint.py`, `firmware/workload.py` |
 | stages | `stages/generate_firmware.py`, `stages/build_firmware.py`, `stages/verify_placement.py`, `stages/build_power_firmware.py` |

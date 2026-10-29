@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 107,
-    "schemaProperties": 107,
+    "declaredFields": 106,
+    "schemaProperties": 106,
     "enums": 4,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -479,7 +479,7 @@
           "name": "target",
           "pythonType": "TargetConfig",
           "required": false,
-          "default": "TargetConfig(board='apollo510_evb', toolchain=<Toolchain.ARM_NONE_EABI_GCC: 'arm-none-eabi-gcc'>, jlink_serial=None, transport=<Transport.RTT: 'rtt'>, usb_port=None, segger_rtt_path=None, rtt_buffer_size_up=None, clock=ClockSelection(cpu=None), psram=PsramConfig(clock_hz=48000000), heartbeat=HeartbeatConfig(enabled=True, every_n_ops=8, every_ms=2000, host_timeout_s=30, overall_timeout_s=None), custom_socs=None, custom_boards=None, ensure_board_powered=False)",
+          "default": "TargetConfig(board='apollo510_evb', toolchain=<Toolchain.ARM_NONE_EABI_GCC: 'arm-none-eabi-gcc'>, jlink_serial=None, transport=<Transport.RTT: 'rtt'>, usb_port=None, rtt_buffer_size_up=None, clock=ClockSelection(cpu=None), psram=PsramConfig(clock_hz=48000000), heartbeat=HeartbeatConfig(enabled=True, every_n_ops=8, every_ms=2000, host_timeout_s=30, overall_timeout_s=None), custom_socs=None, custom_boards=None, ensure_board_powered=False)",
           "defaultFromFactory": true
         },
         {
@@ -528,7 +528,7 @@
           "name": "compatibility_baseline",
           "pythonType": "CompatibilityBaseline",
           "required": false,
-          "default": "CompatibilityBaseline(schema='hpx.compatibility-baseline', schema_version=1, baseline_id='hpx-neuralspotx-0.9.0-2026-10-27.1', neuralspotx_package='neuralspotx', neuralspotx_version='0.9.0', neuralspotx_sha256='ba2dff4660ec0b6123796993e6a66637627ea55a8d8506a72e4408789856146a', projects=(CompatibilityProject(name='neuralspotx', url='https://github.com/AmbiqAI/neuralspotx.git', ref='ffb7339b14b00134b4ed2834a1640d61042c0962'), CompatibilityProject(name='nsx-ambiq-sdk', url='https://github.com/AmbiqAI/nsx-ambiq-sdk.git', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityProject(name='nsx-ethos-u-driver', url='https://github.com/AmbiqAI/nsx-ethos-u-driver.git', ref='f0f99bb124b22486ef55694c76567008680cb5a8'), CompatibilityProject(name='nsx-pmu-armv8m', url='https://github.com/AmbiqAI/nsx-pmu-armv8m.git', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityProject(name='nsx-tflite-micro', url='https://github.com/AmbiqAI/nsx-tflite-micro.git', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityProject(name='arm-cmsis-nn', url='https://github.com/AmbiqAI/arm-cmsis-nn.git', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityProject(name='ns-cmsis-nn', url='https://github.com/AmbiqAI/ns-cmsis-nn.git', ref='9f793bd9343b60e794f915b285bd7b7c4a885abe'), CompatibilityProject(name='nsx-executorch', url='https://github.com/AmbiqAI/nsx-executorch.git', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityProject(name='helia-rt', url='https://github.com/AmbiqAI/helia-rt.git', ref='7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0'), CompatibilityProject(name='nsx-sensors', url='https://github.com/AmbiqAI/nsx-sensors.git', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')), modules=(CompatibilityModule(name='nsx-ambiq-bsp', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-npu', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-pmu-armv8m', project='nsx-pmu-armv8m', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityModule(name='nsx-tflite-micro', project='nsx-tflite-micro', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityModule(name='arm-cmsis-nn', project='arm-cmsis-nn', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityModule(name='nsx-cmsis-nn', project='ns-cmsis-nn', ref='9f793bd9343b60e794f915b285bd7b7c4a885abe'), CompatibilityModule(name='nsx-executorch', project='nsx-executorch', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityModule(name='nsx-helia-rt', project='helia-rt', ref='7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0'), CompatibilityModule(name='nsx-sensors', project='nsx-sensors', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25')))",
+          "default": "CompatibilityBaseline(schema='hpx.compatibility-baseline', schema_version=1, baseline_id='hpx-neuralspotx-0.9.0-2026-10-28.1', neuralspotx_package='neuralspotx', neuralspotx_version='0.9.0', neuralspotx_sha256='ba2dff4660ec0b6123796993e6a66637627ea55a8d8506a72e4408789856146a', projects=(CompatibilityProject(name='neuralspotx', url='https://github.com/AmbiqAI/neuralspotx.git', ref='ffb7339b14b00134b4ed2834a1640d61042c0962'), CompatibilityProject(name='nsx-ambiq-sdk', url='https://github.com/AmbiqAI/nsx-ambiq-sdk.git', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityProject(name='nsx-ethos-u-driver', url='https://github.com/AmbiqAI/nsx-ethos-u-driver.git', ref='f0f99bb124b22486ef55694c76567008680cb5a8'), CompatibilityProject(name='nsx-pmu-armv8m', url='https://github.com/AmbiqAI/nsx-pmu-armv8m.git', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityProject(name='nsx-tflite-micro', url='https://github.com/AmbiqAI/nsx-tflite-micro.git', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityProject(name='arm-cmsis-nn', url='https://github.com/AmbiqAI/arm-cmsis-nn.git', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityProject(name='ns-cmsis-nn', url='https://github.com/AmbiqAI/ns-cmsis-nn.git', ref='9f793bd9343b60e794f915b285bd7b7c4a885abe'), CompatibilityProject(name='nsx-executorch', url='https://github.com/AmbiqAI/nsx-executorch.git', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityProject(name='helia-rt', url='https://github.com/AmbiqAI/helia-rt.git', ref='7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0'), CompatibilityProject(name='nsx-sensors', url='https://github.com/AmbiqAI/nsx-sensors.git', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25'), CompatibilityProject(name='nsx-segger-rtt', url='https://github.com/AmbiqAI/nsx-segger-rtt.git', ref='9b5fe942de1607365a19bab1b6ed549541ff71c6')), modules=(CompatibilityModule(name='nsx-ambiq-bsp', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-npu', project='nsx-ambiq-sdk', ref='aefce2ca858795e783c76726ebe7d14d9d4bde7c'), CompatibilityModule(name='nsx-pmu-armv8m', project='nsx-pmu-armv8m', ref='5725c065a0c3603132f1064ee2684d1fa8587c88'), CompatibilityModule(name='nsx-tflite-micro', project='nsx-tflite-micro', ref='7afcf2b4170e039caf4c49f91e2c45d5869be333'), CompatibilityModule(name='arm-cmsis-nn', project='arm-cmsis-nn', ref='6d21a6f821fb72541173a6c4d05d83329fa74f7c'), CompatibilityModule(name='nsx-cmsis-nn', project='ns-cmsis-nn', ref='9f793bd9343b60e794f915b285bd7b7c4a885abe'), CompatibilityModule(name='nsx-executorch', project='nsx-executorch', ref='5514ac1ea8439b3fe615d180bf68c75a9dabb48e'), CompatibilityModule(name='nsx-helia-rt', project='helia-rt', ref='7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0'), CompatibilityModule(name='nsx-sensors', project='nsx-sensors', ref='c219a2bc98c62f96819fae20ab6c8911fcea3e25'), CompatibilityModule(name='nsx-segger-rtt', project='nsx-segger-rtt', ref='9b5fe942de1607365a19bab1b6ed549541ff71c6')))",
           "defaultFromFactory": true
         },
         {
@@ -708,13 +708,6 @@
           "defaultFromFactory": false
         },
         {
-          "name": "segger_rtt_path",
-          "pythonType": "Path | None",
-          "required": false,
-          "default": null,
-          "defaultFromFactory": false
-        },
-        {
           "name": "rtt_buffer_size_up",
           "pythonType": "int | None",
           "required": false,
@@ -883,8 +876,8 @@
         "reachableFromRoot": true
       },
       "TargetConfig": {
-        "declared": 13,
-        "inSchema": 13,
+        "declared": 12,
+        "inSchema": 12,
         "reachableFromRoot": true
       },
       "TimeoutsConfig": {
@@ -2298,19 +2291,6 @@
           ],
           "default": null,
           "title": "Usb Port"
-        },
-        "segger_rtt_path": {
-          "anyOf": [
-            {
-              "format": "path",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Segger Rtt Path"
         },
         "rtt_buffer_size_up": {
           "anyOf": [

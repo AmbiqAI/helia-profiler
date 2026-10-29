@@ -145,8 +145,8 @@ def test_the_configuration_walk_records_what_it_could_not_reach():
     payload = extract_schema.build()
     counts = payload["counts"]
     assert counts["classes"] == 15
-    assert counts["declaredFields"] == 107
-    assert counts["schemaProperties"] == 107
+    assert counts["declaredFields"] == 106
+    assert counts["schemaProperties"] == 106
     assert counts["unreachableFromRoot"] == ["MonitorBoardPreset"]
     assert payload["x-hpx"]["fieldIndex"]["MonitorBoardPreset"]
 

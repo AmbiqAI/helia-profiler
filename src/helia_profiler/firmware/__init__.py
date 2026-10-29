@@ -8,7 +8,7 @@ receives a ``PipelineContext`` and operates on the fields set by prior stages.
 from __future__ import annotations
 
 # ``glob`` and ``shutil`` stay imported as modules even though the code that
-# uses them moved to .build / .launcher / .segger: tests monkeypatch
+# uses them moved to .build / .launcher: tests monkeypatch
 # ``helia_profiler.firmware.glob.glob`` and
 # ``helia_profiler.firmware.shutil.which``, so the package must keep these
 # module attributes (the split modules import the same module objects, so the
@@ -30,8 +30,8 @@ from ..engines.base import ArenaRegion, HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..placement import Placement
 
-# The compiler-launcher, SEGGER RTT vendoring, generated-C-header, and NSX
-# build invocation APIs live in .build, .headers, .launcher and .segger,
+# The compiler-launcher, generated-C-header, and NSX
+# build invocation APIs live in .build, .headers and .launcher,
 # re-exported here so callers keep one import surface.
 from .build import (
     build_app,
@@ -66,11 +66,6 @@ from .project import (
     render_project_files,
 )
 from .render import _jinja_env, _write_text
-from .segger import (
-    _copy_segger_rtt,
-    _is_segger_rtt_root,
-    find_segger_rtt_dir,
-)
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -113,6 +108,8 @@ def generate_app(ctx: PipelineContext) -> Path:
     profile = _get_starter_profile(board.name, profile_board=profile_board)
 
     transport = config.target.transport
+    if transport == Transport.RTT:
+        _add_missing_modules(module_specs, ("nsx-segger-rtt",), profile)
     if transport == Transport.USB_CDC:
         _add_missing_modules(
             module_specs,
@@ -299,9 +296,6 @@ def generate_app(ctx: PipelineContext) -> Path:
 
         template_vars.update(fixture_template_vars(ctx, aot_arena_regions))
         write_fixture_headers(src_dir, ctx)
-
-    if transport == Transport.RTT:
-        _copy_segger_rtt(src_dir, config.target.segger_rtt_path)
 
     extreme_mode_safe = arena_region is Placement.TCM and weights_region is Placement.TCM
     if config.profiling.extreme_mode and not extreme_mode_safe:

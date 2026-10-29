@@ -127,8 +127,7 @@ def test_heliaaot_fixture_build_reads_only_closure_files(
     assert {
         "engines/templates/heliaaot_attributes.h.j2",
         "firmware/templates/fixed_fixture.cc.j2",
-        "vendor/segger_rtt/RTT/SEGGER_RTT.c",
-    } <= reads, "the tracer must see the engine template, firmware template and vendored copy"
+    } <= reads, "the tracer must see the engine and firmware templates"
     assert reads - _listed() == set()
     cmake = build.app_dir / "CMakeLists.txt"
     assert "-ffile-prefix-map=${CMAKE_CURRENT_LIST_DIR}=." in cmake.read_text(encoding="utf-8")
@@ -219,7 +218,6 @@ def test_litert_fixture_build_reads_only_closure_files(
     assert {
         "firmware/templates/fixed_fixture.cc.j2",
         "firmware/templates/fixed_fixture_memory.h.j2",
-        "vendor/segger_rtt/RTT/SEGGER_RTT.c",
     } <= reads, "the tracer must see the TFLM fixture templates and vendored copy"
     assert reads - _listed() == set()
     cmake = build.app_dir / "CMakeLists.txt"

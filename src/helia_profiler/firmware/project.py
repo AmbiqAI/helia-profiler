@@ -173,6 +173,16 @@ def _render_module_registry(
     """
     project_overrides = dict(profile.get("project_overrides") or {})
     module_overrides = dict(profile.get("module_overrides") or {})
+    if "nsx-segger-rtt" in (app_modules or {}):
+        project_overrides["nsx-segger-rtt"] = {
+            "name": "nsx-segger-rtt",
+            "url": "https://github.com/AmbiqAI/nsx-segger-rtt.git",
+            "path": "modules/nsx-segger-rtt",
+        }
+        module_overrides["nsx-segger-rtt"] = {
+            "project": "nsx-segger-rtt",
+            "metadata": "modules/nsx-segger-rtt/nsx-module.yaml",
+        }
     ref_overrides_by_project: dict[str, str] = {}
     for project, (mode, value) in project_ref_overrides.items():
         if mode != "ref":

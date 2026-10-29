@@ -397,10 +397,10 @@ def test_exact_dependency_provenance_serialization(
 
     assert ctx.dependency_lock_path.read_bytes() == snapshot_bytes == exact_lock
     assert serialized["workspace"]["registry_hash"]["algorithm"] == "sha256"
-    assert serialized["workspace"]["baseline_id"] == "hpx-neuralspotx-0.9.0-2026-10-27.1"
+    assert serialized["workspace"]["baseline_id"] == ctx.config.compatibility_baseline.baseline_id
     assert (
         serialized["workspace"]["baseline_fingerprint"]
-        == "711f7ebd3e74d04f5777a1e2cad4f6f00729524451bfe82c356daa421918518c"
+        == ctx.config.compatibility_baseline.fingerprint
     )
     assert serialized["lock"]["mode"] == "reused"
     assert serialized["qualification"] == "development-overrides"
@@ -652,11 +652,12 @@ def _baseline_ref(ctx: PipelineContext, project: str) -> str:
     return compatibility.baseline.project(project).ref
 
 
+@pytest.mark.parametrize("project", ["nsx-sensors", "nsx-segger-rtt"])
 def test_lock_resolving_off_baseline_ref_raises_version_error(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, project: str
 ) -> None:
     ctx = _context(tmp_path)
-    _write_valid_lock(ctx, project="nsx-sensors", commit="d" * 40)
+    _write_valid_lock(ctx, project=project, commit="d" * 40)
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     with pytest.raises(VersionError, match="qualified baseline pins") as exc:
@@ -664,20 +665,23 @@ def test_lock_resolving_off_baseline_ref_raises_version_error(
 
     message = str(exc.value)
     assert "d" * 40 in message
-    assert _baseline_ref(ctx, "nsx-sensors") in message
+    assert _baseline_ref(ctx, project) in message
     # The corrupt resolution must not be persisted as valid run state.
     assert ctx.firmware_dir is not None
     assert not (ctx.firmware_dir / "hpx-dependencies.json").exists()
 
 
-def test_lock_matching_baseline_ref_passes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("project", ["nsx-sensors", "nsx-segger-rtt"])
+def test_lock_matching_baseline_ref_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, project: str
+) -> None:
     ctx = _context(tmp_path)
-    _write_valid_lock(ctx, project="nsx-sensors", commit=_baseline_ref(ctx, "nsx-sensors"))
+    _write_valid_lock(ctx, project=project, commit=_baseline_ref(ctx, project))
     monkeypatch.setattr("helia_profiler.deps.dependencies.nsx_cli.sync", lambda *_a, **_kw: None)
 
     provenance = prepare_locked_dependencies(ctx)
 
-    assert provenance.modules[0].peeled_commit == _baseline_ref(ctx, "nsx-sensors")
+    assert provenance.modules[0].peeled_commit == _baseline_ref(ctx, project)
 
 
 def test_explicit_module_override_exempts_project_from_baseline_check(

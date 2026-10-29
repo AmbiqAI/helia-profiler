@@ -8,7 +8,6 @@ license = "Apache-2.0"
 license-files = [
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
-    "src/helia_profiler/vendor/segger_rtt/LICENSE.md",
 ]
 keywords = ["ambiq", "apollo", "embedded", "joulescope", "litert", "profiling"]
 classifiers = [
@@ -106,7 +105,6 @@ helia_profiler = [
     "data/models/*.json",
     "data/runtimes/*/*.json",
     "data/models/*.tflite",
-    "vendor/segger_rtt/**/*",
     "fixture_closure.txt",
 ]
 

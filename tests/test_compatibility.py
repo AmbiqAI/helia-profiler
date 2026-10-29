@@ -72,6 +72,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
+        "nsx-segger-rtt": "9b5fe942de1607365a19bab1b6ed549541ff71c6",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
         "nsx-ambiq-bsp": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
@@ -83,6 +84,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "nsx-helia-rt": "7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
+        "nsx-segger-rtt": "9b5fe942de1607365a19bab1b6ed549541ff71c6",
     }
 
 

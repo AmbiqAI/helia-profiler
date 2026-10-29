@@ -288,21 +288,11 @@ def test_session_discovery_returns_typed_values(monkeypatch) -> None:
     assert any(board.name == "apollo510_evb" for board in session.boards())
 
 
-def test_session_doctor_requires_rtt_sources_for_rtt_transport(tmp_path: Path, monkeypatch) -> None:
-    rtt_root = tmp_path / "segger-rtt"
-    (rtt_root / "RTT").mkdir(parents=True)
-    (rtt_root / "Config").mkdir()
-    (rtt_root / "RTT" / "SEGGER_RTT.c").write_text("")
-    (rtt_root / "RTT" / "SEGGER_RTT.h").write_text("")
-    (rtt_root / "Config" / "SEGGER_RTT_Conf.h").write_text("")
+def test_session_doctor_checks_host_dependencies_only(monkeypatch) -> None:
     monkeypatch.setattr("shutil.which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr("helia_profiler.hostenv.doctor.find_spec", lambda _name: object())
-
-    result = hpx.Session().with_target(transport="rtt", segger_rtt_path=rtt_root).doctor()
-
-    rtt_check = next(check for check in result.checks if "RTT source" in check.label)
-    assert rtt_check.available
-    assert rtt_check.path == str(rtt_root.resolve())
+    result = hpx.Session().with_target(transport="rtt").doctor()
+    assert not any("RTT source" in check.label for check in result.checks)
 
 
 def test_session_show_renders_doctor_and_returns_original_value() -> None:

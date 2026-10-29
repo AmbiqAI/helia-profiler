@@ -56,8 +56,11 @@ uses buffers in target RAM that the host reads over SWD. No target
 peripheral is involved in the transfer, which keeps the PMU data clean.
 
 - Hardware: the J-Link over the same USB cable used for flashing. The RTT
-  target sources are bundled; `target.segger_rtt_path` or
-  `SEGGER_RTT_PATH` test another checkout.
+  target library comes from the pinned `nsx-segger-rtt` module. Use
+  `build.nsx_modules.nsx-segger-rtt.path` or `ref` to override it.
+  For a release, use a tag such as `ref: v0.1.3`; `version` is not supported.
+  Raw `target.segger_rtt_path` overrides have been removed and nonempty
+  `SEGGER_RTT_PATH` is rejected for RTT; see the [migration instructions](/getting-started/install/).
 - hpx opens the RTT session through `pylink` after J-Link Commander resets
   the target, and uses a toolchain-aware up-buffer (32 KB for GCC and
   armclang, 12 KB for ATfE by default; `--rtt-buffer-size-up` overrides it

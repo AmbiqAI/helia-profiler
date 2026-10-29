@@ -257,8 +257,8 @@ jobs:
             uv venv --python "${python_version}" "${environment}"
             uv pip install --python "${environment}/bin/python" "${package}"
             "${environment}/bin/hpx" --version | grep -F "hpx ${PACKAGE_VERSION}"
-            env -u SEGGER_RTT_PATH "${environment}/bin/python" -c \
-              'from helia_profiler.firmware import find_segger_rtt_dir; assert find_segger_rtt_dir().name == "segger_rtt"'
+            "${environment}/bin/python" -c \
+              'from helia_profiler.deps.compatibility import load_compatibility_baseline; b = load_compatibility_baseline(); assert b.module("nsx-segger-rtt").ref == b.project("nsx-segger-rtt").ref'
           }
 
           wheel=(dist/*.whl)
