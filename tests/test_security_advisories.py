@@ -78,7 +78,7 @@ def test_security_floors_are_declared() -> None:
         ("idna", "3.14", "3.15"),
         ("certifi", "2026.4.22", "2026.10.19"),
         ("urllib3", "2.7.0", "2.8.0"),
-        ("tornado", "6.5.8", "6.5.9"),
+        ("tornado", "6.5.9", "6.6"),
     ):
         assert name in floors, (
             f"security floor for {name!r} is gone from [tool.uv] constraint-dependencies; "
