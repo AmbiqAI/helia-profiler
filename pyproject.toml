@@ -81,8 +81,8 @@ constraint-dependencies = [
     "idna>=3.15",
     # GHSA-8988-9cw3-xx77, GHSA-vxq7-64xx-v4gw, GHSA-gh4c-6fx4-qh6g.
     "urllib3>=2.8.0",
-    # GHSA-c2m8-h5v5-343r, GHSA-chx6-46f5-w4vp, GHSA-3hv7-mjh2-fv65.
-    "tornado>=6.5.9",
+    # GHSA-pcg2-g6cj-q92c, GHSA-pw9p-v7r6-gx4p, GHSA-r4j5-9xpp-3985.
+    "tornado>=6.6",
 ]
 
 [build-system]
