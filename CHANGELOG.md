@@ -56,6 +56,51 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.5.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.1...v0.5.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **config:** retire unsupported NSX module version selectors ([#628](https://github.com/AmbiqAI/helia-profiler/issues/628))
+* **firmware:** remove target.segger_rtt_path and obsolete raw-source doctor arguments; reject nonempty SEGGER_RTT_PATH for RTT runs. Use build.nsx_modules.nsx-segger-rtt.path or ref. Unsupported RTT version selectors fail early. Previous frozen plans require re-freezing after the baseline change.
+
+### Features
+
+* **deps:** move the baseline to neuralSPOT-X 0.9.0 for apollo4l ATfE ([25df00e](https://github.com/AmbiqAI/helia-profiler/commit/25df00ee7f73ba553ad0a2d0b01027d96e429ca0))
+* **deps:** move the baseline to neuralSPOT-X 0.9.0 for apollo4l ATfE ([61e9497](https://github.com/AmbiqAI/helia-profiler/commit/61e94974c2b4d626ab130697ef8f606f07e3570d))
+* **deps:** move the baseline to neuralSPOT-X 0.9.2 ([7b4c38e](https://github.com/AmbiqAI/helia-profiler/commit/7b4c38ea48aa600622ebbafe5359ae431488d4fd))
+* **deps:** move the baseline to neuralSPOT-X 0.9.2 ([515eabd](https://github.com/AmbiqAI/helia-profiler/commit/515eabd74087578b7de07e98cace358e80036fcb))
+* **zoo:** add remaining MLPerf Tiny models to the Zoo list ([d23e3b8](https://github.com/AmbiqAI/helia-profiler/commit/d23e3b89cc8e3323150e060517db18d603e9d0e0))
+* **zoo:** add remaining MLPerf Tiny models to the Zoo list ([886135c](https://github.com/AmbiqAI/helia-profiler/commit/886135cb3f2f8f36049ee0ecf93991a8e187aa68))
+
+
+### Bug Fixes
+
+* **apollo330P:** skip images past flashable MRAM ([0bb9c6c](https://github.com/AmbiqAI/helia-profiler/commit/0bb9c6cc665e3c70329adf342f7458d9b93a9d4c))
+* **apollo330P:** skip images past flashable MRAM ([9183a7e](https://github.com/AmbiqAI/helia-profiler/commit/9183a7e42b4a87f4c0014523d88fcc3fa850b6ad))
+* **config:** retire unsupported NSX module version selectors ([#628](https://github.com/AmbiqAI/helia-profiler/issues/628)) ([a187e69](https://github.com/AmbiqAI/helia-profiler/commit/a187e698cef0b7fa4e4f277b3abaf0f2afa31448)), closes [#626](https://github.com/AmbiqAI/helia-profiler/issues/626)
+* **deps:** require patched Tornado for notebook environments ([#630](https://github.com/AmbiqAI/helia-profiler/issues/630)) ([0617cf7](https://github.com/AmbiqAI/helia-profiler/commit/0617cf758979ff7256c9e0aa54b184c31d0f3921)), closes [#629](https://github.com/AmbiqAI/helia-profiler/issues/629)
+* **firmware:** render only referenced synchronization and RTT helpers ([#625](https://github.com/AmbiqAI/helia-profiler/issues/625)) ([74822f1](https://github.com/AmbiqAI/helia-profiler/commit/74822f12bb8a8f7a686258976c39b628ac3b5b0c)), closes [#374](https://github.com/AmbiqAI/helia-profiler/issues/374)
+* report config file access failures consistently ([#613](https://github.com/AmbiqAI/helia-profiler/issues/613)) ([ba3d216](https://github.com/AmbiqAI/helia-profiler/commit/ba3d216b27250e3da1ed1a1c732c5fc4ef39f90e))
+* share frozen-plan overwrite protection between API and CLI ([#606](https://github.com/AmbiqAI/helia-profiler/issues/606)) ([8631f10](https://github.com/AmbiqAI/helia-profiler/commit/8631f10cd22a3f51f3a2c9d7936443ebde35caee))
+* **validate:** skip fp16 helia cases on cores without MVE ([3890c13](https://github.com/AmbiqAI/helia-profiler/commit/3890c13ec8b78b5f402b20d319e55d9ea579c7b8))
+* **validate:** skip fp16 helia cases on cores without MVE ([5d5e86d](https://github.com/AmbiqAI/helia-profiler/commit/5d5e86d3a6b5f54f66b0f2802fe9f78468d07c5a))
+* **validate:** skip LiteRT cases for float16 models ([d27f45d](https://github.com/AmbiqAI/helia-profiler/commit/d27f45d2ace6b5402b5c410813f4629ac899283a))
+* **validate:** skip LiteRT cases for float16 models ([bbd4cad](https://github.com/AmbiqAI/helia-profiler/commit/bbd4cad05208de03c8622974116cb0adc70ea6c9))
+
+
+### Documentation
+
+* align maintainer guidance with current ownership and security closeout ([#615](https://github.com/AmbiqAI/helia-profiler/issues/615)) ([3b0c6ae](https://github.com/AmbiqAI/helia-profiler/commit/3b0c6ae6a703e60ba5c813887b79811ef1f07a85))
+* **ci:** note how a8w8 Zoo arenas reuse built-ins ([f205cc2](https://github.com/AmbiqAI/helia-profiler/commit/f205cc291a47d8a8b1638fb0593c31cb03cd44ec))
+* clarify current contracts and API ownership ([#612](https://github.com/AmbiqAI/helia-profiler/issues/612)) ([6aec874](https://github.com/AmbiqAI/helia-profiler/commit/6aec87470666843c556d01f4fb5057e94cfb0f88))
+* map recipe example and tool ownership ([#624](https://github.com/AmbiqAI/helia-profiler/issues/624)) ([00c8801](https://github.com/AmbiqAI/helia-profiler/commit/00c8801b4def3305e58a1f7ab4239d9fe3e93686))
+
+
+### Code Refactoring
+
+* **firmware:** adopt the shared NSX RTT module ([#627](https://github.com/AmbiqAI/helia-profiler/issues/627)) ([9333ad9](https://github.com/AmbiqAI/helia-profiler/commit/9333ad913974e7294905340643dbb4661513cf4f)), closes [#382](https://github.com/AmbiqAI/helia-profiler/issues/382)
+
 ## [0.4.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.0...v0.4.1) (2026-10-25)
 
 
