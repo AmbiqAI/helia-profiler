@@ -99,10 +99,11 @@ nightly `complete` suite on 2026-09-16 recorded, for `apollo510_evb`:
   suite for the registered ones.
 - A case whose built image does not fit the board's flashable MRAM is a
   skip with the note `image exceeds flashable MRAM`: `hpx profile` stops
-  after the build with exit 4, before flashing, and the case counts as
-  skipped in the report and JUnit. On `apollo330mP_evb` the flashable MRAM
-  is 1552 KB, not the linker script's 1984 KB, because the top of MRAM is
-  erase-protected.
+  when the link overflows MRAM, or after the build when the image exceeds
+  the app extent, with exit 4, before flashing, and the case counts as
+  skipped in the report and JUnit. On `apollo330mP_evb` and
+  `apollo510dL_evb` the application MRAM is 1552 KB; radio firmware
+  occupies the top of the 2 MB bank.
 - Each case's bundle is an ordinary result bundle, so
   [Re-analyse saved results](../reanalyse-results/) applies to any of them.
 

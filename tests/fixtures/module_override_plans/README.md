@@ -8,3 +8,7 @@ that same commit's hashing implementation. Tests supply the equivalent model
 and stand in for local directory availability; they retain the stored content
 identity and compare the exact recorded intent hashes. Do not regenerate
 these fixtures using the current configuration contract.
+
+`baseline.json` is the compatibility baseline at that commit. The replay test
+loads it in place of the packaged baseline, so later baseline moves do not
+invalidate these records.

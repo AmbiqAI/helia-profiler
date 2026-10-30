@@ -108,7 +108,7 @@ def _write_valid_lock(
     (module_dir / "nsx-module.yaml").write_text("name: demo\n", encoding="utf-8")
     lock = NsxLock(
         generated_at="2026-08-03T00:00:00+00:00",
-        nsx_tool_version="0.9.0",
+        nsx_tool_version="0.9.2",
         manifest_hash=hash_manifest(ctx.firmware_dir / "nsx.yml"),
         target={"board": "apollo510_evb"},
         modules={

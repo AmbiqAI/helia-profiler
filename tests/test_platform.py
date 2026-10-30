@@ -127,8 +127,8 @@ def test_apollo330_hardware_facts_not_copied_from_apollo510():
     assert soc.swo_trace_clock_mhz == 48
     # Linked memories: 240 KB gcc MCU_TCM (the capacity-check ceiling;
     # the hardware DTCM aperture is 256 KB, see memory_map.py), 1792 KB
-    # SSRAM, 1552 KB flashable MRAM (the linker's 1984 KB top is
-    # erase-protected), no separate ITCM region.
+    # SSRAM, 1552 KB linker MCU_MRAM (radio firmware sits above), no
+    # separate ITCM region.
     assert soc.memory.dtcm_kb == 240
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
@@ -155,7 +155,7 @@ def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
     assert soc.memory.dtcm_kb == 240
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
-    assert soc.memory.mram_kb == 1984
+    assert soc.memory.mram_kb == 1552
     assert soc.memory.psram_kb == 32768
     assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
     assert soc.ssram_full_power_enum == "AM_HAL_PWRCTRL_SRAM_1P75M"

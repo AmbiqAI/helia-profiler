@@ -574,7 +574,7 @@ _register_soc(
             # DTCM_MAX_SIZE). memory_map.py records that aperture
             # separately (#176); do not cite this block as
             # "hardware-confirmed 240".
-            # Measured flashable MRAM; the top is erase-protected.
+            # Linker MCU_MRAM; radio firmware sits above.
             mram_kb=1552,
             sram_kb=1792,
             dtcm_kb=240,
@@ -645,8 +645,8 @@ _register_soc(
         has_mve=True,
         # Same linked memory map as apollo330P; boards decide if PSRAM is fitted.
         memory=MemoryLayout(
-            # Linker MRAM; flashable limit not yet measured.
-            mram_kb=1984,
+            # Linker MCU_MRAM; radio firmware sits above.
+            mram_kb=1552,
             sram_kb=1792,
             dtcm_kb=240,
             itcm_kb=0,
