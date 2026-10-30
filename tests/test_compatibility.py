@@ -35,13 +35,13 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert compatibility.qualification is QualificationState.QUALIFIED
     baseline = compatibility.baseline
     assert baseline.schema_version == BASELINE_SCHEMA_VERSION
-    assert baseline.neuralspotx_version == "0.9.0"
+    assert baseline.neuralspotx_version == "0.9.2"
     assert (
         baseline.neuralspotx_sha256
-        == "ba2dff4660ec0b6123796993e6a66637627ea55a8d8506a72e4408789856146a"
+        == "c3816103ad8f55c44701d2a498bbc8c1e9869ae3e8eec1ab09eb8d79c602df79"
     )
-    assert baseline.project("neuralspotx").ref == "ffb7339b14b00134b4ed2834a1640d61042c0962"
-    assert baseline.project("nsx-ambiq-sdk").ref == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+    assert baseline.project("neuralspotx").ref == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
+    assert baseline.project("nsx-ambiq-sdk").ref == "993b7901a82008ac4cd523ffe0b125a016a8f6a8"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
@@ -55,8 +55,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
     baseline = load_compatibility_baseline()
 
     assert {project.name: project.ref for project in baseline.projects} == {
-        "neuralspotx": "ffb7339b14b00134b4ed2834a1640d61042c0962",
-        "nsx-ambiq-sdk": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
+        "neuralspotx": "62ca121a73b906f6ca8a82d4146b3c69d9587c5d",
+        "nsx-ambiq-sdk": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
         # Vendored Arm Ethos-U core driver pulled transitively by nsx-npu;
         # the baseline records the resolved commit, not the registry's
         # mutable tag, so _verify_baseline_resolution covers the NPU
@@ -75,8 +75,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-segger-rtt": "9b5fe942de1607365a19bab1b6ed549541ff71c6",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
-        "nsx-ambiq-bsp": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
-        "nsx-npu": "aefce2ca858795e783c76726ebe7d14d9d4bde7c",
+        "nsx-ambiq-bsp": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+        "nsx-npu": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",

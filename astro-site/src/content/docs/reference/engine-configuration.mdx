@@ -143,7 +143,7 @@ at AOT compilation with the operator name.
 | `prefix` | `hpx` | C symbol prefix. |
 | `module_name` | `hpx_model` | Generated NSX module name. |
 | `cmsis_nn_requantize_inline_asm` | `true` | Inline-assembly requantisation. |
-| `linker_profile` | `default` | `itcm` promotes hot kernels into ITCM on Apollo5-family Cortex-M55 parts. |
+| `linker_profile` | `default` | `itcm` promotes hot kernels into ITCM on Apollo5-family Cortex-M55 parts that have ITCM (not Apollo330P or Apollo510 Lite). |
 | `aot_args` | `{}` | Pass-through arguments to the compiler, including the per-tensor memory rules described on [Memory placement](../../guide/memory/#heliaaot-per-tensor-placement). |
 | `platform_name` | from the board | Override the board to AOT platform mapping. |
 

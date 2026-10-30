@@ -17,7 +17,7 @@ from neuralspotx.models import AppConfig
 from helia_profiler.config import load_config
 from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
-from helia_profiler.errors import BuildError, DependencyError, FirmwareError
+from helia_profiler.errors import BuildError, DependencyError, FirmwareError, ImageTooLargeError
 from helia_profiler.firmware import (
     _board_module_name,
     _model_to_header,
@@ -1241,23 +1241,59 @@ class TestBuildApp:
 
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", overflowing_build)
         with pytest.raises(
-            BuildError, match="does not fit in MCU_MRAM: overflowed by 434,308"
+            ImageTooLargeError, match="does not fit in MCU_MRAM: overflowed by 434,308"
         ) as exc:
             build_app(ctx)
         assert "PSRAM" in (exc.value.hint or "")
 
     @pytest.mark.parametrize(
-        ("region", "advice"),
-        [("MCU_MRAM", "PSRAM"), ("ROMEM", "smaller model"), ("MCU_TCM", "arena")],
+        ("output", "advice", "error_type", "overflow"),
+        [
+            ("ld: region `MCU_MRAM' overflowed by 8 bytes", "PSRAM", ImageTooLargeError, 8),
+            ("ld: region `ROMEM' overflowed by 8 bytes", "smaller model", ImageTooLargeError, 8),
+            ("ld: region `MCU_TCM' overflowed by 8 bytes", "arena", BuildError, 8),
+            (
+                "ld.lld: error: section '.bss' will not fit in region 'MCU_TCM': "
+                "overflowed by 8 bytes",
+                "arena",
+                BuildError,
+                8,
+            ),
+            (
+                "Error: L6220E: Load region LR_1 size (1600904 bytes) exceeds limit "
+                "(1589248 bytes). Region contains 0 bytes of padding and 0 bytes of "
+                "veneers (total 0 bytes of linker generated content).",
+                "PSRAM",
+                ImageTooLargeError,
+                11_656,
+            ),
+            (
+                "Error: L6220E: Execution region MCU_MRAM size (1600904 bytes) exceeds "
+                "limit (1589248 bytes).",
+                "PSRAM",
+                ImageTooLargeError,
+                11_656,
+            ),
+            (
+                "Error: L6220E: Execution region MCU_TCM size (245760 bytes) exceeds "
+                "limit (241664 bytes).",
+                "arena",
+                BuildError,
+                4_096,
+            ),
+        ],
     )
-    def test_region_overflow_advice_follows_the_region(self, region: str, advice: str):
+    def test_region_overflow_advice_follows_the_region(
+        self, output: str, advice: str, error_type: type[BuildError], overflow: int
+    ):
         from helia_profiler.firmware.build import region_overflow_error
 
-        error = region_overflow_error(
-            BuildError("nsx build failed", details=f"ld: region `{region}' overflowed by 8 bytes")
-        )
+        error = region_overflow_error(BuildError("nsx build failed", returncode=1, details=output))
         assert error is not None and advice in (error.hint or "")
-        assert region not in ("ROMEM",) or "MRAM" not in (error.hint or "")
+        assert type(error) is error_type
+        assert error.returncode == 1
+        assert "ROMEM" not in output or "MRAM" not in (error.hint or "")
+        assert f"overflowed by {overflow:,} bytes" in str(error)
 
     def test_missing_binary_invalidates_frozen_sync_stamp(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
@@ -1673,8 +1709,8 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
-        assert projects["neuralspotx"]["revision"] == "ffb7339b14b00134b4ed2834a1640d61042c0962"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "993b7901a82008ac4cd523ffe0b125a016a8f6a8"
+        assert projects["neuralspotx"]["revision"] == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
 
     def test_atomiq110_pins_nsx_core_and_npu_module_entries(self, tmp_path: Path, fake_dist: Path):
         """The sdk baseline pin must reach the module_registry *module* entries.
@@ -1704,7 +1740,7 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = manifest["module_registry"]
-        sdk_ref = "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+        sdk_ref = "993b7901a82008ac4cd523ffe0b125a016a8f6a8"
         assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == sdk_ref
         assert registry["modules"]["nsx-core"]["revision"] == sdk_ref
         assert registry["modules"]["nsx-npu"]["revision"] == sdk_ref
@@ -1867,7 +1903,7 @@ class TestNsxModuleOverrides:
         assert len(direct_overrides) == sdk_module_count
         assert (
             manifest["module_registry"]["projects"]["neuralspotx"]["revision"]
-            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
+            == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
         )
 
     def test_ref_override_aligns_module_registry_revisions(self, tmp_path: Path, fake_dist: Path):
@@ -1909,11 +1945,11 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "aefce2ca858795e783c76726ebe7d14d9d4bde7c"
+            == "993b7901a82008ac4cd523ffe0b125a016a8f6a8"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]
-            == "ffb7339b14b00134b4ed2834a1640d61042c0962"
+            == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
         )
         # WORKAROUND neuralspotx#218: NSX honours a module's own revision
         # over its project's, so standalone baseline-pinned projects need a

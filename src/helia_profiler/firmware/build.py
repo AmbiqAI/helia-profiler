@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 from ..config import Transport
 from ..deps import nsx as nsx_cli
-from ..errors import BuildError
+from ..errors import BuildError, ImageTooLargeError
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -129,6 +129,11 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 _REGION_OVERFLOW = re.compile(
     r"region [`']?(?P<region>[A-Za-z0-9_]+)'?:? overflowed by (?P<bytes>\d+) bytes"
 )
+# armlink: "L6220E: Load region LR_1 size (1600904 bytes) exceeds limit (1589248 bytes)"
+_ARMLINK_OVERFLOW = re.compile(
+    r"L6220E: (?P<kind>Load|Execution) region (?P<region>[A-Za-z0-9_]+) "
+    r"size \((?P<size>\d+) bytes\) exceeds limit \((?P<limit>\d+) bytes\)"
+)
 
 
 #: Linker regions that hold code and weights: MRAM on Apollo4/5, NOR flash
@@ -136,20 +141,41 @@ _REGION_OVERFLOW = re.compile(
 _NONVOLATILE_REGIONS = ("MRAM", "ROMEM", "FLASH")
 
 
+def _find_overflow(text: str) -> tuple[str, int, bool] | None:
+    """Region, overflow bytes and whether it is a load region."""
+    match = _REGION_OVERFLOW.search(text)
+    if match is not None:
+        return match["region"], int(match["bytes"]), False
+    match = _ARMLINK_OVERFLOW.search(text)
+    if match is not None:
+        overflow = int(match["size"]) - int(match["limit"])
+        return match["region"], overflow, match["kind"] == "Load"
+    return None
+
+
 def region_overflow_error(exc: BuildError) -> BuildError | None:
-    """A linker region overflow as a placement error, or ``None`` for other failures."""
-    match = _REGION_OVERFLOW.search(f"{exc.details or ''}\n{exc}")
-    if match is None:
+    """A linker region overflow as a placement error, or ``None`` for other failures.
+
+    A nonvolatile overflow is an :class:`ImageTooLargeError`, the same
+    outcome as the post-build flash check.
+    """
+    found = _find_overflow(f"{exc.details or ''}\n{exc}")
+    if found is None:
         return None
-    region, overflow = match["region"], int(match["bytes"])
-    hint = (
-        f"The model weights plus the runtime and application code exceed the {region} "
-        "space the linker can use. Use a smaller model, or place weights in PSRAM "
-        "(--weights-location psram) on a board that has PSRAM."
-        if any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
-        else "Reduce the arena size or choose another --arena-location."
+    region, overflow, is_load = found
+    # Scatter load regions live in flash.
+    nonvolatile = is_load or any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
+    cls, hint = (
+        (
+            ImageTooLargeError,
+            f"The model weights plus the runtime and application code exceed the {region} "
+            "space the linker can use. Use a smaller model, or place weights in PSRAM "
+            "(--weights-location psram) on a board that has PSRAM.",
+        )
+        if nonvolatile
+        else (BuildError, "Reduce the arena size or choose another --arena-location.")
     )
-    return BuildError(
+    return cls(
         f"The linked image does not fit in {region}: overflowed by {overflow:,} bytes",
         hint=hint,
         returncode=exc.returncode,

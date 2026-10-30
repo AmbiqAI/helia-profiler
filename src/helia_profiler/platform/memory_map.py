@@ -127,8 +127,8 @@ class LinkedRegionWindow:
     #: window and app extents have separate provenance because hardware
     #: bounds and linker reservations come from different sources.
     window_provenance: str = "hardware-aperture"
-    #: Where the app extents came from — linker-script characterization,
-    #: board knowledge (PSRAM), or "measured-flashable" (hardware flash test).
+    #: Where the app extents came from — linker-script characterization
+    #: or board knowledge (PSRAM).
     app_provenance: str = "linker-script"
     #: False when the characterized linker scripts provide no section region
     #: here (PSRAM). Consumers must reconcile such regions from
@@ -280,9 +280,9 @@ _APOLLO5_FULL = (
     _window(MemoryRegion.SRAM, 0x20080000, 3_145_728, gnu=3_145_728, armlink=3_145_728),
 )
 
-# apollo510L / apollo330P — apollo330P/gcc/linker_script_sbl.ld:10-12,
-# apollo330P/armclang/linker_script_sbl.sct:6-33 (byte-identical to
-# apollo510L's). No ITCM region in the DEFAULT script (.dtcm_text goes to
+# apollo510L / apollo330P — apollo330P/gcc/linker_script_sbl.ld:11-13,
+# apollo330P/armclang/linker_script_sbl.sct:7-36 (apollo510L's regions
+# are identical). No ITCM region in the DEFAULT script (.dtcm_text goes to
 # MCU_TCM instead). The DTCM window is the HARDWARE aperture, 256 KB — the
 # SDK's am_reg_base_addresses.h says DTCM_MAX_SIZE = 256 KB, and armlink's
 # scatter tiles to exactly that (MCU_TCM 0x3B000 + heap 0x1000 + stack
@@ -291,7 +291,16 @@ _APOLLO5_FULL = (
 # choice, not a hardware limit. The
 # armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
 # should.
-_APOLLO330P_RAM = (
+_APOLLO330P = (
+    # Window runs to the physical NVM top.
+    _window(
+        MemoryRegion.MRAM,
+        0x00410000,
+        2_031_616,
+        gnu=1_589_248,
+        armlink=1_589_248,
+        window_provenance="linker-app-origin",
+    ),
     # gcc extent = the FULL 240 KB MCU_TCM script region. On THIS part
     # .dtcm_text precedes .stack into MCU_TCM (and hpx's AOT engine emits
     # .dtcm_text via HELIAAOT_PUT_IN_ITCM on ITCM-less parts), so the
@@ -305,32 +314,6 @@ _APOLLO330P_RAM = (
         armlink=241_664,
     ),
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
-)
-
-_APOLLO510L = (
-    _window(
-        MemoryRegion.MRAM,
-        0x00410000,
-        2_031_616,
-        gnu=2_031_616,
-        armlink=2_031_616,
-        window_provenance="linker-app-origin",
-    ),
-    *_APOLLO330P_RAM,
-)
-
-# Linker window; measured flashable app extent.
-_APOLLO330P = (
-    _window(
-        MemoryRegion.MRAM,
-        0x00410000,
-        2_031_616,
-        gnu=1_589_248,
-        armlink=1_589_248,
-        window_provenance="linker-app-origin",
-        app_provenance="measured-flashable",
-    ),
-    *_APOLLO330P_RAM,
 )
 
 # atomiq110 — atomiq110/gcc/linker_script_nbl.ld:16-21, atomiq110/armclang/
@@ -378,7 +361,7 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
         "apollo510b": _APOLLO5_FULL,
         "apollo5b": _APOLLO5_FULL,
         "apollo330P": _APOLLO330P,
-        "apollo510L": _APOLLO510L,
+        "apollo510L": _APOLLO330P,
         "atomiq110": _ATOMIQ110,
     }
 )
@@ -403,8 +386,8 @@ def linked_memory_map(
     characterize NSX's DEFAULT profile ONLY (sbl-based on Apollo parts,
     nbl-based on atomiq110). ``itcm`` is a
     documented engine knob (the ``guide/engines`` page) forwarded straight
-    to CMake, and its scripts declare DIFFERENT regions — on apollo330P,
-    AP510-sized ones (see upstream-script investigation in #176) — so any
+    to CMake, and its scripts declare DIFFERENT regions (apollo330P and
+    apollo510L have none) — so any
     profile other than ``default`` returns empty: the honest "unavailable"
     instead of a confidently wrong map.
     """
