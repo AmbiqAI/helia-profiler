@@ -29,10 +29,13 @@ from typing import Any
 import yaml
 
 from ..engines import EngineType
+from ..errors import EXIT_IMAGE_TOO_LARGE
 from ..results.run_summary import load_run_summary
 from ..results.serde import strip_none
 from .matrix import CaseSpec, MemoryProfile
 
+#: Skip reason for an image too large to flash.
+_TOO_LARGE_REASON = "image exceeds flashable MRAM"
 _TRANSIENT_POWER_LOCK_RETRY_DELAY_S = 5.0
 _TRANSIENT_POWER_LOCK_MARKERS = (
     "is already in use by another process",
@@ -520,9 +523,10 @@ def run_case(
         pass
 
     if proc.returncode != 0:
+        too_large = proc.returncode == EXIT_IMAGE_TOO_LARGE
         return CaseResult(
             case_id=case.case_id,
-            status="fail",
+            status="skip" if too_large else "fail",
             duration_s=duration,
             engine=case.engine,
             model_id=case.model.id,
@@ -542,7 +546,7 @@ def run_case(
             attempt=case.attempt,
             repeat_total=case.repeat_total,
             output_dir=str(case_dir),
-            error=f"hpx profile exited {proc.returncode}",
+            error=_TOO_LARGE_REASON if too_large else f"hpx profile exited {proc.returncode}",
             stdout_tail=stdout_tail,
             stderr_tail=stderr_tail,
             log_path=log_path,

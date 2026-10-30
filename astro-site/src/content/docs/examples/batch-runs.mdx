@@ -97,6 +97,12 @@ nightly `complete` suite on 2026-09-16 recorded, for `apollo510_evb`:
   makes an invalid run exit 3; the suite form gives you the manifest and
   JUnit output CI can consume. Use the loop for your own models and the
   suite for the registered ones.
+- A case whose built image does not fit the board's flashable MRAM is a
+  skip with the note `image exceeds flashable MRAM`: `hpx profile` stops
+  after the build with exit 4, before flashing, and the case counts as
+  skipped in the report and JUnit. On `apollo330mP_evb` the flashable MRAM
+  is 1552 KB, not the linker script's 1984 KB, because the top of MRAM is
+  erase-protected.
 - Each case's bundle is an ordinary result bundle, so
   [Re-analyse saved results](../reanalyse-results/) applies to any of them.
 

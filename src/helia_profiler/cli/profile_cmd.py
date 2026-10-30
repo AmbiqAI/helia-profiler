@@ -13,7 +13,7 @@ from .options import _build_cli_overrides
 def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any) -> None:
     from ..config import load_config
     from ..console import HpxConsole
-    from ..errors import HpxError
+    from ..errors import EXIT_IMAGE_TOO_LARGE, HpxError, ImageTooLargeError
 
     cli = _build_cli_overrides(verbose=verbose, **params)
 
@@ -40,7 +40,7 @@ def _cmd_profile(*, config: Path | None = None, verbose: int = 0, **params: Any)
         sys.exit(130)
     except HpxError as exc:
         console.print_error(exc)
-        sys.exit(1)
+        sys.exit(EXIT_IMAGE_TOO_LARGE if isinstance(exc, ImageTooLargeError) else 1)
 
     # Apply the opt-in exit policy only after reports and presentation complete.
     if (

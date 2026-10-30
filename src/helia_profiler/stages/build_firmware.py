@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..errors import BuildError
+from ..errors import BuildError, ImageTooLargeError
 from ..firmware.image import record_build_image
 from ..hostenv.memory_measurement import measure_memory_regions, reconcile_memory
 from ..hostenv.toolchain_probe import (
@@ -14,7 +14,8 @@ from ..hostenv.toolchain_probe import (
     symbol_inventory,
 )
 from ..pipeline import PipelineContext
-from ..results import FirmwareArtifact, ToolchainInfo
+from ..platform.placement import MemoryRegion
+from ..results import FirmwareArtifact, MeasuredMemoryRegions, ToolchainInfo
 
 log = logging.getLogger("hpx")
 
@@ -66,6 +67,7 @@ class BuildFirmwareStage:
                 linker_profile=linker_profile,
                 timeout_s=ctx.config.timeouts.binary_probe_s,
             )
+            check_image_fits(ctx.memory_regions, has_psram=ctx.soc.memory.psram_kb > 0)
         # Symbol inventory + plan-vs-measured reconciliation (#133). A
         # partial nm listing is refused like a partial section inventory —
         # never understate.
@@ -116,3 +118,21 @@ class BuildFirmwareStage:
             compiler_version=compiler_version(toolchain, timeout_s=probe_s),
             cmake_version=cmake_version(timeout_s=probe_s),
         )
+
+
+def check_image_fits(regions: MeasuredMemoryRegions | None, *, has_psram: bool) -> None:
+    """Refuse an image larger than the flashable MRAM.
+
+    An unavailable measurement skips the check rather than guessing.
+    """
+    mram = regions.region(MemoryRegion.MRAM) if regions is not None else None
+    if mram is None or mram.load_image <= mram.app_length:
+        return
+    raise ImageTooLargeError(
+        f"Image exceeds flashable MRAM by {mram.load_image - mram.app_length:,} bytes",
+        hint=(
+            "Use a smaller model, or place weights in PSRAM."
+            if has_psram
+            else "Use a smaller model."
+        ),
+    )

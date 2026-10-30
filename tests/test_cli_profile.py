@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from helia_profiler.cli import profile_cmd as cli
 from helia_profiler.console import HpxConsole
+from helia_profiler.errors import EXIT_IMAGE_TOO_LARGE, BuildError, ImageTooLargeError
 from helia_profiler.results import FirmwareMeta, PmuResult, ProfileResult
 
 
@@ -148,3 +151,27 @@ def test_profile_signature_matches_override_specs():
 
     sig_params = set(inspect.signature(profile_command).parameters) - {"config"}
     assert sig_params == set(_KNOWN_PARAMS)
+
+
+@pytest.mark.parametrize(
+    ("error", "code"),
+    [
+        (ImageTooLargeError("Image exceeds flashable MRAM by 1 bytes"), EXIT_IMAGE_TOO_LARGE),
+        (BuildError("Build failed"), 1),
+    ],
+)
+def test_profile_cli_exit_code_names_oversized_image(monkeypatch, error, code) -> None:
+    monkeypatch.setattr(
+        "helia_profiler.config.load_config", lambda path, overrides: SimpleNamespace(verbose=0)
+    )
+
+    def fail(config, **kwargs):
+        raise error
+
+    monkeypatch.setattr("helia_profiler.api._execute_profile", fail)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _run_profile_cmd()
+
+    assert excinfo.value.code == code
+    assert EXIT_IMAGE_TOO_LARGE == 4

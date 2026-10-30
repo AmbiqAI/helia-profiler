@@ -128,7 +128,7 @@ class LinkedRegionWindow:
     #: bounds and linker reservations come from different sources.
     window_provenance: str = "hardware-aperture"
     #: Where the app extents came from — linker-script characterization,
-    #: or board knowledge (PSRAM).
+    #: board knowledge (PSRAM), or "measured-flashable" (hardware flash test).
     app_provenance: str = "linker-script"
     #: False when the characterized linker scripts provide no section region
     #: here (PSRAM). Consumers must reconcile such regions from
@@ -280,7 +280,7 @@ _APOLLO5_FULL = (
     _window(MemoryRegion.SRAM, 0x20080000, 3_145_728, gnu=3_145_728, armlink=3_145_728),
 )
 
-# apollo330P — apollo330P/gcc/linker_script_sbl.ld:10-12,
+# apollo510L / apollo330P — apollo330P/gcc/linker_script_sbl.ld:10-12,
 # apollo330P/armclang/linker_script_sbl.sct:6-33 (byte-identical to
 # apollo510L's). No ITCM region in the DEFAULT script (.dtcm_text goes to
 # MCU_TCM instead). The DTCM window is the HARDWARE aperture, 256 KB — the
@@ -291,15 +291,7 @@ _APOLLO5_FULL = (
 # choice, not a hardware limit. The
 # armlink 16 KB stack at 0x2003C000 therefore classifies as DTCM, as it
 # should.
-_APOLLO330P = (
-    _window(
-        MemoryRegion.MRAM,
-        0x00410000,
-        2_031_616,
-        gnu=2_031_616,
-        armlink=2_031_616,
-        window_provenance="linker-app-origin",
-    ),
+_APOLLO330P_RAM = (
     # gcc extent = the FULL 240 KB MCU_TCM script region. On THIS part
     # .dtcm_text precedes .stack into MCU_TCM (and hpx's AOT engine emits
     # .dtcm_text via HELIAAOT_PUT_IN_ITCM on ITCM-less parts), so the
@@ -313,6 +305,32 @@ _APOLLO330P = (
         armlink=241_664,
     ),
     _window(MemoryRegion.SRAM, 0x20080000, 1_835_008, gnu=1_835_008, armlink=1_835_008),
+)
+
+_APOLLO510L = (
+    _window(
+        MemoryRegion.MRAM,
+        0x00410000,
+        2_031_616,
+        gnu=2_031_616,
+        armlink=2_031_616,
+        window_provenance="linker-app-origin",
+    ),
+    *_APOLLO330P_RAM,
+)
+
+# Linker window; measured flashable app extent.
+_APOLLO330P = (
+    _window(
+        MemoryRegion.MRAM,
+        0x00410000,
+        2_031_616,
+        gnu=1_589_248,
+        armlink=1_589_248,
+        window_provenance="linker-app-origin",
+        app_provenance="measured-flashable",
+    ),
+    *_APOLLO330P_RAM,
 )
 
 # atomiq110 — atomiq110/gcc/linker_script_nbl.ld:16-21, atomiq110/armclang/
@@ -360,9 +378,7 @@ _MAPS: Mapping[str, tuple[LinkedRegionWindow, ...]] = MappingProxyType(
         "apollo510b": _APOLLO5_FULL,
         "apollo5b": _APOLLO5_FULL,
         "apollo330P": _APOLLO330P,
-        # apollo510L's linker scripts are byte-identical to apollo330P's (see
-        # the _APOLLO330P note above).
-        "apollo510L": _APOLLO330P,
+        "apollo510L": _APOLLO510L,
         "atomiq110": _ATOMIQ110,
     }
 )
