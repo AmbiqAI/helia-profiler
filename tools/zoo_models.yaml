@@ -61,3 +61,39 @@ models:
     rev: 0124dea005e876b9589537180c0b1f111d115699
     sha256: 9e6b9904bf5987912b41445f64d7d0233ab66d0128675a764986177fb6b0c064
     arena_size: 16384
+  - zoo: heartkit-arr
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 75128e080d1ff33cf90dc985a25b5857e939225f0458bc8845d249de252423df
+    arena_size: 65536
+  - zoo: heartkit-arr
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 9f6c276dd547c4fe649c7cb389ba45773c2ae31b439ec65695937ce5d2cb2a5c
+    arena_size: 65536
+  - zoo: heartkit-arr
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 521e63b5ca20a86d2f4077f0c06c223c9c594fca01f6bb50421859908aceac47
+    arena_size: 65536
+  - zoo: heartkit-seg
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 1d32489a846bad80a9473a76ab403331568cf757cd629813939dab6bd734ae0b
+    arena_size: 32768
+  - zoo: heartkit-seg
+    precision: a16w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 91cabb0a57ea1b66c7de78d03e52e94eaa89c4149eb3ed0afa88f0a597d2c626
+    arena_size: 65536
+  - zoo: heartkit-seg
+    precision: fp32
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: e72790735c1bf673a485f7ae79b0a45ab614f4ebb32525eb3d37e72cee8e73f0
+    arena_size: 131072
+  - zoo: heartkit-seg
+    precision: fp16
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 8104511d2fc2587aa31aea938139c92ce672c24ba840bcae4ebe5b8078a08685
+    arena_size: 65536
+# heartkit-arr a16w8 omitted: LiteRT rejects per-channel FC.
