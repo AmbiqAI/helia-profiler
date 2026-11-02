@@ -448,7 +448,7 @@ jobs:
           printf '%s\n' "${preview}"
           # A selection that matches nothing used to pass silently: no
           # bundle, green job, and nothing for the dashboard to show.
-          if [[ "${preview}" == *"0 case(s) would run"* ]]; then
+          if grep -qx '0 case(s) would run:' <<< "${preview}"; then
             echo "::error::the requested suite, boards, and axes select no validation cases on ${HPX_VALIDATION_BOARD}" >&2
             exit 2
           fi

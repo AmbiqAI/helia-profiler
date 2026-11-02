@@ -386,6 +386,9 @@ def test_preview_fails_when_no_case_is_selected(
     assert "select no validation cases on apollo3p_evb" in failure.value.stderr
     listed = 'uv() { printf "1 case(s) would run:\n  apollo3p_evb-kws-rt-ns\n"; }\n' + script
     assert "1 case(s) would run:" in _run_bash(listed, env, tmp_path)
+    # A count ending in 0 is not an empty selection.
+    ten = 'uv() { printf "10 case(s) would run:\n  apollo3p_evb-kws-rt-ns\n"; }\n' + script
+    assert "10 case(s) would run:" in _run_bash(ten, env, tmp_path)
 
 
 def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> None:
