@@ -96,4 +96,21 @@ models:
     rev: 0124dea005e876b9589537180c0b1f111d115699
     sha256: 8104511d2fc2587aa31aea938139c92ce672c24ba840bcae4ebe5b8078a08685
     arena_size: 65536
+  - zoo: mlperf-tiny-streaming-wake-word
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 0275b7139fd5966605a83a318cded2d7dd8ae2a0e69614950c98ff96aa056f28
+    arena_size: 32768
+  - zoo: compressionkit-ppg-encoder
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: e570dc9a4b43df106c62983612fbe59ff1d39a31dc296b18c09411d07586cdae
+    arena_size: 32768
+  - zoo: sleepkit-stage
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: c3e37e74c0ffc21b054744d65f2f845f45a9f3257badb15dffe9e6e9371df7d8
+    arena_size: 65536
 # heartkit-arr a16w8 omitted: LiteRT rejects per-channel FC.
+# compressionkit-ecg-prior omitted: GELU not registered.
+# fomo-cuedc-animals omitted: 393 KB activations.

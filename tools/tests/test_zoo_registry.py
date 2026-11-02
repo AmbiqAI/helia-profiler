@@ -120,6 +120,9 @@ def test_checked_in_list_is_valid():
         ),
         *(("heartkit-arr", precision) for precision in ("a8w8", "fp32", "fp16")),
         *(("heartkit-seg", precision) for precision in ("a8w8", "a16w8", "fp32", "fp16")),
+        ("mlperf-tiny-streaming-wake-word", "a8w8"),
+        ("compressionkit-ppg-encoder", "a8w8"),
+        ("sleepkit-stage", "a8w8"),
     }
 
 
