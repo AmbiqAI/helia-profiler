@@ -27,8 +27,10 @@ consumer remediation. The checks below support those owners.
   Python versions. The workflow cache key invalidates old hook environments.
 - Nix keeps the firmware compiler input unchanged. A separate pinned input
   supplies uv and the CA bundle; the Python override replaces its ensurepip
-  wheel with the upstream checksum-verified patched pip wheel. The development
-  shell selects that CA bundle. `checks.<system>.certificate-tools` verifies the
+  wheel with the upstream checksum-verified patched pip wheel. It is a nixpkgs
+  overlay, so console-script shebangs and the environment share one
+  interpreter; `checks.<system>.python-environment-scripts` runs `hpx` and
+  `nsx` from the environment. The development shell selects that CA bundle. `checks.<system>.certificate-tools` verifies the
   executable uv, Python ensurepip and the contributor virtualenv seed. The Nix
   contributor pre-commit uses that patched virtualenv; evaluation alone does not
   execute these checks.

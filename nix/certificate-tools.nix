@@ -17,14 +17,17 @@ let
 in
 {
   inherit virtualenv;
-  python312 = pkgs.python312.overrideAttrs (old: {
-    postPatch = (old.postPatch or "") + ''
-      rm Lib/ensurepip/_bundled/pip-*.whl
-      cp ${pipWheel} Lib/ensurepip/_bundled/pip-26.2.2-py3-none-any.whl
-      substituteInPlace Lib/ensurepip/__init__.py \
-        --replace-fail '_PIP_VERSION = "25.0.1"' '_PIP_VERSION = "26.2.2"'
-    '';
-  });
+  # An overlay keeps pythonOnBuildForHost patched too.
+  overlay = final: prev: {
+    python312 = prev.python312.overrideAttrs (old: {
+      postPatch = (old.postPatch or "") + ''
+        rm Lib/ensurepip/_bundled/pip-*.whl
+        cp ${pipWheel} Lib/ensurepip/_bundled/pip-26.2.2-py3-none-any.whl
+        substituteInPlace Lib/ensurepip/__init__.py \
+          --replace-fail '_PIP_VERSION = "25.0.1"' '_PIP_VERSION = "26.2.2"'
+      '';
+    });
+  };
   preCommit =
     (pkgs.pre-commit.override {
       python3Packages = pkgs.python3Packages // {

@@ -78,8 +78,8 @@
           overlays = [
             (final: prev: {
               inherit (import nixpkgs-trust { inherit system; }) uv;
-              inherit (certificateTools.${system}) python312;
             })
+            certificateTools.${system}.overlay
           ];
           config.allowUnfreePredicate =
             pkg:
@@ -390,6 +390,12 @@
             c.pkgs.runCommand "helia-profiler-nix-compat-rules" { } ''
               ${c.pkgs.coreutils}/bin/touch "$out"
             '';
+          # Console scripts must run the venv's interpreter.
+          python-environment-scripts = c.pkgs.runCommand "helia-profiler-nix-env-scripts" { } ''
+            ${c.runtimeEnv}/bin/hpx --version
+            ${c.runtimeEnv}/bin/nsx --help >/dev/null
+            "${c.pkgs.coreutils}/bin/touch" "$out"
+          '';
           smoke = c.pkgs.runCommand "helia-profiler-nix-smoke" { } ''
             export PATH="${
               lib.makeBinPath (
