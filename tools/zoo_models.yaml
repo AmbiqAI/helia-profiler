@@ -111,6 +111,21 @@ models:
     rev: 0124dea005e876b9589537180c0b1f111d115699
     sha256: c3e37e74c0ffc21b054744d65f2f845f45a9f3257badb15dffe9e6e9371df7d8
     arena_size: 65536
+  - zoo: microwakeword-okay-nabu
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 21eaaa2455fcc5b6fec5803be993aab08932e04d9f1d40396d55d5043f2ea0b0
+    arena_size: 32768
+  - zoo: rnnoise
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 9c582545b7c13af44616c44b654f4fe721aa2585630b0ca173ca3589f6f11c2c
+    arena_size: 32768
+  - zoo: dtln-tflm
+    precision: a8w8
+    rev: 0124dea005e876b9589537180c0b1f111d115699
+    sha256: 91e94316d1a4747dd3bddcf58423927e97213913a9b4210edca3f9402b2ff0fe
+    arena_size: 32768
 # heartkit-arr a16w8 omitted: LiteRT rejects per-channel FC.
 # compressionkit-ecg-prior omitted: GELU not registered.
 # fomo-cuedc-animals omitted: 393 KB activations.

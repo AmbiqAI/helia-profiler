@@ -123,6 +123,9 @@ def test_checked_in_list_is_valid():
         ("mlperf-tiny-streaming-wake-word", "a8w8"),
         ("compressionkit-ppg-encoder", "a8w8"),
         ("sleepkit-stage", "a8w8"),
+        ("microwakeword-okay-nabu", "a8w8"),
+        ("rnnoise", "a8w8"),
+        ("dtln-tflm", "a8w8"),
     }
 
 
