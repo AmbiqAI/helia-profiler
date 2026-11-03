@@ -452,24 +452,18 @@ Per board, the job:
    the downloads. uv's Python looks for a CA bundle where NixOS has none,
    so the step sets `SSL_CERT_FILE` to the NixOS bundle unless the runner
    sets one.
-2. lists both selections (failing if the Zoo one is empty), then runs the
+2. lists the Zoo selection (failing if it is empty), then runs the
    registry's models over the `complete` axes for `helia-rt`, `helia-aot`
    and `litert` into `results/validation/zoo/`.
-3. runs the built-in MLPerf models on `executorch` only, as `complete` does,
-   into `results/validation/executorch/`. Boards without ExecuTorch support
-   (anything but Cortex-M55) select no case and skip this run.
 
-Steps 2 and 3 are two `hpx validate` invocations because one invocation is
-the full models × engines product (it would rerun the built-in models on the
-other engines) and each invocation rewrites its output's
-`validation_manifest.json`. Both bundles go in the board's one
-`zoo-validation-<run_id>-<board>` artifact; a reader finds them by searching
-the artifact for `validation_manifest.json`. Both manifests record
+The Zoo nightly runs no built-in model and no ExecuTorch case; the
+`complete` nightly covers both. The bundle goes in the board's
+`zoo-validation-<run_id>-<board>` artifact; a reader finds it by searching
+the artifact for `validation_manifest.json`. The manifest records
 `validation.suite: complete`, so only the artifact name marks a Zoo bundle.
-A failure in step 2 still runs step 3, then fails the job.
 
 The `models` and `engines` inputs must stay empty for `suite=zoo`; the plan
-job rejects them. Other axis inputs apply to both invocations. The 12:00 UTC
+job rejects them. Other axis inputs apply to the run. The 12:00 UTC
 slot starts after the 09:00 nightly typically finishes (under two hours
 warm); a board whose 09:00 job still runs makes the Zoo job wait for its
 runner.

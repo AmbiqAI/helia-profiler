@@ -424,7 +424,7 @@ def test_zoo_mode_swaps_only_the_validation_steps(validate_job: dict[str, Any]) 
         "Checkout qualified nsx-executorch",
         "Initialize qualified ExecuTorch dependencies",
     ):
-        assert "env.HPX_VALIDATION_SUITE == 'zoo'" in _step(validate_job, name)["if"]
+        assert "zoo" not in _step(validate_job, name)["if"]
     build = _step(validate_job, "Build the Zoo model registry")["run"]
     assert "tools/zoo_registry.py" in build
     assert '--output "${HPX_ZOO_REGISTRY}" --cache "${HPX_ZOO_CACHE_DIR}"' in build
@@ -451,7 +451,7 @@ def test_plan_rejects_zoo_model_overrides(workflow: dict[Any, Any], tmp_path: Pa
 
 
 def _zoo_run(
-    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, et_count: str, fail: str
+    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, fail: str
 ) -> tuple[list[list[str]], subprocess.CompletedProcess[str]]:
     """Run the Zoo step against a fake hpx."""
     # A listing prints counts; a run fails on demand.
@@ -459,7 +459,7 @@ def _zoo_run(
 uv() {{
   printf "%s\\n" "$@" "--" >> calls
   if [[ " $* " == *" --list "* ]]; then
-    if [[ " $* " == *" --models-file "* ]]; then echo "12 case(s) would run:"; else echo "{et_count} case(s) would run:"; fi
+    echo "12 case(s) would run:"
   elif [[ -n "{fail}" && " $* " == *" {fail} "* ]]; then
     return 1
   fi
@@ -487,34 +487,22 @@ uv() {{
     return [call.split("\n") for call in raw if call], proc
 
 
-@pytest.mark.parametrize("et_count", ["0", "8", "10"])
 @pytest.mark.host_integration
-def test_zoo_step_runs_each_listed_selection(
-    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path, et_count: str
+def test_zoo_step_runs_the_registry(
+    workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
 ) -> None:
-    calls, proc = _zoo_run(workflow, validate_job, tmp_path, et_count, fail="")
+    calls, proc = _zoo_run(workflow, validate_job, tmp_path, fail="")
     assert proc.returncode == 0, proc.stderr
+    zoo_list, zoo = calls
+    assert "--list" in zoo_list
     for call in calls:
         assert call[:3] == ["run", "hpx", "validate"]
         assert call[call.index("--suite") + 1] == "complete"
         assert "--models" not in call
-    zoo_list, et_list, zoo, *et = calls
-    assert "--list" in zoo_list and "--list" in et_list
-    for call in (zoo_list, zoo):
         assert call[call.index("--models-file") + 1] == "results/validation/zoo-models.yaml"
         assert call[call.index("--engines") + 1] == "helia-rt,helia-aot,litert"
-    assert "--models-file" not in et_list
-    assert et_list[et_list.index("--engines") + 1] == "executorch"
-    runs = [zoo, *et]
-    outputs = [call[call.index("--output-dir") + 1] for call in runs]
-    # "10" must not read as zero.
-    expected = ["results/validation/zoo"]
-    if et_count != "0":
-        expected.append("results/validation/executorch")
-        assert et[0][et[0].index("--engines") + 1] == "executorch"
-    assert outputs == expected
-    for call, output in zip(runs, outputs, strict=True):
-        assert call[call.index("--junit-xml") + 1] == f"{output}/junit.xml"
+    assert zoo[zoo.index("--output-dir") + 1] == "results/validation/zoo"
+    assert zoo[zoo.index("--junit-xml") + 1] == "results/validation/zoo/junit.xml"
 
 
 @pytest.mark.host_integration
@@ -531,13 +519,9 @@ def test_zoo_step_fails_without_zoo_cases(
 
 
 @pytest.mark.host_integration
-def test_zoo_failure_still_runs_executorch(
+def test_zoo_failure_fails_the_step(
     workflow: dict[Any, Any], validate_job: dict[str, Any], tmp_path: Path
 ) -> None:
-    calls, proc = _zoo_run(workflow, validate_job, tmp_path, "8", fail="--models-file")
+    calls, proc = _zoo_run(workflow, validate_job, tmp_path, fail="--models-file")
     assert proc.returncode == 1
-    assert [call for call in calls if "--list" not in call][-1][-3:] == [
-        "results/validation/executorch",
-        "--junit-xml",
-        "results/validation/executorch/junit.xml",
-    ]
+    assert len(calls) == 2
