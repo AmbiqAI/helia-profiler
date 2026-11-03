@@ -12,8 +12,8 @@ decide whether to rerun, file, or dig.
    `legs.sh <run_id>` for one. Same board red on two different runners →
    code. Red on one runner while its sibling bench passes → bench. Note the
    first night each leg went red; compare against `git log origin/main` for
-   that day. Scheduled runs created near 12:00 UTC are the Zoo nightly
-   (`suite=zoo`), so five runs cover about two and a half nights.
+   that day. Scheduled runs are the Zoo nightly (`suite=zoo`); until
+   2026-11-04 a 09:00 UTC `complete` nightly also ran.
 2. Read only the failed step: fetch the job log with
    `gh api repos/AmbiqAI/helia-profiler/actions/jobs/<job_id>/logs`, then
    cut between the `##[group]Run` marker of the failed step and its

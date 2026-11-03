@@ -402,14 +402,11 @@ def test_plan_job_builds_matrix_from_boards_input(workflow: dict[Any, Any]) -> N
     )
 
 
-def test_zoo_nightly_has_its_own_cron(workflow: dict[Any, Any]) -> None:
+def test_zoo_is_the_only_nightly(workflow: dict[Any, Any]) -> None:
     triggers = _triggers(workflow)
-    assert [entry["cron"] for entry in triggers["schedule"]] == ["0 9 * * *", ZOO_CRON]
+    assert [entry["cron"] for entry in triggers["schedule"]] == [ZOO_CRON]
     assert "zoo" in triggers["workflow_dispatch"]["inputs"]["suite"]["options"]
-    # Only the Zoo cron selects zoo; other schedules keep complete.
-    assert workflow["env"]["HPX_VALIDATION_SUITE"] == (
-        f"${{{{ inputs.suite || (github.event.schedule == '{ZOO_CRON}' && 'zoo') || 'complete' }}}}"
-    )
+    assert workflow["env"]["HPX_VALIDATION_SUITE"] == "${{ inputs.suite || 'zoo' }}"
     assert workflow["env"]["HPX_VALIDATION_RUN_ORIGIN"] == (
         "${{ github.event_name == 'schedule' && 'nightly' || 'manual' }}"
     )
