@@ -330,8 +330,7 @@ jobs:
         if: >-
           contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
           contains(env.HPX_VALIDATION_ENGINES, 'et') ||
-          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '') ||
-          env.HPX_VALIDATION_SUITE == 'zoo'
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
         with:
           repository: AmbiqAI/nsx-executorch
           ref: ${{ env.HPX_NSX_EXECUTORCH_REF }}
@@ -343,8 +342,7 @@ jobs:
         if: >-
           contains(env.HPX_VALIDATION_ENGINES, 'executorch') ||
           contains(env.HPX_VALIDATION_ENGINES, 'et') ||
-          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '') ||
-          env.HPX_VALIDATION_SUITE == 'zoo'
+          (env.HPX_VALIDATION_SUITE == 'complete' && env.HPX_VALIDATION_ENGINES == '')
         run: |
           checkout_path="${GITHUB_WORKSPACE}/.dependencies/nsx-executorch"
 
@@ -537,7 +535,6 @@ jobs:
             args+=(--power-serials "${HPX_VALIDATION_POWER_SERIALS}")
           fi
           zoo=(--models-file "${HPX_ZOO_REGISTRY}" --engines "helia-rt,helia-aot,litert")
-          et=(--engines executorch)
           case_count() { sed -n 's/^\([0-9][0-9]*\) case(s) would run:$/\1/p' <<< "$1"; }
           preview="$(uv run hpx validate --list "${args[@]}" "${zoo[@]}")"
           printf '%s\n' "${preview}"
@@ -545,20 +542,9 @@ jobs:
             echo "::error::the zoo suite selects no cases on ${HPX_VALIDATION_BOARD}" >&2
             exit 2
           fi
-          # Boards without ExecuTorch list none.
-          preview="$(uv run hpx validate --list "${args[@]}" "${et[@]}")"
-          printf '%s\n' "${preview}"
-          et_cases="$(case_count "${preview}")"
-          status=0
           uv run hpx validate "${args[@]}" "${zoo[@]}" \
             --output-dir results/validation/zoo \
-            --junit-xml results/validation/zoo/junit.xml || status=$?
-          if [[ "${et_cases}" != 0 ]]; then
-            uv run hpx validate "${args[@]}" "${et[@]}" \
-              --output-dir results/validation/executorch \
-              --junit-xml results/validation/executorch/junit.xml || status=$?
-          fi
-          exit "${status}"
+            --junit-xml results/validation/zoo/junit.xml
 
       # Free the board before the hardware-free steps.
       - name: Release the board lock

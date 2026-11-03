@@ -27,7 +27,7 @@ decide whether to rerun, file, or dig.
    - Run hardware validation / Run Zoo validation → open the bundle (step 3).
 3. Bundles are small (≈1 MB, `work/` is excluded). `gh run download <run_id>
    -n hardware-validation-<run_id>-<board>` (`zoo-validation-…` for a Zoo
-   run, which holds `zoo/` and `executorch/` bundles). Group failed cases by the first
+   run, bundle under `zoo/`). Group failed cases by the first
    `Error:` line of `<case>/hpx_stderr.log`; the pattern across cases is the
    verdict (every `-power` case failing at `ensure_board_powered` = Joulescope,
    not firmware).
