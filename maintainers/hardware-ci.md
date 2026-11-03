@@ -232,9 +232,9 @@ look like a READY/GATE timeout.
 
 ## GitHub Actions workflow
 
-The `Hardware Validation` workflow runs two nightlies and on manual
-dispatch: the 09:00 UTC nightly runs `suite=complete` and the 12:00 UTC
-nightly runs `suite=zoo` (see "Zoo nightly" below). It runs one job per
+The `Hardware Validation` workflow runs one nightly and on manual
+dispatch: the 12:00 UTC nightly runs `suite=zoo` (see "Zoo nightly"
+below). Run `suite=complete` by manual dispatch. It runs one job per
 board. Each self-hosted runner owns exactly one board, is confined
 to that board's probes, and advertises three labels:
 
@@ -441,9 +441,9 @@ comparison, threshold enforcement, and dashboards should consume
 model registry" above). It is not an `hpx validate` suite: the workflow swaps
 its preview and run steps for a registry step and one Zoo run step, and keeps
 every other step (runner guard, board lock, `hpx probes match`, ns-cmsis-nn
-resolution, power gating, caches, compile gate). A scheduled run selects it
-by its cron, `0 12 * * *`; a manual run sets `suite=zoo`. Both crons record
-`run.origin: nightly`.
+resolution, power gating, caches, compile gate). Every scheduled run
+selects it (cron `0 12 * * *`) and records `run.origin: nightly`; a manual
+run sets `suite=zoo`.
 
 Per board, the job:
 
@@ -456,17 +456,14 @@ Per board, the job:
    registry's models over the `complete` axes for `helia-rt`, `helia-aot`
    and `litert` into `results/validation/zoo/`.
 
-The Zoo nightly runs no built-in model and no ExecuTorch case; the
-`complete` nightly covers both. The bundle goes in the board's
+The Zoo nightly runs no built-in model and no ExecuTorch case; dispatch
+`suite=complete` for those. The bundle goes in the board's
 `zoo-validation-<run_id>-<board>` artifact; a reader finds it by searching
 the artifact for `validation_manifest.json`. The manifest records
 `validation.suite: complete`, so only the artifact name marks a Zoo bundle.
 
 The `models` and `engines` inputs must stay empty for `suite=zoo`; the plan
-job rejects them. Other axis inputs apply to the run. The 12:00 UTC
-slot starts after the 09:00 nightly typically finishes (under two hours
-warm); a board whose 09:00 job still runs makes the Zoo job wait for its
-runner.
+job rejects them. Other axis inputs apply to the run.
 
 The dashboard's MLPerf view reads only `hardware-validation-*` artifacts and
 skips scheduled runs without one, so Zoo runs do not displace its nightlies.

@@ -9,9 +9,7 @@ name: Hardware Validation
 
 on:
   schedule:
-    # 09:00 UTC nightly (01:00 PDT / 00:00 PST).
-    - cron: "0 9 * * *"
-    # Zoo nightly, after the 09:00 one.
+    # Zoo nightly, 12:00 UTC.
     - cron: "0 12 * * *"
   workflow_dispatch:
     inputs:
@@ -116,9 +114,8 @@ env:
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
   HPX_NSX_EXECUTORCH_REF: 5514ac1ea8439b3fe615d180bf68c75a9dabb48e
-  # Scheduled runs have no workflow_dispatch inputs. Keep those runs aligned
-  # with the manual defaults, except that nightly validation covers the full suite.
-  HPX_VALIDATION_SUITE: ${{ inputs.suite || (github.event.schedule == '0 12 * * *' && 'zoo') || 'complete' }}
+  # Scheduled runs take no inputs; run zoo.
+  HPX_VALIDATION_SUITE: ${{ inputs.suite || 'zoo' }}
   HPX_VALIDATION_BOARDS: ${{ inputs.boards || 'apollo510_evb,apollo330mP_evb,apollo3p_evb,apollo4l_blue_evb' }}
   HPX_VALIDATION_MODELS: ${{ inputs.models || '' }}
   HPX_VALIDATION_ENGINES: ${{ inputs.engines || '' }}
