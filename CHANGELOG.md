@@ -66,7 +66,7 @@ release pull requests from Conventional Commits.
 
 ### Features
 
-* **zoo:** add pinned microWakeWord Okay Nabu, RNNoise and DTLN-TFLM a8w8 selections. The Zoo workflow now runs only Zoo models; use the manual complete suite for ExecuTorch coverage. ([#638](https://github.com/AmbiqAI/helia-profiler/pull/638))
+* **zoo:** add pinned microWakeWord Okay Nabu, RNNoise and DTLN-TFLM a8w8 selections. ([#637](https://github.com/AmbiqAI/helia-profiler/pull/637)) The Zoo workflow now runs only Zoo models; use the manual complete suite for ExecuTorch coverage. ([#638](https://github.com/AmbiqAI/helia-profiler/pull/638))
 
 * **zoo:** add pinned INT8 streaming wake word, CompressionKit PPG encoder and SleepKit stage selections to the validation list. ([#635](https://github.com/AmbiqAI/helia-profiler/pull/635))
 
