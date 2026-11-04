@@ -412,6 +412,89 @@ def test_adapter_rejects_sidecar_with_malformed_operator_list(tmp_path: Path, ke
         ExecuTorchAdapter().prepare(config, tmp_path / "work")
 
 
+def _helia_aot_module(directory: Path, name: str) -> Path:
+    module = directory / name
+    module.mkdir(parents=True)
+    (module / "nsx-module.yaml").write_text(f"module:\n  name: {name}\n", encoding="utf-8")
+    (module / "CMakeLists.txt").write_text(f"add_library({name} STATIC)\n", encoding="utf-8")
+    return module
+
+
+def test_adapter_adds_helia_aot_modules_next_to_the_pte(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    module = _helia_aot_module(config.model.path.parent, "haot_0123456789")
+    _write_sidecar(config.model.path, helia_aot_modules=[{"module": "haot_0123456789"}])
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_HELIA_AOT"] == "ON"
+    assert artifacts.executorch_link_targets == ("nsx::haot_0123456789",)
+    names = [m.name for m in artifacts.extra_modules]
+    # The provider, then nsx-executorch, then the delegate's modules.
+    assert names == ["nsx-cmsis-nn", "nsx-executorch", "haot_0123456789"]
+    assert artifacts.extra_modules[-1].path == module.resolve()
+    assert artifacts.extra_modules[-1].local is True
+
+
+def test_adapter_finds_helia_aot_modules_in_helia_aot_dir(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    modules_dir = tmp_path / "exported" / "haot"
+    _helia_aot_module(modules_dir, "haot_aaaa")
+    config = _sidecar_config(tmp_path, source, helia_aot_dir=str(modules_dir))
+    _write_sidecar(config.model.path, helia_aot_modules=[{"module": "haot_aaaa"}])
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.executorch_link_targets == ("nsx::haot_aaaa",)
+
+
+def test_adapter_without_helia_aot_leaves_backend_off(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_HELIA_AOT"] == "OFF"
+    assert artifacts.executorch_link_targets == ()
+
+
+def test_adapter_rejects_missing_helia_aot_module(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, helia_aot_modules=[{"module": "haot_missing"}])
+
+    with pytest.raises(EngineError, match="heliaAOT module haot_missing not found"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+def test_adapter_rejects_helia_aot_with_arm_provider(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source, backend="arm")
+    _helia_aot_module(config.model.path.parent, "haot_0123456789")
+    _write_sidecar(
+        config.model.path,
+        kernel_provider="arm",
+        requires_ns_ops=False,
+        operators={"cortex_m": [], "cortex_m_ns": [], "portable": []},
+        helia_aot_modules=[{"module": "haot_0123456789"}],
+    )
+
+    with pytest.raises(EngineError, match="needs engine.backend 'ns'"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+@pytest.mark.parametrize("entry", [["haot_x"], [{"module": 3}], "haot_x"])
+def test_adapter_rejects_malformed_helia_aot_modules(tmp_path: Path, entry):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path, helia_aot_modules=entry)
+
+    with pytest.raises(EngineError, match="helia_aot_modules"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
 def test_adapter_explicit_config_overrides_sidecar(tmp_path: Path):
     source = _source_tree(tmp_path)
     config = _config(tmp_path, source, backend="ns", ns_ops=True)
@@ -1018,3 +1101,39 @@ def test_offline_explicit_source_does_not_access_cache(tmp_path, monkeypatch):
         _offline_config(tmp_path, source, explicit=True), tmp_path / "work"
     )
     assert artifacts.extra_modules
+
+
+def test_cmake_template_links_executorch_link_targets():
+    def render(targets):
+        return _jinja_env.get_template("CMakeLists.txt.j2").render(
+            board="apollo510_evb",
+            engine_type="executorch",
+            has_ethos_u=False,
+            cmake_vars={},
+            source_roots=[],
+            compiler_launcher=None,
+            aot_cmake_target="",
+            executorch_link_targets=targets,
+            transport="rtt",
+            rtt_buffer_size_up=32768,
+            arena_region="tcm",
+            weights_region="sram",
+            has_armv8m_pmu=True,
+            power_sync_enabled=False,
+            power_binary_needs_gpio=False,
+            power_monitor=None,
+            arena_regions=[],
+            power_binary_enabled=True,
+        )
+
+    linked = render(("nsx::haot_0123456789",))
+    # Both the profiler and the power binary run the delegated PTE.
+    assert linked.count("nsx::executorch") == 2
+    assert linked.count("nsx::haot_0123456789") == 2
+
+    def lines(text):  # the template's control tags leave blank lines; CMake ignores them
+        return [line for line in text.splitlines() if line.strip()]
+
+    assert lines(render(())) == [
+        line for line in lines(linked) if "nsx::haot_0123456789" not in line
+    ]

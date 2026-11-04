@@ -182,6 +182,7 @@ engine:
     portable_ops: []
     cortex_m_ops: null          # null: register every cortex_m:: operator
     cortex_m_ns_ops: null       # null: every cortex_m_ns:: operator (with ns_ops)
+    helia_aot_dir: null         # heliaAOT delegate modules; null: the PTE's directory
 ```
 
 The sizes and the portable-operator list are explicit because the embedded
@@ -209,6 +210,20 @@ take effect with an `nsx-executorch` that supports
 `NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST` and
 `NSX_EXECUTORCH_NS_SELECT_OPS_LIST`; older revisions ignore them and
 register everything.
+
+A PTE exported with helia-torch's heliaAOT delegate
+(`export(..., helia_aot=HeliaAotOptions(output_dir=...))`) runs part of the model as
+plain C that heliaAOT generated. Its sidecar lists the generated NSX modules in
+`helia_aot_modules`.
+
+- **Where the modules come from.** hpx looks for one directory per module in
+  `engine.config.helia_aot_dir`, which defaults to the directory holding the PTE.
+  Point it at the export's `output_dir` if that is somewhere else.
+- **What hpx adds to the build.** It vendors and links those modules and builds
+  `nsx-executorch` with `NSX_EXECUTORCH_ENABLE_HELIA_AOT=ON`.
+- **Provider.** The delegate needs `engine.backend: ns`, because the modules link
+  ns-cmsis-nn.
+- **Per-layer rows.** A delegate call shows as one row named `HeliaAotBackend`.
 
 The clean whole-model measurement is the DWT cycle count of
 `Method::execute()` only. Program and method loading, input and output

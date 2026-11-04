@@ -12,7 +12,7 @@ import yaml
 
 from ..deps import nsx as nsx_cli
 from ..deps.compatibility import CompatibilityBaseline
-from ..engines.base import HeliaAotArtifacts
+from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import ConfigError, FirmwareError
 from ..platform import get_soc_for_board
 from .context import FirmwareRenderContext
@@ -423,6 +423,11 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
                 ctx.artifacts.aot_cmake_target
                 if isinstance(ctx.artifacts, HeliaAotArtifacts)
                 else ""
+            ),
+            executorch_link_targets=(
+                ctx.artifacts.executorch_link_targets
+                if isinstance(ctx.artifacts, ExecutorchArtifacts)
+                else ()
             ),
             transport=ctx.config.target.transport,
             rtt_buffer_size_up=ctx.rtt_buffer_size_up,

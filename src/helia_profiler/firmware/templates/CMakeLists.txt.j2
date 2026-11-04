@@ -75,6 +75,9 @@ target_link_libraries(hpx_profiler PRIVATE
 {% endif %}
 {% if engine_type == "executorch" %}
     nsx::executorch
+{% for target in executorch_link_targets %}
+    {{ target }}
+{% endfor %}
 {% else %}
     {{ aot_cmake_target }}
 {% endif %}
@@ -119,6 +122,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
 {% endif %}
 {% if engine_type == "executorch" %}
     nsx::executorch
+{% for target in executorch_link_targets %}
+    {{ target }}
+{% endfor %}
 {% else %}
     {{ aot_cmake_target }}
 {% endif %}

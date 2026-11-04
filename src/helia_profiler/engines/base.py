@@ -297,6 +297,10 @@ class ExecutorchArtifacts(EngineArtifacts):
     executorch_input_size: int
     executorch_output_size: int
 
+    #: Extra CMake targets the profiler app links after ``nsx::executorch``:
+    #: the heliaAOT modules a delegated PTE calls (``nsx::haot_<hash>``).
+    executorch_link_targets: tuple[str, ...] = ()
+
     #: Per-buffer memory regions ("tcm" | "sram"); None = follow the run's
     #: resolved arena region (model.arena_location or the planner's choice).
     executorch_planned_arena_region: str | None = None

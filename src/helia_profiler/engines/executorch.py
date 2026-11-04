@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -266,6 +267,56 @@ def _operator_list(config: dict[str, Any], name: str, default: list[str] | None 
     return ",".join(value)
 
 
+_HELIA_AOT_MODULE_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _helia_aot_modules(
+    config: ProfileConfig,
+    engine_config: dict[str, Any],
+    sidecar: dict[str, Any] | None,
+    provider: str,
+) -> list[tuple[str, Path]]:
+    """The heliaAOT NSX modules a delegated PTE calls, as (name, module directory).
+
+    helia-torch's heliaAOT delegate writes one module per delegated partition into its
+    export ``output_dir`` and lists them in the sidecar (``helia_aot_modules``).
+    ``engine.config.helia_aot_dir`` names that directory; it defaults to the PTE's own
+    directory.
+    """
+    entries = (sidecar or {}).get("helia_aot_modules") or []
+    if not entries:
+        return []
+    if provider != "ns":
+        raise EngineError(
+            "The PTE delegates to heliaAOT, which needs engine.backend 'ns'",
+            hint="heliaAOT modules link ns-cmsis-nn; set engine.backend: ns.",
+        )
+    raw_dir = engine_config.get("helia_aot_dir")
+    if raw_dir is not None and (not isinstance(raw_dir, (str, Path)) or not str(raw_dir).strip()):
+        raise EngineError("engine.config.helia_aot_dir must be a directory path")
+    base = (
+        Path(raw_dir).expanduser()
+        if raw_dir is not None
+        else Path(config.model.path).expanduser().resolve().parent
+    )
+    modules = []
+    for entry in entries:
+        name = entry.get("module") if isinstance(entry, dict) else None
+        if not isinstance(name, str) or not _HELIA_AOT_MODULE_NAME.fullmatch(name):
+            raise EngineError(
+                f"PTE sidecar helia_aot_modules entry {entry!r} has no valid module name"
+            )
+        path = (base / name).resolve()
+        if not (path / "nsx-module.yaml").is_file() or not (path / "CMakeLists.txt").is_file():
+            raise EngineError(
+                f"heliaAOT module {name} not found in {base}",
+                hint="Point engine.config.helia_aot_dir at the helia_aot output_dir the PTE was "
+                "exported with (it holds one directory per delegated partition).",
+            )
+        modules.append((name, path))
+    return modules
+
+
 def _registered_operator_list(
     config: dict[str, Any], name: str, sidecar_default: list[str] | None
 ) -> str:
@@ -367,6 +418,14 @@ def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
                 not isinstance(size, int) or isinstance(size, bool) or size <= 0
             ):
                 fail(f"{key}[].size_bytes", "a positive integer")
+    helia_aot = manifest.get("helia_aot_modules")
+    if helia_aot is not None and (
+        not isinstance(helia_aot, list)
+        or not all(
+            isinstance(entry, dict) and isinstance(entry.get("module"), str) for entry in helia_aot
+        )
+    ):
+        fail("helia_aot_modules", "a list of {module: name} objects")
     operators = manifest.get("operators")
     if operators is not None:
         if not isinstance(operators, dict):
@@ -443,6 +502,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                 hint="This PTE fails at Method::load without NS ops. Set "
                 "engine.config.ns_ops: true and engine.backend: ns.",
             )
+        helia_aot_modules = _helia_aot_modules(config, engine_config, sidecar, provider)
 
         def _sidecar_io(key: str) -> int | None:
             if not sidecar:
@@ -589,10 +649,18 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                     local=True,
                     project=EXECUTORCH_PROJECT,
                 ),
+                # heliaAOT modules a delegated PTE calls; each registers itself with
+                # HeliaAotBackend from a source the module compiles into the app.
+                *(
+                    NsxModuleRef(name=name, path=path, local=True, project=name)
+                    for name, path in helia_aot_modules
+                ),
             ],
+            executorch_link_targets=tuple(f"nsx::{name}" for name, _ in helia_aot_modules),
             cmake_vars={
                 "NSX_EXECUTORCH_ENABLE_PROFILING": "ON",
                 "NSX_EXECUTORCH_CMSIS_NN_PROVIDER": provider,
+                "NSX_EXECUTORCH_ENABLE_HELIA_AOT": "ON" if helia_aot_modules else "OFF",
                 "NSX_EXECUTORCH_ENABLE_NS_OPS": "ON" if ns_ops else "OFF",
                 "NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST": _operator_list(
                     engine_config, "portable_ops", default=sidecar_portable
