@@ -690,7 +690,7 @@ class TestWorkspaceResolution:
         if ninja:
             (build / "build.ninja").write_text(
                 f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
-                f"  DEFINES = -DX\n  INCLUDES = -I{app}/src\n  FLAGS = -O2\n"
+                f"  DEFINES = -DX\n  INCLUDES = -I{app.as_posix()}/src\n  FLAGS = -O2\n"
             )
         (build / "CMakeFiles" / "rules.ninja").write_text(
             "rule CXX_COMPILER__x\n  command = " + sys.executable + " $FLAGS -c $in\n"
@@ -747,7 +747,7 @@ class TestWorkspaceResolution:
         (with_psram / "build" / case.board / "build.ninja").write_text(
             f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
             "  DEFINES = -DX\n"
-            f"  INCLUDES = -I{with_psram}/src -isystem {psram}\n"
+            f"  INCLUDES = -I{with_psram.as_posix()}/src -isystem {psram.as_posix()}\n"
             "  FLAGS = -O2\n"
         )
         past = time.time() - 1000
@@ -772,7 +772,7 @@ class TestWorkspaceResolution:
         for target, source in stanzas:
             lines.append(
                 f"build CMakeFiles/{target}.dir/{source}.obj: CXX_COMPILER__x ../{source}\n"
-                f"  DEFINES = -DX\n  INCLUDES = -I{app}/src\n  FLAGS = -O2\n"
+                f"  DEFINES = -DX\n  INCLUDES = -I{app.as_posix()}/src\n  FLAGS = -O2\n"
             )
         (app / "build" / case.board / "build.ninja").write_text("".join(lines))
 
@@ -822,14 +822,14 @@ class TestWorkspaceResolution:
         gone = tmp_path / "gone-checkout" / "includes-api"
         (app / "build" / case.board / "build.ninja").write_text(
             f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
-            f"  DEFINES = -DX\n  INCLUDES = -I{app}/src -I{gone}\n  FLAGS = -O2\n"
+            f"  DEFINES = -DX\n  INCLUDES = -I{app.as_posix()}/src -I{gone.as_posix()}\n  FLAGS = -O2\n"
         )
         monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
 
         resolved = _resolve_workspace(case)
 
         assert isinstance(resolved, str)
-        assert f"include dir {gone} is missing" in resolved
+        assert f"include dir {gone.as_posix()} is missing" in resolved
 
     def test_a_missing_in_tree_include_dir_is_fine(self, tmp_path: Path, monkeypatch):
         case = _MATRIX[0]
@@ -838,7 +838,7 @@ class TestWorkspaceResolution:
         )
         (app / "build" / case.board / "build.ninja").write_text(
             f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
-            f"  DEFINES = -DX\n  INCLUDES = -I{app}/src -I{app}/modules/nsx-core/includes-api\n"
+            f"  DEFINES = -DX\n  INCLUDES = -I{app.as_posix()}/src -I{app.as_posix()}/modules/nsx-core/includes-api\n"
             "  FLAGS = -O2\n"
         )
         monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
