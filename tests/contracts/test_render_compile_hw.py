@@ -293,6 +293,10 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
     for module in _fixture_modules(case.fixture_kind):
         if f"{module}/" not in includes:
             return f"configured without the {module} module ({_MODULE_WARMUP[module]})"
+    # Gone external checkouts break the compile.
+    missing = next((d for d in _external_includes(includes, app_dir) if not Path(d).is_dir()), None)
+    if missing is not None:
+        return f"include dir {missing} is missing"
     return _Workspace(
         app_dir=app_dir,
         build_dir=build_dir,
@@ -352,6 +356,26 @@ def _tu_variables(ninja_text: str, target: str, source: str) -> dict[str, str] |
     if m is None:
         return None
     return dict(re.findall(r"  (\w+) = ?(.*)", m.group(1)))
+
+
+def _include_dirs(includes: str) -> list[str]:
+    """Directories named by -I and -isystem."""
+    dirs: list[str] = []
+    tokens = iter(_split_ninja(includes))
+    for token in tokens:
+        for flag in ("-isystem", "-I"):
+            if token.startswith(flag):
+                dirs.append(token[len(flag) :] or next(tokens, ""))
+                break
+    return [d for d in dirs if d]
+
+
+def _external_includes(includes: str, app_dir: Path) -> list[str]:
+    """Include dirs outside the workspace.
+
+    CMake lists some in-tree dirs it never creates (nsx-core/includes-api).
+    """
+    return [d for d in _include_dirs(includes) if not Path(d).is_relative_to(app_dir)]
 
 
 def _split_ninja(value: str) -> list[str]:
@@ -662,10 +686,11 @@ class TestWorkspaceResolution:
         app = root / "workspaces" / case.workspace / "dependency-workspaces" / name / "profiler_app"
         build = app / "build" / case.board
         (build / "CMakeFiles").mkdir(parents=True)
+        (app / "src").mkdir()
         if ninja:
             (build / "build.ninja").write_text(
                 f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
-                "  DEFINES = -DX\n  INCLUDES = -I/ws/src\n  FLAGS = -O2\n"
+                f"  DEFINES = -DX\n  INCLUDES = -I{app}/src\n  FLAGS = -O2\n"
             )
         (build / "CMakeFiles" / "rules.ninja").write_text(
             "rule CXX_COMPILER__x\n  command = " + sys.executable + " $FLAGS -c $in\n"
@@ -717,10 +742,12 @@ class TestWorkspaceResolution:
         case = next(c for c in _MATRIX if c.fixture_kind == "psram")
         current = load_compatibility_baseline().fingerprint
         with_psram = self._make_tree(tmp_path, case, "old-psram", fingerprint=current)
+        psram = with_psram / "modules/nsx-ambiq-sdk/modules/nsx-psram/includes-api"
+        psram.mkdir(parents=True)
         (with_psram / "build" / case.board / "build.ninja").write_text(
             f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
             "  DEFINES = -DX\n"
-            "  INCLUDES = -I/ws/src -I/ws/modules/nsx-ambiq-sdk/modules/nsx-psram/includes-api\n"
+            f"  INCLUDES = -I{with_psram}/src -isystem {psram}\n"
             "  FLAGS = -O2\n"
         )
         past = time.time() - 1000
@@ -745,7 +772,7 @@ class TestWorkspaceResolution:
         for target, source in stanzas:
             lines.append(
                 f"build CMakeFiles/{target}.dir/{source}.obj: CXX_COMPILER__x ../{source}\n"
-                "  DEFINES = -DX\n  INCLUDES = -I/ws/src\n  FLAGS = -O2\n"
+                f"  DEFINES = -DX\n  INCLUDES = -I{app}/src\n  FLAGS = -O2\n"
             )
         (app / "build" / case.board / "build.ninja").write_text("".join(lines))
 
@@ -784,6 +811,47 @@ class TestWorkspaceResolution:
 
         assert isinstance(resolved, _Workspace), resolved
         assert resolved.app_dir == app
+
+    def test_a_workspace_with_a_missing_include_dir_is_skipped(self, tmp_path: Path, monkeypatch):
+        """A retired checkout (nsx-executorch on Zoo runs) leaves a warm
+        workspace whose includes are gone: skip, do not fail the gate."""
+        case = _MATRIX[0]
+        app = self._make_tree(
+            tmp_path, case, "gone", fingerprint=load_compatibility_baseline().fingerprint
+        )
+        gone = tmp_path / "gone-checkout" / "includes-api"
+        (app / "build" / case.board / "build.ninja").write_text(
+            f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
+            f"  DEFINES = -DX\n  INCLUDES = -I{app}/src -I{gone}\n  FLAGS = -O2\n"
+        )
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        resolved = _resolve_workspace(case)
+
+        assert isinstance(resolved, str)
+        assert f"include dir {gone} is missing" in resolved
+
+    def test_a_missing_in_tree_include_dir_is_fine(self, tmp_path: Path, monkeypatch):
+        case = _MATRIX[0]
+        app = self._make_tree(
+            tmp_path, case, "in-tree", fingerprint=load_compatibility_baseline().fingerprint
+        )
+        (app / "build" / case.board / "build.ninja").write_text(
+            f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
+            f"  DEFINES = -DX\n  INCLUDES = -I{app}/src -I{app}/modules/nsx-core/includes-api\n"
+            "  FLAGS = -O2\n"
+        )
+        monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
+
+        assert isinstance(_resolve_workspace(case), _Workspace)
+
+    def test_include_dirs_reads_both_flag_forms(self):
+        assert _include_dirs("-I/a -isystem /b -isystem/c -DX -I/with$ space") == [
+            "/a",
+            "/b",
+            "/c",
+            "/with space",
+        ]
 
     def test_all_candidates_failing_names_each_reason(self, tmp_path: Path, monkeypatch):
         case = _MATRIX[0]
