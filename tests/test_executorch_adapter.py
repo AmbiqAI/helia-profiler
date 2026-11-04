@@ -313,6 +313,105 @@ def test_adapter_self_configures_from_pte_sidecar(tmp_path: Path):
     assert artifacts.executorch_output_size == 40
 
 
+def test_adapter_registers_only_sidecar_operators(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    _write_sidecar(config.model.path)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert (
+        artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"]
+        == "cortex_m::quantized_conv2d.out"
+    )
+    assert (
+        artifacts.cmake_vars["NSX_EXECUTORCH_NS_SELECT_OPS_LIST"]
+        == "cortex_m_ns::quantized_sub.out"
+    )
+
+
+def test_adapter_registers_all_operators_without_sidecar(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(tmp_path, source, backend="ns", ns_ops=True), tmp_path / "work"
+    )
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == ""
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_NS_SELECT_OPS_LIST"] == ""
+
+
+def test_adapter_null_registered_ops_override_sidecar(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source, cortex_m_ops=None, cortex_m_ns_ops=None)
+    _write_sidecar(config.model.path)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == ""
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_NS_SELECT_OPS_LIST"] == ""
+
+
+def test_adapter_explicit_registered_ops_override_sidecar(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(
+        tmp_path,
+        source,
+        cortex_m_ops=["cortex_m::quantize_per_tensor.out", "cortex_m::quantized_add.out"],
+    )
+    _write_sidecar(config.model.path)
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == (
+        "cortex_m::quantize_per_tensor.out,cortex_m::quantized_add.out"
+    )
+
+
+def test_adapter_skips_ns_selection_when_ns_ops_off(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source, backend="arm")
+    _write_sidecar(
+        config.model.path,
+        kernel_provider="arm",
+        requires_ns_ops=False,
+        operators={"cortex_m": ["cortex_m::pad.out"], "cortex_m_ns": [], "portable": []},
+    )
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == "cortex_m::pad.out"
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_NS_SELECT_OPS_LIST"] == ""
+
+
+def test_adapter_rejects_ns_selection_without_ns_ops(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _config(tmp_path, source, cortex_m_ns_ops=["cortex_m_ns::quantized_sub.out"])
+
+    with pytest.raises(EngineError, match="ns_ops is off"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+@pytest.mark.parametrize("key", ["cortex_m_ops", "cortex_m_ns_ops"])
+def test_adapter_rejects_non_list_registered_ops(tmp_path: Path, key: str):
+    source = _source_tree(tmp_path)
+    config = _config(tmp_path, source, backend="ns", ns_ops=True, **{key: "cortex_m::pad.out"})
+
+    with pytest.raises(EngineError, match=f"engine.config.{key} must be a list"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
+@pytest.mark.parametrize("key", ["cortex_m", "cortex_m_ns"])
+def test_adapter_rejects_sidecar_with_malformed_operator_list(tmp_path: Path, key: str):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    operators = {"cortex_m": [], "cortex_m_ns": [], "portable": []}
+    operators[key] = "cortex_m::pad.out"
+    _write_sidecar(config.model.path, operators=operators)
+
+    with pytest.raises(EngineError, match=f"operators.{key}"):
+        ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+
 def test_adapter_explicit_config_overrides_sidecar(tmp_path: Path):
     source = _source_tree(tmp_path)
     config = _config(tmp_path, source, backend="ns", ns_ops=True)

@@ -180,6 +180,8 @@ engine:
     input_size: 12288
     output_size: 40
     portable_ops: []
+    cortex_m_ops: null          # null: register every cortex_m:: operator
+    cortex_m_ns_ops: null       # null: every cortex_m_ns:: operator (with ns_ops)
 ```
 
 The sizes and the portable-operator list are explicit because the embedded
@@ -189,11 +191,24 @@ carries as a portable fallback, read from the serialised program's operator
 list.
 When the PTE was exported with `helia-torch`, a `<model>.pte.json` sidecar
 (schema `nsx-executorch.pte-manifest/1`, SHA-256 bound to the file) supplies
-`backend`, `ns_ops`, `portable_ops`, `planned_arena_size`, `input_size` and
-`output_size` as defaults, so a minimal configuration is `model.path` and
-the board. Explicit values override the sidecar; a sidecar whose hash does
+`backend`, `ns_ops`, `portable_ops`, `cortex_m_ops`, `cortex_m_ns_ops`,
+`planned_arena_size`, `input_size` and `output_size` as defaults, so a
+minimal configuration is `model.path` and the board. Explicit values override the sidecar; a sidecar whose hash does
 not match, or an `ns` PTE with `ns_ops` off, is a configuration error with
 a hint.
+
+`cortex_m_ops` and `cortex_m_ns_ops` select which `cortex_m::` and
+`cortex_m_ns::` kernels the firmware registers. ExecuTorch registers kernels
+in a static table, so every registered operator, and the CMSIS-NN kernels it
+calls, is linked whether or not the model uses it. With a sidecar the default
+is the program's own operator list, so the profiled image carries only what
+the model runs, as a deployment build would. Without a sidecar, or with
+`null`, every operator is registered. A PTE that needs an operator outside
+the list fails at `Method::load` with a missing-operator error. The lists
+take effect with an `nsx-executorch` that supports
+`NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST` and
+`NSX_EXECUTORCH_NS_SELECT_OPS_LIST`; older revisions ignore them and
+register everything.
 
 The clean whole-model measurement is the DWT cycle count of
 `Method::execute()` only. Program and method loading, input and output

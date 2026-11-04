@@ -266,6 +266,28 @@ def _operator_list(config: dict[str, Any], name: str, default: list[str] | None 
     return ",".join(value)
 
 
+def _registered_operator_list(
+    config: dict[str, Any], name: str, sidecar_default: list[str] | None
+) -> str:
+    """Select-list value for the cortex_m / cortex_m_ns kernel registration.
+
+    nsx-executorch registers every operator of a library unless given a select
+    list, so all of them (and the CMSIS-NN kernels they call) are linked. A list
+    registers exactly those operators; the PTE sidecar's operator list is the
+    default. An explicit ``null``, an empty list, or no value without a sidecar
+    registers all of them (an empty CMake value).
+    """
+    value = config[name] if name in config else sidecar_default
+    if value is None:
+        return ""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise EngineError(
+            f"engine.config.{name} must be a list of operator names, or null to register all",
+            hint="Omit it to use the operators listed in the PTE's .pte.json sidecar.",
+        )
+    return ",".join(value)
+
+
 PTE_SIDECAR_SCHEMA = "nsx-executorch.pte-manifest/1"
 
 
@@ -349,11 +371,12 @@ def _validate_sidecar_fields(sidecar: Path, manifest: dict[str, Any]) -> None:
     if operators is not None:
         if not isinstance(operators, dict):
             fail("operators", "an object of operator lists")
-        portable = operators.get("portable")
-        if portable is not None and (
-            not isinstance(portable, list) or not all(isinstance(name, str) for name in portable)
-        ):
-            fail("operators.portable", "a list of operator names")
+        for key in ("portable", "cortex_m", "cortex_m_ns"):
+            names = operators.get(key)
+            if names is not None and (
+                not isinstance(names, list) or not all(isinstance(name, str) for name in names)
+            ):
+                fail(f"operators.{key}", "a list of operator names")
 
 
 class ExecuTorchAdapter(SingleArenaPlacementMixin):
@@ -466,9 +489,19 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
         temporary_size = _positive_int(engine_config, "temporary_arena_size", 32 * 1024)
         input_size = _positive_int(engine_config, "input_size", _sidecar_io("inputs"))
         output_size = _positive_int(engine_config, "output_size", _sidecar_io("outputs"))
-        sidecar_portable = (
-            list((sidecar.get("operators") or {}).get("portable") or []) if sidecar else None
+        sidecar_operators = (sidecar.get("operators") or {}) if sidecar else {}
+        sidecar_portable = list(sidecar_operators.get("portable") or []) if sidecar else None
+        sidecar_cortex_m = list(sidecar_operators.get("cortex_m") or []) if sidecar else None
+        sidecar_cortex_m_ns = list(sidecar_operators.get("cortex_m_ns") or []) if sidecar else None
+        cortex_m_ops = _registered_operator_list(engine_config, "cortex_m_ops", sidecar_cortex_m)
+        cortex_m_ns_ops = _registered_operator_list(
+            engine_config, "cortex_m_ns_ops", sidecar_cortex_m_ns if ns_ops else None
         )
+        if cortex_m_ns_ops and not ns_ops:
+            raise EngineError(
+                "engine.config.cortex_m_ns_ops selects cortex_m_ns:: operators, but ns_ops is off",
+                hint="Set engine.config.ns_ops: true (and engine.backend: ns), or drop the list.",
+            )
 
         # Materialize the checkout only after the pure-config validation above:
         # a bad YAML must fail immediately, not after a multi-minute clone.
@@ -564,6 +597,10 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
                 "NSX_EXECUTORCH_PORTABLE_SELECT_OPS_LIST": _operator_list(
                     engine_config, "portable_ops", default=sidecar_portable
                 ),
+                # Register only the cortex_m / cortex_m_ns operators the PTE
+                # uses, so unused kernels are not linked. Empty registers all.
+                "NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST": cortex_m_ops,
+                "NSX_EXECUTORCH_NS_SELECT_OPS_LIST": cortex_m_ns_ops,
                 # nsx-executorch wraps this interpreter with its pinned
                 # torchgen sources. Point CMake discovery at HPX's own Python
                 # environment, which is Python 3.11+ and already includes
