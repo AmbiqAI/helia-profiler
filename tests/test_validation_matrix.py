@@ -225,6 +225,20 @@ class TestCaseValidity:
         case = self._case(model=_fixture_model(_FIXTURES / fixture), engine=EngineType.LITERT)
         assert case_validity(case) == "Upstream TFLM refuses any model with a FLOAT16 tensor"
 
+    def test_litert_skips_int16_per_channel_fc(self):
+        case = self._case(
+            model=_fixture_model(_FIXTURES / "fc_int16_per_channel.tflite"),
+            engine=EngineType.LITERT,
+        )
+        assert case_validity(case) == "LiteRT FC rejects per-channel weights on int16 input"
+
+    @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.HELIA_AOT])
+    def test_helia_engines_run_int16_per_channel_fc(self, engine):
+        case = self._case(
+            model=_fixture_model(_FIXTURES / "fc_int16_per_channel.tflite"), engine=engine
+        )
+        assert case_validity(case) is None
+
     @pytest.mark.parametrize("engine", [EngineType.HELIA_RT, EngineType.HELIA_AOT])
     def test_helia_engines_run_float16(self, engine):
         case = self._case(model=_fixture_model(_FIXTURES / "kws_float_fp16.tflite"), engine=engine)

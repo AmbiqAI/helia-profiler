@@ -24,8 +24,9 @@ drift between the two fails a test rather than silently diverging. Schema
 evolution cannot move them: flatbuffers appends new fields to the end of the
 vtable precisely so existing slots stay fixed.
 
-This reader answers three narrow questions (the Softmax scaling gate, #57; the
-float precisions a model works in, #246; the tensor types a model holds). Real model analysis belongs in
+This reader answers four narrow questions (the Softmax scaling gate, #57; the
+float precisions a model works in, #246; the tensor types a model holds; whether
+an int16 FullyConnected has per-channel weights). Real model analysis belongs in
 ``model_analysis``'s litert path, not here.
 """
 
@@ -41,11 +42,13 @@ from typing import Any
 #
 # BuiltinOperator / TensorType / BuiltinOptions enum values:
 BUILTIN_DEQUANTIZE = 6
+BUILTIN_FULLY_CONNECTED = 9
 BUILTIN_SOFTMAX = 25
 BUILTIN_QUANTIZE = 114
 TENSOR_TYPE_FLOAT32 = 0
 TENSOR_TYPE_FLOAT16 = 1
 TENSOR_TYPE_UINT8 = 3
+TENSOR_TYPE_INT16 = 7
 TENSOR_TYPE_INT8 = 9
 BUILTIN_OPTIONS_SOFTMAX = 9
 
@@ -193,6 +196,31 @@ def read_tensor_types(buf: bytes) -> set[int]:
         for sg in model.table_vector(_MODEL_SUBGRAPHS)
         for tensor in sg.table_vector(_SUBGRAPH_TENSORS)
     }
+
+
+def has_int16_per_channel_fc(buf: bytes) -> bool:
+    """Whether any FullyConnected has int16 input and per-channel weights.
+
+    Raises like :func:`read_quantized_softmax_ops` on a malformed buffer.
+    """
+    model = _Table(buf, _read("<I", buf, 0))
+    opcodes = model.table_vector(_MODEL_OPERATOR_CODES)
+    for sg in model.table_vector(_MODEL_SUBGRAPHS):
+        tensors = sg.table_vector(_SUBGRAPH_TENSORS)
+        for op in sg.table_vector(_SUBGRAPH_OPERATORS):
+            builtin = _builtin_code(opcodes[op.scalar(_OPERATOR_OPCODE_INDEX, "<I", 0)])
+            start, length = op.vector(_OPERATOR_INPUTS)
+            if builtin != BUILTIN_FULLY_CONNECTED or length < 2:
+                continue
+            data, weights = (_read("<i", op.buf, start + 4 * i) for i in range(2))
+            if data < 0 or weights < 0:
+                continue
+            if tensors[data].scalar(_TENSOR_TYPE, "<b", 0) != TENSOR_TYPE_INT16:
+                continue
+            quant = tensors[weights].table(_TENSOR_QUANTIZATION)
+            if quant is not None and quant.vector(_QUANT_SCALE)[1] > 1:
+                return True
+    return False
 
 
 @dataclass(frozen=True)

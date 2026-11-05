@@ -28,6 +28,7 @@ from ..engines.cmsis_nn import has_fp16_kernels
 from ..hostenv.toolchains import get_toolchain_spec
 from ..modelcost._tflite_reader import (
     TENSOR_TYPE_FLOAT16,
+    has_int16_per_channel_fc,
     read_float_compute_types,
     read_tensor_types,
 )
@@ -215,6 +216,15 @@ def _reads_float16(path: Path, reader: Callable[[bytes], set[int]]) -> bool:
         return False
 
 
+@functools.lru_cache(maxsize=None)
+def _int16_per_channel_fc(path: Path) -> bool:
+    """Whether the model has one; unreadable means no."""
+    try:
+        return has_int16_per_channel_fc(path.read_bytes())
+    except (OSError, struct.error, IndexError):
+        return False
+
+
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
     soc = get_soc_for_board(case.board.id)
@@ -241,6 +251,9 @@ def case_validity(case: CaseSpec) -> str | None:
         record = runtime("litert")
         if record is not None and (reason := record.precisions.get("fp16")):
             return reason
+    # CMSIS-NN FC Prepare allows per-channel only for int8.
+    if case.engine is EngineType.LITERT and _int16_per_channel_fc(_fixture_file(case)):
+        return "LiteRT FC rejects per-channel weights on int16 input"
     if (
         case.engine in (EngineType.HELIA_RT, EngineType.HELIA_AOT)
         and not has_fp16_kernels(soc)
