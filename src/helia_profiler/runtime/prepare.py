@@ -49,6 +49,8 @@ _HELIA_RT_INCLUDE_DIRS = (
     "third_party/ns_cmsis_nn",
     "third_party/ns_cmsis_nn/Include",
 )
+# These dependencies were retired upstream: https://github.com/AmbiqAI/helia-rt/pull/508
+_HELIA_RT_OPTIONAL_INCLUDE_DIRS = frozenset({"third_party/gemmlowp", "third_party/ruy"})
 #: The Cortex-M55 library is built with FP32 and FP16 kernels enabled.
 _HELIA_RT_DEFINES = (
     "TF_LITE_STATIC_MEMORY",
@@ -232,7 +234,11 @@ def _stage_helia_rt(
         "abi": _ABI,
         "build": {"consumer_defines": list(_HELIA_RT_DEFINES), "kernel_dir": "helia"},
         "headers": headers,
-        "include_dirs": list(_HELIA_RT_INCLUDE_DIRS),
+        "include_dirs": [
+            name
+            for name in _HELIA_RT_INCLUDE_DIRS
+            if name not in _HELIA_RT_OPTIONAL_INCLUDE_DIRS or (include / name).is_dir()
+        ],
     }
     (staging / "provider-manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"

@@ -74,6 +74,69 @@ def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert not (prepared.directory.parent / "2.2.2.partial").exists()
 
 
+@pytest.mark.parametrize(
+    "retired",
+    [(), ("gemmlowp",), ("ruy",), ("gemmlowp", "ruy")],
+)
+@pytest.mark.parametrize("empty_directory", [False, True])
+def test_retired_header_roots_follow_staged_headers(
+    cache: Path, tmp_path: Path, retired: tuple[str, ...], empty_directory: bool
+) -> None:
+    from helia_profiler.runtime.archive import prepare_runtime_module
+
+    for name in retired:
+        directory = tmp_path / "dist" / "third_party" / name
+        shutil.rmtree(directory)
+        if empty_directory:
+            directory.mkdir()
+            (directory / "README").write_text("No consumer headers remain here.\n")
+
+    prepared = prepare_runtime("helia-rt")
+    verified = prepared.runtime.verify()
+    expected = (
+        ".",
+        "third_party/flatbuffers/include",
+        *(f"third_party/{name}" for name in ("gemmlowp", "ruy") if name not in retired),
+        "third_party/kissfft",
+        "third_party/cmsis/CMSIS/Core/Include",
+        "third_party/ns_cmsis_nn",
+        "third_party/ns_cmsis_nn/Include",
+    )
+    assert verified.record.include_dirs == expected
+    module = prepare_runtime_module(verified, tmp_path / "consumer").path
+    assert module is not None
+    cmake = (module / "CMakeLists.txt").read_text()
+    for name in expected:
+        assert (module / "include" / name).is_dir()
+        assert f'"${{CMAKE_CURRENT_LIST_DIR}}/include/{name}"' in cmake
+    for name in retired:
+        assert f"third_party/{name}" not in cmake
+        assert not (module / "include" / "third_party" / name).exists()
+
+
+@pytest.mark.parametrize(
+    "required",
+    ["flatbuffers/include", "kissfft", "cmsis/CMSIS/Core/Include", "ns_cmsis_nn/Include"],
+)
+def test_missing_required_helia_rt_include_is_still_refused(cache: Path, tmp_path: Path, required):
+    shutil.rmtree(tmp_path / "dist" / "third_party" / required)
+    with pytest.raises(ConfigError, match="Missing runtime include directory"):
+        prepare_runtime("helia-rt")
+
+
+@pytest.mark.parametrize("dependency", ["gemmlowp", "ruy"])
+@pytest.mark.parametrize("remove", [False, True])
+def test_present_retired_dependency_headers_remain_verified(cache: Path, dependency, remove):
+    prepared = prepare_runtime("helia-rt")
+    header = prepared.directory / "include" / "third_party" / dependency / "api.h"
+    if remove:
+        header.unlink()
+    else:
+        header.write_text("changed header")
+    with pytest.raises(ConfigError, match="is damaged"):
+        prepared_runtime("helia-rt")
+
+
 def test_a_differing_archive_is_reported_not_refused(cache: Path, monkeypatch) -> None:
     assert not prepare_runtime("helia-rt").matches_record
     sha256 = hashlib.sha256(ARCHIVE).hexdigest()
