@@ -330,6 +330,40 @@ def test_adapter_registers_only_sidecar_operators(tmp_path: Path):
     )
 
 
+def test_adapter_registers_no_operators_for_an_empty_list(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    config = _sidecar_config(tmp_path, source)
+    module = tmp_path / "haot_0123456789"
+    module.mkdir()
+    (module / "nsx-module.yaml").write_text("module:\n  name: haot_0123456789\n", encoding="utf-8")
+    (module / "CMakeLists.txt").write_text(
+        "add_library(haot_0123456789 STATIC)\n", encoding="utf-8"
+    )
+    # A PTE that is only a heliaAOT delegate call: no cortex_m:: or cortex_m_ns:: operators.
+    _write_sidecar(
+        config.model.path,
+        requires_ns_ops=False,
+        operators={"cortex_m": [], "cortex_m_ns": [], "portable": []},
+        helia_aot_modules=[{"module": "haot_0123456789"}],
+    )
+
+    artifacts = ExecuTorchAdapter().prepare(config, tmp_path / "work")
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == "NONE"
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_NS_OPS"] == "OFF"
+
+
+def test_adapter_explicit_empty_list_registers_no_operators(tmp_path: Path):
+    source = _source_tree(tmp_path)
+    artifacts = ExecuTorchAdapter().prepare(
+        _config(tmp_path, source, backend="ns", ns_ops=True, cortex_m_ops=[], cortex_m_ns_ops=[]),
+        tmp_path / "work",
+    )
+
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST"] == "NONE"
+    assert artifacts.cmake_vars["NSX_EXECUTORCH_NS_SELECT_OPS_LIST"] == "NONE"
+
+
 def test_adapter_registers_all_operators_without_sidecar(tmp_path: Path):
     source = _source_tree(tmp_path)
     artifacts = ExecuTorchAdapter().prepare(

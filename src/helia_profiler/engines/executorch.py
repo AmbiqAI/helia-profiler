@@ -324,9 +324,10 @@ def _registered_operator_list(
 
     nsx-executorch registers every operator of a library unless given a select
     list, so all of them (and the CMSIS-NN kernels they call) are linked. A list
-    registers exactly those operators; the PTE sidecar's operator list is the
-    default. An explicit ``null``, an empty list, or no value without a sidecar
-    registers all of them (an empty CMake value).
+    registers exactly those operators -- an empty list none at all ("NONE"), as
+    for a PTE that is only a delegate call. The PTE sidecar's operator list is
+    the default; an explicit ``null``, or no value without a sidecar, registers
+    every operator (an empty CMake value).
     """
     value = config[name] if name in config else sidecar_default
     if value is None:
@@ -336,7 +337,7 @@ def _registered_operator_list(
             f"engine.config.{name} must be a list of operator names, or null to register all",
             hint="Omit it to use the operators listed in the PTE's .pte.json sidecar.",
         )
-    return ",".join(value)
+    return ",".join(value) if value else "NONE"
 
 
 PTE_SIDECAR_SCHEMA = "nsx-executorch.pte-manifest/1"

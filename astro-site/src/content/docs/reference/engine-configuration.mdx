@@ -203,13 +203,14 @@ a hint.
 in a static table, so every registered operator, and the CMSIS-NN kernels it
 calls, is linked whether or not the model uses it. With a sidecar the default
 is the program's own operator list, so the profiled image carries only what
-the model runs, as a deployment build would. Without a sidecar, or with
-`null`, every operator is registered. A PTE that needs an operator outside
+the model runs, as a deployment build would. An empty list registers none of
+that namespace (a PTE that is only a heliaAOT delegate call). Without a
+sidecar, or with `null`, every operator is registered. A PTE that needs an operator outside
 the list fails at `Method::load` with a missing-operator error. The lists
 take effect with an `nsx-executorch` that supports
 `NSX_EXECUTORCH_CORTEX_M_SELECT_OPS_LIST` and
-`NSX_EXECUTORCH_NS_SELECT_OPS_LIST`; older revisions ignore them and
-register everything.
+`NSX_EXECUTORCH_NS_SELECT_OPS_LIST` (and `NONE` for an empty list); older
+revisions ignore them and register everything.
 
 A PTE exported with helia-torch's heliaAOT delegate
 (`export(..., helia_aot=HeliaAotOptions(output_dir=...))`) runs part of the model as
