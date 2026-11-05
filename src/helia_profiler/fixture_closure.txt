@@ -129,6 +129,7 @@ firmware/templates/_ssram_power.j2
 firmware/templates/_stimer_init.j2
 firmware/templates/_system_config.j2
 firmware/templates/_system_includes.j2
+firmware/templates/_tflm_schema_include.j2
 firmware/templates/_usb_config.j2
 firmware/templates/_usb_timer.j2
 firmware/templates/fixed_fixture.cc.j2

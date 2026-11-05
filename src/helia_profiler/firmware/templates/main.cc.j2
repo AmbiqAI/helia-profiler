@@ -35,7 +35,7 @@
 #endif
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/system_setup.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+{% include "_tflm_schema_include.j2" %}
 
 #include "hpx_pmu_profiler.h"
 {% if has_ethos_u | default(false) %}
