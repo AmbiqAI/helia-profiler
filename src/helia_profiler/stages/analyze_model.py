@@ -6,6 +6,7 @@ import logging
 
 from ..engines import EngineType
 from ..engines.base import HeliaAotArtifacts
+from ..engines.helia_aot.torch_program import is_torch_program
 from ..errors import ConfigError
 from ..modelcost import analyze_model, is_available
 from ..pipeline import PipelineContext
@@ -64,7 +65,9 @@ class AnalyzeModelStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        source = analyze_model(ctx.config.model.path) if is_available() else None
+        # A PyTorch .pt2 (helia-aot engine) has no .tflite to analyze; the compiled analysis covers it.
+        readable = is_available() and not is_torch_program(ctx.config.model.path)
+        source = analyze_model(ctx.config.model.path) if readable else None
         if source is not None:
             _check_ethos_u_consistency(ctx.config, source)
         result = source

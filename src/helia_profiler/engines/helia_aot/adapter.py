@@ -1,6 +1,7 @@
 """heliaAOT engine adapter.
 
-Invokes the heliaAOT compiler to produce an NSX module from a .tflite model,
+Invokes the heliaAOT compiler to produce an NSX module from a .tflite model
+(or a quantized PyTorch .pt2, through helia-torch),
 generates a memory-placement attribute header, and declares the ns-cmsis-nn
 module it links against. See :mod:`.compile` for platform mapping / AOT
 compiler invocation, :mod:`.manifest` for operator manifest and memory-plan
@@ -45,6 +46,7 @@ from .compile import (
     _write_attributes_header,
 )
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
+from .torch_program import is_torch_program
 
 log = logging.getLogger("hpx")
 
@@ -286,9 +288,10 @@ class HeliaAOTAdapter:
 
         # heliaAOT transforms/fuses ops, so the generated graph may differ
         # from the .tflite; the views describe what it actually emits.
-        compiled_analysis = analyze_aot_operators(
-            result.operators, result.tensors, analyze_model(config.model.path)
+        source_analysis = (
+            None if is_torch_program(config.model.path) else analyze_model(config.model.path)
         )
+        compiled_analysis = analyze_aot_operators(result.operators, result.tensors, source_analysis)
         op_manifest = _extract_operator_manifest(result, prefix)
         manifest_path = work_dir / "aot_operator_manifest.json"
         manifest_path.write_text(json.dumps(op_manifest, indent=2), encoding="utf-8")

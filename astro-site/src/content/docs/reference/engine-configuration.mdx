@@ -104,6 +104,41 @@ engine:
 4. The two link into the same profiler firmware harness the interpreter
    engines use.
 
+#### PyTorch models (`.pt2`)
+
+The heliaAOT engine also takes a quantized PyTorch program: a PT2E-quantized
+`torch.export.ExportedProgram` saved with `torch.export.save()`, for
+example what helia-torch's `quantize()` returns. hpx hands it to
+[helia-torch](https://github.com/AmbiqAI/nsx-executorch) (nsx-executorch's
+`aot/` package), which converts it to heliaAOT's internal model with the
+frontend of its ExecuTorch heliaAOT delegate. heliaAOT then compiles it with
+the same configuration, placement and per-layer profiling as a `.tflite`.
+The firmware has no ExecuTorch runtime.
+
+```python
+import torch
+from nsx_cortex_m.export import quantize
+
+torch.export.save(quantize(model, example_inputs, kernel_provider="ns"), "model.pt2")
+```
+
+```bash
+pip install 'helia-torch[helia-aot]'   # in the environment hpx runs in
+hpx profile model.pt2 --engine helia-aot --board apollo510_evb
+```
+
+- **Whole model only.** Every operator must be one heliaAOT compiles; hpx
+  stops with the operators that are not. Profile such a model with the
+  ExecuTorch engine and a PTE exported with the heliaAOT delegate, which
+  leaves those operators in ExecuTorch.
+- **Bit-exact with ExecuTorch.** The generated code computes what
+  ExecuTorch's Cortex-M kernels compute for the same program, and is the
+  same code the delegate would link.
+- **CPU only.** `engine.backend: ethos_u` needs a Vela-compiled `.tflite`.
+- **No source analysis.** Per-layer MACs come from heliaAOT's compiled
+  operators; there is no `.tflite` to analyze, and the softmax preflight
+  check does not apply.
+
 #### Version policy
 
 heliaAOT is a Python package that runs at build time, so pip owns its

@@ -29,18 +29,25 @@ def analyze_for_engine(
 ) -> ModelAnalysis:
     """Analyze a model as the selected inference engine executes it."""
     from ..engines import EngineType
+    from ..engines.helia_aot.torch_program import aot_converter, is_torch_program
     from ..errors import ConfigError, EngineError
 
     path = Path(model_path)
     if not path.is_file():
         raise ConfigError(f"Model file not found: {path}")
-    if not is_available():
+    engine_type = EngineType(engine)
+    torch_program = is_torch_program(path)
+    if torch_program and engine_type is not EngineType.HELIA_AOT:
+        raise ConfigError(
+            f"A PyTorch program ({path.name}) can only be analyzed with the helia-aot engine.",
+            hint="Pass --engine helia-aot.",
+        )
+    if not torch_program and not is_available():
         raise ConfigError(
             "ai-edge-litert is not installed.",
             hint="Install with: pip install 'helia-profiler[analysis]'",
         )
 
-    engine_type = EngineType(engine)
     if engine_type is not EngineType.HELIA_AOT:
         result = analyze_model(path)
         if result is None:
@@ -58,7 +65,7 @@ def analyze_for_engine(
     from ..engines.helia_aot.compile import aot_platform_for_board, convert_with_views
 
     try:
-        from helia_aot import AotConverter, ConvertArgs
+        from helia_aot import ConvertArgs
         from helia_aot.defines import ModuleType
     except ImportError as exc:
         raise ConfigError(
@@ -74,10 +81,11 @@ def analyze_for_engine(
             result_views=True,
         )
         try:
-            result = convert_with_views(AotConverter(config=convert_args))
+            result = convert_with_views(aot_converter(path, convert_args))
         except EngineError:
             raise
         except Exception as exc:
             raise EngineError(f"AOT compilation failed: {exc}") from exc
 
-        return analyze_aot_operators(result.operators, result.tensors, analyze_model(path))
+        source = None if torch_program else analyze_model(path)
+        return analyze_aot_operators(result.operators, result.tensors, source)

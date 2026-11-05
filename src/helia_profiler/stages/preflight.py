@@ -30,6 +30,7 @@ from pathlib import Path
 from ..config import CleanWindowProbe, PowerFirmware, Transport
 from ..engines import EngineType, get_adapter
 from ..engines.base import PsramWeightsSource
+from ..engines.helia_aot.torch_program import TORCH_PROGRAM_MAGIC, is_torch_program
 from ..errors import ConfigError
 from ..modelcost.softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
 from ..pipeline import PipelineContext
@@ -88,6 +89,9 @@ def _check_model(path: Path, engine: EngineType) -> None:
             f"Model file is empty: {path}",
             hint="The file exists but has zero bytes — re-export your model.",
         )
+    if engine is EngineType.HELIA_AOT and is_torch_program(path):
+        _check_torch_program(path)
+        return
     expected_suffix = ".pte" if engine is EngineType.EXECUTORCH else ".tflite"
     if path.suffix.lower() != expected_suffix:
         raise ConfigError(
@@ -95,7 +99,8 @@ def _check_model(path: Path, engine: EngineType) -> None:
             hint=(
                 "Use a PTE exported for ExecuTorch when engine.type is executorch."
                 if engine is EngineType.EXECUTORCH
-                else "LiteRT, heliaRT, and heliaAOT consume TFLite flatbuffers."
+                else "LiteRT and heliaRT consume TFLite flatbuffers; heliaAOT also takes a "
+                "quantized PyTorch program (.pt2) through helia-torch."
             ),
         )
     # TFLite flatbuffer sanity: 'TFL3' magic should appear in the first 16
@@ -120,6 +125,25 @@ def _check_model(path: Path, engine: EngineType) -> None:
         )
 
 
+def _check_torch_program(path: Path) -> None:
+    """A ``.pt2`` for the helia-aot engine is a zip archive (``torch.export.save``).
+
+    Whether it is a quantized program heliaAOT can compile in full is only
+    known once helia-torch converts it, in the engine's prepare step.
+    """
+    try:
+        head = path.read_bytes()[: len(TORCH_PROGRAM_MAGIC)]
+    except OSError as exc:
+        raise ConfigError(
+            f"Cannot read model file: {path} ({exc})", hint="Check file permissions."
+        ) from exc
+    if head != TORCH_PROGRAM_MAGIC:
+        raise ConfigError(
+            f"Model file does not look like a saved PyTorch program: {path}",
+            hint="Save the quantized program with torch.export.save(program, 'model.pt2').",
+        )
+
+
 def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     """Reject quantized Softmax scales the selected engine cannot handle (#57).
 
@@ -139,6 +163,8 @@ def _check_softmax_scaling(path: Path, engine: EngineType) -> None:
     """
     if engine is EngineType.EXECUTORCH:
         return  # .pte -- never parses a TFLite flatbuffer
+    if is_torch_program(path):
+        return  # .pt2 -- helia-torch sets heliaAOT's softmax rules from the program itself
     try:
         findings = scan_softmax_scaling(path)
     except Exception as exc:  # struct.error / IndexError on malformed bytes
@@ -312,6 +338,11 @@ def _check_npu_backend(cfg) -> None:
     """Gate the ``ethos_u`` engine backend to NPU-equipped targets and engines."""
     if cfg.engine.backend != "ethos_u":
         return
+    if is_torch_program(cfg.model.path):
+        raise ConfigError(
+            "engine.backend=ethos_u needs a Vela-compiled .tflite; a PyTorch .pt2 compiles for the CPU only.",
+            hint="Drop engine.backend, or profile the Vela-compiled .tflite.",
+        )
     if cfg.engine.type not in (EngineType.HELIA_RT, EngineType.HELIA_AOT):
         raise ConfigError(
             f"engine.backend=ethos_u is not supported with engine.type="

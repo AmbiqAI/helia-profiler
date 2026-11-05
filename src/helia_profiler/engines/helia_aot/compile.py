@@ -5,7 +5,8 @@ apollo510_evb, …). The profiler board names are close but not always
 identical; this module maps profiler boards onto AOT platform names, derives
 per-kind (constant/persistent/scratch) tensor placement rulesets from the
 profiler's memory-placement config, invokes the heliaAOT Python API to
-compile a ``.tflite`` model into an NSX module, validates the generated
+compile a ``.tflite`` model (or, through helia-torch, a quantized PyTorch
+``.pt2``; see :mod:`.torch_program`) into an NSX module, validates the generated
 memory-placement pragmas, and enforces the installed ``helia-aot`` package's
 minimum-supported version.
 """
@@ -27,6 +28,7 @@ from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
 from ..semver import parse_semver
+from .torch_program import aot_converter
 
 log = logging.getLogger("hpx")
 
@@ -318,7 +320,7 @@ def _run_aot_compiler(
     platform) override any values there.
     """
     try:
-        from helia_aot import AotConverter, ConvertArgs
+        from helia_aot import ConvertArgs
         from helia_aot.defines import ModuleType
     except ImportError as exc:
         raise EngineError(
@@ -377,7 +379,7 @@ def _run_aot_compiler(
     log.debug("ConvertArgs: %s", convert_args)
 
     try:
-        result = convert_with_views(AotConverter(config=convert_args))
+        result = convert_with_views(aot_converter(config.model.path, convert_args))
     except EngineError:
         raise
     except Exception as exc:

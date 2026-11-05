@@ -95,7 +95,7 @@ def register(app: typer.Typer) -> None:
 def freeze_command(
     output: Annotated[Path, typer.Option("-o", "--output", help="Where to write the plan (JSON)")],
     model: Annotated[
-        Optional[Path], typer.Argument(help="Path to .tflite or .pte model file")
+        Optional[Path], typer.Argument(help="Path to .tflite, .pte, or (helia-aot) .pt2 model file")
     ] = None,
     config: Annotated[
         Optional[Path], typer.Option("-c", "--config", help="YAML config file (hpx.yml)")
