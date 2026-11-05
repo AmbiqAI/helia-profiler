@@ -126,6 +126,7 @@ def test_checked_in_list_is_valid():
         ("microwakeword-okay-nabu", "a8w8"),
         ("rnnoise", "a8w8"),
         ("dtln-tflm", "a8w8"),
+        ("fomo-cuedc-animals", "a8w8"),
     }
 
 
