@@ -26,7 +26,7 @@ volatile uint32_t deployment_power[5];
 #include "tensorflow/lite/micro/micro_resource_variable.h"
 {% endif %}
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+{% include "_tflm_schema_include.j2" %}
 {% endif %}
 {% if fixture_psram | default(false) %}
 {% include "fixed_fixture_psram.h.j2" %}

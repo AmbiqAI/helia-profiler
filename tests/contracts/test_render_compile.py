@@ -660,3 +660,37 @@ def test_compile_matrix_covers_fixture_render_arms():
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in case.text
         if "|helia-aot|" not in case.case_id:
             assert "kTfLiteInt32" in case.text and "data.i32" in case.text
+
+
+@pytest.mark.parametrize("layout", ["legacy", "micro", "missing"])
+@pytest.mark.parametrize("consumer", ["profile", "fixture"])
+def test_schema_header_layouts(tmp_path, monkeypatch, layout, consumer):
+    import sys
+
+    stubs = tmp_path / "stubs"
+    shutil.copytree(_STUB_DIR, stubs)
+    legacy = "tensorflow/lite/schema/schema_generated.h"
+    current = "tensorflow/lite/micro/schema/schema_generated.h"
+    if layout != "legacy":
+        source = stubs / legacy
+        target = stubs / current
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(target)
+        for header in stubs.rglob("*.h"):
+            text = header.read_text()
+            if legacy in text:
+                header.write_text(text.replace(legacy, current))
+        if layout == "missing":
+            target.unlink()
+    monkeypatch.setattr(sys.modules[__name__], "_STUB_DIR", stubs)
+    if consumer == "profile":
+        text, headers = _render("apollo510", "rtt", "litert"), {}
+    else:
+        text, headers = render_fixture("kws", "litert", "restore_and_invoke")
+    case = _CompileCase(consumer, text, _common_kwargs("apollo510", "rtt"), headers=headers)
+    result = _compile(_prepare_case_dir(case, tmp_path), _part_define(case.vars))
+    if layout == "missing":
+        assert result.returncode != 0
+        assert "schema_generated.h" in result.stderr
+    else:
+        assert result.returncode == 0, result.stderr
