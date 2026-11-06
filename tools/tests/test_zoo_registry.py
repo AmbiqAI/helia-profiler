@@ -140,6 +140,207 @@ def test_skip_engines_match_engine_type():
     assert zoo_registry.ENGINES == {engine.value for engine in EngineType}
 
 
+HF_URI = f"Ambiq/private-models@{'1' * 40}/models/tiny-vad/a8w8/model.tflite"
+
+
+def _hf_entry(payload: bytes, arena: int = 4096) -> dict:
+    return {
+        "hf": HF_URI,
+        "family": "tiny-vad",
+        "precision": "a8w8",
+        "sha256": hashlib.sha256(payload).hexdigest(),
+        "arena_size": arena,
+    }
+
+
+def _fake_hf(tmp_path: Path, payload: bytes):
+    calls: list[tuple[str, str]] = []
+
+    def fetch(uri: str, sha256: str) -> Path:
+        calls.append((uri, sha256))
+        model = tmp_path / "hf" / "model.tflite"
+        model.parent.mkdir(parents=True, exist_ok=True)
+        model.write_bytes(payload)
+        return model
+
+    return fetch, calls
+
+
+def _private(monkeypatch, entries: list[dict] | None, token: str = "hf_test") -> None:
+    text = None if entries is None else yaml.safe_dump({"models": entries})
+    monkeypatch.setattr(zoo_registry, "_read_private", lambda path: text)
+    monkeypatch.setattr(zoo_registry, "_hf_token", lambda: token)
+
+
+def _run_private(tmp_path, resolve=None, fetch=None) -> tuple[int, Path, Path]:
+    models_list = _write_list(tmp_path / "zoo.yaml", [_entry("a8w8", b"int8 graph")])
+    resolve = resolve or _fake_zoo(tmp_path, {"a8w8": b"int8 graph"})[0]
+    output, private = tmp_path / "models.yaml", tmp_path / "private" / "models.yaml"
+    argv = ["--models", str(models_list), "--output", str(output)]
+    code = zoo_registry.main([*argv, "--private-output", str(private)], resolve, fetch)
+    return code, output, private
+
+
+def test_private_models_get_opaque_ids(tmp_path, monkeypatch):
+    entry = {**_hf_entry(b"private graph", 16384), "skip": {"helia-aot": "lacks ROUND"}}
+    _private(monkeypatch, [entry])
+    fetch, calls = _fake_hf(tmp_path, b"private graph")
+
+    code, output, private = _run_private(tmp_path, fetch=fetch)
+
+    assert code == 0
+    assert calls == [(HF_URI, entry["sha256"])]
+    assert list(load_model_file(output)) == ["tiny-kws-a8w8"]
+    model_id = f"p-{entry['sha256'][:8]}"
+    spec = load_model_file(private)[model_id]
+    assert spec.arena_size == 16384
+    assert spec.name == "tiny-vad (a8w8)"
+    assert (spec.family, spec.precision) == ("tiny-vad", "a8w8")
+    assert spec.source == f"hf://{HF_URI}"
+    assert spec.skips == (("helia-aot", "lacks ROUND"),)
+
+
+def test_private_skipped_without_output(tmp_path, monkeypatch):
+    monkeypatch.setattr(zoo_registry, "_read_private", pytest.fail)
+    models_list = _write_list(tmp_path / "zoo.yaml", [_entry("a8w8", b"int8 graph")])
+    resolve, _ = _fake_zoo(tmp_path, {"a8w8": b"int8 graph"})
+    output = tmp_path / "models.yaml"
+
+    assert zoo_registry.main(["--models", str(models_list), "--output", str(output)], resolve) == 0
+
+
+@pytest.mark.parametrize(
+    ("entries", "token", "unset"), [(None, "hf", "ZOO_AGE_KEY"), ([], "", "HF_TOKEN")]
+)
+def test_private_skips_without_secret(tmp_path, monkeypatch, capsys, entries, token, unset):
+    _private(monkeypatch, entries if entries is None else [_hf_entry(b"x")], token)
+
+    code, output, private = _run_private(tmp_path)
+
+    assert code == 0
+    assert output.exists() and not private.exists()
+    assert f"{unset} unset; skipping private models" in capsys.readouterr().err
+
+
+def test_private_fetch_error_hides_names(tmp_path, monkeypatch, capsys):
+    entry = _hf_entry(b"private graph")
+    _private(monkeypatch, [entry])
+
+    def fetch(uri: str, sha256: str) -> Path:
+        raise RuntimeError(f"https://huggingface.co/{uri}: HTTP 404")
+
+    code, output, _ = _run_private(tmp_path, fetch=fetch)
+
+    err = capsys.readouterr().err
+    assert code == 1 and not output.exists()
+    assert f"p-{entry['sha256'][:8]}: fetch failed: RuntimeError" in err
+    assert "tiny-vad" not in err and "Ambiq" not in err
+
+
+def test_private_sha_mismatch_hides_names(tmp_path, monkeypatch, capsys):
+    _private(monkeypatch, [_hf_entry(b"pinned bytes")])
+    fetch, _ = _fake_hf(tmp_path, b"other bytes")
+
+    assert _run_private(tmp_path, fetch=fetch)[0] == 1
+
+    err = capsys.readouterr().err
+    assert "differs from pin" in err
+    assert "tiny-vad" not in err and "Ambiq" not in err
+
+
+def test_public_list_refuses_hf(tmp_path):
+    models_list = _write_list(tmp_path / "zoo.yaml", [_hf_entry(b"x")])
+    with pytest.raises(ValueError, match="hf entries belong in the private list"):
+        zoo_registry.load_model_list(models_list)
+
+
+def test_private_ids_must_differ():
+    first = _hf_entry(b"x")
+    second = {**first, "family": "other-vad"}
+    with pytest.raises(ValueError, match="share a sha256 prefix"):
+        zoo_registry.parse_private_list(yaml.safe_dump({"models": [first, second]}))
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"hf": "Ambiq/x@main/model.tflite"}, "40-hex commit"),
+        ({"zoo": "tiny-kws", "rev": REV}, "one of 'zoo' or 'hf'"),
+        ({"family": None}, "lacks 'family'"),
+    ],
+)
+def test_invalid_hf_entry_refuses(change, message):
+    entry = {**_hf_entry(b"x"), **change}
+    entry = {key: value for key, value in entry.items() if value is not None}
+    with pytest.raises(ValueError, match=message):
+        zoo_registry.parse_private_list(yaml.safe_dump({"models": [entry]}))
+
+
+@pytest.mark.parametrize(
+    ("env", "saved"),
+    [
+        ({"HF_TOKEN_PATH": "custom/tok"}, "custom/tok"),
+        ({"HF_HOME": "hfhome"}, "hfhome/token"),
+        ({"XDG_CACHE_HOME": "xdg"}, "xdg/huggingface/token"),
+    ],
+)
+def test_hf_token_path_follows_env(tmp_path, monkeypatch, env, saved):
+    for key in ("HF_TOKEN", "HF_TOKEN_PATH", "HF_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.delenv(key, raising=False)
+    for key, value in env.items():
+        monkeypatch.setenv(key, str(tmp_path / value))
+    path = tmp_path / saved
+    path.parent.mkdir(parents=True)
+    path.write_text("hf_custom\n", encoding="utf-8")
+
+    assert zoo_registry._hf_token() == "hf_custom"
+
+
+def test_hf_token_falls_back_to_saved_file(tmp_path, monkeypatch):
+    for key in ("HF_TOKEN", "HF_TOKEN_PATH", "HF_HOME", "XDG_CACHE_HOME"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    saved = tmp_path / ".cache" / "huggingface" / "token"
+    saved.parent.mkdir(parents=True)
+    saved.write_text("hf_saved\n", encoding="utf-8")
+
+    assert zoo_registry._hf_token() == "hf_saved"
+    monkeypatch.setenv("HF_TOKEN", "hf_env")
+    assert zoo_registry._hf_token() == "hf_env"
+
+
+def test_age_key_from_env_then_file(tmp_path, monkeypatch):
+    key = tmp_path / "zoo.key"
+    key.write_text("# public key: age1x\nAGE-SECRET-KEY-1FILE\n", encoding="utf-8")
+    monkeypatch.delenv("ZOO_AGE_KEY", raising=False)
+    monkeypatch.setenv("ZOO_AGE_KEY_FILE", str(key))
+    assert zoo_registry.age_identity().endswith("AGE-SECRET-KEY-1FILE")
+    monkeypatch.setenv("ZOO_AGE_KEY", "AGE-SECRET-KEY-1ENV")
+    assert zoo_registry.age_identity() == "AGE-SECRET-KEY-1ENV"
+
+
+def test_private_list_round_trips(tmp_path):
+    x25519 = pytest.importorskip("pyrage").x25519
+    identity = x25519.Identity.generate()
+    recipients = tmp_path / "recipients"
+    recipients.write_text(f"# test\n{identity.to_public()}\n", encoding="utf-8")
+    text = yaml.safe_dump({"models": [_hf_entry(b"x")]})
+
+    data = zoo_registry.encrypt_list(text, recipients)
+
+    assert data.startswith(b"-----BEGIN AGE ENCRYPTED FILE-----")
+    assert zoo_registry.decrypt_list(data, f"# key\n{identity}\n") == text
+    with pytest.raises(ValueError, match="private list"):
+        zoo_registry.decrypt_list(data, str(x25519.Identity.generate()))
+
+
+def test_checked_in_private_list_is_encrypted():
+    data = zoo_registry.PRIVATE_LIST.read_bytes()
+    assert data.startswith(b"-----BEGIN AGE ENCRYPTED FILE-----")
+    lines = zoo_registry.RECIPIENTS.read_text(encoding="utf-8").splitlines()
+    assert any(line.startswith("age1") for line in lines)
+
+
 def test_checked_in_list_is_valid():
     entries = zoo_registry.load_model_list(zoo_registry.DEFAULT_LIST)
     assert {(e["zoo"], e["precision"]) for e in entries} == {

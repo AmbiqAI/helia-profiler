@@ -194,6 +194,35 @@ activations (a tensor-lifetime pass over the graph) plus the runtime
 overhead its a8w8 sibling measured on hardware (allocated arena minus peak
 activations).
 
+### Private models
+
+Private models live in `tools/zoo_private.yaml.age`, an
+[age](https://age-encryption.org)-encrypted list with the same entry shape
+plus `hf: <repo>@<commit>/<path>` and `family` in place of `zoo` and `rev`.
+The repo is public, so the list stays encrypted and the registry keys
+private models by an opaque ID, `p-` plus the first 8 hex digits of the
+model sha256. Errors for a private model name only that ID.
+
+```bash
+uv run tools/zoo_registry.py --output build/zoo/models.yaml \
+  --private-output build/zoo/private.yaml
+```
+
+`--private-output` needs the age key (`ZOO_AGE_KEY`, `ZOO_AGE_KEY_FILE` or
+`~/.config/helia-profiler/zoo-private.key`) and a Hugging Face token
+(`HF_TOKEN` or `hf auth login`); without either it warns and writes no
+private registry. The private registry and its results name the models,
+so they must never reach a public artifact or log.
+
+Edit the list with `uv run tools/zoo_private.py edit`, which decrypts it,
+opens `$EDITOR`, checks the entries and re-encrypts to every key in
+`tools/zoo_private.recipients`. `show` prints the plaintext. For readable
+local diffs:
+
+```bash
+git config diff.age.textconv "uv run --quiet tools/zoo_private.py show"
+```
+
 ## Dependency source pinning
 
 The `ns_cmsis_nn_ref` workflow input is blank by default. In that normal mode,
