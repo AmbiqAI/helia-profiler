@@ -56,6 +56,23 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.5.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.5.0...v0.5.1) (2026-11-06)
+
+
+### Features
+
+* **ci:** run private Zoo models and seal their results ([#652](https://github.com/AmbiqAI/helia-profiler/issues/652)) ([6231cd2](https://github.com/AmbiqAI/helia-profiler/commit/6231cd2e2452fcef2e52f73a4254402d457ef9b9))
+* **validate:** let a models file skip an engine per model ([#651](https://github.com/AmbiqAI/helia-profiler/issues/651)) ([146f465](https://github.com/AmbiqAI/helia-profiler/commit/146f465ec4be6bb862c2a81661ee24160bd041e4))
+* **zoo:** add encrypted private models to the Zoo registry ([#650](https://github.com/AmbiqAI/helia-profiler/issues/650)) ([288ae41](https://github.com/AmbiqAI/helia-profiler/commit/288ae4140b0806f0f3ed65c0e7fe2754730e71f5))
+* **zoo:** add fomo-cuedc-animals to the Zoo list ([#645](https://github.com/AmbiqAI/helia-profiler/issues/645)) ([5938430](https://github.com/AmbiqAI/helia-profiler/commit/5938430f7f51c417c0a8d53e530ca5457b24cd04))
+* **zoo:** add heartkit-arr a16w8 with a LiteRT skip ([#646](https://github.com/AmbiqAI/helia-profiler/issues/646)) ([1145010](https://github.com/AmbiqAI/helia-profiler/commit/11450104d7911e401c4b7dbcfa9ac50e0fd960b5))
+
+
+### Bug Fixes
+
+* **firmware:** support relocated LiteRT schema headers ([#649](https://github.com/AmbiqAI/helia-profiler/issues/649)) ([126f5dc](https://github.com/AmbiqAI/helia-profiler/commit/126f5dc4e638776060fd3820f04aaea47b55fb9f)), closes [#586](https://github.com/AmbiqAI/helia-profiler/issues/586)
+* **runtime:** handle retired heliaRT header dependencies ([8593dad](https://github.com/AmbiqAI/helia-profiler/commit/8593dada5d0e797940fa9defd8d480ac8955cefe)), closes [#586](https://github.com/AmbiqAI/helia-profiler/issues/586)
+
 ## [0.5.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.1...v0.5.0) (2026-11-04)
 
 
