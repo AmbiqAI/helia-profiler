@@ -1,0 +1,4 @@
+# age recipients for zoo_private.yaml.age and private results.
+# One age1 key per line; re-encrypt after a change.
+# zoo-ci: CI secret ZOO_AGE_KEY and the dashboard sync.
+age1vvckk47lfxmvpecj3ahufryta9zdyyq8tclznsss4553ktxvue2sl068z2

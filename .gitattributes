@@ -9,3 +9,6 @@ examples/results/** -text
 
 # ORIGIN.json pins BENCH's contract files by sha256 of their exact bytes.
 tests/fixtures/result_contract_v1/** -text
+
+# Encrypted private Zoo list; see tools/zoo_private.py.
+tools/zoo_private.yaml.age diff=age -text

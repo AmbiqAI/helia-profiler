@@ -38,6 +38,7 @@ published product documentation belongs in `astro-site/src/content/docs/`.
 | [`export/executorch_tier1/export_tier1.py`](export/executorch_tier1/export_tier1.py) | Pinned ExecuTorch/helia-torch export environment; generates paired ARM/NS comparison models and instruction maps. See the [kernel guide](../astro-site/src/content/docs/guide/executorch-ns-kernels.mdx). |
 | [`export/executorch_tier1/compare_tier1.py`](export/executorch_tier1/compare_tier1.py) | Reads paired saved runs and the instruction-map manifest; prints a comparison without invoking a compiler or device. It handles the different PTE serializations that ordinary `hpx compare` refuses to treat as one model. |
 | [`zoo_registry.py`](zoo_registry.py), [`zoo_models.yaml`](zoo_models.yaml) | Fetch pinned Zoo models, verify their hashes and write an `hpx validate --models-file` registry. `uv run tools/zoo_registry.py --output build/zoo/models.yaml` uses the script's isolated dependency environment and downloads assets. See [hardware CI](../maintainers/hardware-ci.md). |
+| [`zoo_private.py`](zoo_private.py), [`zoo_private.yaml.age`](zoo_private.yaml.age) | Show or edit the age-encrypted private model list. `uv run tools/zoo_private.py edit` needs the age key. See [hardware CI](../maintainers/hardware-ci.md#private-models). |
 
 The scripts and adjacent manifests own asset generation; config recipes consume
 the resulting files. Do not infer accuracy qualification from synthetic or
