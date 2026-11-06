@@ -34,6 +34,8 @@ import yaml
 DEFAULT_LIST = Path(__file__).resolve().with_name("zoo_models.yaml")
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _REVISION = re.compile(r"[0-9a-f]{40}")
+# EngineType values; a test keeps them equal.
+ENGINES = frozenset({"helia-rt", "helia-aot", "litert", "executorch"})
 
 Resolver = Callable[[str], Any]
 
@@ -55,6 +57,13 @@ def load_model_list(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}: rev must be a 40-hex commit")
         if not _SHA256.fullmatch(str(entry["sha256"])):
             raise ValueError(f"{path}: sha256 must be 64 lowercase hex")
+        skip = entry.get("skip", {})
+        if not isinstance(skip, dict) or not all(
+            isinstance(reason, str) and reason.strip() for reason in skip.values()
+        ):
+            raise ValueError(f"{path}: skip must map engine to reason")
+        if unknown := sorted(set(map(str, skip)) - ENGINES):
+            raise ValueError(f"{path}: skip names unknown engine {', '.join(unknown)}")
         arena = entry["arena_size"]
         if isinstance(arena, bool) or not isinstance(arena, int) or arena <= 0:
             raise ValueError(f"{path}: arena_size must be a positive integer")
@@ -92,6 +101,8 @@ def build_registry(entries: list[dict[str, Any]], resolve: Resolver) -> dict[str
             "precision": entry["precision"],
             "source": source,
         }
+        if "skip" in entry:
+            models[_model_id(entry)]["skip"] = entry["skip"]
     return {"models": models}
 
 

@@ -110,6 +110,36 @@ def test_duplicate_model_refuses(tmp_path):
         zoo_registry.load_model_list(_write_list(tmp_path / "zoo.yaml", [entry, entry]))
 
 
+def test_skip_reaches_the_registry(tmp_path):
+    entry = {**_entry("a8w8", b"int8 graph"), "skip": {"helia-aot": "lacks ROUND"}}
+    models_list = _write_list(tmp_path / "zoo.yaml", [entry])
+    resolve, _ = _fake_zoo(tmp_path, {"a8w8": b"int8 graph"})
+    output = tmp_path / "models.yaml"
+
+    assert zoo_registry.main(["--models", str(models_list), "--output", str(output)], resolve) == 0
+
+    assert load_model_file(output)["tiny-kws-a8w8"].skips == (("helia-aot", "lacks ROUND"),)
+
+
+@pytest.mark.parametrize("skip", [["helia-aot"], {"helia-aot": ""}])
+def test_invalid_skip_refuses(tmp_path, skip):
+    entry = {**_entry("a8w8", b"x"), "skip": skip}
+    with pytest.raises(ValueError, match="skip must map engine to reason"):
+        zoo_registry.load_model_list(_write_list(tmp_path / "zoo.yaml", [entry]))
+
+
+def test_unknown_skip_engine_refuses(tmp_path):
+    entry = {**_entry("a8w8", b"x"), "skip": {"tvm": "lacks ROUND"}}
+    with pytest.raises(ValueError, match="unknown engine tvm"):
+        zoo_registry.load_model_list(_write_list(tmp_path / "zoo.yaml", [entry]))
+
+
+def test_skip_engines_match_engine_type():
+    from helia_profiler.engines import EngineType
+
+    assert zoo_registry.ENGINES == {engine.value for engine in EngineType}
+
+
 def test_checked_in_list_is_valid():
     entries = zoo_registry.load_model_list(zoo_registry.DEFAULT_LIST)
     assert {(e["zoo"], e["precision"]) for e in entries} == {
