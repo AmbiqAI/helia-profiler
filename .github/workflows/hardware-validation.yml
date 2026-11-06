@@ -110,6 +110,9 @@ env:
   # Zoo downloads, kept warm like hpx-cache.
   HPX_ZOO_CACHE_DIR: ${{ github.workspace }}/../zoo-cache
   HPX_ZOO_REGISTRY: results/validation/zoo-models.yaml
+  # Private models: never in a plain artifact.
+  HPX_ZOO_PRIVATE_DIR: private
+  HPX_ZOO_PRIVATE_SEALED: sealed/zoo-private.tar.gz.age
   # ccache: the runner exports a per-board CCACHE_DIR; hpx's
   # build.compiler_launcher auto-detect picks ccache up from PATH.
   CCACHE_MAXSIZE: 10G
@@ -492,14 +495,20 @@ jobs:
       # Zoo mode: two bundles, one artifact.
       - name: Build the Zoo model registry
         if: env.HPX_VALIDATION_SUITE == 'zoo'
+        env:
+          # Private list key and download token.
+          ZOO_AGE_KEY: ${{ secrets.ZOO_AGE_KEY }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           # uv's Python lacks the NixOS CA path.
           if [[ -z "${SSL_CERT_FILE:-}" && -f /etc/ssl/certs/ca-certificates.crt ]]; then
             export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
           fi
+          rm -rf "${HPX_ZOO_PRIVATE_DIR}" "$(dirname "${HPX_ZOO_PRIVATE_SEALED}")"
           mkdir -p results/validation
           uv run --python 3.12 tools/zoo_registry.py \
-            --output "${HPX_ZOO_REGISTRY}" --cache "${HPX_ZOO_CACHE_DIR}"
+            --output "${HPX_ZOO_REGISTRY}" --cache "${HPX_ZOO_CACHE_DIR}" \
+            --private-output "${HPX_ZOO_PRIVATE_DIR}/zoo-models.yaml"
 
       - name: Run Zoo validation
         if: env.HPX_VALIDATION_SUITE == 'zoo'
@@ -539,9 +548,28 @@ jobs:
             echo "::error::the zoo suite selects no cases on ${HPX_VALIDATION_BOARD}" >&2
             exit 2
           fi
+          status=0
           uv run hpx validate "${args[@]}" "${zoo[@]}" \
             --output-dir results/validation/zoo \
-            --junit-xml results/validation/zoo/junit.xml
+            --junit-xml results/validation/zoo/junit.xml || status=$?
+          private="${HPX_ZOO_PRIVATE_DIR}"
+          if [[ -f "${private}/zoo-models.yaml" ]]; then
+            # Output names models; it stays sealed.
+            mkdir -p "${private}/validation"
+            pzoo=(--models-file "${private}/zoo-models.yaml" --engines "helia-rt,helia-aot,litert")
+            pstatus=0
+            uv run hpx validate "${args[@]}" "${pzoo[@]}" \
+              --output-dir "${private}/validation" \
+              --junit-xml "${private}/validation/junit.xml" \
+              > "${private}/validate.log" 2>&1 || pstatus=$?
+            summary="$(grep -E '^=+ .* in [0-9.]+s' "${private}/validate.log" | tail -n 1 || true)"
+            echo "Private models: ${summary:-no pytest summary} (exit ${pstatus})"
+            if (( pstatus != 0 )); then
+              echo "::error::private Zoo models failed; see the sealed log" >&2
+              status=${pstatus}
+            fi
+          fi
+          exit "${status}"
 
       # Free the board before the hardware-free steps.
       - name: Release the board lock
@@ -567,6 +595,23 @@ jobs:
         if: always()
         run: uv run pytest -m compile_hw tests/contracts/test_render_compile_hw.py -rs -W default
 
+      # Recipients key only; no secret needed.
+      - name: Seal private Zoo results
+        if: always() && env.HPX_VALIDATION_SUITE == 'zoo'
+        run: |
+          [[ -d "${HPX_ZOO_PRIVATE_DIR}/validation" ]] || exit 0
+          uv run --python 3.12 tools/zoo_private.py seal \
+            "${HPX_ZOO_PRIVATE_DIR}" "${HPX_ZOO_PRIVATE_SEALED}"
+
+      - name: Upload sealed private results
+        if: always() && env.HPX_VALIDATION_SUITE == 'zoo'
+        uses: actions/upload-artifact@v4
+        with:
+          name: zoo-private-${{ github.run_id }}-${{ matrix.board }}
+          overwrite: true
+          path: ${{ env.HPX_ZOO_PRIVATE_SEALED }}
+          if-no-files-found: ignore
+
       # One artifact per board. Consumers group a run's artifacts by the
       # GitHub run ID recorded in each validation_manifest.json. The upload
       # runs on failure too, so "re-run failed jobs" meets an artifact of the
@@ -581,3 +626,8 @@ jobs:
             results/validation/
             !results/validation/**/work/**
           if-no-files-found: warn
+
+      # Self-hosted workspaces persist between runs.
+      - name: Remove private Zoo files
+        if: always()
+        run: rm -rf "${HPX_ZOO_PRIVATE_DIR}" "$(dirname "${HPX_ZOO_PRIVATE_SEALED}")"

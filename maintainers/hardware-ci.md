@@ -214,6 +214,15 @@ uv run tools/zoo_registry.py --output build/zoo/models.yaml \
 private registry. The private registry and its results name the models,
 so they must never reach a public artifact or log.
 
+The Zoo nightly passes the `ZOO_AGE_KEY` and `HF_TOKEN` secrets to the
+registry step, runs the private registry as a second `hpx validate` with
+its console output in `private/validate.log`, and prints only the pytest
+summary line. `tools/zoo_private.py seal` then encrypts `private/` (without
+`work/` trees) to the recipients, and the job uploads it as
+`zoo-private-<run>-<board>`. Open one with
+`uv run tools/zoo_private.py unseal zoo-private.tar.gz.age out/`. A private
+failure fails the step after the public run finishes.
+
 Edit the list with `uv run tools/zoo_private.py edit`, which decrypts it,
 opens `$EDITOR`, checks the entries and re-encrypts to every key in
 `tools/zoo_private.recipients`. `show` prints the plaintext. For readable

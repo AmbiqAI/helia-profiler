@@ -202,8 +202,8 @@ def age_identity() -> str:
     return path.read_text(encoding="utf-8").strip() if path.is_file() else ""
 
 
-def decrypt_list(data: bytes, identity: str) -> str:
-    """Plaintext of an age-encrypted list."""
+def decrypt(data: bytes, identity: str) -> bytes:
+    """Plaintext of age ciphertext."""
     import pyrage
 
     keys = [
@@ -214,13 +214,18 @@ def decrypt_list(data: bytes, identity: str) -> str:
     if not keys:
         raise ValueError("age key holds no AGE-SECRET-KEY line")
     try:
-        return pyrage.decrypt(data, keys).decode("utf-8")
+        return pyrage.decrypt(data, keys)
     except pyrage.DecryptError as error:
-        raise ValueError(f"private list: {error}") from None
+        raise ValueError(f"age: {error}") from None
 
 
-def encrypt_list(text: str, recipients: Path = RECIPIENTS) -> bytes:
-    """Armored age ciphertext for every recipient."""
+def decrypt_list(data: bytes, identity: str) -> str:
+    """Plaintext of an age-encrypted list."""
+    return decrypt(data, identity).decode("utf-8")
+
+
+def encrypt(data: bytes, recipients: Path = RECIPIENTS, armored: bool = False) -> bytes:
+    """Age ciphertext for every recipient."""
     import pyrage
 
     keys = [
@@ -230,7 +235,12 @@ def encrypt_list(text: str, recipients: Path = RECIPIENTS) -> bytes:
     ]
     if not keys:
         raise ValueError(f"{recipients}: no age1 recipients")
-    return pyrage.encrypt(text.encode("utf-8"), keys, armored=True)
+    return pyrage.encrypt(data, keys, armored=armored)
+
+
+def encrypt_list(text: str, recipients: Path = RECIPIENTS) -> bytes:
+    """Armored age ciphertext of a list."""
+    return encrypt(text.encode("utf-8"), recipients, armored=True)
 
 
 def _hf_token_path() -> Path:

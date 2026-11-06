@@ -330,7 +330,7 @@ def test_private_list_round_trips(tmp_path):
 
     assert data.startswith(b"-----BEGIN AGE ENCRYPTED FILE-----")
     assert zoo_registry.decrypt_list(data, f"# key\n{identity}\n") == text
-    with pytest.raises(ValueError, match="private list"):
+    with pytest.raises(ValueError, match="age: "):
         zoo_registry.decrypt_list(data, str(x25519.Identity.generate()))
 
 
@@ -369,3 +369,27 @@ def test_malformed_list_reports(tmp_path, capsys):
     assert zoo_registry.main(["--models", str(models_list), "--output", str(output)]) == 1
 
     assert capsys.readouterr().err.startswith("zoo_registry: ")
+
+
+def test_seal_round_trips_without_work(tmp_path, monkeypatch):
+    x25519 = pytest.importorskip("pyrage").x25519
+    monkeypatch.syspath_prepend(str(ROOT / "tools"))
+    spec = importlib.util.spec_from_file_location("zoo_private", ROOT / "tools" / "zoo_private.py")
+    assert spec is not None and spec.loader is not None
+    zoo_private = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(zoo_private)
+    identity = x25519.Identity.generate()
+    recipients = tmp_path / "recipients"
+    recipients.write_text(f"{identity.to_public()}\n", encoding="utf-8")
+    private = tmp_path / "private"
+    (private / "validation" / "case" / "work").mkdir(parents=True)
+    (private / "validation" / "case" / "summary.json").write_text("{}", encoding="utf-8")
+    (private / "validation" / "case" / "work" / "fw.bin").write_bytes(b"big")
+    sealed = tmp_path / "sealed" / "zoo-private.tar.gz.age"
+
+    zoo_private.seal(private, sealed, recipients)
+    zoo_private.unseal(sealed, tmp_path / "out", str(identity))
+
+    case = tmp_path / "out" / "private" / "validation" / "case"
+    assert (case / "summary.json").read_text(encoding="utf-8") == "{}"
+    assert not (case / "work").exists()
