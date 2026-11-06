@@ -29,6 +29,10 @@
     int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
     va_end(ap);
     if (n > 0) {
+        // vsnprintf returns the untruncated length; send only what fits in line_buf.
+        if (n >= (int)sizeof(line_buf)) {
+            n = (int)sizeof(line_buf) - 1;
+        }
         uint32_t sent = 0;
         nsx_usb_send(&g_usb_cfg, line_buf, (uint32_t)n, &sent);
     }
@@ -122,6 +126,10 @@ static void hpx_rtt_write_lossless(const char *buf, unsigned len) {
     int n = vsnprintf(line_buf, sizeof(line_buf), fmt, ap);
     va_end(ap);
     if (n > 0) {
+        // vsnprintf returns the untruncated length; send only what fits in line_buf.
+        if (n >= (int)sizeof(line_buf)) {
+            n = (int)sizeof(line_buf) - 1;
+        }
         if (g_hpx_rtt_lossless) {
             hpx_rtt_write_lossless(line_buf, (unsigned)n);
         } else {
