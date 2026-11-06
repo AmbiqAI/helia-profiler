@@ -146,6 +146,31 @@ models:
         with pytest.raises(ValueError, match="precision for model 'kws-x'"):
             load_model_file(registry)
 
+    def test_yaml_models_carry_engine_skips(self, tmp_path):
+        (tmp_path / "kws.tflite").write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(
+            "models:\n  kws-x:\n    path: kws.tflite\n    skip:\n      helia-aot: ' lacks ROUND '\n"
+        )
+
+        assert load_model_file(registry)["kws-x"].skips == ((EngineType.HELIA_AOT, "lacks ROUND"),)
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            ("[helia-aot]", "must map engine"),
+            ("{tvm: x}", "unknown engine"),
+            ("{litert: ''}", "cannot be empty"),
+        ],
+    )
+    def test_yaml_models_reject_invalid_skip(self, tmp_path, value, message):
+        (tmp_path / "kws.tflite").write_bytes(b"model")
+        registry = tmp_path / "zoo.yml"
+        registry.write_text(f"models:\n  kws-x:\n    path: kws.tflite\n    skip: {value}\n")
+
+        with pytest.raises(ValueError, match=message):
+            load_model_file(registry)
+
     def test_builtin_models_have_no_zoo_metadata(self):
         assert all((m.family, m.precision, m.source) == (None, None, None) for m in MODELS.values())
 
@@ -201,6 +226,11 @@ class TestCaseValidity:
     def test_psram_with_rtt_is_valid(self):
         case = self._case(memory=MemoryProfile.PSRAM, transport=Transport.RTT)
         assert case_validity(case) is None
+
+    def test_model_skip_names_its_engine(self):
+        model = dataclasses.replace(MODELS["kws"], skips=((EngineType.HELIA_AOT, "lacks ROUND"),))
+        assert case_validity(self._case(model=model, engine=EngineType.HELIA_AOT)) == "lacks ROUND"
+        assert case_validity(self._case(model=model, engine=EngineType.HELIA_RT)) is None
 
     def test_ordinary_case_is_valid(self):
         assert case_validity(self._case()) is None

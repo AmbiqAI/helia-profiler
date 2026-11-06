@@ -95,6 +95,8 @@ class ModelSpec:
     precision: str | None = None
     source: str | None = None  # where the model came from
     executorch: ExecuTorchModelSpec | None = None
+    # (engine, reason) pairs the model skips.
+    skips: tuple[tuple[EngineType, str], ...] = ()
 
     @property
     def decision_group(self) -> str:
@@ -227,6 +229,9 @@ def _int16_per_channel_fc(path: Path) -> bool:
 
 def case_validity(case: CaseSpec) -> str | None:
     """Return a skip reason if the case is a known-unsupported combination."""
+    for engine, reason in case.model.skips:
+        if case.engine is engine:
+            return reason
     soc = get_soc_for_board(case.board.id)
     declared = nsx_declared_toolchains(case.board.id)
     if declared is not None and case.toolchain not in declared[1]:
@@ -440,8 +445,29 @@ def load_model_file(path: Path) -> dict[str, ModelSpec]:
             family=_optional_label(raw_spec, "family", model_id),
             precision=_optional_label(raw_spec, "precision", model_id),
             source=_optional_label(raw_spec, "source", model_id),
+            skips=_model_skips(raw_spec.get("skip"), model_id),
         )
     return models
+
+
+def _model_skips(raw: Any, model_id: str) -> tuple[tuple[EngineType, str], ...]:
+    """Validate a model's ``skip`` mapping of engine to reason."""
+    if raw is None:
+        return ()
+    if not isinstance(raw, dict):
+        raise ValueError(f"skip for model {model_id!r} must map engine to reason")
+    skips = []
+    for engine, reason in raw.items():
+        try:
+            engine_type = EngineType(str(engine))
+        except ValueError:
+            raise ValueError(
+                f"skip for model {model_id!r} names unknown engine {engine!r}"
+            ) from None
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError(f"skip reason for {engine!r} in model {model_id!r} cannot be empty")
+        skips.append((engine_type, reason.strip()))
+    return tuple(skips)
 
 
 def _optional_label(raw_spec: dict[str, Any], key: str, model_id: str) -> str | None:
