@@ -412,7 +412,11 @@ class TestLockstepDefaultsOnWhenWired:
         # the lock-step hand-off depends on which engine.
         ctx.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
 
-        template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+        # The dedicated power binary is the one the host captures from here;
+        # the PMU binary's lock-step is pinned separately below.
+        template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars(
+            power_only=True
+        )
 
         assert template_vars["lockstep"] == resolve_power_lockstep(ctx), scenario
         assert template_vars["lockstep"] is expect_lockstep, scenario
@@ -428,6 +432,47 @@ class TestLockstepDefaultsOnWhenWired:
         assert (
             f"static constexpr bool     kPowerSyncEnabled = {str(expect_sync).lower()};"
         ) in rendered, scenario
+
+    @pytest.mark.parametrize(
+        "firmware,expect_pmu_lockstep",
+        [("dedicated", False), ("shared", True)],
+    )
+    def test_pmu_binary_waits_for_go_only_when_it_is_measured(
+        self, tmp_path, firmware, expect_pmu_lockstep
+    ):
+        """Only the binary the host captures power from runs the handshake.
+
+        With ``power.firmware: dedicated`` the host drives GO for the power
+        binary only, so a PMU binary built with lock-step waits out
+        ``hpx_sync_wait_go()``'s timeout (about 3 s) on every run. With
+        ``shared`` the PMU binary *is* the measured binary and must keep it,
+        or the host waits for a READY that never comes (#114).
+        """
+        from helia_profiler.engines import TFLM_ENGINE_HEADER
+        from helia_profiler.engines.base import LiteRtArtifacts
+        from helia_profiler.firmware import _jinja_env
+        from helia_profiler.firmware.context import FirmwareRenderContext
+
+        ctx = make_pmu_ctx(
+            tmp_path,
+            board="apollo4p_blue_kbr_evb",
+            transport="rtt",
+            power_enabled=True,
+            lockstep=None,
+            extra={"power": {"firmware": firmware}},
+        )
+        ctx.engine_artifacts = LiteRtArtifacts(engine_header=TFLM_ENGINE_HEADER)
+        render_ctx = FirmwareRenderContext.from_pipeline_context(ctx)
+
+        assert resolve_power_lockstep(ctx) is True
+        assert render_ctx.to_template_vars(power_only=True)["lockstep"] is True
+
+        pmu_vars = render_ctx.to_template_vars()
+        assert pmu_vars["lockstep"] is expect_pmu_lockstep
+        rendered = _jinja_env.get_template("_gpio_sync.j2").render(**pmu_vars)
+        assert (
+            f"static constexpr bool     kSyncLockstep     = {str(expect_pmu_lockstep).lower()};"
+        ) in rendered
 
 
 class TestAutoStrategyNeverCyclesRail:

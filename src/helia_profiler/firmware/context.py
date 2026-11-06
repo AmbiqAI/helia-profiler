@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
+from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, PowerFirmware, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import FirmwareError, PipelineError
@@ -49,19 +49,28 @@ class SyncContext:
     lockstep: bool
     state_gpio_pin: int
     go_gpio_pin: int
+    #: Lock-step for the transport-attached PMU binary. The handshake belongs
+    #: to whichever binary the host captures power from: with a dedicated
+    #: power binary nothing drives GO during the PMU phase, so the PMU
+    #: binary's wait could only time out.
+    pmu_binary_lockstep: bool
 
     @classmethod
     def from_pipeline_context(cls, ctx: "PipelineContext") -> "SyncContext":
         wiring = ctx.fixture.method.power_sync if ctx.fixture is not None else None
         if wiring is not None:
-            return cls(True, wiring.sync_gpio_pin, True, wiring.state_gpio_pin, wiring.go_gpio_pin)
+            return cls(
+                True, wiring.sync_gpio_pin, True, wiring.state_gpio_pin, wiring.go_gpio_pin, True
+            )
         power = ctx.config.power
+        lockstep = resolve_power_lockstep(ctx)
         return cls(
             power.gated_external_capture,
             power.sync_gpio_pin,
-            resolve_power_lockstep(ctx),
+            lockstep,
             power.state_gpio_pin,
             power.go_gpio_pin,
+            lockstep and power.firmware is not PowerFirmware.DEDICATED,
         )
 
 
@@ -470,7 +479,7 @@ class FirmwareRenderContext:
             "power_sync_enabled": self.sync.power_sync_enabled,
             "power_binary_needs_gpio": self.power_binary_needs_gpio,
             "sync_gpio_pin": self.sync.sync_gpio_pin,
-            "lockstep": self.sync.lockstep,
+            "lockstep": self.sync.lockstep if power_only else self.sync.pmu_binary_lockstep,
             "state_gpio_pin": self.sync.state_gpio_pin,
             "go_gpio_pin": self.sync.go_gpio_pin,
             "transport": self.transport.transport,
