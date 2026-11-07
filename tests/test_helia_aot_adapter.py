@@ -204,6 +204,11 @@ def _prepare(
 class TestPrepareArtifactFlags:
     """``prepare()`` derives its artifact flags from the merged AOT args."""
 
+    @pytest.fixture(autouse=True)
+    def _needs_helia_aot(self):
+        # prepare() digests the arguments the compiler receives with heliaAOT's own ConvertArgs.
+        pytest.importorskip("helia_aot")
+
     def test_config_path_allocate_arenas_false(self, monkeypatch, tmp_path):
         aot_yaml = _write_aot_yaml(tmp_path, "memory:\n  allocate_arenas: false\n")
         artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({"config_path": str(aot_yaml)}))
@@ -312,6 +317,11 @@ class _Distribution:
 
 class TestPreparationEvidence:
     """``prepare()`` owns the converter's report files and the installed-package identity."""
+
+    @pytest.fixture(autouse=True)
+    def _needs_helia_aot(self):
+        # prepare() digests the arguments the compiler receives with heliaAOT's own ConvertArgs.
+        pytest.importorskip("helia_aot")
 
     def test_pins_this_conversions_reports_and_drops_stale_ones(self, monkeypatch, tmp_path):
         output = tmp_path / "work" / "aot_output"
