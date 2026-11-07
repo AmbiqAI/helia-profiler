@@ -32,11 +32,11 @@ RECORD = _RECORD
 ARCHIVE = b"!<arch>\nhelia-rt-member"
 
 
-def _dist(root: Path, *, commit: str = "7fe6dfd") -> Path:
+def _dist(root: Path, *, commit: str = "7fe6dfd", version: str = RECORD.version) -> Path:
     (root / "lib").mkdir(parents=True)
     (root / "lib" / "libhelia-rt-cm55-atfe-release-with-logs.a").write_bytes(ARCHIVE)
     (root / "lib" / "libhelia-rt-cm55-atfe-release.a").write_bytes(b"!<arch>\nother")
-    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v2.2.2\nCommit: {commit}\n")
+    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v{version}\nCommit: {commit}\n")
     for include in prepared_runtimes._HELIA_RT_INCLUDE_DIRS[1:]:
         (root / include).mkdir(parents=True, exist_ok=True)
         (root / include / "api.h").write_text(f"// {include}\n")
@@ -72,6 +72,37 @@ def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert all(name.endswith(".h") for name in headers)
     assert verified.record.consumer_defines == prepared_runtimes._HELIA_RT_DEFINES
     assert not (prepared.directory.parent / "2.2.2.partial").exists()
+
+
+def test_default_release_exports_optional_virtual_delete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from helia_profiler.runtime.archive import prepare_runtime_module
+
+    record = runtime("helia-rt")
+    assert record is not None
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    dist = _dist(tmp_path / "dist", commit=record.source.commit, version=record.version)
+    compatibility = dist / "tensorflow/lite/micro/compatibility.h"
+    compatibility.parent.mkdir(parents=True)
+    compatibility.write_text(
+        "#ifdef TFLM_REMOVE_VIRTUAL_DELETE\n"
+        "#define TF_LITE_REMOVE_VIRTUAL_DELETE void operator delete(void*) {}\n"
+        "#else\n#define TF_LITE_REMOVE_VIRTUAL_DELETE\n#endif\n"
+    )
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_rt.download._fetch_github_release",
+        lambda repo, ref, **_: (dist, record.version)
+        if ref == f"helia-rt-v{record.version}"
+        else pytest.fail(ref),
+    )
+
+    prepared = prepare_runtime("helia-rt")
+    verified = prepared.runtime.verify()
+    assert "TFLM_REMOVE_VIRTUAL_DELETE" in verified.record.consumer_defines
+    module = prepare_runtime_module(verified, tmp_path / "consumer").path
+    assert module is not None
+    assert "TFLM_REMOVE_VIRTUAL_DELETE" in (module / "CMakeLists.txt").read_text()
 
 
 @pytest.mark.parametrize(
