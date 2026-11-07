@@ -64,8 +64,11 @@ DIMENSIONS = {
     **{dimension.value: None for dimension in CAPTURE_DIMENSIONS},
     "model_sha256": SHA,
     "link_family": "gnu",
+    "toolchain": "arm-none-eabi-gcc",
+    "engine_version": "0.33.0",
     "kernel_version": "7.0.0",
     "kernel_commit": "c" * 40,
+    "arena_memory": "DTCM",
 }
 
 PLANS = Path(__file__).parent / "fixtures" / "calibration"
@@ -99,6 +102,7 @@ def bundle(
     kernel_commit: str = "c" * 40,
     arena_region: str = "DTCM",
     layer_cycles_text: str | None = None,
+    power: dict[str, Any] | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
     path.mkdir(parents=True)
@@ -129,6 +133,8 @@ def bundle(
     }
     if conditions is not None:
         summary["conditions"] = conditions
+    if power is not None:
+        summary["power"] = power
     (path / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     metadata = {
         "schema": "hpx.run-metadata",
@@ -530,17 +536,41 @@ def test_the_kernel_commit_tells_untagged_builds_apart(tmp_path: Path) -> None:
     assert table.dimensions["kernel_version"] == UNTAGGED
 
 
-def test_an_informative_difference_does_not_block_a_merge(tmp_path: Path) -> None:
-    """Only the blocking dimensions and the kernel build identify a setup."""
+@pytest.mark.parametrize(
+    ("change", "name", "values"),
+    [
+        ({"toolchain": "armclang"}, "toolchain", ("'armclang'", "'arm-none-eabi-gcc'")),
+        ({"engine_version": "0.34.0"}, "engine_version", ("'0.34.0'", "'0.33.0'")),
+        ({"arena_region": "SRAM"}, "arena_memory", ("'SRAM'", "'DTCM'")),
+    ],
+)
+def test_a_dimension_that_changes_cycles_is_refused_though_compare_only_reports_it(
+    tmp_path: Path, change: dict[str, Any], name: str, values: tuple[str, str]
+) -> None:
     auto, _ = two_bundles(tmp_path)
-    other = bundle(
-        tmp_path / "other",
+    other = bundle(tmp_path / "other", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, **change)
+    with pytest.raises(CalibrationError, match=f"has {name} {values[0]};.*has {values[1]}"):
+        calibrate([auto, other], output=tmp_path / "out.json")
+
+
+def test_a_power_only_difference_still_merges(tmp_path: Path) -> None:
+    """A power scope is a blocking dimension for power metrics, which no price is."""
+    auto, _ = two_bundles(tmp_path)
+    gated = bundle(
+        tmp_path / "gated",
         cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
-        toolchain="armclang",
-        engine_version="0.34.0",
-        arena_region="SRAM",
+        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"},
     )
-    assert calibrate([auto, other], output=tmp_path / "out.json").price_count == 3
+    table = calibrate([auto, gated], output=tmp_path / "out.json")
+    assert table.price_count == 3
+    assert table.dimensions["power_scope"] is None
+    whole = bundle(
+        tmp_path / "whole",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        power={"measurement_scope": "whole_capture_window", "integrity": "valid"},
+    )
+    with pytest.raises(CalibrationError, match="has power_scope 'whole_capture_window'"):
+        calibrate([gated, whole], output=tmp_path / "out.json")
 
 
 def test_a_file_that_records_no_setup_takes_the_bundles_setup(tmp_path: Path) -> None:

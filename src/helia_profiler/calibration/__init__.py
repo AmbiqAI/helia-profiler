@@ -5,6 +5,7 @@ from __future__ import annotations
 from .table import (
     CALIBRATION_SCHEMA_VERSION,
     CAPTURE_DIMENSIONS,
+    CYCLE_DIMENSIONS,
     DEFAULT_TOLERANCE,
     CalibrationSource,
     CalibrationTable,
@@ -20,6 +21,7 @@ from .table import (
 __all__ = [
     "CALIBRATION_SCHEMA_VERSION",
     "CAPTURE_DIMENSIONS",
+    "CYCLE_DIMENSIONS",
     "DEFAULT_TOLERANCE",
     "CalibrationSource",
     "CalibrationTable",

@@ -19,7 +19,11 @@ silent skip: another model, other conditions, a capture setup (the blocking
 comparison dimensions and the kernel build) that differs, a run whose
 cycles the profiler flagged, an overflowed counter, a position the plan and
 the capture disagree on, two prices of one key that disagree, or two
-records of one vector's facts that disagree. The file is schema version 1 as
+records of one vector's facts that disagree. The setup is the blocking
+comparison dimensions, the dimensions that change cycle counts although a
+comparison only reports them (toolchain and compiler version, engine
+version and backend, arena placement and memory, link family), and the
+kernel build. The file is schema version 1 as
 ``helia_optimus.cost.calibration`` reads it; what hpx needs for a later
 ``--merge`` sits under ``capture``, a key heliaOptimus ignores.
 """
@@ -60,19 +64,39 @@ PLAN_SCHEMA_VERSION = 1
 #: Largest relative disagreement two prices of one key may have.
 DEFAULT_TOLERANCE = 0.02
 
-#: What identifies a capture's setup: the comparison dimensions whose
-#: difference blocks a comparison, read as ``hpx compare`` reads them and
-#: compared under its rule (a value absent on either side does not block).
-CAPTURE_DIMENSIONS: tuple[ComparisonDimension, ...] = (
+#: The comparison dimensions whose difference blocks a comparison, read as
+#: ``hpx compare`` reads them and compared under its rule (a value absent on
+#: either side does not block).
+BLOCKING_DIMENSIONS: tuple[ComparisonDimension, ...] = (
     dimensions_with_effect(DimensionEffect.IDENTITY_BLOCKING)
     + dimensions_with_effect(DimensionEffect.POWER_METRIC_BLOCKING)
     + dimensions_with_effect(DimensionEffect.METRIC_GATE)
     + dimensions_with_effect(DimensionEffect.MEMORY_METRIC_BLOCKING)
 )
+#: Dimensions ``hpx compare`` reports as informative that change cycle
+#: counts all the same; any difference, an absent value included, refuses.
+CYCLE_DIMENSIONS: tuple[ComparisonDimension, ...] = (
+    ComparisonDimension.TOOLCHAIN,
+    ComparisonDimension.COMPILER_VERSION,
+    ComparisonDimension.ENGINE_VERSION,
+    ComparisonDimension.ENGINE_BACKEND,
+    ComparisonDimension.ARENA_LOCATION,
+    ComparisonDimension.LINK_FAMILY,
+)
+#: What identifies a capture's setup, with the planned arena memory and the
+#: kernel build below.
+CAPTURE_DIMENSIONS: tuple[ComparisonDimension, ...] = BLOCKING_DIMENSIONS + tuple(
+    dimension for dimension in CYCLE_DIMENSIONS if dimension not in BLOCKING_DIMENSIONS
+)
+#: The memory the plan put the arena in, which no comparison dimension names.
+ARENA_MEMORY = "arena_memory"
 #: The kernel build: the commit is always compared, the version when both
 #: sides state one (an untagged lock records why the version is unknown).
 KERNEL_COMMIT = "kernel_commit"
 KERNEL_VERSION = "kernel_version"
+_STRICT: frozenset[str] = frozenset(
+    {dimension.value for dimension in CYCLE_DIMENSIONS} | {ARENA_MEMORY, KERNEL_COMMIT}
+)
 #: The one metric family whose confined errors leave the cycles usable.
 _EXCUSED_METRIC_GROUP = "power"
 
@@ -523,12 +547,13 @@ def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) 
     """Refuse two sources whose capture setups differ.
 
     A blocking dimension is compared when both sides state it, as ``hpx
-    compare`` compares it; the kernel commit is always compared, and the
-    kernel version when both sides state one.
+    compare`` compares it; a cycle dimension, the arena memory and the
+    kernel commit are always compared, and the kernel version when both
+    sides state one.
     """
     for name in sorted(set(reference.dimensions) | set(other.dimensions)):
         mine, theirs = reference.dimensions.get(name), other.dimensions.get(name)
-        if name == KERNEL_COMMIT:
+        if name in _STRICT:
             differs = mine != theirs
         elif name == KERNEL_VERSION:
             differs = isinstance(mine, str) and isinstance(theirs, str) and mine != theirs
@@ -601,6 +626,20 @@ def _capture_dimensions(run: RunArtifacts) -> dict[str, Any]:
     kernels = nested_get(run.summary, "identity", "kernels")
     facts[KERNEL_VERSION] = nested_get(kernels, "version")
     facts[KERNEL_COMMIT] = nested_get(kernels, "commit")
+    plan = run.summary.get("memory_plan")
+    regions = plan.get("regions") if isinstance(plan, dict) else None
+    arena = sorted(
+        {
+            str(region.get("region"))
+            for region in (regions if isinstance(regions, list) else ())
+            if isinstance(region, dict)
+            and any(
+                isinstance(consumer, dict) and consumer.get("kind") == "arena"
+                for consumer in region.get("consumers") or ()
+            )
+        }
+    )
+    facts[ARENA_MEMORY] = ",".join(arena) if arena else None
     return facts
 
 
