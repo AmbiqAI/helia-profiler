@@ -102,10 +102,11 @@ _ACCEPTED: dict[str, Change] = {
     "null pairing": lambda d: _setup(d).update(pairing_digest=None, pairing_fields=None),
     "a null helia_aot_version": lambda d: _setup(d).update(helia_aot_version=None),
 }
-#: What only the reader can refuse, as JSON Schema cannot say it. The first
-#: four are the proposal's list; Python's JSON parser reads 1e400 as infinity;
-#: jsonschema's pattern search lets ``$`` match before a final newline, which
-#: the reader's full match does not.
+#: What only the reader can refuse, as JSON Schema cannot say it: an
+#: integer-valued float in an integer field, a vector listed twice, NaN and
+#: infinity (Python's JSON parser reads 1e400 as infinity), and a final
+#: newline (jsonschema's pattern search lets ``$`` match before it, which the
+#: reader's full match does not).
 _READER_ONLY: dict[str, Change] = {
     "version 2.0": lambda d: d.update(schema_version=2.0),
     "subgraph 0.0": lambda d: d["model"].update(subgraph=0.0),
