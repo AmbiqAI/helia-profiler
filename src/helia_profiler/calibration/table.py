@@ -40,6 +40,7 @@ file that carries it can be merged into.
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
@@ -53,7 +54,8 @@ from pathlib import Path
 from typing import Any, TypeGuard
 
 from ..deps.compatibility import CMSIS_NN_PROVIDER_MODULES
-from ..errors import CalibrationError
+from ..engines.helia_aot.compile import non_finite_field
+from ..errors import CalibrationError, EngineError
 from ..evaluation.compare import RunArtifacts, load_run_artifacts
 from ..results import (
     METRIC_BLOCKING_CODE_BY_GROUP,
@@ -92,6 +94,7 @@ SETUP_EXCLUDED: frozenset[str] = frozenset(
         "config.build.offline",
         "config.build.update_dependencies",
         "config.build.compiler_launcher",
+        # CMake only drives the build; the flags come from the toolchain file.
         "toolchain.cmake_version",
     }
 )
@@ -141,17 +144,24 @@ class Setup:
 
     digest: str
     fields: tuple[str, ...]
+    #: The heliaAOT release the run compiled with, whose knob registry the
+    #: stripping depends on; ``None`` for another engine.
+    helia_aot_version: str | None = None
     values: Mapping[str, Any] | None = field(default=None, compare=False, repr=False)
 
     @classmethod
-    def of(cls, basis: Mapping[str, Any]) -> Setup:
+    def of(cls, basis: Mapping[str, Any], helia_aot_version: str | None = None) -> Setup:
         """The setup of a nested *basis*: its canonical JSON digested, its leaves listed."""
         leaves: dict[str, Any] = {}
         _leaves("", basis, leaves)
-        return cls(_canonical_digest(basis), tuple(sorted(leaves)), basis)
+        return cls(_canonical_digest(basis), tuple(sorted(leaves)), helia_aot_version, basis)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"digest": self.digest, "fields": list(self.fields)}
+        return {
+            "digest": self.digest,
+            "fields": list(self.fields),
+            "helia_aot_version": self.helia_aot_version,
+        }
 
 
 @dataclass(frozen=True)
@@ -351,11 +361,13 @@ def read_calibration(path: Path) -> CalibrationTable:
         )
     digest = nested_get(data, "capture", "setup", "digest")
     fields = nested_get(data, "capture", "setup", "fields")
+    helia_aot_version = nested_get(data, "capture", "setup", "helia_aot_version")
     if (
         not isinstance(digest, str)
         or not re.fullmatch(r"[0-9a-f]{64}", digest)
         or not isinstance(fields, list)
         or not all(isinstance(name, str) for name in fields)
+        or not (helia_aot_version is None or isinstance(helia_aot_version, str))
     ):
         raise CalibrationError(
             f"Calibration file {path} records no setup under capture.setup.",
@@ -395,7 +407,7 @@ def read_calibration(path: Path) -> CalibrationTable:
         subgraph=subgraph,
         conditions=conditions,
         prices=prices,
-        setup=Setup(digest, tuple(fields)),
+        setup=Setup(digest, tuple(fields), helia_aot_version),
     )
 
 
@@ -589,6 +601,14 @@ def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) 
     only the digest and the field names, so against one the field lists are
     compared and otherwise the digests are named.
     """
+    mine_version, their_version = reference.setup.helia_aot_version, other.setup.helia_aot_version
+    if mine_version != their_version:
+        raise CalibrationError(
+            f"{other.source} was compiled with heliaAOT {their_version} and {reference.source} "
+            f"with heliaAOT {mine_version}; the knob registry the setup is stripped by is "
+            "that release's.",
+            hint="Calibrate captures compiled by one heliaAOT release.",
+        )
     if reference.setup.digest == other.setup.digest:
         return
     mine, theirs = reference.setup.values, other.setup.values
@@ -597,11 +617,17 @@ def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) 
         their_leaves: dict[str, Any] = {}
         _leaves("", mine, mine_leaves)
         _leaves("", theirs, their_leaves)
+        # A name that is a leaf on one side and a mapping on the other is
+        # not absent there; its own leaves say what differs.
         names = sorted(
             name
             for name in set(mine_leaves) | set(their_leaves)
             if _canonical(mine_leaves.get(name, _ABSENT))
             != _canonical(their_leaves.get(name, _ABSENT))
+            and not any(
+                other_name.startswith(name + ".")
+                for other_name in (their_leaves if name in mine_leaves else mine_leaves)
+            )
         )
         if names:
             detail = "; ".join(
@@ -652,37 +678,58 @@ def _shown(value: Any) -> str:
 def _setup(run: RunArtifacts, source: str) -> Setup:
     """The held settings of a bundle, as one nested basis.
 
+    The excluded sections go before anything is canonicalized, so a value
+    they hold that is not a finite number (a power limit set to infinity)
+    does not matter; one in a held field is an error naming the field.
+
     Raises:
-        CalibrationError: when the bundle records no settings, or a helia-aot
-            bundle records no ``engine.effective_config_sha256``.
+        CalibrationError: when the bundle records no settings, a held field
+            holds a NaN or infinity, heliaAOT rejects the recorded engine
+            arguments, or a helia-aot bundle records no
+            ``engine.effective_config_sha256``.
     """
     config = run.metadata.get("config")
     if not isinstance(config, dict) or not config:
         raise CalibrationError(f"Bundle {source} records no settings in run_metadata.json.")
-    basis: dict[str, Any] = {"config": json.loads(_canonical(config))}
+    basis: dict[str, Any] = {"config": copy.deepcopy(config)}
     for section in ("toolchain", "engine"):
         block = run.metadata.get(section)
         if isinstance(block, dict):
-            basis[section] = json.loads(_canonical(block))
+            basis[section] = copy.deepcopy(block)
     for excluded in SETUP_EXCLUDED:
         _remove(basis, tuple(excluded.split(".")))
     aot_args = _lookup(basis, _AOT_ARGS)
-    if isinstance(aot_args, dict):
+    helia_aot_version: str | None = None
+    if nested_get(run.metadata, "config", "engine", "type") == _HELIA_AOT:
         from ..engines.helia_aot.compile import without_knob_values
 
-        _lookup(basis, _AOT_ARGS[:-1])[_AOT_ARGS[-1]] = without_knob_values(aot_args)
-    engine = basis.get("engine")
-    if nested_get(run.metadata, "config", "engine", "type") == _HELIA_AOT and not (
-        isinstance(engine, dict) and isinstance(engine.get(_EFFECTIVE_CONFIG), str)
-    ):
-        raise CalibrationError(
-            f"Bundle {source} records no engine.{_EFFECTIVE_CONFIG}, so the configuration "
-            "its compiler received is unknown.",
-            hint="It was written by a heliaPROFILER that did not record it; profile again.",
-        )
+        engine = basis.get("engine")
+        if not (isinstance(engine, dict) and isinstance(engine.get(_EFFECTIVE_CONFIG), str)):
+            raise CalibrationError(
+                f"Bundle {source} records no engine.{_EFFECTIVE_CONFIG}, so the "
+                "configuration its compiler received is unknown.",
+                hint="It was written by a heliaPROFILER that did not record it; profile again.",
+            )
+        version = engine.get("version")
+        helia_aot_version = version if isinstance(version, str) else None
+        try:
+            stripped = without_knob_values(aot_args if isinstance(aot_args, dict) else {})
+        except EngineError as exc:
+            raise CalibrationError(
+                f"Bundle {source}: {str(exc).replace(chr(10) + '  Hint: ', '; ')}",
+                hint="The recorded engine arguments are not ones this heliaAOT accepts.",
+            ) from exc
+        _lookup(basis, _AOT_ARGS[:-1])[_AOT_ARGS[-1]] = stripped
     basis["build"] = {"architecture_flags": derive_architecture_flags(run.metadata)}
     basis["kernel"] = {"build": _kernel_build(run)}
-    return Setup.of(basis)
+    unfit = non_finite_field(basis)
+    if unfit is not None:
+        raise CalibrationError(
+            f"Bundle {source}: the held setting {unfit} is not a finite number, which the "
+            "record cannot hold.",
+            hint="Profile with a finite value there, or leave the setting at its default.",
+        )
+    return Setup.of(basis, helia_aot_version)
 
 
 def _lookup(data: Any, path: tuple[str, ...]) -> Any:

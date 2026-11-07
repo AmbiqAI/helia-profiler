@@ -16,6 +16,7 @@ import copy
 import hashlib
 import json
 import logging
+import math
 import re
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -438,34 +439,64 @@ _RUN_ONLY_AOT_FIELDS: tuple[tuple[str, ...], ...] = (
     ("verbose",),
     ("keep_work_dir",),
 )
-#: The selectors of an ``operators[]`` rule; a rule left with only these set nothing.
+#: The selectors of an ``operators[]`` rule; a rule that sets nothing else is a no-op.
 _RULE_SELECTORS = frozenset({"type", "id"})
+_AOT_ARGS_HINT = "Check engine.config_path and engine.config.aot_args."
 
 
-def without_knob_values(aot_args: Mapping[str, Any]) -> dict[str, Any]:
-    """A copy of heliaAOT arguments with every knob value and run-only field removed.
+def without_knob_values(
+    aot_args: Mapping[str, Any],
+    *,
+    module_name: str | None = None,
+    prefix: str | None = None,
+    aot_platform: str | None = None,
+) -> dict[str, Any]:
+    """heliaAOT arguments as the compiler reads them, less knob values and run-only fields.
 
-    The knobs come from heliaAOT's own registry (``helia_aot.optimization.KNOBS``),
-    so a new knob needs no hpx edit: the keys ``optimization.<knob>`` and
-    ``operators[].optimization.<knob>`` are removed, an ``optimization``
-    mapping that is then empty goes with them, and an ``operators[]`` rule
-    left with nothing but its selectors is dropped. ``optimization.goal`` and
-    ``allow_approximate`` stay: they steer what ``auto`` resolves to and are
-    not swept. The paths of one run (the model, the module, the log file)
-    and the verbosity switches are removed as well.
+    The mapping is validated by heliaAOT's own ``ConvertArgs`` and dumped in
+    full, so a default spelled out equals one left implicit, an empty
+    ``attributes`` equals none and a null ``optimization`` equals an absent
+    one. The knobs come from heliaAOT's own registry
+    (``helia_aot.optimization.KNOBS``), so a new knob needs no hpx edit: the
+    keys ``optimization.<knob>`` and ``operators[].optimization.<knob>`` are
+    removed, and an ``operators[]`` rule left setting nothing is dropped.
+    ``optimization.goal`` and ``allow_approximate`` stay: they steer what
+    ``auto`` resolves to and are not swept. The paths of one run (the model,
+    the module, the log file) and the verbosity switches are removed as
+    well. With the forced fields given, they are set as the compile step
+    sets them.
 
     Raises:
-        EngineError: when heliaAOT is not installed.
+        EngineError: when heliaAOT is not installed, when heliaAOT rejects
+            the arguments (its own message and the config hint), or when a
+            value that stays is not a finite number, naming the field.
     """
     try:
+        from helia_aot import ConvertArgs
+        from helia_aot.defines import ModuleType
         from helia_aot.optimization import KNOBS
     except ImportError as exc:
         raise EngineError(
             "heliaAOT package not installed",
             hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
         ) from exc
+    try:
+        convert_args = ConvertArgs(**aot_args)
+    except Exception as exc:
+        raise EngineError(
+            f"Failed to build heliaAOT ConvertArgs: {exc}", hint=_AOT_ARGS_HINT
+        ) from exc
+    if module_name is not None:
+        convert_args.module.name = module_name
+    if prefix is not None:
+        convert_args.module.prefix = prefix
+    if aot_platform is not None:
+        convert_args.module.type = ModuleType("nsx")
+        convert_args.platform.name = aot_platform
+        convert_args.force = True
+        convert_args.result_views = True
+    data: dict[str, Any] = convert_args.model_dump(mode="json")
     knobs = {spec.name for spec in KNOBS}
-    data: dict[str, Any] = copy.deepcopy(dict(aot_args))
     for path in _RUN_ONLY_AOT_FIELDS:
         _remove(data, path)
     optimization = data.get("optimization")
@@ -483,16 +514,41 @@ def without_knob_values(aot_args: Mapping[str, Any]) -> dict[str, Any]:
                 if isinstance(overrides, dict):
                     for name in knobs:
                         overrides.pop(name, None)
-                    if not overrides:
-                        del rule["optimization"]
-                if set(rule) <= _RULE_SELECTORS:
+                if not any(
+                    value not in (None, {}, [])
+                    for key, value in rule.items()
+                    if key not in _RULE_SELECTORS
+                ):
                     continue
             kept.append(rule)
         if kept:
             data["operators"] = kept
         else:
             del data["operators"]
+    unfit = non_finite_field(data)
+    if unfit is not None:
+        raise EngineError(
+            f"heliaAOT argument {unfit} is not a finite number, which the record cannot hold.",
+            hint=_AOT_ARGS_HINT,
+        )
     return data
+
+
+def non_finite_field(value: Any, prefix: str = "") -> str | None:
+    """The dotted name of the first NaN or infinity in *value*, else ``None``."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return prefix or "<root>"
+    if isinstance(value, dict):
+        for key, item in value.items():
+            found = non_finite_field(item, f"{prefix}.{key}" if prefix else str(key))
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found = non_finite_field(item, f"{prefix}.{index}" if prefix else str(index))
+            if found is not None:
+                return found
+    return None
 
 
 def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
@@ -508,24 +564,20 @@ def effective_config_digest(
 ) -> tuple[str, tuple[str, ...]]:
     """The sha256 of what the compiler received, less the knob values, and the keys it covers.
 
-    The forced module and platform fields join the mapping;
-    :func:`without_knob_values` removes ``optimization.<knob>`` and
-    ``operators[].optimization.<knob>`` for every knob heliaAOT registers,
-    together with the run-only paths, so two conversions that differ only in
-    a knob value digest the same. The digest is of the canonical JSON of the
-    nested mapping (sorted keys, no NaN).
+    :func:`without_knob_values` validates the arguments with heliaAOT's
+    ``ConvertArgs``, sets the forced module and platform fields as the
+    compile step does, dumps the result in full and removes
+    ``optimization.<knob>`` and ``operators[].optimization.<knob>`` for every
+    knob heliaAOT registers, together with the run-only paths, so two
+    conversions that differ only in a knob value digest the same. The digest
+    is of the canonical JSON of the nested mapping (sorted keys, no NaN).
+
+    Raises:
+        EngineError: as :func:`without_knob_values` raises it.
     """
-    data = without_knob_values(aot_args)
-    module: dict[str, Any] = dict(data["module"]) if isinstance(data.get("module"), dict) else {}
-    module.update(name=module_name, prefix=prefix, type="nsx")
-    data["module"] = module
-    platform: dict[str, Any] = (
-        dict(data["platform"]) if isinstance(data.get("platform"), dict) else {}
+    data = without_knob_values(
+        aot_args, module_name=module_name, prefix=prefix, aot_platform=aot_platform
     )
-    platform["name"] = aot_platform
-    data["platform"] = platform
-    data["force"] = True
-    data["result_views"] = True
     canonical = json.dumps(
         data, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False
     )

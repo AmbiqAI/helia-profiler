@@ -563,7 +563,6 @@ def test_bundles_under_other_conditions_are_refused(tmp_path: Path) -> None:
             ("'armclang'", "'arm-none-eabi-gcc'"),
         ),
         ({"compiler_version": "14.1.0"}, "toolchain.compiler_version", ("'14.1.0'", "'13.2.1'")),
-        ({"engine_version": "0.34.0"}, "engine.version", ("'0.34.0'", "'0.33.0'")),
         ({"backend": "ethos_u"}, "config.engine.backend", ("'ethos_u'", "None")),
         ({"arena_location": "sram"}, "config.model.arena_location", ("'sram'", "None")),
         (
@@ -680,11 +679,12 @@ def test_the_digest_is_of_the_nested_settings_not_a_flattened_view(tmp_path: Pat
         {"memory": {"planner_options": {"a": {"b": 1}}}},
     )
     assert read_bundle(dotted).setup.digest != read_bundle(nested).setup.digest
-    with pytest.raises(CalibrationError, match="different setups"):
+    # No leaf differs, so the message names the section.
+    with pytest.raises(CalibrationError, match="different setups: the config section differs"):
         calibrate([dotted, nested], output=tmp_path / "out.json")
 
 
-def test_a_mismatch_that_no_leaf_shows_names_the_section(tmp_path: Path) -> None:
+def test_a_leaf_mismatch_names_the_leaf_and_absent_means_absent(tmp_path: Path) -> None:
     flag = _with_engine_config(
         bundle(tmp_path / "flag", cycles={0: 1.0, 1: 1.0, 2: 1.0}),
         {"memory": {"planner_options": {"fast": True}}},
@@ -708,10 +708,10 @@ def test_a_mismatch_that_no_leaf_shows_names_the_section(tmp_path: Path) -> None
     )
     with pytest.raises(
         CalibrationError,
-        match="planner_options.fast is absent in .*absent but None in .*null|"
-        "planner_options is \\{\\} in .*absent but None in .*null",
-    ):
+        match="different setups: (.*; )?[a-z_.]*planner_options.fast is absent in .*absent but None in .*null",
+    ) as caught:
         calibrate([null, absent], output=tmp_path / "out.json")
+    assert "planner_options is" not in str(caught.value)
 
 
 def test_power_measurement_state_never_takes_part(tmp_path: Path) -> None:
@@ -1215,7 +1215,18 @@ def test_the_compiler_configuration_a_file_supplies_is_part_of_the_setup(tmp_pat
     )
     sram_digest, keys = _digest(sram)
     assert sram_digest != _digest(dtcm)[0]
-    assert keys == ("force", "memory", "module", "platform", "result_views")
+    assert keys == (
+        "documentation",
+        "force",
+        "memory",
+        "model",
+        "module",
+        "optimization",
+        "platform",
+        "result_views",
+        "test",
+        "transforms",
+    )
     # The knob values are the swept inputs: a config that differs only there digests the same.
     generic = _aot_config(tmp_path, "generic", "optimization: {kernel: generic}\n")
     specialized = _aot_config(tmp_path, "specialized", "optimization: {kernel: specialized}\n")
@@ -1278,3 +1289,136 @@ def test_the_run_metadata_records_the_effective_configuration() -> None:
         "memory",
         "module",
     ]
+
+
+def test_captures_compiled_by_different_heliaaot_releases_do_not_merge(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    newer = bundle(
+        tmp_path / "newer",
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "fast"),
+        knob_values={"accumulation": "fast"},
+        engine_version="0.34.0",
+    )
+    with pytest.raises(
+        CalibrationError,
+        match="newer was compiled with heliaAOT 0.34.0 and .*auto with heliaAOT 0.33.0",
+    ):
+        calibrate([auto, newer], output=tmp_path / "out.json")
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    assert json.loads(output.read_text())["capture"]["setup"]["helia_aot_version"] == "0.33.0"
+    with pytest.raises(CalibrationError, match="compiled with heliaAOT 0.34.0 and .*kws.json"):
+        calibrate([newer], output=output, merge=True)
+
+
+def test_a_non_finite_value_in_an_excluded_section_does_not_matter(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    for path in (auto, wide):
+        metadata = json.loads((path / "run_metadata.json").read_text(encoding="utf-8"))
+        metadata["config"]["power"]["max_current_a"] = float("inf")
+        metadata["config"]["power"]["io_voltage"] = float("nan")
+        (path / "run_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+        _republish(path)
+    assert "Infinity" in (auto / "run_metadata.json").read_text(encoding="utf-8")
+    assert calibrate([auto, wide], output=tmp_path / "out.json").price_count == 4
+    result = CliRunner().invoke(
+        app, ["calibrate", str(auto), str(wide), "--output", str(tmp_path / "cli.json")]
+    )
+    assert result.exit_code == 0, result.output
+
+
+def test_a_non_finite_value_in_a_held_field_is_refused_naming_it(tmp_path: Path) -> None:
+    held = _with_engine_config(
+        bundle(tmp_path / "held", cycles={0: 1.0, 1: 1.0, 2: 1.0}),
+        {"transforms": [{"name": "fuse_activation", "options": {"eps": float("inf")}}]},
+    )
+    with pytest.raises(
+        CalibrationError, match="heliaAOT argument transforms.0.options.eps is not a finite number"
+    ):
+        read_bundle(held)
+    metadata = json.loads((held / "run_metadata.json").read_text(encoding="utf-8"))
+    metadata["config"]["engine"]["config"]["aot_args"] = {}
+    metadata["config"]["profiling"]["window_target_ms"] = float("nan")
+    (held / "run_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+    _republish(held)
+    with pytest.raises(
+        CalibrationError,
+        match="held setting config.profiling.window_target_ms is not a finite number",
+    ):
+        read_bundle(held)
+    # The CLI reports it as an error, never as a traceback.
+    result = CliRunner().invoke(app, ["calibrate", str(held), "--output", str(tmp_path / "o.json")])
+    assert result.exit_code == 1 and "window_target_ms" in result.output
+
+
+def test_heliaaot_rejecting_the_arguments_surfaces_its_own_error(tmp_path: Path) -> None:
+    from helia_profiler.engines.helia_aot.compile import effective_config_digest
+    from helia_profiler.errors import EngineError
+
+    with pytest.raises(
+        EngineError, match=r"(?s)Failed to build heliaAOT ConvertArgs: .*tolerance"
+    ) as caught:
+        effective_config_digest(
+            {"test": {"tolerance": -1}}, module_name="m", prefix="p", aot_platform="apollo510_evb"
+        )
+    assert caught.value.hint == "Check engine.config_path and engine.config.aot_args."
+    bad = _with_engine_config(
+        bundle(tmp_path / "bad", cycles={0: 1.0, 1: 1.0, 2: 1.0}), {"optimization": {"knobs": {}}}
+    )
+    with pytest.raises(
+        CalibrationError, match=r"(?s)Failed to build heliaAOT ConvertArgs: .*knobs"
+    ):
+        read_bundle(bad)
+
+
+def test_the_dumped_form_makes_spelled_out_defaults_equal(tmp_path: Path) -> None:
+    from helia_profiler.engines.helia_aot.compile import effective_config_digest
+
+    def digest(args: dict[str, Any]) -> str:
+        return effective_config_digest(args, module_name="m", prefix="p", aot_platform="x")[0]
+
+    plain = digest({})
+    assert digest({"optimization": {"goal": "balanced", "kernel": "generic"}}) == plain
+    assert digest({"optimization": {}}) == plain
+    assert digest({"operators": [{"type": "conv_2d", "optimization": None}]}) == plain
+    assert digest(
+        {
+            "operators": [
+                {"type": "conv_2d", "attributes": {}, "optimization": {"kernel": "generic"}}
+            ]
+        }
+    ) == digest({"operators": [{"type": "conv_2d", "optimization": {"kernel": "specialized"}}]})
+    assert digest({"optimization": {"goal": "latency"}}) != plain
+
+
+def test_a_rule_setting_operator_attributes_is_part_of_the_setup(tmp_path: Path) -> None:
+    ruled = _aot_config(
+        tmp_path,
+        "ruled",
+        "operators:\n  - type: conv_2d\n    attributes: {memory: sram}\n"
+        "    optimization: {kernel: generic}\n",
+    )
+    swept = _aot_config(
+        tmp_path,
+        "swept",
+        "operators:\n  - type: conv_2d\n    attributes: {memory: sram}\n"
+        "    optimization: {kernel: specialized}\n",
+    )
+    bare = _aot_config(tmp_path, "bare", "optimization: {kernel: generic}\n")
+    assert _digest(ruled) == _digest(swept)
+    assert _digest(ruled)[0] != _digest(bare)[0]
+    one = bundle(
+        tmp_path / "one",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        effective_config=_digest(ruled)[0],
+    )
+    other = bundle(
+        tmp_path / "other",
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "fast"),
+        knob_values={"accumulation": "fast"},
+        effective_config=_digest(bare)[0],
+    )
+    with pytest.raises(CalibrationError, match="engine.effective_config_sha256 is"):
+        calibrate([one, other], output=tmp_path / "out.json")
