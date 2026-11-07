@@ -456,7 +456,9 @@ def without_knob_values(
     The mapping is validated by heliaAOT's own ``ConvertArgs`` and dumped in
     full, so a default spelled out equals one left implicit, an empty
     ``attributes`` equals none and a null ``optimization`` equals an absent
-    one. The knobs come from heliaAOT's own registry
+    one; a rule's ``optimization`` left empty by the stripping is removed,
+    as is the top-level one when it held nothing but knobs. The knobs come
+    from heliaAOT's own registry
     (``helia_aot.optimization.KNOBS``), so a new knob needs no hpx edit: the
     keys ``optimization.<knob>`` and ``operators[].optimization.<knob>`` are
     removed, and an ``operators[]`` rule left setting nothing is dropped.
@@ -515,6 +517,11 @@ def without_knob_values(
                 if isinstance(overrides, dict):
                     for name in knobs:
                         overrides.pop(name, None)
+                # A rule's optimization holds only knobs, so once they are
+                # gone an explicit mapping, an empty one and null are one
+                # thing: nothing.
+                if "optimization" in rule and not rule["optimization"]:
+                    del rule["optimization"]
                 if not any(
                     value not in (None, {}, [])
                     for key, value in rule.items()

@@ -1444,3 +1444,36 @@ def test_a_host_without_heliaaot_gets_the_install_hint(tmp_path: Path, monkeypat
     assert result.exit_code == 1, result.output
     assert "heliaAOT package not installed" in result.output
     assert "pip install 'helia-profiler[aot]'" in result.output
+
+
+def test_a_rule_with_attributes_digests_the_same_whatever_it_says_of_knobs(tmp_path: Path) -> None:
+    from helia_profiler.engines.helia_aot.compile import (
+        effective_config_digest,
+        without_knob_values,
+    )
+
+    def digest(rule: dict[str, Any]) -> str:
+        return effective_config_digest(
+            {"operators": [rule]}, module_name="m", prefix="p", aot_platform="x"
+        )[0]
+
+    attributes = {"memory": "sram"}
+    explicit = {"type": "conv_2d", "attributes": attributes, "optimization": {"kernel": "generic"}}
+    other = {"type": "conv_2d", "attributes": attributes, "optimization": {"kernel": "specialized"}}
+    null = {"type": "conv_2d", "attributes": attributes, "optimization": None}
+    omitted = {"type": "conv_2d", "attributes": attributes}
+    assert digest(explicit) == digest(other) == digest(null) == digest(omitted)
+    (stripped,) = without_knob_values({"operators": [explicit]})["operators"]
+    assert "optimization" not in stripped and stripped["attributes"] == attributes
+    assert digest(explicit) != digest({"type": "conv_2d", "attributes": {"memory": "dtcm"}})
+    # And the same through two configs that differ only in the explicit knob.
+    ruled = _aot_config(
+        tmp_path,
+        "ruled",
+        "operators:\n  - type: conv_2d\n    attributes: {memory: sram}\n"
+        "    optimization: {kernel: generic}\n",
+    )
+    silent = _aot_config(
+        tmp_path, "silent", "operators:\n  - type: conv_2d\n    attributes: {memory: sram}\n"
+    )
+    assert _digest(ruled) == _digest(silent)
