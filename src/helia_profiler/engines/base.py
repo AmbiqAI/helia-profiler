@@ -171,7 +171,8 @@ class EngineArtifacts:
 
     @property
     def effective_config_sha256(self) -> str | None:
-        """The sha256 of the configuration the engine's compiler received, less knob values."""
+        """The sha256 of the configuration the engine's compiler received, less
+        ``optimization.<knob>`` and ``operators[].optimization.<knob>``."""
         return None
 
     @property
@@ -279,7 +280,8 @@ class HeliaAotArtifacts(EngineArtifacts):
     engine_backend: str | None = None
     #: What the compiler received (``compile.effective_config_digest``):
     #: the merged heliaAOT arguments with hpx's forced fields and placement
-    #: rulesets, every knob value removed.
+    #: rulesets, less ``optimization.<knob>`` and
+    #: ``operators[].optimization.<knob>`` for every registered knob.
     aot_effective_config_sha256: str | None = None
     aot_effective_config_keys: tuple[str, ...] = ()
 

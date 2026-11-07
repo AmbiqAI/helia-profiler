@@ -327,14 +327,15 @@ def _run_aot_compiler(
     module_name: str,
     prefix: str,
     aot_platform: str,
+    aot_args: dict[str, Any] | None = None,
 ) -> Any:
     """Run heliaAOT via its Python API and return its ``ConversionResult``.
 
     The result's views describe the post-transform graph (operators, tensors,
     arena regions, placements) without parsing generated C.
 
-    ``ConvertArgs`` come from :func:`_merged_aot_args` plus the profiler's
-    tensor rulesets; the profiler's mandatory fields (model, module,
+    ``ConvertArgs`` come from *aot_args*, :func:`effective_aot_args` of the
+    config when not given; the profiler's mandatory fields (model, module,
     platform) override any values there.
     """
     try:
@@ -348,7 +349,8 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    aot_args = effective_aot_args(config)
+    if aot_args is None:
+        aot_args = effective_aot_args(config)
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
@@ -427,16 +429,93 @@ def effective_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return aot_args
 
 
+#: ConvertArgs fields that belong to one run or cannot change a cycle count.
+_RUN_ONLY_AOT_FIELDS: tuple[tuple[str, ...], ...] = (
+    ("path",),
+    ("model", "path"),
+    ("module", "path"),
+    ("log_file",),
+    ("verbose",),
+    ("keep_work_dir",),
+)
+#: The selectors of an ``operators[]`` rule; a rule left with only these set nothing.
+_RULE_SELECTORS = frozenset({"type", "id"})
+
+
+def without_knob_values(aot_args: Mapping[str, Any]) -> dict[str, Any]:
+    """A copy of heliaAOT arguments with every knob value and run-only field removed.
+
+    The knobs come from heliaAOT's own registry (``helia_aot.optimization.KNOBS``),
+    so a new knob needs no hpx edit: the keys ``optimization.<knob>`` and
+    ``operators[].optimization.<knob>`` are removed, an ``optimization``
+    mapping that is then empty goes with them, and an ``operators[]`` rule
+    left with nothing but its selectors is dropped. ``optimization.goal`` and
+    ``allow_approximate`` stay: they steer what ``auto`` resolves to and are
+    not swept. The paths of one run (the model, the module, the log file)
+    and the verbosity switches are removed as well.
+
+    Raises:
+        EngineError: when heliaAOT is not installed.
+    """
+    try:
+        from helia_aot.optimization import KNOBS
+    except ImportError as exc:
+        raise EngineError(
+            "heliaAOT package not installed",
+            hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
+        ) from exc
+    knobs = {spec.name for spec in KNOBS}
+    data: dict[str, Any] = copy.deepcopy(dict(aot_args))
+    for path in _RUN_ONLY_AOT_FIELDS:
+        _remove(data, path)
+    optimization = data.get("optimization")
+    if isinstance(optimization, dict):
+        for name in knobs:
+            optimization.pop(name, None)
+        if not optimization:
+            del data["optimization"]
+    rules = data.get("operators")
+    if isinstance(rules, list):
+        kept: list[Any] = []
+        for rule in rules:
+            if isinstance(rule, dict):
+                overrides = rule.get("optimization")
+                if isinstance(overrides, dict):
+                    for name in knobs:
+                        overrides.pop(name, None)
+                    if not overrides:
+                        del rule["optimization"]
+                if set(rule) <= _RULE_SELECTORS:
+                    continue
+            kept.append(rule)
+        if kept:
+            data["operators"] = kept
+        else:
+            del data["operators"]
+    return data
+
+
+def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
+    parent: Any = data
+    for key in path[:-1]:
+        parent = parent.get(key) if isinstance(parent, dict) else None
+    if isinstance(parent, dict):
+        parent.pop(path[-1], None)
+
+
 def effective_config_digest(
     aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
 ) -> tuple[str, tuple[str, ...]]:
     """The sha256 of what the compiler received, less the knob values, and the keys it covers.
 
-    The forced module and platform fields join the mapping; the model path
-    does not, being a path of one run. Every ``knobs`` mapping is removed, so
-    two conversions that differ only in a knob value digest the same.
+    The forced module and platform fields join the mapping;
+    :func:`without_knob_values` removes ``optimization.<knob>`` and
+    ``operators[].optimization.<knob>`` for every knob heliaAOT registers,
+    together with the run-only paths, so two conversions that differ only in
+    a knob value digest the same. The digest is of the canonical JSON of the
+    nested mapping (sorted keys, no NaN).
     """
-    data: dict[str, Any] = _without_knobs(copy.deepcopy(dict(aot_args)))
+    data = without_knob_values(aot_args)
     module: dict[str, Any] = dict(data["module"]) if isinstance(data.get("module"), dict) else {}
     module.update(name=module_name, prefix=prefix, type="nsx")
     data["module"] = module
@@ -447,16 +526,10 @@ def effective_config_digest(
     data["platform"] = platform
     data["force"] = True
     data["result_views"] = True
-    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
+    canonical = json.dumps(
+        data, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False
+    )
     return hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(data))
-
-
-def _without_knobs(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {k: _without_knobs(v) for k, v in value.items() if k != "knobs"}
-    if isinstance(value, list):
-        return [_without_knobs(item) for item in value]
-    return value
 
 
 def _merge_aot_tensor_rulesets(

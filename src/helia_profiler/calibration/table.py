@@ -16,14 +16,17 @@ capture setup held equal, whatever else the plan reports for the operator
 recorded with the price as a fact and never compared.
 
 The setup is one digest of the run's frozen settings as the bundle records
-them, with the swept inputs (every heliaAOT knob value), the power, output
-and timeout sections and the run-only fields (probe serials, ports, paths)
-removed, plus the toolchain and engine the run resolved (for heliaAOT with
-the digest of the configuration the compiler received, knob values
-removed), the build's ISA flags and the kernel build (its commit, else its
-content hash). Everything
-else is held, with no list of fields to maintain; the file records the
-digest and the fields it covers so a reader can see what was held.
+them: the frozen config less the heliaAOT knob values (``optimization.<knob>``
+and ``operators[].optimization.<knob>`` for every knob heliaAOT registers),
+the power, output and timeout sections, the verbosity and the run-only
+fields (probe serials, ports, paths); the toolchain and engine records the
+run resolved, less the cmake version; the configuration the heliaAOT
+compiler received (``engine.effective_config_sha256``); the build's ISA
+flags; and the kernel build (its commit, else its content hash). The hpx
+version and the contents of locally overridden modules are not held. Power
+sync adds code to the image, which a power-measured and a non-power capture
+are allowed to differ in by this design. The file records the digest and the
+fields it covers so a reader can see what was held.
 
 Everything that would make a price mean something else is an error, never a
 silent skip: another model, other conditions, another setup, a run whose
@@ -89,12 +92,14 @@ SETUP_EXCLUDED: frozenset[str] = frozenset(
         "config.build.offline",
         "config.build.update_dependencies",
         "config.build.compiler_launcher",
+        "toolchain.cmake_version",
     }
 )
-#: Under the heliaAOT engine config, every mapping of this name holds knob
-#: values, the swept inputs.
-_KNOBS = "knobs"
-_ENGINE_CONFIG = "config.engine.config"
+#: Where the heliaAOT arguments sit in the frozen config; the knob values
+#: under them are removed by heliaAOT's own registry.
+_AOT_ARGS = ("config", "engine", "config", "aot_args")
+_EFFECTIVE_CONFIG = "effective_config_sha256"
+_HELIA_AOT = "helia-aot"
 #: The one metric family whose confined errors leave the cycles usable.
 _EXCUSED_METRIC_GROUP = "power"
 
@@ -139,9 +144,11 @@ class Setup:
     values: Mapping[str, Any] | None = field(default=None, compare=False, repr=False)
 
     @classmethod
-    def of(cls, values: Mapping[str, Any]) -> Setup:
-        canonical = json.dumps(values, sort_keys=True, separators=(",", ":"), default=str)
-        return cls(hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(values)), values)
+    def of(cls, basis: Mapping[str, Any]) -> Setup:
+        """The setup of a nested *basis*: its canonical JSON digested, its leaves listed."""
+        leaves: dict[str, Any] = {}
+        _leaves("", basis, leaves)
+        return cls(_canonical_digest(basis), tuple(sorted(leaves)), basis)
 
     def to_dict(self) -> dict[str, Any]:
         return {"digest": self.digest, "fields": list(self.fields)}
@@ -574,19 +581,42 @@ def merge_sources(
 
 
 def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) -> None:
-    """Refuse two sources whose setup digests differ, naming what differs when known."""
+    """Refuse two sources whose setup digests differ, naming what differs when known.
+
+    With both bases in hand the leaves are compared by their canonical JSON,
+    an absent leaf counting as different from a null one; when no leaf
+    differs the top-level sections are compared the same way. A file holds
+    only the digest and the field names, so against one the field lists are
+    compared and otherwise the digests are named.
+    """
     if reference.setup.digest == other.setup.digest:
         return
     mine, theirs = reference.setup.values, other.setup.values
     if mine is not None and theirs is not None:
+        mine_leaves: dict[str, Any] = {}
+        their_leaves: dict[str, Any] = {}
+        _leaves("", mine, mine_leaves)
+        _leaves("", theirs, their_leaves)
         names = sorted(
-            name for name in set(mine) | set(theirs) if mine.get(name) != theirs.get(name)
+            name
+            for name in set(mine_leaves) | set(their_leaves)
+            if _canonical(mine_leaves.get(name, _ABSENT))
+            != _canonical(their_leaves.get(name, _ABSENT))
         )
-        detail = "; ".join(
-            f"{name} is {theirs.get(name)!r} in {other.source} but {mine.get(name)!r} in "
-            f"{reference.source}"
-            for name in names[:5]
-        )
+        if names:
+            detail = "; ".join(
+                f"{name} is {_shown(their_leaves.get(name, _ABSENT))} in {other.source} but "
+                f"{_shown(mine_leaves.get(name, _ABSENT))} in {reference.source}"
+                for name in names[:5]
+            )
+        else:
+            sections = sorted(
+                name
+                for name in set(mine) | set(theirs)
+                if _canonical(mine.get(name, _ABSENT)) != _canonical(theirs.get(name, _ABSENT))
+            )
+            plural = len(sections) != 1
+            detail = f"the {', '.join(sections)} section{'s' if plural else ''} differ{'' if plural else 's'}"
     else:
         missing = sorted(set(reference.setup.fields) ^ set(other.setup.fields))
         detail = (
@@ -601,38 +631,82 @@ def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) 
     )
 
 
+_ABSENT = object()
+
+
+def _canonical(value: Any) -> str:
+    """The canonical JSON of *value*; an absent value has a form no JSON has."""
+    if value is _ABSENT:
+        return "<absent>"
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False)
+
+
+def _canonical_digest(value: Any) -> str:
+    return hashlib.sha256(_canonical(value).encode()).hexdigest()
+
+
+def _shown(value: Any) -> str:
+    return "absent" if value is _ABSENT else repr(value)
+
+
 def _setup(run: RunArtifacts, source: str) -> Setup:
-    """The held settings of a bundle, flattened to dotted field names."""
+    """The held settings of a bundle, as one nested basis.
+
+    Raises:
+        CalibrationError: when the bundle records no settings, or a helia-aot
+            bundle records no ``engine.effective_config_sha256``.
+    """
     config = run.metadata.get("config")
     if not isinstance(config, dict) or not config:
         raise CalibrationError(f"Bundle {source} records no settings in run_metadata.json.")
-    values: dict[str, Any] = {}
-    _flatten("config", config, values)
-    for name in list(values):
-        if any(name == excluded or name.startswith(excluded + ".") for excluded in SETUP_EXCLUDED):
-            del values[name]
-        elif name.startswith(_ENGINE_CONFIG + ".") and f".{_KNOBS}." in f"{name}.":
-            del values[name]
+    basis: dict[str, Any] = {"config": json.loads(_canonical(config))}
     for section in ("toolchain", "engine"):
         block = run.metadata.get(section)
         if isinstance(block, dict):
-            _flatten(section, block, values)
-    values["build.architecture_flags"] = derive_architecture_flags(run.metadata)
-    values["kernel.build"] = _kernel_build(run)
-    return Setup.of(values)
+            basis[section] = json.loads(_canonical(block))
+    for excluded in SETUP_EXCLUDED:
+        _remove(basis, tuple(excluded.split(".")))
+    aot_args = _lookup(basis, _AOT_ARGS)
+    if isinstance(aot_args, dict):
+        from ..engines.helia_aot.compile import without_knob_values
+
+        _lookup(basis, _AOT_ARGS[:-1])[_AOT_ARGS[-1]] = without_knob_values(aot_args)
+    engine = basis.get("engine")
+    if nested_get(run.metadata, "config", "engine", "type") == _HELIA_AOT and not (
+        isinstance(engine, dict) and isinstance(engine.get(_EFFECTIVE_CONFIG), str)
+    ):
+        raise CalibrationError(
+            f"Bundle {source} records no engine.{_EFFECTIVE_CONFIG}, so the configuration "
+            "its compiler received is unknown.",
+            hint="It was written by a heliaPROFILER that did not record it; profile again.",
+        )
+    basis["build"] = {"architecture_flags": derive_architecture_flags(run.metadata)}
+    basis["kernel"] = {"build": _kernel_build(run)}
+    return Setup.of(basis)
 
 
-def _flatten(prefix: str, value: Any, out: dict[str, Any]) -> None:
-    if isinstance(value, dict):
-        if not value:
-            out[prefix] = {}
+def _lookup(data: Any, path: tuple[str, ...]) -> Any:
+    for key in path:
+        if not isinstance(data, dict):
+            return None
+        data = data.get(key)
+    return data
+
+
+def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
+    parent = _lookup(data, path[:-1])
+    if isinstance(parent, dict):
+        parent.pop(path[-1], None)
+
+
+def _leaves(prefix: str, value: Any, out: dict[str, Any]) -> None:
+    """Dotted leaf names of a nested basis, for the file and for messages only."""
+    if isinstance(value, dict) and value:
         for key, item in value.items():
-            _flatten(f"{prefix}.{key}", item, out)
-    elif isinstance(value, list):
-        if not value:
-            out[prefix] = []
+            _leaves(f"{prefix}.{key}" if prefix else str(key), item, out)
+    elif isinstance(value, list) and value:
         for index, item in enumerate(value):
-            _flatten(f"{prefix}.{index}", item, out)
+            _leaves(f"{prefix}.{index}" if prefix else str(index), item, out)
     else:
         out[prefix] = value
 

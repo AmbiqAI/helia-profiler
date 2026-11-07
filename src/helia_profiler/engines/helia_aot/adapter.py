@@ -275,8 +275,9 @@ class HeliaAOTAdapter:
             _user_tensor_rules(aot_args)
         )
 
+        compiler_args = effective_aot_args(compiler_config)
         effective_config_sha256, effective_config_keys = effective_config_digest(
-            effective_aot_args(compiler_config),
+            compiler_args,
             module_name=module_name,
             prefix=prefix,
             aot_platform=aot_platform,
@@ -291,6 +292,7 @@ class HeliaAOTAdapter:
             module_name,
             prefix,
             aot_platform,
+            compiler_args,
         )
 
         # heliaAOT transforms/fuses ops, so the generated graph may differ
