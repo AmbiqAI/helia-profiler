@@ -6,6 +6,7 @@ import csv
 import dataclasses
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -215,7 +216,7 @@ EXPECTED = {
             "weights": {"packed": {"cycles": 3000.0}},
         },
     },
-    "capture": {"dimensions": DIMENSIONS, "knobs": {}, "held": {}},
+    "capture": {"dimensions": DIMENSIONS, "knobs": {}, "held": {}, "derived": {}},
 }
 
 
@@ -422,6 +423,26 @@ def test_a_file_that_records_no_setup_takes_the_bundles_setup(tmp_path: Path) ->
     assert "capture" not in json.loads(hand.read_text())
 
 
+def test_merge_keeps_every_price_the_file_holds(tmp_path: Path) -> None:
+    auto = bundle(tmp_path / "auto", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+    output = tmp_path / "cal.json"
+    calibrate([auto], output=output)
+    flat = bundle(
+        tmp_path / "flat",
+        cycles={0: 12000.0, 1: 2500.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:fc", "weights", "flat"),
+    )
+
+    calibrate([flat], output=output, merge=True)
+
+    written = json.loads(output.read_text(encoding="utf-8"))
+    assert written["operators"]["0:fc"] == {
+        "accumulation": {"int32": {"cycles": 3000.0}},
+        "weights": {"flat": {"cycles": 2500.0}, "packed": {"cycles": 3000.0}},
+    }
+    assert written["capture"]["knobs"] == {"0:fc": {"accumulation": "int32"}}
+
+
 def test_merge_never_replaces_a_price_the_file_holds(tmp_path: Path) -> None:
     auto, _ = two_bundles(tmp_path)
     uneven = _hand_written(
@@ -481,42 +502,118 @@ def test_an_operator_whose_knob_set_differs_is_refused(tmp_path: Path) -> None:
         calibrate([auto], output=partial, merge=True)
 
 
-def _with_fixed(ops: list[dict[str, Any]], layout: str) -> list[dict[str, Any]]:
-    out = json.loads(json.dumps(ops))
-    out[0]["fixed"] = {"weight_layout": {"value": layout, "set_by": "placement"}}
-    out[0]["kernel"] = {"entry": f"arm_convolve_{layout}", "provider": None}
-    return out
+PLANS = Path(__file__).parent / "fixtures" / "calibration"
 
 
-def test_a_fixed_choice_or_kernel_that_moved_is_refused(tmp_path: Path) -> None:
-    standard = bundle(
-        tmp_path / "standard",
-        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
-        plan_ops=_with_fixed(PLAN_OPERATORS, "standard"),
+def _real_bundle(path: Path, plan_name: str, *, offset: float = 0.0, **changes: Any) -> Path:
+    """A bundle around one of heliaAOT 0.33's own plans for the kws models."""
+    plan = json.loads((PLANS / f"{plan_name}_plan.json").read_text(encoding="utf-8"))
+    ops = plan["operators"]
+    return bundle(
+        path,
+        cycles={op["index"]: 1000.0 + op["index"] + offset for op in ops},
+        ops=tuple(op["op_type"] for op in ops),
+        plan_ops=ops,
+        sha256=plan["model"]["sha256"],
+        **changes,
     )
-    packed = bundle(
-        tmp_path / "packed",
-        cycles={0: 7000.0, 1: 3000.0, 2: 400.0},
-        plan_ops=_with_fixed(_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"), "packed"),
+
+
+@pytest.mark.parametrize(
+    ("model", "knob", "values", "prices"),
+    [
+        ("kws_int8", "kernel", ("specialized", "generic"), 20),
+        ("kws_fp16", "accumulation", ("precise", "fast"), 8),
+    ],
+)
+def test_a_real_knob_sweep_prices_every_operator_the_knob_moves(
+    tmp_path: Path, model: str, knob: str, values: tuple[str, str], prices: int
+) -> None:
+    """heliaAOT's knobs exist to change the kernel entry, so the entry moves with them."""
+    first = _real_bundle(tmp_path / values[0], f"{model}_{knob}_{values[0]}")
+    second = _real_bundle(tmp_path / values[1], f"{model}_{knob}_{values[1]}", offset=500.0)
+    output = tmp_path / f"{model}.json"
+
+    table = calibrate([first, second], output=output)
+
+    assert table.price_count == prices
+    written = json.loads(output.read_text(encoding="utf-8"))
+    for operator, knobs in written["operators"].items():
+        assert set(knobs) == {knob} and set(knobs[knob]) == set(values), operator
+    # What the knob determined is recorded per vector, for the reader.
+    plan = json.loads((PLANS / f"{model}_{knob}_{values[0]}_plan.json").read_text())
+    conv = plan["operators"][0]
+    entries = written["capture"]["derived"][conv["id"]]
+    assert entries[f"{knob}={values[0]}"]["kernel:entry"] == conv["kernel"]["entry"]
+    assert f"{knob}={values[1]}" in entries
+    assert written["capture"]["held"].get(conv["id"]) is None
+
+
+def _fp16_with_layout(
+    tmp_path: Path, name: str, value: str, set_by: str, *, fast: bool = True
+) -> tuple[Path, dict[str, Any]]:
+    """One of the fp16 plans with its heuristic weight_layout choice rewritten."""
+    plan_name = "kws_fp16_accumulation_fast" if fast else "kws_fp16_accumulation_precise"
+    plan = json.loads((PLANS / f"{plan_name}_plan.json").read_text())
+    ops = plan["operators"]
+    (layout,) = [op for op in ops if op["fixed"].get("weight_layout")][:1]
+    assert layout["fixed"]["weight_layout"] == {"set_by": "heuristic", "value": "packed"}
+    layout["fixed"]["weight_layout"] = {"set_by": set_by, "value": value}
+    path = bundle(
+        tmp_path / name,
+        cycles={op["index"]: 1000.0 for op in ops},
+        ops=tuple(op["op_type"] for op in ops),
+        plan_ops=ops,
+        sha256=plan["model"]["sha256"],
     )
+    return path, layout
+
+
+def test_a_fixed_choice_no_knob_sets_must_hold(tmp_path: Path) -> None:
+    precise = _real_bundle(tmp_path / "precise", "kws_fp16_accumulation_precise")
+    moved, layout = _fp16_with_layout(tmp_path, "moved", "standard", "heuristic")
     with pytest.raises(
         CalibrationError,
-        match="Operator 0:conv ran with different fixed:weight_layout, kernel:entry in .*packed",
+        match=f"Operator {re.escape(layout['id'])} ran with different fixed:weight_layout in "
+        r".*moved \('standard'\) and .*precise \('packed'\)",
     ):
-        calibrate([standard, packed], output=tmp_path / "out.json")
-    # Held still, the choices are recorded with the prices and checked on merge.
-    output = tmp_path / "kws.json"
-    calibrate([standard], output=output)
-    assert json.loads(output.read_text())["capture"]["held"] == {
-        "0:conv": {"fixed:weight_layout": "standard", "kernel:entry": "arm_convolve_standard"}
-    }
-    with pytest.raises(CalibrationError, match="different fixed:weight_layout, kernel:entry"):
-        calibrate([packed], output=output, merge=True)
-    other_commit = bundle(
-        tmp_path / "commit", cycles={0: 1.0, 1: 1.0, 2: 1.0}, kernel_commit="d" * 40
+        calibrate([precise, moved], output=tmp_path / "out.json")
+    # The same choice set by the knob moves with it and is only recorded.
+    packed, _ = _fp16_with_layout(tmp_path, "packed", "packed", "knob", fast=False)
+    knob_set, layout = _fp16_with_layout(tmp_path, "knob_set", "standard", "knob")
+    table = calibrate([packed, knob_set], output=tmp_path / "out.json")
+    assert table.derived[layout["id"]]["accumulation=fast"]["fixed:weight_layout"] == "standard"
+    assert "fixed:weight_layout" not in table.held.get(layout["id"], {})
+
+
+def test_a_hand_written_file_merges_with_a_real_plan(tmp_path: Path) -> None:
+    real = _real_bundle(tmp_path / "specialized", "kws_int8_kernel_specialized")
+    plan = json.loads((PLANS / "kws_int8_kernel_specialized_plan.json").read_text())
+    conv = plan["operators"][0]["id"]
+    hand = tmp_path / "hand.json"
+    hand.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "model": {"sha256": plan["model"]["sha256"], "subgraph": 0},
+                "conditions": CONDITIONS,
+                "operators": {conv: {"kernel": {"generic": {"cycles": 1500}}}},
+            }
+        ),
+        encoding="utf-8",
     )
-    with pytest.raises(CalibrationError, match="has kernel_commit 'dddd"):
-        calibrate([standard, other_commit], output=tmp_path / "out.json")
+    table = calibrate([real], output=hand, merge=True)
+    assert table.operators[conv]["kernel"] == {"generic": 1500.0, "specialized": 1000.0}
+    assert table.dimensions == DIMENSIONS
+
+
+def test_the_kernel_commit_is_recorded_but_never_compared(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    other = bundle(
+        tmp_path / "commit", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, kernel_commit="d" * 40
+    )
+    table = calibrate([auto, other], output=tmp_path / "out.json")
+    assert table.dimensions["kernel_commit"] == "c" * 40
 
 
 def test_a_bundle_without_conditions_or_weights_memory_is_refused(tmp_path: Path) -> None:
@@ -558,10 +655,22 @@ def test_a_run_whose_cycle_counter_is_suspect_is_refused(tmp_path: Path, code: s
         read_bundle(slow)
 
 
-def test_a_run_whose_power_capture_failed_is_priced(tmp_path: Path) -> None:
-    dark = bundle(tmp_path / "dark", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
-    _mark(dark, ResultValidity.INVALID, "power.observation_missing")
-    assert read_bundle(dark).samples
+def test_validity_follows_the_issue_registry_as_compare_applies_it(tmp_path: Path) -> None:
+    # The one error the registry confines to power metrics leaves the cycles usable.
+    confined = bundle(tmp_path / "confined", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+    _mark(confined, ResultValidity.INVALID, "power.window_observer_mismatch")
+    assert read_bundle(confined).samples
+    # A run-wide power error, an unrecognized code, and an invalid run with no
+    # error to explain it are refused, as hpx compare refuses them.
+    for name, codes, named in (
+        ("dark", ("power.observation_missing",), "power.observation_missing"),
+        ("newer", ("power.from_a_newer_hpx",), "power.from_a_newer_hpx"),
+        ("silent", (), "no issue explains it"),
+    ):
+        path = bundle(tmp_path / name, cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+        _mark(path, ResultValidity.INVALID, *codes)
+        with pytest.raises(CalibrationError, match=f"Bundle .*{name} is invalid: {named}"):
+            read_bundle(path)
 
 
 def test_an_overflowed_layer_is_refused(tmp_path: Path) -> None:
@@ -631,6 +740,15 @@ def test_a_plan_that_lists_a_position_or_an_operator_twice_is_refused(tmp_path: 
     renamed = bundle(tmp_path / "renamed", cycles={0: 1.0, 1: 1.0, 2: 1.0}, plan_ops=same)
     with pytest.raises(CalibrationError, match="lists operator 0:conv twice"):
         read_bundle(renamed)
+
+
+@pytest.mark.parametrize("fixed", [[], 0, "", "x"])
+def test_a_plan_whose_fixed_is_not_an_object_is_refused(tmp_path: Path, fixed: Any) -> None:
+    ops = json.loads(json.dumps(PLAN_OPERATORS))
+    ops[0]["fixed"] = fixed
+    odd = bundle(tmp_path / "odd", cycles={0: 1.0, 1: 1.0, 2: 1.0}, plan_ops=ops)
+    with pytest.raises(CalibrationError, match="operator 0:conv fixed is not an object"):
+        read_bundle(odd)
 
 
 def test_a_bundle_without_a_plan_is_refused(tmp_path: Path) -> None:
@@ -807,7 +925,7 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     directory = runner.invoke(app, ["calibrate", str(auto), "-o", str(tmp_path)])
     assert directory.exit_code == 1, directory.output
     assert "Could not write" in directory.output
-    assert not any(tmp_path.glob(f"{tmp_path.name}*"))
+    assert not any(tmp_path.glob(f".{tmp_path.name}.*"))
 
     help_text = runner.invoke(app, ["calibrate", "--help"]).output
     assert "without knobs" in help_text and "left out" in help_text
@@ -828,6 +946,12 @@ def test_the_file_follows_the_umask_and_never_replaces_a_link(tmp_path: Path) ->
         assert stat.S_IMODE(output.stat().st_mode) == 0o640
     finally:
         os.umask(previous)
+    private = tmp_path / "private.json"
+    private.write_text("{}", encoding="utf-8")
+    private.chmod(0o600)
+    calibrate([auto], output=private)
+    assert stat.S_IMODE(private.stat().st_mode) == 0o600
+    assert not any(tmp_path.glob(".private.json.*"))
     real = tmp_path / "real.json"
     real.write_text("{}", encoding="utf-8")
     link = tmp_path / "link.json"

@@ -29,12 +29,16 @@ def register(app: typer.Typer) -> None:
             "knobs, as operators[<id>][<knob>][<value>]; an operator without knobs has "
             "no slot in the file and is left out. Every bundle must profile the same "
             "model under the same recorded conditions and capture setup (toolchain, "
-            "engine and kernel versions, arena memory), be a valid run with no "
-            "overflowed layer, sweep at most one knob per operator, and two bundles "
+            "engine and kernel versions, arena memory), carry cycles the profiler did "
+            "not flag (an invalid run counts only when the issue registry confines "
+            "every error to a metric family such as power; a run whose cycle counter "
+            "was flagged is refused whatever its verdict), sweep at most one knob per "
+            "operator while the plan's other fixed choices hold, and two bundles "
             "pricing one value must agree within --tolerance; anything else is an "
-            "error. heliaOptimus matches the file when the planner passes the same "
-            "conditions, including application_load=none and, with PSRAM, "
-            "external_memory_clock."
+            "error. The kernel entry a knob selects is recorded, never compared. "
+            "--merge keeps every price the file holds. heliaOptimus matches the file "
+            "when the planner passes the same conditions, including "
+            "application_load=none and, with PSRAM, external_memory_clock."
         ),
     )(calibrate_command)
 

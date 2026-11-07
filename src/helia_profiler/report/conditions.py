@@ -61,6 +61,14 @@ def _weights_memory(ctx: PipelineContext) -> str | None:
             user_rules = tensors
     if "constant" in user_wildcard_kinds(user_rules):
         return None
+    # heliaAOT merges matching rules by specificity: catch-all (``*``), then
+    # type-only, then id-specific, later rules winning within a tier. The
+    # first two tiers are modelled here: a user catch-all rule's attributes
+    # sit under hpx's type-only constant rule. The third is not, and cannot
+    # change what this records: an id-specific constant rule moves one tensor
+    # and leaves the rule hpx sent for the constant kind as it is, and that
+    # rule is the condition heliaOptimus names. A per-tensor move shows in the
+    # plan's own placement facts, not in the run's conditions.
     soc = get_soc_for_board(ctx.config.target.board, registry=ctx.config.platform_registry)
     attributes: dict[str, Any] = {}
     for rule in user_rules:
