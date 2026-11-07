@@ -86,7 +86,7 @@ Firmware generation failure — template rendering, file I/O.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:45`
+Source: `src/helia_profiler/errors.py:49`
 
 ## helia_profiler.BuildError
 
@@ -105,7 +105,7 @@ return code is also captured in :attr:`returncode`.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:49`
+Source: `src/helia_profiler/errors.py:53`
 
 ### helia_profiler.BuildError.returncode
 
@@ -115,7 +115,7 @@ Source: `src/helia_profiler/errors.py:49`
 returncode = returncode
 ```
 
-Source: `src/helia_profiler/errors.py:66`
+Source: `src/helia_profiler/errors.py:70`
 
 ### helia_profiler.BuildError.details
 
@@ -125,7 +125,7 @@ Source: `src/helia_profiler/errors.py:66`
 details = details
 ```
 
-Source: `src/helia_profiler/errors.py:67`
+Source: `src/helia_profiler/errors.py:71`
 
 ## helia_profiler.CaptureError
 
@@ -139,7 +139,7 @@ Data capture failure — serial timeout, corrupt data, SWO framing.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:71`
+Source: `src/helia_profiler/errors.py:75`
 
 ## helia_profiler.DeterministicCaptureError
 
@@ -160,7 +160,7 @@ hardware.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:75`
+Source: `src/helia_profiler/errors.py:79`
 
 ## helia_profiler.NetworkError
 
@@ -177,7 +177,7 @@ still catch it, but callers that want to retry can specifically catch this.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:87`
+Source: `src/helia_profiler/errors.py:91`
 
 ## helia_profiler.DependencyError
 
@@ -196,7 +196,7 @@ specifically about an incompatible version or a missing/corrupt lock.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:95`
+Source: `src/helia_profiler/errors.py:99`
 
 ## helia_profiler.VersionError
 
@@ -215,7 +215,7 @@ dependency failures and surface an actionable upgrade/downgrade hint.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:105`
+Source: `src/helia_profiler/errors.py:109`
 
 ## helia_profiler.LockError
 
@@ -234,7 +234,7 @@ failing an entire report.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/errors.py:115`
+Source: `src/helia_profiler/errors.py:119`
 
 ## helia_profiler.PowerError
 
@@ -248,7 +248,7 @@ Power measurement failure — Joulescope not found, calibration error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:125`
+Source: `src/helia_profiler/errors.py:129`
 
 ## helia_profiler.ReportError
 
@@ -262,4 +262,4 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:129`
+Source: `src/helia_profiler/errors.py:137`

@@ -614,7 +614,7 @@ Build toolchain versions (populated by stage 4).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/models.py:254`
+Source: `src/helia_profiler/results/models.py:334`
 
 ### helia_profiler.ToolchainInfo.compiler
 
@@ -624,7 +624,7 @@ Source: `src/helia_profiler/results/models.py:254`
 compiler: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:258`
+Source: `src/helia_profiler/results/models.py:338`
 
 ### helia_profiler.ToolchainInfo.compiler_version
 
@@ -634,7 +634,7 @@ Source: `src/helia_profiler/results/models.py:258`
 compiler_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:259`
+Source: `src/helia_profiler/results/models.py:339`
 
 ### helia_profiler.ToolchainInfo.cmake_version
 
@@ -644,7 +644,7 @@ Source: `src/helia_profiler/results/models.py:259`
 cmake_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:260`
+Source: `src/helia_profiler/results/models.py:340`
 
 ## helia_profiler.MemoryPlan
 
@@ -670,7 +670,7 @@ the firmware template generator for placement macros / linker hints.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/models.py:441`
+Source: `src/helia_profiler/results/models.py:530`
 
 ### helia_profiler.MemoryPlan.engine
 
@@ -680,7 +680,7 @@ Source: `src/helia_profiler/results/models.py:441`
 engine: EngineType
 ```
 
-Source: `src/helia_profiler/results/models.py:451`
+Source: `src/helia_profiler/results/models.py:540`
 
 ### helia_profiler.MemoryPlan.regions
 
@@ -690,7 +690,7 @@ Source: `src/helia_profiler/results/models.py:451`
 regions: tuple[MemoryRegionUsage, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:452`
+Source: `src/helia_profiler/results/models.py:541`
 
 ### helia_profiler.MemoryPlan.model_weight_bytes
 
@@ -700,7 +700,7 @@ Source: `src/helia_profiler/results/models.py:452`
 model_weight_bytes: int = 0
 ```
 
-Source: `src/helia_profiler/results/models.py:454`
+Source: `src/helia_profiler/results/models.py:543`
 
 ### helia_profiler.MemoryPlan.has_overflow
 
@@ -710,7 +710,7 @@ Source: `src/helia_profiler/results/models.py:454`
 has_overflow: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:458`
+Source: `src/helia_profiler/results/models.py:547`
 
 ### helia_profiler.MemoryPlan.region
 
@@ -720,4 +720,4 @@ Source: `src/helia_profiler/results/models.py:458`
 region(name: str | MemoryRegion) -> MemoryRegionUsage | None
 ```
 
-Source: `src/helia_profiler/results/models.py:464`
+Source: `src/helia_profiler/results/models.py:553`

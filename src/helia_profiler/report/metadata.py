@@ -54,6 +54,8 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
         d["compatibility"] = meta.compatibility.to_dict()
     if meta.dependencies is not None:
         d["dependencies"] = meta.dependencies.to_dict()
+    if meta.conditions is not None:
+        d["conditions"] = meta.conditions.to_dict()
     return d
 
 

@@ -1124,7 +1124,7 @@ def test_summary_schema_dimension_is_visible_and_usable_in_profiles(
     )
 
 
-@pytest.mark.parametrize("version", [1, 18, 20, True, 19.0, "19", None])
+@pytest.mark.parametrize("version", [1, 19, 21, True, 20.0, "20", None])
 @pytest.mark.parametrize("side", ["base", "candidate"])
 def test_compare_refuses_unsupported_summary(tmp_path, version, side):
     paths = [tmp_path / "base", tmp_path / "candidate"]

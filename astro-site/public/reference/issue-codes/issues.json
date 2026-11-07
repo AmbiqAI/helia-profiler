@@ -10,7 +10,7 @@
     "issues": 27,
     "comparability": 7,
     "families": 3,
-    "familyCodes": 25
+    "familyCodes": 29
   },
   "issues": [
     {
@@ -361,7 +361,11 @@
         "weights_location",
         "engine_version",
         "architecture_flags",
-        "engine_backend"
+        "engine_backend",
+        "weights_memory",
+        "weights_cache",
+        "external_memory_clock",
+        "application_load"
       ],
       "codes": [
         "dimension.hpx_version_differs",
@@ -379,7 +383,11 @@
         "dimension.weights_location_differs",
         "dimension.engine_version_differs",
         "dimension.architecture_flags_differs",
-        "dimension.engine_backend_differs"
+        "dimension.engine_backend_differs",
+        "dimension.weights_memory_differs",
+        "dimension.weights_cache_differs",
+        "dimension.external_memory_clock_differs",
+        "dimension.application_load_differs"
       ]
     }
   ]

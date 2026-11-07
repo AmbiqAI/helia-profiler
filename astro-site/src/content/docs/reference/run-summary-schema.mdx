@@ -6,7 +6,7 @@ description: "Current summary.json reader and writer boundaries, with the histor
 ## Current contract
 
 The ordinary profile artifact `summary.json` uses schema `hpx.run-summary`.
-The current version is 19, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
+The current version is 20, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
 `helia_profiler.results.run_summary` and re-exported by `report.contracts`.
 This schema is separate from the saved-run `hpx.run-result` format.
 
@@ -150,3 +150,15 @@ profile without power and unknown for one with power. Other changes are additive
 ### Version 19
 
 The identity's `build_hash`, `observation_hash` and `intent_hash` become semantic hashes of the form `hpx.<kind>/<version>:sha256:<hex>`, replacing bare hex. `inputs_sha256` is renamed `inputs_hash` and also becomes a semantic hash. Other semantics are unchanged. [#558](https://github.com/AmbiqAI/helia-profiler/issues/558).
+
+### Version 20
+
+Adds `conditions`, the board conditions the measurements refer to: `target` (heliaAOT's
+name for the board), `cpu_hz` (the configured core clock; the on-device measurement stays in
+`run_metadata.json`'s `firmware.measured_clock_hz`),
+`weights_memory` (where hpx placed the constants, `null` when hpx set no rule),
+`weights_cache`, `external_memory_clock` (MHz, present only when the run used PSRAM) and
+`application_load`. `run_metadata.json` carries the same block. `weights_memory`,
+`weights_cache`, `external_memory_clock` and `application_load` are informative comparison
+dimensions. This is additive; no existing field changes meaning.
+[#648](https://github.com/AmbiqAI/helia-profiler/issues/648).

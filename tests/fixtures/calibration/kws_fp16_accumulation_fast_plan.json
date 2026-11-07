@@ -1,0 +1,162 @@
+{
+  "generator": {
+    "cmsis_nn_required": "7.47.0",
+    "helia_aot": "0.33.0"
+  },
+  "model": {
+    "file": "kws_float_fp16.tflite",
+    "sha256": "a251dfde6a6ef8d11b13440cea5b37d62c72a2aea9969e73dec1360b15c23d87",
+    "subgraph": 0
+  },
+  "module_prefix": "hpx",
+  "operators": [
+    {
+      "fixed": {},
+      "id": "0:kws_dscnn_float_1/conv2d_1/Relu;kws_dscnn_float_1/conv2d_1/convolution",
+      "id_source": "tensor_name",
+      "index": 0,
+      "kernel": {
+        "entry": "arm_convolve_f16",
+        "local_scratch_bytes": 144,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "accumulation": {
+          "approximate": false,
+          "requested": "fast",
+          "resolved_by": "explicit",
+          "source": {
+            "kind": "model",
+            "rule": null
+          },
+          "value": "fast"
+        }
+      },
+      "node_id": "0",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:kws_dscnn_float_1/depthwise_conv2d_1/Relu;kws_dscnn_float_1/depthwise_conv2d_1/depthwise",
+      "id_source": "tensor_name",
+      "index": 1,
+      "kernel": {
+        "entry": "arm_depthwise_conv_f16_acc16",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-depthwise/7.45.0/2"
+      },
+      "knobs": {
+        "accumulation": {
+          "approximate": true,
+          "requested": "fast",
+          "resolved_by": "explicit",
+          "source": {
+            "kind": "model",
+            "rule": null
+          },
+          "value": "fast"
+        }
+      },
+      "node_id": "1",
+      "op_type": "DEPTHWISE_CONV_2D"
+    },
+    {
+      "fixed": {
+        "weight_layout": {
+          "set_by": "heuristic",
+          "value": "packed"
+        }
+      },
+      "id": "0:kws_dscnn_float_1/conv2d_1_2/Relu;kws_dscnn_float_1/conv2d_1_2/convolution",
+      "id_source": "tensor_name",
+      "index": 2,
+      "kernel": {
+        "entry": "arm_convolve_1x1_f16",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "accumulation": {
+          "approximate": false,
+          "requested": "fast",
+          "resolved_by": "explicit",
+          "source": {
+            "kind": "model",
+            "rule": null
+          },
+          "value": "fast"
+        }
+      },
+      "node_id": "2",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:kws_dscnn_float_1/flatten_1/Reshape",
+      "id_source": "tensor_name",
+      "index": 3,
+      "kernel": null,
+      "knobs": {},
+      "node_id": "3",
+      "op_type": "RESHAPE"
+    },
+    {
+      "fixed": {
+        "weight_layout": {
+          "set_by": "heuristic",
+          "value": "standard"
+        }
+      },
+      "id": "0:kws_dscnn_float_1/logits_1/MatMul2",
+      "id_source": "tensor_name",
+      "index": 4,
+      "kernel": {
+        "entry": "arm_fully_connected_f16",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-fully-connected/7.44.2/1"
+      },
+      "knobs": {
+        "accumulation": {
+          "approximate": false,
+          "requested": "fast",
+          "resolved_by": "explicit",
+          "source": {
+            "kind": "model",
+            "rule": null
+          },
+          "value": "fast"
+        }
+      },
+      "node_id": "4",
+      "op_type": "FULLY_CONNECTED"
+    },
+    {
+      "fixed": {},
+      "id": "0:StatefulPartitionedCall_1:0",
+      "id_source": "tensor_name",
+      "index": 5,
+      "kernel": null,
+      "knobs": {},
+      "node_id": "5",
+      "op_type": "SOFTMAX"
+    }
+  ],
+  "optimization": {
+    "allow_approximate": false,
+    "goal": "balanced",
+    "knobs": {}
+  },
+  "platform": {
+    "capabilities": [
+      "DSP",
+      "FP16",
+      "MCU",
+      "MVE"
+    ],
+    "cpu": "cortex-m55",
+    "name": "apollo510_evb",
+    "supports_fp16": true
+  },
+  "schema_version": 1,
+  "tensors": []
+}

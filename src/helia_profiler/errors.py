@@ -42,6 +42,10 @@ class EngineError(HpxError):
     """Engine adapter failure — AOT compile error, missing static lib, etc."""
 
 
+class EngineMissingError(EngineError):
+    """The engine's package is not installed; the hint says how to install it."""
+
+
 class FirmwareError(HpxError):
     """Firmware generation failure — template rendering, file I/O."""
 
@@ -124,6 +128,10 @@ class LockError(DependencyError):
 
 class PowerError(HpxError):
     """Power measurement failure — Joulescope not found, calibration error."""
+
+
+class CalibrationError(HpxError):
+    """``hpx calibrate`` refused a bundle, a price or an existing file."""
 
 
 class ReportError(HpxError):

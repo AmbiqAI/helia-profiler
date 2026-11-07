@@ -22,6 +22,7 @@ from ..engines import EngineType
 from ..placement import Placement
 from ..power import list_drivers
 from ..target.lifecycle import ResetStrategy
+from . import calibrate_app as _calibrate_app
 from . import inspect_app as _inspect_app
 from . import run_app as _run_app
 from . import validation_app as _validation_app
@@ -602,6 +603,9 @@ _validation_app.register(app)
 
 
 _run_app.register(app)
+
+
+_calibrate_app.register(app)
 
 
 @app.command(

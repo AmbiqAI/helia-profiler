@@ -23,6 +23,10 @@
         "slug": "reference/cli/cache"
       },
       {
+        "label": "hpx calibrate",
+        "slug": "reference/cli/calibrate"
+      },
+      {
         "label": "hpx compare",
         "slug": "reference/cli/compare"
       },

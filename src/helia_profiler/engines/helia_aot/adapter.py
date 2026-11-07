@@ -43,6 +43,8 @@ from .compile import (
     _run_aot_compiler,
     _validate_pragmas,
     _write_attributes_header,
+    effective_aot_args,
+    effective_config_digest,
 )
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
 
@@ -273,6 +275,14 @@ class HeliaAOTAdapter:
             _user_tensor_rules(aot_args)
         )
 
+        compiler_args = effective_aot_args(compiler_config)
+        effective_config_sha256, effective_config_keys = effective_config_digest(
+            compiler_args,
+            module_name=module_name,
+            prefix=prefix,
+            aot_platform=aot_platform,
+        )
+
         aot_output_dir = work_dir / "aot_output"
         aot_module_dir = aot_output_dir / module_name
         _clear_reports(aot_output_dir, prefix)
@@ -282,6 +292,7 @@ class HeliaAOTAdapter:
             module_name,
             prefix,
             aot_platform,
+            compiler_args,
         )
 
         # heliaAOT transforms/fuses ops, so the generated graph may differ
@@ -335,6 +346,8 @@ class HeliaAOTAdapter:
             helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
             aot_user_memory_config=user_memory_config,
+            aot_effective_config_sha256=effective_config_sha256,
+            aot_effective_config_keys=effective_config_keys,
             aot_memory_intent_json=memory_intent_json,
             aot_arena_regions=arena_regions,
             aot_op_manifest=op_manifest or None,

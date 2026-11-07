@@ -93,5 +93,9 @@ informative. A comparison dimension differs between the runs; deltas remain comp
 | `dimension.engine_version_differs` | `engine_version` |
 | `dimension.architecture_flags_differs` | `architecture_flags` |
 | `dimension.engine_backend_differs` | `engine_backend` |
+| `dimension.weights_memory_differs` | `weights_memory` |
+| `dimension.weights_cache_differs` | `weights_cache` |
+| `dimension.external_memory_clock_differs` | `external_memory_clock` |
+| `dimension.application_load_differs` | `application_load` |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
