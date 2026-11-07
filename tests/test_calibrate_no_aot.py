@@ -12,7 +12,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from typer.testing import CliRunner
 
-from helia_profiler.calibration import calibrate
+from helia_profiler.calibration import calibrate, read_calibration
 from helia_profiler.cli.app import app
 from helia_profiler.errors import CalibrationError, EngineMissingError
 from tests.calibration_bundles import GOLDEN, _calibration_schema, two_bundles
@@ -50,47 +50,100 @@ def _entry(document: dict[str, Any]) -> dict[str, Any]:
     return document["operator_cycles"]["0:fc"][0]
 
 
-_REJECTED: dict[str, Callable[[dict[str, Any]], Any]] = {
+def _setup(document: dict[str, Any]) -> dict[str, Any]:
+    return document["capture"]["setup"]
+
+
+Change = Callable[[dict[str, Any]], Any]
+
+#: Shapes the exported schema refuses; hpx's reader must refuse every one.
+_REJECTED: dict[str, Change] = {
     "operators": lambda d: d.update(operators={}),
     "capture.prices": lambda d: d["capture"].update(prices={}),
     "model.x": lambda d: d["model"].update(x=1),
-    "capture.setup.x": lambda d: d["capture"]["setup"].update(x=1),
+    "capture.setup.x": lambda d: _setup(d).update(x=1),
     "an entry's stdev": lambda d: _entry(d).update(stdev=1.0),
     "an entry without facts": lambda d: _entry(d).pop("facts"),
     "a fact named note": lambda d: _entry(d)["facts"].update(note="x"),
+    "a fact named fixed:": lambda d: _entry(d)["facts"].update({"fixed:": "x"}),
     "negative cycles": lambda d: _entry(d).update(cycles=-1.0),
     "boolean cycles": lambda d: _entry(d).update(cycles=True),
     "an empty list": lambda d: d["operator_cycles"].update({"0:fc": []}),
-    "a pairing digest without fields": lambda d: d["capture"]["setup"].update(pairing_fields=None),
+    "a pairing digest without fields": lambda d: _setup(d).update(pairing_fields=None),
+    "no pairing keys": lambda d: [_setup(d).pop(k) for k in ("pairing_digest", "pairing_fields")],
+    "no helia_aot_version": lambda d: _setup(d).pop("helia_aot_version"),
+    "no fields": lambda d: _setup(d).pop("fields"),
     "version 1": lambda d: d.update(schema_version=1),
     "version 3": lambda d: d.update(schema_version=3),
+    "no version": lambda d: d.pop("schema_version"),
+    "an empty sha256": lambda d: d["model"].update(sha256=""),
+    "a negative subgraph": lambda d: d["model"].update(subgraph=-3),
+    "empty conditions": lambda d: d.update(conditions={}),
     "null weights_memory": lambda d: d["conditions"].update(weights_memory=None),
+    "no weights_memory": lambda d: d["conditions"].pop("weights_memory"),
     "no target": lambda d: d["conditions"].pop("target"),
+    "an empty target": lambda d: d["conditions"].update(target=""),
+    "a string cpu_hz": lambda d: d["conditions"].update(cpu_hz="250"),
+    "a boolean cpu_hz": lambda d: d["conditions"].update(cpu_hz=True),
+    "a string external_memory_clock": lambda d: d["conditions"].update(external_memory_clock="48"),
+    "a null weights_cache": lambda d: d["conditions"].update(weights_cache=None),
+    "a numeric application_load": lambda d: d["conditions"].update(application_load=0),
     "no capture": lambda d: d.pop("capture"),
 }
-_ACCEPTED: dict[str, Callable[[dict[str, Any]], Any]] = {
+#: Shapes both accept.
+_ACCEPTED: dict[str, Change] = {
+    "the committed file": lambda d: None,
     "minimal conditions": lambda d: d.update(
         conditions={"target": "apollo510_evb", "weights_memory": "dtcm"}
     ),
     "npu_hz": lambda d: d["conditions"].update(npu_hz=96_000_000),
     "an object-valued condition": lambda d: d["conditions"].update(board={"rev": "b"}),
-    "null pairing": lambda d: d["capture"]["setup"].update(
-        pairing_digest=None, pairing_fields=None
-    ),
+    "a null external_memory_clock": lambda d: d["conditions"].update(external_memory_clock=None),
+    "null pairing": lambda d: _setup(d).update(pairing_digest=None, pairing_fields=None),
+    "a null helia_aot_version": lambda d: _setup(d).update(helia_aot_version=None),
+}
+#: What only the reader can refuse, as JSON Schema cannot say it. The first
+#: four are the proposal's list; Python's JSON parser reads 1e400 as infinity;
+#: jsonschema's pattern search lets ``$`` match before a final newline, which
+#: the reader's full match does not.
+_READER_ONLY: dict[str, Change] = {
+    "version 2.0": lambda d: d.update(schema_version=2.0),
+    "subgraph 0.0": lambda d: d["model"].update(subgraph=0.0),
+    "a float cpu_hz": lambda d: d["conditions"].update(cpu_hz=250_000_000.0),
+    "a vector listed twice": lambda d: d["operator_cycles"]["0:fc"].append(_entry(d)),
+    "NaN cycles": lambda d: _entry(d).update(cycles=float("nan")),
+    "infinite cycles": lambda d: _entry(d).update(cycles=float("inf")),
+    "a fact name with a final newline": lambda d: _entry(d)["facts"].update({"fixed:a\n": "x"}),
+    "a digest with a final newline": lambda d: _setup(d).update(digest=_setup(d)["digest"] + "\n"),
 }
 
 
-def test_the_exported_schema_rejects_what_hpx_refuses() -> None:
+def _reads(path: Path) -> bool:
+    try:
+        read_calibration(path)
+    except CalibrationError:
+        return False
+    return True
+
+
+def test_the_exported_schema_rejects_what_hpx_refuses(tmp_path: Path) -> None:
+    """Every case goes through both the exported schema and hpx's reader, which must agree."""
     schema = _calibration_schema()
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema)
     committed = json.loads(GOLDEN.read_text(encoding="utf-8"))
-    validator.validate(committed)
-    for name, change in _REJECTED.items():
-        document = json.loads(json.dumps(committed))
-        change(document)
-        assert not validator.is_valid(document), name
-    for name, change in _ACCEPTED.items():
-        document = json.loads(json.dumps(committed))
-        change(document)
-        assert validator.is_valid(document), name
+    disagreements = []
+    for expected, cases in (
+        ((False, False), _REJECTED),
+        ((True, True), _ACCEPTED),
+        ((True, False), _READER_ONLY),
+    ):
+        for name, change in cases.items():
+            document = json.loads(json.dumps(committed))
+            change(document)
+            path = tmp_path / "case.json"
+            path.write_text(json.dumps(document), encoding="utf-8")
+            seen = (validator.is_valid(json.loads(path.read_text())), _reads(path))
+            if seen != expected:
+                disagreements.append(f"{name}: schema, reader = {seen}, expected {expected}")
+    assert not disagreements, disagreements

@@ -748,9 +748,12 @@ def test_a_cycle_count_too_large_for_a_float_is_refused(tmp_path: Path) -> None:
         read_bundle(big)
     output = tmp_path / "big.json"
     output.write_text(
-        '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
-        '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}, '
-        '"operator_cycles": {"x": [{"knobs": {}, "facts": {}, "cycles": ' + huge + "}]}}",
+        '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, '
+        '"conditions": {"target": "apollo510_evb", "weights_memory": "dtcm"}, '
+        + _SETUP_TEXT
+        + ', "operator_cycles": {"x": [{"knobs": {}, "facts": {}, "cycles": '
+        + huge
+        + "}]}}",
         encoding="utf-8",
     )
     with pytest.raises(CalibrationError, match="x has an entry without string knobs, finite"):
@@ -805,6 +808,35 @@ def test_a_plan_whose_fixed_is_not_an_object_is_refused(tmp_path: Path, fixed: A
     odd = bundle(tmp_path / "odd", cycles={0: 1.0, 1: 1.0, 2: 1.0}, plan_ops=ops)
     with pytest.raises(CalibrationError, match="operator 0:conv fixed is not an object"):
         read_bundle(odd)
+
+
+@pytest.mark.parametrize("name", ["", "weight\nlayout", "weight_layout\n"])
+def test_a_fixed_choice_a_calibration_file_cannot_name_is_refused(
+    tmp_path: Path, name: str
+) -> None:
+    """The writer never emits a fact name the exported schema or the reader refuses."""
+    ops = json.loads(json.dumps(PLAN_OPERATORS))
+    ops[1]["fixed"] = {name: {"value": "packed", "set_by": "heuristic"}}
+    odd = bundle(tmp_path / "odd", cycles={0: 1.0, 1: 1.0, 2: 1.0}, plan_ops=ops)
+    output = tmp_path / "out.json"
+    with pytest.raises(
+        CalibrationError,
+        match=rf"Bundle .*odd: plan operator 0:fc names a fixed choice {re.escape(repr(name))}, "
+        "which a calibration file cannot hold",
+    ):
+        calibrate([odd], output=output)
+    assert not output.exists()
+
+
+def test_a_plan_with_a_negative_subgraph_is_refused(tmp_path: Path) -> None:
+    negative = bundle(tmp_path / "negative", cycles={0: 1.0, 1: 1.0, 2: 1.0}, subgraph=-1)
+    output = tmp_path / "out.json"
+    with pytest.raises(
+        CalibrationError,
+        match=r"Bundle .*negative: the plan names no model sha256 and non-negative subgraph",
+    ):
+        calibrate([negative], output=output)
+    assert not output.exists()
 
 
 def test_a_bundle_without_a_plan_is_refused(tmp_path: Path) -> None:
@@ -912,7 +944,14 @@ def test_merge_refuses_a_file_for_another_model(tmp_path: Path) -> None:
         calibrate([auto], output=output, merge=True)
 
 
-_SETUP_TEXT = '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}'
+_V2_HEAD = (
+    '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, '
+    '"conditions": {"target": "t", "weights_memory": "dtcm"}, '
+)
+_SETUP_TEXT = (
+    '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": [], '
+    '"pairing_digest": null, "pairing_fields": null, "helia_aot_version": null}}'
+)
 _MALFORMED = "is malformed: it needs model.sha256, model.subgraph, conditions and operator_cycles."
 _RECALIBRATE = (
     "A schema 2 file holds only the fields helia_profiler/data/calibration.schema.v2.json "
@@ -959,20 +998,19 @@ _RECALIBRATE = (
             None,
         ),
         (
-            '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
-            '"operator_cycles": {"x": [{"knobs": {}, "cycles": 1, "facts": {}}]}}',
+            _V2_HEAD + '"operator_cycles": {"x": [{"knobs": {}, "cycles": 1, "facts": {}}]}}',
             "records no setup",
             None,
         ),
         (
-            '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+            _V2_HEAD
             + _SETUP_TEXT
             + ', "operator_cycles": {"x": [{"knobs": {}, "cycles": NaN, "facts": {}}]}}',
             "x has an entry without string knobs, finite non-negative cycles",
             None,
         ),
         (
-            '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+            _V2_HEAD
             + _SETUP_TEXT
             + ', "operator_cycles": {"x": [{"knobs": {}, "cycles": -1, "facts": {}}]}}',
             "x has an entry without string knobs, finite non-negative cycles",

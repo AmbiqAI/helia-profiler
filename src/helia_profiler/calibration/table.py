@@ -148,6 +148,8 @@ _SETUP_KEYS = frozenset(
 )
 _ENTRY_KEYS = frozenset({"knobs", "cycles", "facts"})
 _FACT_NAME = re.compile(r"fixed:.+|kernel:entry")
+#: Why a conditions block without a weights memory is refused.
+_UNPLACED = "conditions.weights_memory must be a string"
 
 
 #: A knob vector as a key: its (knob, value) pairs, sorted.
@@ -310,7 +312,8 @@ def read_calibration(path: Path) -> CalibrationTable:
     """Read a calibration schema 2 file hpx wrote.
 
     hpx writes the file it reads again, so a key schema 2 does not define is
-    refused rather than dropped.
+    refused rather than dropped, and whatever the exported schema refuses is
+    refused here too: a file is never read in that a rewrite would change.
 
     Raises:
         CalibrationError: when the file is not JSON, not calibration schema 2,
@@ -361,7 +364,7 @@ def read_calibration(path: Path) -> CalibrationTable:
     if (
         not isinstance(sha256, str)
         or not sha256
-        or type(subgraph) is not int
+        or not _is_subgraph(subgraph)
         or not isinstance(conditions, dict)
         or "operator_cycles" not in data
     ):
@@ -369,13 +372,19 @@ def read_calibration(path: Path) -> CalibrationTable:
             f"Calibration file {path} is malformed: it needs model.sha256, model.subgraph, "
             "conditions and operator_cycles.",
         )
+    refusal = _conditions_refusal(conditions)
+    if refusal is not None:
+        raise CalibrationError(f"Calibration file {path} is malformed: {refusal}.")
+    setup = nested_get(data, "capture", "setup")
     digest = nested_get(data, "capture", "setup", "digest")
     fields = nested_get(data, "capture", "setup", "fields")
     helia_aot_version = nested_get(data, "capture", "setup", "helia_aot_version")
     pairing_digest = nested_get(data, "capture", "setup", "pairing_digest")
     pairing_fields = nested_get(data, "capture", "setup", "pairing_fields")
     if (
-        not _is_digest(digest)
+        not isinstance(setup, dict)
+        or not _SETUP_KEYS <= setup.keys()
+        or not _is_digest(digest)
         or not _is_names(fields)
         or not (helia_aot_version is None or isinstance(helia_aot_version, str))
         or not (
@@ -465,6 +474,11 @@ def _read_operator_cycles(
     return samples
 
 
+def _is_subgraph(value: Any) -> TypeGuard[int]:
+    """A subgraph index: an integer from 0, never a boolean or a float."""
+    return type(value) is int and value >= 0
+
+
 def _is_digest(value: Any) -> TypeGuard[str]:
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
@@ -508,8 +522,10 @@ def read_bundle(path: Path) -> CalibrationSource:
     plan = _plan(run, source)
     plan_sha256 = nested_get(plan, "model", "sha256")
     subgraph = nested_get(plan, "model", "subgraph")
-    if not isinstance(plan_sha256, str) or type(subgraph) is not int:
-        raise CalibrationError(f"Bundle {source}: the plan names no model sha256 and subgraph.")
+    if not isinstance(plan_sha256, str) or not _is_subgraph(subgraph):
+        raise CalibrationError(
+            f"Bundle {source}: the plan names no model sha256 and non-negative subgraph."
+        )
     if plan_sha256 != model_sha256:
         raise CalibrationError(
             f"Bundle {source}: the plan was compiled from model {plan_sha256[:12]} but the "
@@ -695,11 +711,8 @@ def _conditions(run: RunArtifacts, source: str) -> Mapping[str, Any]:
     recorded = run.summary.get("conditions")
     if not isinstance(recorded, dict):
         raise CalibrationError(f"Bundle {source} records no conditions.")
-    try:
-        typed = Conditions.from_dict(recorded)
-    except ValueError as exc:
-        raise CalibrationError(f"Bundle {source}: {exc}.") from exc
-    if typed.weights_memory is None:
+    refusal = _conditions_refusal(recorded)
+    if refusal == _UNPLACED:
         raise CalibrationError(
             f"Bundle {source} records no weights memory: hpx set no placement rule for the "
             "constants, so heliaOptimus could not match the calibration to a plan.",
@@ -708,7 +721,22 @@ def _conditions(run: RunArtifacts, source: str) -> Mapping[str, Any]:
                 "constant tensor kind."
             ),
         )
+    if refusal is not None:
+        raise CalibrationError(f"Bundle {source}: {refusal}.")
     return recorded
+
+
+def _conditions_refusal(recorded: Mapping[str, Any]) -> str | None:
+    """Why *recorded* is not a conditions block a calibration file holds, or ``None``.
+
+    One rule for a bundle and an existing file: the types ``Conditions``
+    reads, and a weights memory, which heliaOptimus matches a plan on.
+    """
+    try:
+        typed = Conditions.from_dict(recorded)
+    except ValueError as exc:
+        return str(exc)
+    return _UNPLACED if typed.weights_memory is None else None
 
 
 def _model_sha256(run: RunArtifacts, source: str) -> str:
@@ -844,7 +872,14 @@ def _plan_operator(entry: Any, source: str) -> tuple[OperatorSample, int, str]:
             raise CalibrationError(
                 f"Bundle {source}: plan operator {operator} fixed choice {name} has no value."
             )
-        facts[f"{_FIXED_PREFIX}{name}"] = value
+        fact = f"{_FIXED_PREFIX}{name}"
+        if not _FACT_NAME.fullmatch(fact):
+            raise CalibrationError(
+                f"Bundle {source}: plan operator {operator} names a fixed choice {name!r}, "
+                "which a calibration file cannot hold: a fact name is fixed:<name> with a "
+                "non-empty name on one line."
+            )
+        facts[fact] = value
     kernel = entry.get("kernel")
     if isinstance(kernel, dict) and isinstance(kernel.get("entry"), str):
         facts[_KERNEL_ENTRY] = kernel["entry"]

@@ -357,7 +357,7 @@ def _calibration_schema() -> dict[str, Any]:
 
 @pytest.fixture
 def schema_checked_writes(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Validate every file ``calibrate`` writes against the exported schema."""
+    """Hold every file ``calibrate`` writes to the exported schema and to hpx's own reader."""
     from jsonschema import Draft202012Validator
 
     from helia_profiler.calibration import table
@@ -368,6 +368,7 @@ def schema_checked_writes(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     def checked(written: Any, path: Path) -> Path:
         result = original(written, path)
         validator.validate(json.loads(path.read_text(encoding="utf-8")))
+        assert table.read_calibration(path) == written
         return result
 
     monkeypatch.setattr(table, "write_calibration", checked)
