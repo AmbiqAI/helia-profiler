@@ -70,6 +70,7 @@ DIMENSIONS = {
     "arena_location": None,
     "kernel_library": "cmsis-nn",
     "kernel_version": "7.0.0",
+    "kernel_commit": "c" * 40,
     "arena_memory": "DTCM",
 }
 
@@ -98,7 +99,9 @@ def bundle(
     toolchain: str = "arm-none-eabi-gcc",
     engine_version: str = "0.33.0",
     kernel_version: str = "7.0.0",
+    kernel_commit: str = "c" * 40,
     arena_region: str = "DTCM",
+    layer_cycles_text: str | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
     path.mkdir(parents=True)
@@ -111,7 +114,7 @@ def bundle(
         "overflow_detected": overflow is not None,
         "identity": {
             "model_sha256": sha256,
-            "kernels": {"library": "cmsis-nn", "version": kernel_version, "commit": "c" * 40},
+            "kernels": {"library": "cmsis-nn", "version": kernel_version, "commit": kernel_commit},
         },
         "top_layers": [],
         "memory_plan": {
@@ -147,7 +150,7 @@ def bundle(
                 {
                     "id": position,
                     "op": ops[position % len(ops)],
-                    "cycles": value,
+                    "cycles": layer_cycles_text if layer_cycles_text and position == 1 else value,
                     "overflow": position == overflow,
                 }
             )
@@ -178,9 +181,9 @@ def _republish(path: Path, **changes: Any) -> None:
     )
 
 
-def _mark(path: Path, validity: ResultValidity, *codes: str) -> None:
+def _mark(path: Path, validity: ResultValidity, *codes: str, severity: str = "error") -> None:
     issues = tuple(
-        ResultIssue(code=code, severity="error", message="The run is not a measurement.")
+        ResultIssue(code=code, severity=severity, message="The run is not a measurement.")
         for code in codes
     )
     summary = json.loads((path / "summary.json").read_text(encoding="utf-8"))
@@ -212,7 +215,7 @@ EXPECTED = {
             "weights": {"packed": {"cycles": 3000.0}},
         },
     },
-    "capture": {"dimensions": DIMENSIONS, "knobs": {}},
+    "capture": {"dimensions": DIMENSIONS, "knobs": {}, "held": {}},
 }
 
 
@@ -286,6 +289,7 @@ def test_one_knob_of_a_two_knob_operator_can_be_swept(tmp_path: Path) -> None:
         "weights": {"flat": {"cycles": 2500.0}, "packed": {"cycles": 3000.0}}
     }
     assert written["capture"]["knobs"] == {"0:fc": {"accumulation": "int32"}}
+    assert written["capture"]["held"] == {}
 
 
 def test_two_knobs_of_one_operator_may_not_both_change(tmp_path: Path) -> None:
@@ -382,19 +386,137 @@ def test_captures_from_another_setup_are_refused(
         calibrate([other], output=output, merge=True)
 
 
-def test_a_file_that_records_no_setup_merges(tmp_path: Path) -> None:
-    auto, _ = two_bundles(tmp_path)
-    output = tmp_path / "hand.json"
-    hand = {
-        "schema_version": 1,
-        "model": {"sha256": SHA, "subgraph": 0},
-        "conditions": CONDITIONS,
-        "operators": {"0:conv": {"accumulation": {"int16": {"cycles": 9000}}}},
-    }
-    output.write_text(json.dumps(hand), encoding="utf-8")
+def _hand_written(path: Path, operators: dict[str, Any]) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "model": {"sha256": SHA, "subgraph": 0},
+                "conditions": CONDITIONS,
+                "operators": operators,
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
+def test_a_file_that_records_no_setup_takes_the_bundles_setup(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = _hand_written(
+        tmp_path / "hand.json", {"0:conv": {"accumulation": {"int16": {"cycles": 9000}}}}
+    )
+
     table = calibrate([auto], output=output, merge=True)
+
     assert table.operators["0:conv"]["accumulation"] == {"int16": 9000.0, "int32": 12000.0}
-    assert table.dimensions == {}
+    assert table.dimensions == DIMENSIONS
+    assert json.loads(output.read_text())["capture"]["dimensions"] == DIMENSIONS
+    # The bundles must still agree among themselves, file or no file.
+    other = bundle(tmp_path / "other", cycles={0: 1.0, 1: 1.0, 2: 1.0}, toolchain="armclang")
+    hand = _hand_written(
+        tmp_path / "hand2.json", {"0:conv": {"accumulation": {"int16": {"cycles": 9000}}}}
+    )
+    with pytest.raises(CalibrationError, match="has toolchain 'armclang';.*auto has"):
+        calibrate([auto, other], output=hand, merge=True)
+    assert "capture" not in json.loads(hand.read_text())
+
+
+def test_merge_never_replaces_a_price_the_file_holds(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    uneven = _hand_written(
+        tmp_path / "uneven.json",
+        {
+            "0:fc": {
+                "accumulation": {"int32": {"cycles": 3000}},
+                "weights": {"packed": {"cycles": 5000}},
+            }
+        },
+    )
+    with pytest.raises(CalibrationError, match="0:fc prices one vector .* at different cycles"):
+        calibrate([auto], output=uneven, merge=True)
+    assert json.loads(uneven.read_text())["operators"]["0:fc"]["weights"]["packed"] == {
+        "cycles": 5000
+    }
+    even = _hand_written(
+        tmp_path / "even.json",
+        {
+            "0:fc": {
+                "accumulation": {"int32": {"cycles": 5000}},
+                "weights": {"packed": {"cycles": 5000}},
+            }
+        },
+    )
+    with pytest.raises(
+        CalibrationError, match=r"0:fc accumulation=int32 costs 5000 cycles in .*even.json but 3000"
+    ):
+        calibrate([auto], output=even, merge=True)
+    agreeing = bundle(tmp_path / "agreeing", cycles={0: 12000.0, 1: 5050.0, 2: 1.0})
+    table = calibrate([agreeing], output=even, merge=True)
+    assert table.operators["0:fc"] == {
+        "accumulation": {"int32": 5000.0},
+        "weights": {"packed": 5000.0},
+    }
+
+
+def test_an_operator_whose_knob_set_differs_is_refused(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    extra = json.loads(json.dumps(PLAN_OPERATORS))
+    extra[1]["knobs"]["tiling"] = {"value": "rows"}
+    tiled = bundle(tmp_path / "tiled", cycles={0: 1.0, 1: 1.0, 2: 1.0}, plan_ops=extra)
+    message = (
+        r"Operator 0:fc has knobs \['accumulation', 'tiling', 'weights'\] in .*tiled but "
+        r"\['accumulation', 'weights'\] in .*auto"
+    )
+    with pytest.raises(CalibrationError, match=message):
+        calibrate([auto, tiled], output=tmp_path / "out.json")
+    with pytest.raises(CalibrationError, match="Operator 0:fc has knobs"):
+        calibrate([tiled, auto], output=tmp_path / "out.json")
+    partial = _hand_written(
+        tmp_path / "partial.json", {"0:fc": {"accumulation": {"int32": {"cycles": 3000}}}}
+    )
+    with pytest.raises(
+        CalibrationError, match=r"has knobs \['accumulation', 'weights'\] in .*auto"
+    ):
+        calibrate([auto], output=partial, merge=True)
+
+
+def _with_fixed(ops: list[dict[str, Any]], layout: str) -> list[dict[str, Any]]:
+    out = json.loads(json.dumps(ops))
+    out[0]["fixed"] = {"weight_layout": {"value": layout, "set_by": "placement"}}
+    out[0]["kernel"] = {"entry": f"arm_convolve_{layout}", "provider": None}
+    return out
+
+
+def test_a_fixed_choice_or_kernel_that_moved_is_refused(tmp_path: Path) -> None:
+    standard = bundle(
+        tmp_path / "standard",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_with_fixed(PLAN_OPERATORS, "standard"),
+    )
+    packed = bundle(
+        tmp_path / "packed",
+        cycles={0: 7000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_with_fixed(_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"), "packed"),
+    )
+    with pytest.raises(
+        CalibrationError,
+        match="Operator 0:conv ran with different fixed:weight_layout, kernel:entry in .*packed",
+    ):
+        calibrate([standard, packed], output=tmp_path / "out.json")
+    # Held still, the choices are recorded with the prices and checked on merge.
+    output = tmp_path / "kws.json"
+    calibrate([standard], output=output)
+    assert json.loads(output.read_text())["capture"]["held"] == {
+        "0:conv": {"fixed:weight_layout": "standard", "kernel:entry": "arm_convolve_standard"}
+    }
+    with pytest.raises(CalibrationError, match="different fixed:weight_layout, kernel:entry"):
+        calibrate([packed], output=output, merge=True)
+    other_commit = bundle(
+        tmp_path / "commit", cycles={0: 1.0, 1: 1.0, 2: 1.0}, kernel_commit="d" * 40
+    )
+    with pytest.raises(CalibrationError, match="has kernel_commit 'dddd"):
+        calibrate([standard, other_commit], output=tmp_path / "out.json")
 
 
 def test_a_bundle_without_conditions_or_weights_memory_is_refused(tmp_path: Path) -> None:
@@ -426,6 +548,22 @@ def test_a_run_the_profiler_marked_invalid_is_refused(tmp_path: Path) -> None:
     assert read_bundle(degraded).samples
 
 
+@pytest.mark.parametrize(
+    "code", ["profile.clean_window_clock_rate_low", "profile.clean_window_stalled"]
+)
+def test_a_run_whose_cycle_counter_is_suspect_is_refused(tmp_path: Path, code: str) -> None:
+    slow = bundle(tmp_path / "slow", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+    _mark(slow, ResultValidity.DEGRADED, code, severity="warning")
+    with pytest.raises(CalibrationError, match=f"Bundle .*slow is degraded: {code}"):
+        read_bundle(slow)
+
+
+def test_a_run_whose_power_capture_failed_is_priced(tmp_path: Path) -> None:
+    dark = bundle(tmp_path / "dark", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+    _mark(dark, ResultValidity.INVALID, "power.observation_missing")
+    assert read_bundle(dark).samples
+
+
 def test_an_overflowed_layer_is_refused(tmp_path: Path) -> None:
     hot = bundle(tmp_path / "hot", cycles={0: 1.0, 1: 1.0, 2: 1.0}, overflow=1)
     with pytest.raises(CalibrationError, match=r"layer 1 \(FULLY_CONNECTED\) overflowed"):
@@ -437,6 +575,21 @@ def test_a_cycle_count_that_is_not_one_is_refused(tmp_path: Path, cycles: float)
     odd = bundle(tmp_path / "odd", cycles={0: 1.0, 1: cycles, 2: 1.0})
     with pytest.raises(CalibrationError, match=r"layer 1 \(FULLY_CONNECTED\) has no finite"):
         read_bundle(odd)
+
+
+def test_a_cycle_count_too_large_for_a_float_is_refused(tmp_path: Path) -> None:
+    huge = "9" * 401
+    big = bundle(tmp_path / "big", cycles={0: 1.0, 1: 1.0, 2: 1.0}, layer_cycles_text=huge)
+    with pytest.raises(CalibrationError, match=r"layer 1 \(FULLY_CONNECTED\) has no finite"):
+        read_bundle(big)
+    output = tmp_path / "big.json"
+    output.write_text(
+        '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+        '"operators": {"x": {"k": {"v": {"cycles": ' + huge + "}}}}}",
+        encoding="utf-8",
+    )
+    with pytest.raises(CalibrationError, match="no finite, non-negative cycles"):
+        read_calibration(output)
 
 
 def test_a_position_the_plan_and_the_capture_disagree_on_is_refused(tmp_path: Path) -> None:
@@ -570,6 +723,7 @@ def test_merge_refuses_a_file_for_another_model(tmp_path: Path) -> None:
                 operators={"0:conv": {"accumulation": {"int32": 1.0}}},
                 dimensions={},
                 contexts={},
+                held={},
             ).to_dict()
         )
     )
@@ -660,3 +814,24 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     assert "--merge" in help_text and "--tolerance" in help_text
     assert "application_load=none" in help_text
     assert "kws-sram" not in help_text
+
+
+def test_the_file_follows_the_umask_and_never_replaces_a_link(tmp_path: Path) -> None:
+    import os
+    import stat
+
+    auto, _ = two_bundles(tmp_path)
+    previous = os.umask(0o027)
+    try:
+        output = tmp_path / "kws.json"
+        calibrate([auto], output=output)
+        assert stat.S_IMODE(output.stat().st_mode) == 0o640
+    finally:
+        os.umask(previous)
+    real = tmp_path / "real.json"
+    real.write_text("{}", encoding="utf-8")
+    link = tmp_path / "link.json"
+    link.symlink_to(real)
+    with pytest.raises(CalibrationError, match="link.json is a symbolic link"):
+        calibrate([auto], output=link)
+    assert link.is_symlink() and real.read_text(encoding="utf-8") == "{}"
