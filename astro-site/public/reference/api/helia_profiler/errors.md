@@ -262,4 +262,4 @@ Report generation failure — output path not writable, format error.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/errors.py:129`
+Source: `src/helia_profiler/errors.py:133`

@@ -332,9 +332,9 @@
           "returns": [],
           "signature": "ReportError()",
           "source": {
-            "line": 129,
+            "line": 133,
             "path": "src/helia_profiler/errors.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L129"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/errors.py#L133"
           },
           "summary": "Report generation failure — output path not writable, format error."
         }

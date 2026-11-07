@@ -5,6 +5,8 @@ _litert_inspection.py
 _semantic_hash.py
 _version.py
 api.py
+calibration/__init__.py
+calibration/table.py
 capture/__init__.py
 capture/parser.py
 capture/power_terminal.py
@@ -14,6 +16,8 @@ cli/__init__.py
 cli/analyze_cmd.py
 cli/app.py
 cli/cache_cmd.py
+cli/calibrate_app.py
+cli/calibrate_cmd.py
 cli/choices.py
 cli/common.py
 cli/compare_cmd.py
