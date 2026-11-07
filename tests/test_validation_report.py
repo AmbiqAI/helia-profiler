@@ -402,7 +402,7 @@ def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path,
         assert field not in loaded.cases[0].to_dict()
 
 
-@pytest.mark.parametrize("version", [18, 20, None])
+@pytest.mark.parametrize("version", [19, 21, None])
 @pytest.mark.parametrize("writer", [build_manifest, write_validation_reports])
 def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer, monkeypatch):
     monkeypatch.setattr(

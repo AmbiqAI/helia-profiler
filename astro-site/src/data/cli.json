@@ -8,13 +8,14 @@
     "pydantic": "2.13.4"
   },
   "counts": {
-    "leaf_commands": 23,
+    "leaf_commands": 24,
     "leaf_command_names": [
       "analyze",
       "boards",
       "build",
       "cache info",
       "cache purge",
+      "calibrate",
       "compare",
       "doctor",
       "engines",
@@ -45,12 +46,13 @@
       "target",
       "validate"
     ],
-    "top_level_entries": 17,
-    "epilogs": 9,
+    "top_level_entries": 18,
+    "epilogs": 10,
     "epilog_commands": [
       "analyze",
       "build",
       "cache",
+      "calibrate",
       "compare",
       "freeze",
       "power-on",
@@ -58,8 +60,8 @@
       "run",
       "validate"
     ],
-    "options": 134,
-    "arguments": 15,
+    "options": 137,
+    "arguments": 16,
     "options_with_panel": 57,
     "panel_names": [
       "PMU profiling",
@@ -85,7 +87,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 49
+      "line": 50
     },
     "arguments": [],
     "options": [
@@ -132,7 +134,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 531
+          "line": 532
         },
         "arguments": [
           {
@@ -620,7 +622,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 674
+          "line": 678
         },
         "arguments": [],
         "options": [],
@@ -641,7 +643,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 688
+              "line": 692
             },
             "arguments": [],
             "options": [],
@@ -662,13 +664,152 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 681
+              "line": 685
             },
             "arguments": [],
             "options": [],
             "panels": []
           }
         ]
+      },
+      {
+        "path": [
+          "calibrate"
+        ],
+        "name": "calibrate",
+        "kind": "command",
+        "usage": "hpx calibrate [OPTIONS] BUNDLES",
+        "short_help": "Write a heliaOptimus calibration file from helia-aot result bundles",
+        "help": "Write a heliaOptimus calibration file from helia-aot result bundles",
+        "epilog": "Examples:\n\n  hpx calibrate results/kws-auto results/kws-mve --output kws-calibration.json\n\n  hpx calibrate results/kws-int16 --output kws-calibration.json --merge\n\nEach bundle contributes the cycles of every operator its plan lists with knobs, as operators[<id>][<knob>][<value>]; an operator without knobs has no slot in the file and is left out. Every bundle must profile the same model under the same recorded conditions and setup: a digest of the run's frozen settings less the heliaAOT knob values (optimization.<knob> and operators[].optimization.<knob>), the power, output and timeout sections and the run-only fields, plus the resolved toolchain and engine, the configuration the heliaAOT compiler received, the build's ISA flags and the kernel build, recorded under capture.setup with the fields it covers; the hpx version and the contents of locally overridden modules are not held. Every bundle must carry cycles the profiler did not flag: an invalid run counts only when the issue registry confines every error to power metrics, and a run whose cycle counter was flagged is refused whatever its verdict. Two sources pricing one value under the same other knobs must agree within --tolerance, and a second vector for one value is an error; anything else is an error too. The plan's fixed choices and kernel entry are recorded with each price, never compared. Reading a bundle needs the aot extra installed, since the knob values are stripped by heliaAOT's own registry, and the file records the heliaAOT release the captures compiled with; captures compiled by different releases do not merge. --merge accepts only a file hpx wrote and keeps every price it holds; heliaOptimus reads a hand-written table directly. heliaOptimus matches the file when the planner passes the same conditions, including application_load=none and, with PSRAM, external_memory_clock.",
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/calibrate_app.py",
+          "line": 57
+        },
+        "arguments": [
+          {
+            "name": "bundles",
+            "kind": "argument",
+            "declaration": "bundles",
+            "opts": [
+              "bundles"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "list[Path]",
+            "default": null,
+            "required": true,
+            "help": "helia-aot result directories of one model under one set of conditions",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": -1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "output",
+            "kind": "option",
+            "declaration": "--output",
+            "opts": [
+              "--output",
+              "-o"
+            ],
+            "aliases": [
+              "-o"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Calibration file to write (schema version 1)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "merge",
+            "kind": "option",
+            "declaration": "--merge",
+            "opts": [
+              "--merge"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "boolean",
+              "class": "BoolParamType"
+            },
+            "python_type": "bool",
+            "default": false,
+            "required": false,
+            "help": "Read the existing --output file first and hold its prices to the same rules",
+            "panel": null,
+            "is_flag": true,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "tolerance",
+            "kind": "option",
+            "declaration": "--tolerance",
+            "opts": [
+              "--tolerance"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "float",
+              "class": "FloatParamType"
+            },
+            "python_type": "float",
+            "default": 0.02,
+            "required": false,
+            "help": "Largest relative disagreement two prices of one value may have, as a fraction (default: 0.02, two percent)",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
       },
       {
         "path": [
@@ -684,7 +825,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 607
+          "line": 611
         },
         "arguments": [
           {
@@ -2096,7 +2237,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 87
+          "line": 88
         },
         "arguments": [
           {
@@ -3879,7 +4020,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 703
+          "line": 707
         },
         "arguments": [],
         "options": [],
@@ -3900,7 +4041,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 710
+              "line": 714
             },
             "arguments": [],
             "options": [],
@@ -3921,7 +4062,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 727
+              "line": 731
             },
             "arguments": [
               {
@@ -3995,7 +4136,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 717
+              "line": 721
             },
             "arguments": [
               {

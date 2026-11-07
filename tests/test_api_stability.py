@@ -76,6 +76,7 @@ def test_public_surface_membership_snapshot() -> None:
         "CompatibilityBaseline",
         "CompatibilityResolution",
         "CompiledBuild",
+        "Conditions",
         "ConfigError",
         "DependencyError",
         "DependencyLockProvenance",

@@ -13,6 +13,9 @@ Always generated (root of output_dir):
     profile_results.csv   Merged per-layer profiling results.
     run_metadata.json     Full run metadata (config, toolchain, platform, …).
 
+heliaAOT runs add the operator manifest, its placement CSV, and the
+compiler's own ``<prefix>_plan.json`` and ``<prefix>_report.json``.
+
 Model Explorer (``model_explorer/`` subfolder, unless ``--no-model-explorer``):
     me_overlay_<COUNTER>.json   Per-counter overlay files.
 
@@ -35,7 +38,8 @@ from ..errors import ReportError
 from ..evaluation import evaluate_run
 from ..profile_identity import profile_run_identity
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
-from .aot import _aot_manifest, _write_aot_manifest, _write_aot_memory_layers
+from .aot import _aot_manifest, _write_aot_manifest, _write_aot_memory_layers, _write_aot_plan
+from .conditions import run_conditions
 from .csv_writer import _write_csv, _write_preset_csv
 from .json_writer import _write_json
 from .manifest import _write_result_manifest
@@ -65,6 +69,9 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     incomplete.write_text("Report publication in progress.\n", encoding="utf-8")
     (output_dir / "result_manifest.json").unlink(missing_ok=True)
     paths: list[Path] = []
+    # The conditions are facts of this run, derived once here and recorded
+    # by every artifact below rather than re-derived by their readers.
+    ctx.run_metadata.conditions = run_conditions(ctx)
 
     fmt = ctx.config.output.format
     detailed = ctx.config.output.detailed
@@ -110,6 +117,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         p = _write_aot_memory_layers(ctx, output_dir)
         if p is not None:
             paths.append(p)
+    paths.extend(_write_aot_plan(ctx, output_dir))
 
     if ctx.config.output.model_explorer:
         try:

@@ -105,6 +105,11 @@ def test_family_membership_and_order_are_the_documented_sets():
         "engine_version",
         "architecture_flags",
         "engine_backend",
+        # #648: the recorded conditions, appended after engine_backend.
+        "weights_memory",
+        "weights_cache",
+        "external_memory_clock",
+        "application_load",
     ]
     assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
     assert MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY) == (

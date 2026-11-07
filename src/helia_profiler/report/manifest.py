@@ -132,6 +132,12 @@ def _artifact_metadata(relative: str) -> dict[str, Any]:
         return _artifact_fields("extension", "helia-aot.operators", optional=True)
     if name == "aot_memory_layers.csv":
         return _artifact_fields("extension", "helia-aot.memory-layers", optional=True)
+    if name.endswith("_plan.json"):
+        return _artifact_fields("extension", "helia-aot.plan", producer="helia-aot", optional=True)
+    if name.endswith("_report.json"):
+        return _artifact_fields(
+            "extension", "helia-aot.report", producer="helia-aot", optional=True
+        )
     if name == "power_summary.csv":
         return _artifact_fields("diagnostic", "hpx.power-summary", optional=True)
     if relative.startswith("detailed/"):
@@ -197,6 +203,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
     platform = ctx.run_metadata.platform
     toolchain = ctx.run_metadata.toolchain
     firmware = ctx.pmu_result.meta if ctx.pmu_result is not None else None
+    conditions = ctx.run_metadata.conditions
     values: dict[ComparisonDimension, Any] = {
         ComparisonDimension.MODEL_SHA256: model.sha256 if model is not None else None,
         ComparisonDimension.HPX_VERSION: ctx.run_metadata.hpx_version,
@@ -227,6 +234,20 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         # manifest cannot disagree with the artifact it summarizes.
         ComparisonDimension.ARCHITECTURE_FLAGS: derive_architecture_flags(
             {"build_images": [asdict(image) for image in ctx.run_metadata.build_images]}
+        ),
+        # The conditions the summary records (#648); the same object, so the
+        # manifest and the artifact cannot disagree.
+        ComparisonDimension.WEIGHTS_MEMORY: (
+            conditions.weights_memory if conditions is not None else None
+        ),
+        ComparisonDimension.WEIGHTS_CACHE: (
+            conditions.weights_cache if conditions is not None else None
+        ),
+        ComparisonDimension.EXTERNAL_MEMORY_CLOCK: (
+            conditions.external_memory_clock if conditions is not None else None
+        ),
+        ComparisonDimension.APPLICATION_LOAD: (
+            conditions.application_load if conditions is not None else None
         ),
     }
     if ctx.power_result is not None:

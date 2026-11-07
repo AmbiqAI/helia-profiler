@@ -170,6 +170,17 @@ class EngineArtifacts:
         return None
 
     @property
+    def effective_config_sha256(self) -> str | None:
+        """The sha256 of the configuration the engine's compiler received, less
+        ``optimization.<knob>`` and ``operators[].optimization.<knob>``."""
+        return None
+
+    @property
+    def effective_config_keys(self) -> tuple[str, ...]:
+        """The top-level keys :attr:`effective_config_sha256` covers."""
+        return ()
+
+    @property
     def resolved_version(self) -> str | None:
         return None
 
@@ -267,8 +278,22 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: heliaAOT's ``engine.backend`` selector (e.g. ``"ethos_u"``), or
     #: ``None`` for the default CMSIS-NN-only codegen path.
     engine_backend: str | None = None
+    #: What the compiler received (``compile.effective_config_digest``):
+    #: the merged heliaAOT arguments with hpx's forced fields and placement
+    #: rulesets, less ``optimization.<knob>`` and
+    #: ``operators[].optimization.<knob>`` for every registered knob.
+    aot_effective_config_sha256: str | None = None
+    aot_effective_config_keys: tuple[str, ...] = ()
 
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_AOT
+
+    @property
+    def effective_config_sha256(self) -> str | None:
+        return self.aot_effective_config_sha256
+
+    @property
+    def effective_config_keys(self) -> tuple[str, ...]:
+        return self.aot_effective_config_keys
 
     @property
     def resolved_version(self) -> str | None:

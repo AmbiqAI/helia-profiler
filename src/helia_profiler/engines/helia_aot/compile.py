@@ -13,16 +13,20 @@ minimum-supported version.
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import logging
+import math
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
 import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
-from ...errors import ConfigError, EngineError
+from ...engines import EngineType
+from ...errors import ConfigError, EngineError, EngineMissingError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
@@ -118,6 +122,18 @@ def aot_platform_for_board(board: str) -> str | None:
     return aot_platform
 
 
+def aot_target_name(config: ProfileConfig) -> str:
+    """heliaAOT's name for the configured board, for the recorded conditions.
+
+    A heliaAOT run names the platform it compiled for, override included.
+    Any other engine names the board's mapped platform, or the board itself
+    when heliaAOT has no name for it, so every run records a target.
+    """
+    if config.engine.type is EngineType.HELIA_AOT:
+        return _resolve_aot_platform(config)
+    return _BOARD_TO_AOT_PLATFORM.get(config.target.board, config.target.board)
+
+
 def _resolve_aot_platform(config: ProfileConfig) -> str:
     """Map the profiler's target board to a heliaAOT platform name.
 
@@ -165,6 +181,11 @@ _AOT_MEMORY_ALIASES: dict[str, Placement] = {
     "dram": Placement.SRAM,
     "itcm": Placement.TCM,
 }
+
+
+def placement_memory_type(placement: Placement) -> str:
+    """heliaAOT's lowercase memory type for a logical placement."""
+    return _PLACEMENT_TO_AOT_MEMTYPE[placement]
 
 
 def _resolve_aot_placement_intent(
@@ -307,14 +328,15 @@ def _run_aot_compiler(
     module_name: str,
     prefix: str,
     aot_platform: str,
+    aot_args: dict[str, Any] | None = None,
 ) -> Any:
     """Run heliaAOT via its Python API and return its ``ConversionResult``.
 
     The result's views describe the post-transform graph (operators, tensors,
     arena regions, placements) without parsing generated C.
 
-    ``ConvertArgs`` come from :func:`_merged_aot_args` plus the profiler's
-    tensor rulesets; the profiler's mandatory fields (model, module,
+    ``ConvertArgs`` come from *aot_args*, :func:`effective_aot_args` of the
+    config when not given; the profiler's mandatory fields (model, module,
     platform) override any values there.
     """
     try:
@@ -328,26 +350,8 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    aot_args = _merged_aot_args(config)
-
-    # Pin the three AIR tensor kinds (constant/persistent/scratch) onto the
-    # profiler's requested memories via wildcard attribute rulesets.  A
-    # user-supplied wildcard for a kind replaces the profiler's coarse rule;
-    # this is important for constants because the coarse rule may also carry a
-    # ``constant_destination_memory`` staging attribute.
-    profiler_rulesets = _resolve_aot_tensor_rulesets(
-        config, get_soc_for_board(config.target.board, registry=config.platform_registry)
-    )
-    mem, user_tensors = _prepare_aot_memory_config(aot_args)
-    merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
-    if merged_rulesets:
-        mem["tensors"] = merged_rulesets
-        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(merged_rulesets)
-        log.info(
-            "AOT tensor placement: scratch/persistent=%s, constant=%s",
-            scratch_memory,
-            constant_attributes,
-        )
+    if aot_args is None:
+        aot_args = effective_aot_args(config)
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
@@ -398,6 +402,189 @@ def _run_aot_compiler(
     return result
 
 
+def effective_aot_args(config: ProfileConfig) -> dict[str, Any]:
+    """The ``ConvertArgs`` data heliaAOT receives: the merged config with hpx's rulesets.
+
+    Pins the three AIR tensor kinds (constant/persistent/scratch) onto the
+    profiler's requested memories via wildcard attribute rulesets. A
+    user-supplied wildcard for a kind replaces the profiler's coarse rule;
+    this is important for constants because the coarse rule may also carry a
+    ``constant_destination_memory`` staging attribute. The fields the
+    profiler forces on the built ``ConvertArgs`` (model, module, platform)
+    are not in the mapping.
+    """
+    aot_args = _merged_aot_args(config)
+    profiler_rulesets = _resolve_aot_tensor_rulesets(
+        config, get_soc_for_board(config.target.board, registry=config.platform_registry)
+    )
+    mem, user_tensors = _prepare_aot_memory_config(aot_args)
+    merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
+    if merged_rulesets:
+        mem["tensors"] = merged_rulesets
+        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(merged_rulesets)
+        log.info(
+            "AOT tensor placement: scratch/persistent=%s, constant=%s",
+            scratch_memory,
+            constant_attributes,
+        )
+    return aot_args
+
+
+#: ConvertArgs fields that belong to one run or cannot change a cycle count.
+_RUN_ONLY_AOT_FIELDS: tuple[tuple[str, ...], ...] = (
+    ("path",),
+    ("model", "path"),
+    ("module", "path"),
+    ("log_file",),
+    ("verbose",),
+    ("keep_work_dir",),
+)
+#: The selectors of an ``operators[]`` rule; a rule that sets nothing else is a no-op.
+_RULE_SELECTORS = frozenset({"type", "id"})
+_AOT_ARGS_HINT = "Check engine.config_path and engine.config.aot_args."
+
+
+def without_knob_values(
+    aot_args: Mapping[str, Any],
+    *,
+    module_name: str | None = None,
+    prefix: str | None = None,
+    aot_platform: str | None = None,
+) -> dict[str, Any]:
+    """heliaAOT arguments as the compiler reads them, less knob values and run-only fields.
+
+    The mapping is validated by heliaAOT's own ``ConvertArgs`` and dumped in
+    full, so a default spelled out equals one left implicit, an empty
+    ``attributes`` equals none and a null ``optimization`` equals an absent
+    one. The knobs come from heliaAOT's own registry
+    (``helia_aot.optimization.KNOBS``), so a new knob needs no hpx edit: the
+    keys ``optimization.<knob>`` and ``operators[].optimization.<knob>`` are
+    removed, and an ``operators[]`` rule left setting nothing is dropped.
+    ``optimization.goal`` and ``allow_approximate`` stay: they steer what
+    ``auto`` resolves to and are not swept. The paths of one run (the model,
+    the module, the log file) and the verbosity switches are removed as
+    well. With the forced fields given, they are set as the compile step
+    sets them.
+
+    Raises:
+        EngineMissingError: when heliaAOT is not installed, with the install hint.
+        EngineError: when heliaAOT rejects the arguments (its own message and
+            the config hint), or when a value that stays is not a finite
+            number, naming the field.
+    """
+    try:
+        from helia_aot import ConvertArgs
+        from helia_aot.defines import ModuleType
+        from helia_aot.optimization import KNOBS
+    except ImportError as exc:
+        raise EngineMissingError(
+            "heliaAOT package not installed",
+            hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
+        ) from exc
+    try:
+        convert_args = ConvertArgs(**aot_args)
+    except Exception as exc:
+        raise EngineError(
+            f"Failed to build heliaAOT ConvertArgs: {exc}", hint=_AOT_ARGS_HINT
+        ) from exc
+    if module_name is not None:
+        convert_args.module.name = module_name
+    if prefix is not None:
+        convert_args.module.prefix = prefix
+    if aot_platform is not None:
+        convert_args.module.type = ModuleType("nsx")
+        convert_args.platform.name = aot_platform
+        convert_args.force = True
+        convert_args.result_views = True
+    data: dict[str, Any] = convert_args.model_dump(mode="json")
+    knobs = {spec.name for spec in KNOBS}
+    for path in _RUN_ONLY_AOT_FIELDS:
+        _remove(data, path)
+    optimization = data.get("optimization")
+    if isinstance(optimization, dict):
+        for name in knobs:
+            optimization.pop(name, None)
+        if not optimization:
+            del data["optimization"]
+    rules = data.get("operators")
+    if isinstance(rules, list):
+        kept: list[Any] = []
+        for rule in rules:
+            if isinstance(rule, dict):
+                overrides = rule.get("optimization")
+                if isinstance(overrides, dict):
+                    for name in knobs:
+                        overrides.pop(name, None)
+                if not any(
+                    value not in (None, {}, [])
+                    for key, value in rule.items()
+                    if key not in _RULE_SELECTORS
+                ):
+                    continue
+            kept.append(rule)
+        if kept:
+            data["operators"] = kept
+        else:
+            del data["operators"]
+    unfit = non_finite_field(data)
+    if unfit is not None:
+        raise EngineError(
+            f"heliaAOT argument {unfit} is not a finite number, which the record cannot hold.",
+            hint=_AOT_ARGS_HINT,
+        )
+    return data
+
+
+def non_finite_field(value: Any, prefix: str = "") -> str | None:
+    """The dotted name of the first NaN or infinity in *value*, else ``None``."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return prefix or "<root>"
+    if isinstance(value, dict):
+        for key, item in value.items():
+            found = non_finite_field(item, f"{prefix}.{key}" if prefix else str(key))
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for index, item in enumerate(value):
+            found = non_finite_field(item, f"{prefix}.{index}" if prefix else str(index))
+            if found is not None:
+                return found
+    return None
+
+
+def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
+    parent: Any = data
+    for key in path[:-1]:
+        parent = parent.get(key) if isinstance(parent, dict) else None
+    if isinstance(parent, dict):
+        parent.pop(path[-1], None)
+
+
+def effective_config_digest(
+    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+) -> tuple[str, tuple[str, ...]]:
+    """The sha256 of what the compiler received, less the knob values, and the keys it covers.
+
+    :func:`without_knob_values` validates the arguments with heliaAOT's
+    ``ConvertArgs``, sets the forced module and platform fields as the
+    compile step does, dumps the result in full and removes
+    ``optimization.<knob>`` and ``operators[].optimization.<knob>`` for every
+    knob heliaAOT registers, together with the run-only paths, so two
+    conversions that differ only in a knob value digest the same. The digest
+    is of the canonical JSON of the nested mapping (sorted keys, no NaN).
+
+    Raises:
+        EngineError: as :func:`without_knob_values` raises it.
+    """
+    data = without_knob_values(
+        aot_args, module_name=module_name, prefix=prefix, aot_platform=aot_platform
+    )
+    canonical = json.dumps(
+        data, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False
+    )
+    return hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(data))
+
+
 def _merge_aot_tensor_rulesets(
     profiler_rulesets: list[dict[str, Any]],
     user_tensors: list[Any],
@@ -408,14 +595,24 @@ def _merge_aot_tensor_rulesets(
     user rules (for example, a constant selected by ``id``) remain additive
     and override the matching wildcard in heliaAOT.
     """
-    wildcard_kinds = {
-        str(rule.get("type"))
-        for rule in user_tensors
-        if isinstance(rule, dict) and "type" in rule and "id" not in rule
-    }
+    wildcard_kinds = user_wildcard_kinds(user_tensors)
     return [rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds] + list(
         user_tensors
     )
+
+
+def user_wildcard_kinds(user_tensors: list[Any]) -> set[str]:
+    """The tensor kinds whose placement a user's type-only rule takes over from hpx.
+
+    Matches rules as heliaAOT's ``is_attribute_rule_match`` does: the type
+    compares ignoring case and ``id: null`` names no id. The kinds come back
+    lowercase, as hpx's own rules spell them.
+    """
+    return {
+        str(rule["type"]).casefold()
+        for rule in user_tensors
+        if isinstance(rule, dict) and isinstance(rule.get("type"), str) and rule.get("id") is None
+    }
 
 
 def _prepare_aot_memory_config(
