@@ -1,0 +1,24 @@
+{
+  "schema": "helia-profiler/runtime@1",
+  "name": "helia-rt",
+  "version": "2.5.0",
+  "default": true,
+  "source": {
+    "repo": "AmbiqAI/helia-rt",
+    "commit": "3d704a7151a1e663a0cc16db76fbf02bf54a7647"
+  },
+  "kernels": {
+    "repo": "AmbiqAI/ns-cmsis-nn",
+    "commit": "9f793bd9343b60e794f915b285bd7b7c4a885abe"
+  },
+  "archive": {
+    "sha256": "8b903a88e1efe9bff89d7a203ed18fd0910234dd204f5a4ca5c611b2f0fce695"
+  },
+  "precisions": {
+    "fp32": "supported",
+    "fp16": "supported",
+    "a8w8": "supported",
+    "a16w8": "supported"
+  },
+  "qualified": []
+}

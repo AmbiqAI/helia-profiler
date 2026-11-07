@@ -105,7 +105,7 @@ def test_a_helia_rt_plan_refuses_another_prepared_release(tmp_path):
     )
     assert build.runtime_source is not None and build.runtime_source.version == "2.2.0"
     with pytest.raises(
-        ConfigError, match="runtime version '2.2.0' differs from its plan's '2.2.2'"
+        ConfigError, match="runtime version '2.2.0' differs from its plan's '2.5.0'"
     ):
         compiled(plan, build, Lifecycle.CARRY).verify()
 

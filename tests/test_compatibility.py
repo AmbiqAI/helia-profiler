@@ -67,7 +67,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "ns-cmsis-nn": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "helia-rt": "7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0",
+        "helia-rt": "3d704a7151a1e663a0cc16db76fbf02bf54a7647",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
         # fixes and raw 40-bit accumulator reads power.driver: ina228
         # needs (issue #95).
@@ -82,7 +82,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
         "nsx-cmsis-nn": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
-        "nsx-helia-rt": "7fe6dfdb5f8187b7a5200d718e568ecc9ba9c0f0",
+        "nsx-helia-rt": "3d704a7151a1e663a0cc16db76fbf02bf54a7647",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
         "nsx-segger-rtt": "9b5fe942de1607365a19bab1b6ed549541ff71c6",
     }
