@@ -31,11 +31,12 @@ from helia_profiler.calibration import (
     read_calibration,
 )
 from helia_profiler.cli.app import app
-from helia_profiler.errors import CalibrationError, ReportError
+from helia_profiler.errors import CalibrationError, ConfigError, ReportError
 from helia_profiler.results import ResultValidity
 from helia_profiler.results.manifest import load_result_manifest
 from tests.calibration_bundles import (
     CONDITIONS,
+    PAIR_AOT_MEMORY,
     PLAN_OPERATORS,
     PLANS,
     SHA,
@@ -807,6 +808,9 @@ def test_a_knobless_model_calibrates(tmp_path: Path) -> None:
     }
     assert _CalibrationFile.model_validate(written).operators == {}
     assert calibrate([plain], output=output, merge=True) == table
+    result = CliRunner().invoke(app, ["calibrate", str(plain), "-o", str(tmp_path / "cli.json")])
+    assert result.exit_code == 0, result.output
+    assert "(0 operators, 0 prices; 3 operators timed, 3 timings)" in result.output
     # Only a table with no operator timed at all has nothing to price.
     source = dataclasses.replace(read_bundle(plain), samples=())
     with pytest.raises(CalibrationError, match="No operator in the bundles was timed"):
@@ -928,7 +932,7 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     result = runner.invoke(app, ["calibrate", str(auto), str(wide), "--output", str(output)])
 
     assert result.exit_code == 0, result.output
-    assert "2 operators, 4 prices" in result.output
+    assert "(2 operators, 4 prices; 3 operators timed, 4 timings)" in result.output
     _check_expected(json.loads(output.read_text(encoding="utf-8")))
 
     strict = runner.invoke(
@@ -953,6 +957,8 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     assert "operator_cycles[<id>]" in help_text and "pairing_digest" in help_text
     assert "within --tolerance or within 8 cycles" in help_text
     assert "--tolerance 0 is exact for prices but leaves the 8-cycle floor" in help_text
+    assert "with memory.allocate_arenas: false" in help_text
+    assert "contributes no timings, which are not rebuilt from its prices" in help_text
     assert "kws-sram" not in help_text
 
 
@@ -1287,7 +1293,7 @@ def test_a_rule_with_attributes_digests_the_same_whatever_it_says_of_knobs(tmp_p
     assert _digest(ruled) == _digest(silent)
 
 
-# -- operator_cycles and the pairing digest (#648, amendment 2) --
+# -- operator_cycles and the pairing digest --
 
 EXPECTED_OPERATOR_CYCLES = {
     "0:conv": [
@@ -1299,8 +1305,8 @@ EXPECTED_OPERATOR_CYCLES = {
 }
 
 
-def _as_b1_file(path: Path) -> Path:
-    """The file as the release before operator_cycles and the pairing digest wrote it."""
+def _without_new_keys(path: Path) -> Path:
+    """The file without operator_cycles and the pairing digest, as an earlier hpx wrote it."""
     data = json.loads(path.read_text(encoding="utf-8"))
     del data["operator_cycles"]
     del data["capture"]["setup"]["pairing_digest"]
@@ -1337,11 +1343,11 @@ def test_a_knob_sweep_times_the_swept_operator_once_per_vector(tmp_path: Path) -
     assert reverse["operator_cycles"]["0:softmax"] == [{"knobs": {}, "cycles": 405.0}]
 
 
-def test_a_b1_era_file_reads_and_merges(tmp_path: Path) -> None:
+def test_a_file_without_operator_cycles_reads_and_merges(tmp_path: Path) -> None:
     auto, wide = two_bundles(tmp_path)
     output = tmp_path / "kws.json"
     calibrate([auto], output=output)
-    _as_b1_file(output)
+    _without_new_keys(output)
 
     old = read_calibration(output)
     assert old.operator_cycles == {}
@@ -1362,10 +1368,33 @@ def test_a_b1_era_file_reads_and_merges(tmp_path: Path) -> None:
     _CalibrationFile.model_validate(written)
 
 
+def test_a_file_without_operator_cycles_contributes_no_timings(tmp_path: Path) -> None:
+    """Its prices are not turned into timings: only the merged bundles' timings are written."""
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    _without_new_keys(output)
+
+    table = calibrate([wide], output=output, merge=True)
+
+    precise = (("accumulation", "precise"),)
+    assert table.prices[("0:conv", "accumulation", "precise")].cycles == 12000.0
+    assert ("0:conv", precise) not in table.operator_cycles
+    # The fc vector is priced from the file (3000) but timed from the bundle (3030).
+    fc = (("accumulation", "precise"), ("kernel", "specialized"))
+    assert table.prices[("0:fc", "accumulation", "precise")].cycles == 3000.0
+    assert table.operator_cycles[("0:fc", fc)] == 3030.0
+    assert set(table.operator_cycles) == {
+        ("0:conv", (("accumulation", "fast"),)),
+        ("0:fc", fc),
+        ("0:softmax", ()),
+    }
+
+
 def test_the_pairing_field_leaves_the_ordinary_digest_unchanged(tmp_path: Path) -> None:
-    recorded = read_bundle(bundle(tmp_path / "b2", cycles={0: 1.0, 1: 1.0, 2: 1.0}))
+    recorded = read_bundle(bundle(tmp_path / "recorded", cycles={0: 1.0, 1: 1.0, 2: 1.0}))
     older = read_bundle(
-        bundle(tmp_path / "b1", cycles={0: 1.0, 1: 1.0, 2: 1.0}, effective_config_pairing=None)
+        bundle(tmp_path / "older", cycles={0: 1.0, 1: 1.0, 2: 1.0}, effective_config_pairing=None)
     )
     assert recorded.setup.digest == older.setup.digest
     assert recorded.setup.fields == older.setup.fields
@@ -1427,10 +1456,16 @@ def _timed(path: Path, conv: float, softmax: float) -> Path:
 def test_an_operator_timing_is_held_to_the_tolerance_or_8_cycles(tmp_path: Path) -> None:
     base = _timed(tmp_path / "base", 12000.0, 100.0)
     near = _timed(tmp_path / "near", 12000.0, 107.0)
+    edge = _timed(tmp_path / "edge", 12000.0, 108.0)
     far = _timed(tmp_path / "far", 12000.0, 109.0)
 
     table = calibrate([base, near], output=tmp_path / "near.json")
     assert table.operator_cycles[("0:softmax", ())] == 100.0
+    # Exactly 8 cycles apart is within the floor.
+    assert (
+        calibrate([base, edge], output=tmp_path / "edge.json").operator_cycles[("0:softmax", ())]
+        == 100.0
+    )
     with pytest.raises(
         CalibrationError,
         match=r"0:softmax with the knobs at \{\} takes 100 cycles in .*base but 109 in .*far "
@@ -1529,6 +1564,9 @@ def test_a_synthetic_pair_shares_the_pairing_digest_but_not_the_setup(
     tmp_path: Path, slow_memory: str
 ) -> None:
     slow, fast = pair(tmp_path, slow_memory)
+    # Both are settings hpx's preflight accepts, PSRAM weights included.
+    for capture in (slow, fast):
+        _preflight_recorded(tmp_path, capture)
     slow_setup, fast_setup = read_bundle(slow).setup, read_bundle(fast).setup
 
     assert slow_setup.pairing_digest is not None
@@ -1613,11 +1651,59 @@ def test_without_constant_placement_keeps_whatever_else_a_rule_sets() -> None:
     }
 
 
-def _placed(tmp_path: Path, name: str, weights_location: str, text: str = "{}\n"):
-    (tmp_path / name).mkdir()
-    config = _aot_config(tmp_path / name, name, text)
-    return dataclasses.replace(
-        config, model=dataclasses.replace(config.model, weights_location=weights_location)
+def test_a_constant_rule_heliaaot_refuses_is_refused_by_both_digests() -> None:
+    from helia_profiler.engines.helia_aot.compile import (
+        effective_config_digest,
+        effective_config_pairing_digest,
+        without_constant_placement,
+    )
+    from helia_profiler.errors import EngineError
+
+    odd = _tensors({"type": "constant", "attributes": "zz"})
+    assert without_constant_placement(odd) == odd
+    names = {"module_name": "m", "prefix": "p", "aot_platform": "x"}
+    with pytest.raises(EngineError, match="Failed to build heliaAOT ConvertArgs") as ordinary:
+        effective_config_digest(odd, **names)
+    with pytest.raises(EngineError, match="Failed to build heliaAOT ConvertArgs") as pairing:
+        effective_config_pairing_digest(odd, **names)
+    assert str(pairing.value) == str(ordinary.value)
+    assert pairing.value.hint == ordinary.value.hint
+
+
+def _capture(tmp_path: Path, name: str, weights_location: str, aot_args: dict[str, Any]):
+    """A profile config as a capture runs it: one weights memory, inline heliaAOT arguments."""
+    from helia_profiler.config import load_config
+
+    model = tmp_path / f"{name}.tflite"
+    model.write_bytes(b"\x00")
+    return load_config(
+        None,
+        {
+            "model": {"path": str(model), "weights_location": weights_location},
+            "engine": {"type": "helia-aot", "config": {"aot_args": aot_args}},
+            "target": {"board": "apollo510_evb"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+
+
+def _preflight(config) -> None:
+    """hpx's preflight check of a heliaAOT placement; raises ConfigError on a refused one."""
+    from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+
+    HeliaAOTAdapter().check_psram_placement(config)
+
+
+def _preflight_recorded(tmp_path: Path, bundle_path: Path) -> None:
+    """Preflight the settings a synthetic bundle records, as if a capture ran them."""
+    recorded = json.loads((bundle_path / "run_metadata.json").read_text(encoding="utf-8"))["config"]
+    _preflight(
+        _capture(
+            tmp_path,
+            f"preflight-{bundle_path.parent.name}-{bundle_path.name}",
+            recorded["model"]["weights_location"],
+            recorded["engine"]["config"]["aot_args"],
+        )
     )
 
 
@@ -1637,32 +1723,71 @@ def _pairing(config) -> str:
 
 def test_the_compiler_configuration_pairs_across_the_weights_memory(tmp_path: Path) -> None:
     """hpx's own constant rule follows weights_location; the pairing digest drops it."""
-    from helia_profiler.placement import Placement
-
+    external = {"memory": dict(PAIR_AOT_MEMORY)}
     tcm, mram, psram = (
-        _placed(tmp_path, name, placement)
-        for name, placement in (
-            ("tcm", Placement.TCM),
-            ("mram", Placement.MRAM),
-            ("psram", Placement.PSRAM),
-        )
+        _capture(tmp_path, name, name, external) for name in ("tcm", "mram", "psram")
     )
+    for config in (tcm, mram, psram):
+        _preflight(config)
     assert len({_digest(config)[0] for config in (tcm, mram, psram)}) == 3
     assert _pairing(tcm) == _pairing(mram) == _pairing(psram)
-    scratch = _placed(
+    scratch = _capture(
         tmp_path,
         "scratch",
-        Placement.TCM,
-        "memory:\n  tensors:\n    - type: scratch\n      attributes: {memory: sram}\n",
+        "tcm",
+        {
+            "memory": {
+                **PAIR_AOT_MEMORY,
+                "tensors": [{"type": "scratch", "attributes": {"memory": "sram"}}],
+            }
+        },
     )
     assert _pairing(scratch) != _pairing(tcm)
-    constrained = _placed(
+    constrained = _capture(
         tmp_path,
         "constrained",
-        Placement.TCM,
-        "memory:\n  constraints:\n    - {name: dtcm, max_size: 65536}\n",
+        "tcm",
+        {"memory": {**PAIR_AOT_MEMORY, "constraints": [{"name": "dtcm", "max_size": 65536}]}},
     )
     assert _pairing(constrained) != _pairing(tcm)
+
+
+def test_a_default_tcm_capture_does_not_pair_with_an_accepted_psram_one(tmp_path: Path) -> None:
+    """hpx accepts PSRAM weights only with allocate_arenas false, and that setting is held."""
+    external = {"memory": dict(PAIR_AOT_MEMORY)}
+    default_tcm = _capture(tmp_path, "default-tcm", "tcm", {})
+    external_tcm = _capture(tmp_path, "external-tcm", "tcm", external)
+    psram = _capture(tmp_path, "psram", "psram", external)
+    for config in (default_tcm, external_tcm, psram):
+        _preflight(config)
+    with pytest.raises(ConfigError, match="requires external-arena mode"):
+        _preflight(_capture(tmp_path, "default-psram", "psram", {}))
+    assert _pairing(default_tcm) != _pairing(psram)
+    assert _pairing(external_tcm) == _pairing(psram)
+
+    # And the bundles those captures write pair the same way.
+    def captured(name: str, config, aot_memory: dict[str, Any] | None) -> Setup:
+        memory = str(config.model.weights_location.value)
+        conditions = {**CONDITIONS, "weights_memory": "dtcm" if memory == "tcm" else memory}
+        if memory == "psram":
+            conditions["external_memory_clock"] = 48
+        return read_bundle(
+            bundle(
+                tmp_path / name,
+                cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+                conditions=conditions,
+                weights_location=memory,
+                aot_memory=aot_memory,
+                effective_config=_digest(config)[0],
+                effective_config_pairing=_pairing(config),
+            )
+        ).setup
+
+    slow = captured("psram-bundle", psram, PAIR_AOT_MEMORY)
+    assert captured("default-tcm-bundle", default_tcm, None).pairing_digest != slow.pairing_digest
+    assert captured("external-tcm-bundle", external_tcm, PAIR_AOT_MEMORY).pairing_digest == (
+        slow.pairing_digest
+    )
 
 
 def test_every_helia_aot_bundle_records_the_pairing_configuration(

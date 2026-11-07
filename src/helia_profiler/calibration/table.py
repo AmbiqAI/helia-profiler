@@ -44,16 +44,20 @@ knob registry the stripping depends on; captures compiled by different
 releases do not merge. Reading a bundle needs heliaAOT installed.
 
 Beside the digest the file records a pairing digest, ``pairing_digest`` with
-its ``pairing_fields``: the same basis less where the constants sit, so a
-capture with the weights in MRAM or PSRAM and one with them in TCM share it
-while their setups differ. It leaves out ``config.model.weights_location``,
-every ``memory.tensors[]`` rule of the constants that sets nothing but their
+its ``pairing_fields``: the same basis less where the constants sit, so
+captures that differ only in where the weights sit share it while their
+setups differ. It leaves out ``config.model.weights_location``, every
+``memory.tensors[]`` rule of the constants that sets nothing but their
 placement (and those attributes of one that sets more), and holds
 ``engine.effective_config_pairing_sha256``, the compiler's configuration less
 the same rules, in place of ``engine.effective_config_sha256``. The arena,
-the PSRAM clock and the pool constraints stay held. A bundle that does not
-record the pairing configuration, and a merge whose sources do not all share
-one pairing digest, write ``null`` for both.
+the PSRAM clock, the pool constraints and ``memory.allocate_arenas`` stay
+held. hpx accepts PSRAM weights only with ``memory.allocate_arenas: false``,
+so a pair that includes a PSRAM capture shares the digest only when every
+capture of the pair runs with ``allocate_arenas: false``; a default TCM or
+MRAM capture does not pair with a PSRAM one. A bundle that does not record
+the pairing configuration, and a merge whose sources do not all share one
+pairing digest, write ``null`` for both.
 
 Everything that would make a price mean something else is an error, never a
 silent skip: another model, other conditions, another setup, a run whose
@@ -557,8 +561,9 @@ def merge_sources(
     one operator under one knob vector must agree within *tolerance* of the
     larger or within 8 cycles, whichever is looser, and the first source's
     value is the one kept; different vectors of one operator are kept side
-    by side. The pairing digest is written only when every source carries
-    the same one.
+    by side. A file written before ``operator_cycles`` contributes no
+    timings; they are not rebuilt from its prices. The pairing digest is
+    written only when every source carries the same one.
 
     Raises:
         CalibrationError: on no source, another model, other conditions,

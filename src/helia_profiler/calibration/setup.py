@@ -5,6 +5,9 @@ them; :func:`_setup` builds it and :func:`_require_same_setup` refuses two
 sources whose setups differ, naming what differs when it can. Beside it,
 the pairing digest covers the same basis less where the constants sit, so
 captures that differ only in the weights memory share it.
+``memory.allocate_arenas`` stays held: PSRAM weights need it false, so a
+pair that includes PSRAM pairs only when every capture of it runs with
+``allocate_arenas: false``.
 """
 
 from __future__ import annotations

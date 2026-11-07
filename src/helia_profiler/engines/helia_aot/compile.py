@@ -605,8 +605,10 @@ def without_constant_placement(aot_args: Mapping[str, Any]) -> dict[str, Any]:
     and whose ``attributes`` hold nothing but ``memory``,
     ``constant_destination_memory`` and ``residency`` is removed; a constant
     rule that sets other attributes keeps them and loses only those three.
-    ``scratch`` and ``persistent`` rules are untouched. Two runs that differ
-    only in where the weights sit therefore give the same arguments.
+    ``scratch`` and ``persistent`` rules are untouched, as is a rule whose
+    ``attributes`` is not a mapping, so heliaAOT's ``ConvertArgs`` refuses it
+    as it does for the ordinary digest. Two runs that differ only in where
+    the weights sit therefore give the same arguments.
     """
     data = copy.deepcopy(dict(aot_args))
     memory = data.get("memory")
@@ -619,10 +621,13 @@ def without_constant_placement(aot_args: Mapping[str, Any]) -> dict[str, Any]:
         if not (isinstance(kind, str) and kind.casefold() == _CONSTANT_KIND):
             kept.append(rule)
             continue
-        attributes = rule.get("attributes")
+        attributes = rule.get("attributes", {})
+        if not isinstance(attributes, dict):
+            kept.append(rule)
+            continue
         rest = {
             key: value
-            for key, value in (attributes if isinstance(attributes, dict) else {}).items()
+            for key, value in attributes.items()
             if key not in _CONSTANT_PLACEMENT_ATTRIBUTES
         }
         if rest:

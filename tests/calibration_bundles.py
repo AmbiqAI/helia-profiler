@@ -48,7 +48,9 @@ PLAN_OPERATORS = [
 PLANS = Path(__file__).parent / "fixtures" / "calibration"
 
 
-def _aot_args(knob_values: dict[str, str] | None) -> dict[str, Any]:
+def _aot_args(
+    knob_values: dict[str, str] | None, memory: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """heliaAOT arguments in the shape its ConvertArgs accepts, knob values included.
 
     Validated by ConvertArgs wherever the aot extra is installed; a test
@@ -58,6 +60,8 @@ def _aot_args(knob_values: dict[str, str] | None) -> dict[str, Any]:
         "optimization": {"goal": "balanced", **(knob_values or {})},
         "operators": [{"type": "conv_2d", "optimization": dict(knob_values or {})}],
     }
+    if memory is not None:
+        args["memory"] = dict(memory)
     try:
         from helia_aot.cli.defines import ConvertArgs
     except ImportError:
@@ -94,6 +98,7 @@ def bundle(
     link_family: str = "gnu",
     arena_location: str | None = None,
     knob_values: dict[str, str] | None = None,
+    aot_memory: dict[str, Any] | None = None,
     jlink_serial: str = "1160002204",
     flags: str = "-mcpu=cortex-m55",
     kernel_commit: str | None = "c" * 40,
@@ -140,7 +145,7 @@ def bundle(
                 "type": "helia-aot",
                 "backend": backend,
                 "config_path": None,
-                "config": {"aot_args": _aot_args(knob_values)},
+                "config": {"aot_args": _aot_args(knob_values, aot_memory)},
             },
             "target": {
                 "board": "apollo510_evb",
@@ -258,13 +263,19 @@ def two_bundles(tmp_path: Path) -> tuple[Path, Path]:
     return auto, wide
 
 
+#: The heliaAOT memory arguments of every capture of a pair: hpx accepts
+#: PSRAM weights only in external-arena mode, and the setting is held.
+PAIR_AOT_MEMORY: dict[str, Any] = {"allocate_arenas": False}
+
+
 def pair(tmp_path: Path, slow_memory: str) -> tuple[Path, Path]:
     """A capture with the weights in *slow_memory* (``mram`` or ``psram``) and one in TCM.
 
-    Everything else is held, as one operator session records it: the
-    compiler's configuration differs only in the constants' placement rule
-    hpx derives from ``weights_location``, so its pairing digest is shared,
-    and the PSRAM clock is recorded only by the run that used PSRAM.
+    Everything else is held, as one operator session records it: both run
+    with :data:`PAIR_AOT_MEMORY`, the compiler's configuration differs only
+    in the constants' placement rule hpx derives from ``weights_location``,
+    so its pairing digest is shared, and the PSRAM clock is recorded only by
+    the run that used PSRAM.
     """
     slow_conditions: dict[str, Any] = {**CONDITIONS, "weights_memory": slow_memory}
     if slow_memory == "psram":
@@ -274,12 +285,14 @@ def pair(tmp_path: Path, slow_memory: str) -> tuple[Path, Path]:
         cycles={0: 15000.0, 1: 3600.0, 2: 400.0},
         conditions=slow_conditions,
         weights_location=slow_memory,
+        aot_memory=PAIR_AOT_MEMORY,
         effective_config=hashlib.sha256(f"constants in {slow_memory}".encode()).hexdigest(),
     )
     fast = bundle(
         tmp_path / f"{slow_memory}-pair" / "tcm",
         cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
         weights_location="tcm",
+        aot_memory=PAIR_AOT_MEMORY,
         effective_config=hashlib.sha256(b"constants staged in dtcm").hexdigest(),
     )
     return slow, fast

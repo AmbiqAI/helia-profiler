@@ -1,9 +1,14 @@
 """The pairing digest on real captures: one KWS session with the weights in MRAM, PSRAM and TCM.
 
-The three result bundles come from one board session and are committed under
-``tests/fixtures/calibration/pairs/<weights_location>/``; until they are, the
-real-data test skips and the synthetic pairs in ``test_calibrate.py`` are the
-check. Reading a bundle needs heliaAOT, as ``test_calibrate.py`` does.
+Capture recipe: three ``hpx profile --engine helia-aot`` runs of one KWS model
+in one board session, identical but for ``model.weights_location`` (``mram``,
+``psram``, ``tcm``), every one of them with
+``engine.config.aot_args.memory.allocate_arenas: false``. hpx accepts PSRAM
+weights only in that mode, and the setting is held by the pairing digest, so
+a TCM or MRAM capture left at the default does not pair with the PSRAM one.
+Each bundle goes under ``tests/fixtures/calibration/pairs/<weights_location>/``;
+the real-data test skips while any is missing. Reading a bundle needs
+heliaAOT, as ``test_calibrate.py`` does.
 """
 
 from __future__ import annotations
@@ -28,7 +33,7 @@ def _committed() -> bool:
 
 
 def _pairs(slow: dict[str, Any], fast: dict[str, Any]) -> bool:
-    """heliaOptimus's P7, on two calibration files: a slow one and a fast ``dtcm`` one.
+    """heliaOptimus's pairing check (``pricing._check_pair``), on a slow and a fast ``dtcm`` file.
 
     The pairing digests are equal and not null, and the conditions are equal
     in every field but ``weights_memory``, and but ``external_memory_clock``
