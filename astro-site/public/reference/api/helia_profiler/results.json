@@ -803,7 +803,7 @@
               "summary": ""
             },
             {
-              "description": "The core clock, measured on the device when the firmware\nreported one, otherwise the configured clock.",
+              "description": "The configured core clock. The on-device measurement\njitters from run to run and stays in ``firmware.measured_clock_hz``.",
               "examples": [],
               "id": "helia_profiler.Conditions.cpu_hz",
               "kind": "attribute",

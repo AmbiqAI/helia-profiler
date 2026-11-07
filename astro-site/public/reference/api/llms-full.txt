@@ -11110,8 +11110,8 @@ Source: `src/helia_profiler/results/models.py:219`
 cpu_hz: int | None = None
 ```
 
-The core clock, measured on the device when the firmware
-reported one, otherwise the configured clock.
+The configured core clock. The on-device measurement
+jitters from run to run and stays in ``firmware.measured_clock_hz``.
 
 Source: `src/helia_profiler/results/models.py:220`
 

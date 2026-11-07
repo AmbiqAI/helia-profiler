@@ -10,7 +10,7 @@ hpx calibrate [OPTIONS] BUNDLES
 
 Write a heliaOptimus calibration file from helia-aot result bundles
 
-Defined in `src/helia_profiler/cli/calibrate_app.py` line 38.
+Defined in `src/helia_profiler/cli/calibrate_app.py` line 42.
 
 ### Arguments
 
@@ -33,9 +33,9 @@ Examples:
 
   hpx calibrate results/kws-auto results/kws-mve --output kws-calibration.json
 
-  hpx calibrate results/kws-sram --output kws-calibration.json --merge
+  hpx calibrate results/kws-int16 --output kws-calibration.json --merge
 
-Each bundle contributes the cycles of every operator its plan lists with knobs, as operators[<id>][<knob>][<value>]; an operator without knobs has no slot in the file and is left out. Every bundle must profile the same model under the same recorded conditions, with no overflowed layer, and two bundles pricing one value must agree within --tolerance; anything else is an error.
+Each bundle contributes the cycles of every operator its plan lists with knobs, as operators[<id>][<knob>][<value>]; an operator without knobs has no slot in the file and is left out. Every bundle must profile the same model under the same recorded conditions and capture setup (toolchain, engine and kernel versions, arena memory), be a valid run with no overflowed layer, sweep at most one knob per operator, and two bundles pricing one value must agree within --tolerance; anything else is an error. heliaOptimus matches the file when the planner passes the same conditions, including application_load=none and, with PSRAM, external_memory_clock.
 ```
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.
