@@ -154,7 +154,8 @@ The identity's `build_hash`, `observation_hash` and `intent_hash` become semanti
 ### Version 20
 
 Adds `conditions`, the board conditions the measurements refer to: `target` (heliaAOT's
-name for the board), `cpu_hz` (measured when the firmware reported it, else configured),
+name for the board), `cpu_hz` (the configured core clock; the on-device measurement stays in
+`run_metadata.json`'s `firmware.measured_clock_hz`),
 `weights_memory` (where hpx placed the constants, `null` when hpx set no rule),
 `weights_cache`, `external_memory_clock` (MHz, present only when the run used PSRAM) and
 `application_load`. `run_metadata.json` carries the same block. `weights_memory`,

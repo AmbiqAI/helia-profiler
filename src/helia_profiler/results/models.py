@@ -201,8 +201,8 @@ class Conditions:
 
     Attributes:
         target: heliaAOT's canonical name for the board profiled.
-        cpu_hz: The core clock, measured on the device when the firmware
-            reported one, otherwise the configured clock.
+        cpu_hz: The configured core clock. The on-device measurement
+            jitters from run to run and stays in ``firmware.measured_clock_hz``.
         weights_memory: The memory hpx placed the model's constants in, as a
             lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
             ``psram``); ``None`` when hpx set no placement rule for them.

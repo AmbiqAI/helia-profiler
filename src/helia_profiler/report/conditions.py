@@ -22,10 +22,11 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
     """The conditions *ctx* measured under, from its frozen config and capture."""
     meta = ctx.captured_pmu.meta
     platform = ctx.run_metadata.platform
+    # The configured clock, a setting two runs can share. The on-device
+    # measurement jitters from run to run and stays where the results report
+    # it: firmware.measured_clock_hz.
     cpu_hz: int | None = None
-    if meta.measured_clock_hz:
-        cpu_hz = meta.measured_clock_hz
-    elif platform is not None and platform.cpu_clock_mhz > 0:
+    if platform is not None and platform.cpu_clock_mhz > 0:
         cpu_hz = platform.cpu_clock_mhz * 1_000_000
     elif meta.system_clock_hz:
         cpu_hz = meta.system_clock_hz

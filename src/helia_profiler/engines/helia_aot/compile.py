@@ -433,11 +433,16 @@ def _merge_aot_tensor_rulesets(
 
 
 def user_wildcard_kinds(user_tensors: list[Any]) -> set[str]:
-    """The tensor kinds whose placement a user's type-only rule takes over from hpx."""
+    """The tensor kinds whose placement a user's type-only rule takes over from hpx.
+
+    Matches rules as heliaAOT's ``is_attribute_rule_match`` does: the type
+    compares ignoring case and ``id: null`` names no id. The kinds come back
+    lowercase, as hpx's own rules spell them.
+    """
     return {
-        str(rule.get("type"))
+        str(rule["type"]).casefold()
         for rule in user_tensors
-        if isinstance(rule, dict) and "type" in rule and "id" not in rule
+        if isinstance(rule, dict) and isinstance(rule.get("type"), str) and rule.get("id") is None
     }
 
 

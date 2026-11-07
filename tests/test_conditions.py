@@ -54,7 +54,7 @@ def test_conditions_come_from_the_config_and_the_capture(tmp_path: Path) -> None
 
     assert conditions == Conditions(
         target="apollo510_evb",
-        cpu_hz=249_600_000,
+        cpu_hz=ctx_platform_mhz(ctx) * 1_000_000,
         weights_memory="mram",
         weights_cache="on",
         external_memory_clock=None,
@@ -62,12 +62,11 @@ def test_conditions_come_from_the_config_and_the_capture(tmp_path: Path) -> None
     )
 
 
-def test_configured_clock_stands_in_for_an_unreported_measurement(tmp_path: Path) -> None:
-    assert ctx_platform_mhz(_ctx(tmp_path)) > 0
-    assert run_conditions(_ctx(tmp_path)).cpu_hz == ctx_platform_mhz(_ctx(tmp_path)) * 1_000_000
-    assert run_conditions(_ctx(tmp_path, measured_clock_hz=0)).cpu_hz == (
-        ctx_platform_mhz(_ctx(tmp_path)) * 1_000_000
-    )
+def test_cpu_hz_is_the_configured_clock_whatever_the_device_measured(tmp_path: Path) -> None:
+    configured = ctx_platform_mhz(_ctx(tmp_path)) * 1_000_000
+    assert configured > 0
+    for measured in (None, 0, 96_338_160, 96_240_576):
+        assert run_conditions(_ctx(tmp_path, measured_clock_hz=measured)).cpu_hz == configured
 
 
 def ctx_platform_mhz(ctx) -> int:
@@ -127,9 +126,15 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     assert run_conditions(ctx).target == "x"
     assert run_conditions(ctx).weights_memory == "mram"
 
-    intent = {"tensors": [{"type": "constant", "attributes": {"memory": "sram"}}]}
-    ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(intent))
-    assert run_conditions(ctx).weights_memory is None
+    # The three spellings heliaAOT matches as a type-only constant rule.
+    for rule in (
+        {"type": "constant", "attributes": {"memory": "sram"}},
+        {"type": "CONSTANT", "attributes": {"memory": "sram"}},
+        {"type": "constant", "id": None, "attributes": {"memory": "sram"}},
+    ):
+        intent = {"tensors": [rule]}
+        ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(intent))
+        assert run_conditions(ctx).weights_memory is None, rule
 
     specific = {"tensors": [{"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}}]}
     ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(specific))
@@ -163,7 +168,7 @@ def test_every_artifact_records_the_same_conditions(tmp_path: Path) -> None:
 
     expected = {
         "target": "apollo510_evb",
-        "cpu_hz": 249_600_000,
+        "cpu_hz": ctx_platform_mhz(ctx) * 1_000_000,
         "weights_memory": "mram",
         "weights_cache": "on",
         "application_load": "none",
@@ -283,3 +288,32 @@ def test_every_recorded_condition_but_the_clock_is_a_dimension(tmp_path: Path) -
         "dimension.application_load_differs",
     ]
     assert assessment.run_metrics_comparable
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        {"type": "constant", "attributes": {"memory": "sram"}},
+        {"type": "CONSTANT", "attributes": {"memory": "sram"}},
+        {"type": "constant", "id": None, "attributes": {"memory": "sram"}},
+        {"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}},
+        {"type": "constant", "id": ["0:w"], "attributes": {"memory": "sram"}},
+        {"type": "scratch", "attributes": {"memory": "sram"}},
+    ],
+)
+def test_the_wildcard_rule_matches_as_heliaaot_matches(rule: dict) -> None:
+    """hpx drops its constant rule exactly when heliaAOT would let the user's rule win it."""
+    from helia_profiler.engines.helia_aot.compile import (
+        _merge_aot_tensor_rulesets,
+        user_wildcard_kinds,
+    )
+
+    attributes = pytest.importorskip("helia_aot.attributes.attributes")
+    defines = pytest.importorskip("helia_aot.attributes.defines")
+    hpx_rule = {"type": "constant", "attributes": {"memory": "dtcm"}}
+    merged = [defines.AttributeRuleset(**r) for r in _merge_aot_tensor_rulesets([hpx_rule], [rule])]
+    # heliaAOT picks the user's rule for an unnamed constant exactly when the rule is a
+    # type-only match; hpx must record no weights memory in exactly that case.
+    winner = attributes.winning_rule_index(merged, "constant", "t0", "memory")
+    user_wins_everywhere = merged[winner].attributes["memory"] == "sram" and rule.get("id") is None
+    assert ("constant" in user_wildcard_kinds([rule])) == user_wins_everywhere

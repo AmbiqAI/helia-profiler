@@ -428,9 +428,8 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
     # placement intent above them: a weights-in-DTCM against weights-in-MRAM
     # comparison is one someone ran on purpose. Each hint says what a
     # difference does to the cycle counts, which the generic "dimension
-    # differs" line cannot. Absent on artifacts predating schema v20 -- the
-    # comparator's None-skip rule applies. The core clock already takes part
-    # as CPU_CLOCK and SYSTEM_CLOCK_HZ.
+    # differs" line cannot. The core clock already takes part as CPU_CLOCK
+    # and SYSTEM_CLOCK_HZ.
     DimensionSpec(
         ComparisonDimension.WEIGHTS_MEMORY,
         DimensionEffect.INFORMATIVE,
