@@ -347,7 +347,7 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
 
     shown = runner.invoke(app, ["runtimes", "show", "helia-rt"])
     assert shown.exit_code == 0, shown.output
-    assert json.loads(shown.output)["version"] == "2.2.2"
+    assert json.loads(shown.output)["version"] == "2.5.0"
 
     missing = runner.invoke(app, ["runtimes", "show", "helia-rt", "9.9.9"])
     assert missing.exit_code == 1

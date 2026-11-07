@@ -217,6 +217,14 @@ def _stage_helia_rt(
     library = _library_name(_core_tag(FIXTURE_BOARD), _toolchain_tag("atfe"), _HELIA_RT_VARIANT)
     archive = staging / "runtime.a"
     shutil.copyfile(dist / "lib" / library, archive)
+    defines = list(_HELIA_RT_DEFINES)
+    compatibility = include / "tensorflow/lite/micro/compatibility.h"
+    if compatibility.is_file() and "TFLM_REMOVE_VIRTUAL_DELETE" in compatibility.read_text(
+        encoding="utf-8"
+    ):
+        # Consumers must match the archive's virtual class declarations.
+        # https://github.com/AmbiqAI/helia-rt/blob/main/cmake/helia_rt_sources.cmake
+        defines.append("TFLM_REMOVE_VIRTUAL_DELETE")
     manifest = {
         "schema_version": 2,
         "stack": "helia-rt",
@@ -232,7 +240,7 @@ def _stage_helia_rt(
             },
         },
         "abi": _ABI,
-        "build": {"consumer_defines": list(_HELIA_RT_DEFINES), "kernel_dir": "helia"},
+        "build": {"consumer_defines": defines, "kernel_dir": "helia"},
         "headers": headers,
         "include_dirs": [
             name

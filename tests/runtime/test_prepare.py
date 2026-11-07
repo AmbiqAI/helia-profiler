@@ -26,17 +26,17 @@ from helia_profiler.runtime import prepare as prepared_runtimes
 from helia_profiler.runtime.prepare import prepare_runtime, prepared_directory, prepared_runtime
 from helia_profiler.runtime.records import runtime
 
-_RECORD = runtime("helia-rt")
+_RECORD = runtime("helia-rt", "2.2.2")
 assert _RECORD is not None
 RECORD = _RECORD
 ARCHIVE = b"!<arch>\nhelia-rt-member"
 
 
-def _dist(root: Path, *, commit: str = "7fe6dfd") -> Path:
+def _dist(root: Path, *, commit: str = "7fe6dfd", version: str = RECORD.version) -> Path:
     (root / "lib").mkdir(parents=True)
     (root / "lib" / "libhelia-rt-cm55-atfe-release-with-logs.a").write_bytes(ARCHIVE)
     (root / "lib" / "libhelia-rt-cm55-atfe-release.a").write_bytes(b"!<arch>\nother")
-    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v2.2.2\nCommit: {commit}\n")
+    (root / "MANIFEST.txt").write_text(f"helia-rt helia-rt-v{version}\nCommit: {commit}\n")
     for include in prepared_runtimes._HELIA_RT_INCLUDE_DIRS[1:]:
         (root / include).mkdir(parents=True, exist_ok=True)
         (root / include / "api.h").write_text(f"// {include}\n")
@@ -61,7 +61,7 @@ def cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert RECORD.kernels is not None
-    prepared = prepare_runtime("helia-rt")
+    prepared = prepare_runtime("helia-rt", "2.2.2")
     assert prepared.directory == cache / "runtimes" / "helia-rt" / "2.2.2"
     verified = prepared.runtime.verify()
     assert prepared.runtime.archive.read() == ARCHIVE
@@ -72,6 +72,37 @@ def test_prepare_builds_a_verified_archive_from_the_record(cache: Path) -> None:
     assert all(name.endswith(".h") for name in headers)
     assert verified.record.consumer_defines == prepared_runtimes._HELIA_RT_DEFINES
     assert not (prepared.directory.parent / "2.2.2.partial").exists()
+
+
+def test_default_release_exports_optional_virtual_delete(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from helia_profiler.runtime.archive import prepare_runtime_module
+
+    record = runtime("helia-rt")
+    assert record is not None
+    monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path / "cache"))
+    dist = _dist(tmp_path / "dist", commit=record.source.commit, version=record.version)
+    compatibility = dist / "tensorflow/lite/micro/compatibility.h"
+    compatibility.parent.mkdir(parents=True)
+    compatibility.write_text(
+        "#ifdef TFLM_REMOVE_VIRTUAL_DELETE\n"
+        "#define TF_LITE_REMOVE_VIRTUAL_DELETE void operator delete(void*) {}\n"
+        "#else\n#define TF_LITE_REMOVE_VIRTUAL_DELETE\n#endif\n"
+    )
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_rt.download._fetch_github_release",
+        lambda repo, ref, **_: (dist, record.version)
+        if ref == f"helia-rt-v{record.version}"
+        else pytest.fail(ref),
+    )
+
+    prepared = prepare_runtime("helia-rt")
+    verified = prepared.runtime.verify()
+    assert "TFLM_REMOVE_VIRTUAL_DELETE" in verified.record.consumer_defines
+    module = prepare_runtime_module(verified, tmp_path / "consumer").path
+    assert module is not None
+    assert "TFLM_REMOVE_VIRTUAL_DELETE" in (module / "CMakeLists.txt").read_text()
 
 
 @pytest.mark.parametrize(
@@ -91,7 +122,7 @@ def test_retired_header_roots_follow_staged_headers(
             directory.mkdir()
             (directory / "README").write_text("No consumer headers remain here.\n")
 
-    prepared = prepare_runtime("helia-rt")
+    prepared = prepare_runtime("helia-rt", "2.2.2")
     verified = prepared.runtime.verify()
     expected = (
         ".",
@@ -121,29 +152,29 @@ def test_retired_header_roots_follow_staged_headers(
 def test_missing_required_helia_rt_include_is_still_refused(cache: Path, tmp_path: Path, required):
     shutil.rmtree(tmp_path / "dist" / "third_party" / required)
     with pytest.raises(ConfigError, match="Missing runtime include directory"):
-        prepare_runtime("helia-rt")
+        prepare_runtime("helia-rt", "2.2.2")
 
 
 @pytest.mark.parametrize("dependency", ["gemmlowp", "ruy"])
 @pytest.mark.parametrize("remove", [False, True])
 def test_present_retired_dependency_headers_remain_verified(cache: Path, dependency, remove):
-    prepared = prepare_runtime("helia-rt")
+    prepared = prepare_runtime("helia-rt", "2.2.2")
     header = prepared.directory / "include" / "third_party" / dependency / "api.h"
     if remove:
         header.unlink()
     else:
         header.write_text("changed header")
     with pytest.raises(ConfigError, match="is damaged"):
-        prepared_runtime("helia-rt")
+        prepared_runtime("helia-rt", "2.2.2")
 
 
 def test_a_differing_archive_is_reported_not_refused(cache: Path, monkeypatch) -> None:
-    assert not prepare_runtime("helia-rt").matches_record
+    assert not prepare_runtime("helia-rt", "2.2.2").matches_record
     sha256 = hashlib.sha256(ARCHIVE).hexdigest()
     monkeypatch.setattr(
         prepared_runtimes, "runtime", lambda *_: replace(RECORD, archive_sha256=sha256)
     )
-    assert prepare_runtime("helia-rt").matches_record
+    assert prepare_runtime("helia-rt", "2.2.2").matches_record
 
 
 def test_prepare_refuses_a_release_built_from_another_commit(tmp_path, monkeypatch) -> None:
@@ -154,7 +185,7 @@ def test_prepare_refuses_a_release_built_from_another_commit(tmp_path, monkeypat
         lambda *_a, **_k: (dist, "2.2.2"),
     )
     with pytest.raises(ConfigError, match="not built from 7fe6dfdb"):
-        prepare_runtime("helia-rt")
+        prepare_runtime("helia-rt", "2.2.2")
     assert not (tmp_path / "cache" / "runtimes").exists()
 
 
@@ -174,7 +205,7 @@ def test_prepare_refuses_runtimes_without_an_archive(name, version, message) -> 
 def test_a_missing_prepared_runtime_names_the_prepare_command(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HPX_CACHE_DIR", str(tmp_path))
     with pytest.raises(ConfigError, match="No prepared helia-rt 2.2.2 runtime") as exc:
-        prepared_runtime("helia-rt")
+        prepared_runtime("helia-rt", "2.2.2")
     assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
@@ -185,7 +216,7 @@ def _pin(path: Path, data: bytes) -> FixtureFile:
 
 
 def test_runtimes_prepare_cli_reports_the_archive(cache: Path) -> None:
-    result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt", "2.2.2"])
     assert result.exit_code == 0, result.output
     assert f"Prepared helia-rt 2.2.2 in {prepared_directory(RECORD)}" in result.output
     assert "differs from the record's c027cc65" in result.output
@@ -208,7 +239,7 @@ def test_a_failed_prepare_leaves_nothing_behind_and_no_traceback(tmp_path, monke
     dist = _dist(tmp_path / "dist")
     (dist / "lib" / "libhelia-rt-cm55-atfe-release-with-logs.a").unlink()
     _fetch(monkeypatch, dist)
-    result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt"])
+    result = CliRunner().invoke(app, ["runtimes", "prepare", "helia-rt", "2.2.2"])
     assert result.exit_code == 1
     assert "Cannot prepare helia-rt 2.2.2" in result.output and "Traceback" not in result.output
     assert list((cache / "runtimes" / "helia-rt").iterdir()) == []
@@ -220,28 +251,28 @@ def test_a_release_without_a_header_directory_is_refused(tmp_path, monkeypatch) 
     shutil.rmtree(dist / "signal")
     _fetch(monkeypatch, dist)
     with pytest.raises(ConfigError, match="release has no signal/"):
-        prepare_runtime("helia-rt")
+        prepare_runtime("helia-rt", "2.2.2")
 
 
 def test_re_preparing_replaces_the_install_without_leftovers(cache: Path) -> None:
-    first = prepare_runtime("helia-rt")
+    first = prepare_runtime("helia-rt", "2.2.2")
     (first.directory / "stale.txt").write_text("from the first install")
-    second = prepare_runtime("helia-rt")
+    second = prepare_runtime("helia-rt", "2.2.2")
     assert second.directory == first.directory and not (second.directory / "stale.txt").exists()
     assert sorted(p.name for p in second.directory.parent.iterdir()) == ["2.2.2"]
     assert second.runtime.manifest.sha256 == first.runtime.manifest.sha256
 
 
 def test_a_malformed_prepared_manifest_names_the_prepare_command(cache: Path) -> None:
-    prepared = prepare_runtime("helia-rt")
+    prepared = prepare_runtime("helia-rt", "2.2.2")
     (prepared.directory / "provider-manifest.json").write_text("{}")
     with pytest.raises(ConfigError, match="unreadable") as exc:
-        prepared_runtime("helia-rt")
+        prepared_runtime("helia-rt", "2.2.2")
     assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
 def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -> None:
-    first = prepare_runtime("helia-rt")
+    first = prepare_runtime("helia-rt", "2.2.2")
     marker = first.directory / "marker.txt"
     marker.write_text("previous install")
     real_rename = Path.rename
@@ -253,7 +284,7 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
 
     monkeypatch.setattr(Path, "rename", failing_rename)
     with pytest.raises(ConfigError, match="injected rename failure"):
-        prepare_runtime("helia-rt")
+        prepare_runtime("helia-rt", "2.2.2")
     monkeypatch.setattr(Path, "rename", real_rename)
     assert marker.read_text() == "previous install"
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.2"]
@@ -262,10 +293,10 @@ def test_a_failed_swap_restores_the_previous_install(cache: Path, monkeypatch) -
 
 
 def test_a_damaged_prepared_install_names_the_prepare_command(cache: Path) -> None:
-    prepared = prepare_runtime("helia-rt")
+    prepared = prepare_runtime("helia-rt", "2.2.2")
     (prepared.directory / "include" / "signal" / "fft.h").unlink()
     with pytest.raises(ConfigError, match="is damaged") as exc:
-        prepared_runtime("helia-rt")
+        prepared_runtime("helia-rt", "2.2.2")
     assert "hpx runtimes prepare helia-rt 2.2.2" in (exc.value.hint or "")
 
 
@@ -274,14 +305,14 @@ def test_a_helia_rt_record_without_an_archive_is_refused(monkeypatch) -> None:
         prepared_runtimes, "runtime", lambda *_: replace(RECORD, archive_sha256=None, kernels=None)
     )
     with pytest.raises(ConfigError, match="record pins no prepared archive"):
-        prepare_runtime("helia-rt")
+        prepare_runtime("helia-rt", "2.2.2")
 
 
 def test_a_prepare_removes_leftovers_of_an_interrupted_replace(cache: Path) -> None:
-    first = prepare_runtime("helia-rt")
+    first = prepare_runtime("helia-rt", "2.2.2")
     leftover = first.directory.parent / ".2.2.2-old-abcd1234" / "install"
     leftover.mkdir(parents=True)
-    prepare_runtime("helia-rt")
+    prepare_runtime("helia-rt", "2.2.2")
     assert sorted(p.name for p in first.directory.parent.iterdir()) == ["2.2.2"]
 
 
