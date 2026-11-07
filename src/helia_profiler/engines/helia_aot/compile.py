@@ -13,9 +13,11 @@ minimum-supported version.
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -346,26 +348,7 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    aot_args = _merged_aot_args(config)
-
-    # Pin the three AIR tensor kinds (constant/persistent/scratch) onto the
-    # profiler's requested memories via wildcard attribute rulesets.  A
-    # user-supplied wildcard for a kind replaces the profiler's coarse rule;
-    # this is important for constants because the coarse rule may also carry a
-    # ``constant_destination_memory`` staging attribute.
-    profiler_rulesets = _resolve_aot_tensor_rulesets(
-        config, get_soc_for_board(config.target.board, registry=config.platform_registry)
-    )
-    mem, user_tensors = _prepare_aot_memory_config(aot_args)
-    merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
-    if merged_rulesets:
-        mem["tensors"] = merged_rulesets
-        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(merged_rulesets)
-        log.info(
-            "AOT tensor placement: scratch/persistent=%s, constant=%s",
-            scratch_memory,
-            constant_attributes,
-        )
+    aot_args = effective_aot_args(config)
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
@@ -414,6 +397,66 @@ def _run_aot_compiler(
             )
 
     return result
+
+
+def effective_aot_args(config: ProfileConfig) -> dict[str, Any]:
+    """The ``ConvertArgs`` data heliaAOT receives: the merged config with hpx's rulesets.
+
+    Pins the three AIR tensor kinds (constant/persistent/scratch) onto the
+    profiler's requested memories via wildcard attribute rulesets. A
+    user-supplied wildcard for a kind replaces the profiler's coarse rule;
+    this is important for constants because the coarse rule may also carry a
+    ``constant_destination_memory`` staging attribute. The fields the
+    profiler forces on the built ``ConvertArgs`` (model, module, platform)
+    are not in the mapping.
+    """
+    aot_args = _merged_aot_args(config)
+    profiler_rulesets = _resolve_aot_tensor_rulesets(
+        config, get_soc_for_board(config.target.board, registry=config.platform_registry)
+    )
+    mem, user_tensors = _prepare_aot_memory_config(aot_args)
+    merged_rulesets = _merge_aot_tensor_rulesets(profiler_rulesets, user_tensors)
+    if merged_rulesets:
+        mem["tensors"] = merged_rulesets
+        scratch_memory, constant_attributes = _summarize_aot_tensor_rulesets(merged_rulesets)
+        log.info(
+            "AOT tensor placement: scratch/persistent=%s, constant=%s",
+            scratch_memory,
+            constant_attributes,
+        )
+    return aot_args
+
+
+def effective_config_digest(
+    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+) -> tuple[str, tuple[str, ...]]:
+    """The sha256 of what the compiler received, less the knob values, and the keys it covers.
+
+    The forced module and platform fields join the mapping; the model path
+    does not, being a path of one run. Every ``knobs`` mapping is removed, so
+    two conversions that differ only in a knob value digest the same.
+    """
+    data: dict[str, Any] = _without_knobs(copy.deepcopy(dict(aot_args)))
+    module: dict[str, Any] = dict(data["module"]) if isinstance(data.get("module"), dict) else {}
+    module.update(name=module_name, prefix=prefix, type="nsx")
+    data["module"] = module
+    platform: dict[str, Any] = (
+        dict(data["platform"]) if isinstance(data.get("platform"), dict) else {}
+    )
+    platform["name"] = aot_platform
+    data["platform"] = platform
+    data["force"] = True
+    data["result_views"] = True
+    canonical = json.dumps(data, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(data))
+
+
+def _without_knobs(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _without_knobs(v) for k, v in value.items() if k != "knobs"}
+    if isinstance(value, list):
+        return [_without_knobs(item) for item in value]
+    return value
 
 
 def _merge_aot_tensor_rulesets(

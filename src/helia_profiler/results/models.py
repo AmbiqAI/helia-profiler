@@ -349,6 +349,11 @@ class EngineInfo:
     #: Compute backend the engine resolved (e.g. "cmsis_nn", "ethos_u");
     #: ``None`` when the engine has no backend notion.
     backend: str | None = None
+    #: The sha256 of the configuration the engine's compiler received with
+    #: every knob value removed, and the top-level keys it covers; ``None``
+    #: for an engine that compiles nothing.
+    effective_config_sha256: str | None = None
+    effective_config_keys: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)

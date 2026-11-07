@@ -18,8 +18,10 @@ recorded with the price as a fact and never compared.
 The setup is one digest of the run's frozen settings as the bundle records
 them, with the swept inputs (every heliaAOT knob value), the power, output
 and timeout sections and the run-only fields (probe serials, ports, paths)
-removed, plus the toolchain and engine the run resolved, the build's ISA
-flags and the kernel build (its commit, else its content hash). Everything
+removed, plus the toolchain and engine the run resolved (for heliaAOT with
+the digest of the configuration the compiler received, knob values
+removed), the build's ISA flags and the kernel build (its commit, else its
+content hash). Everything
 else is held, with no list of fields to maintain; the file records the
 digest and the fields it covers so a reader can see what was held.
 

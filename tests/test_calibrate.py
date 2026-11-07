@@ -99,6 +99,7 @@ def bundle(
     power: dict[str, Any] | None = None,
     power_config: dict[str, Any] | None = None,
     with_toolchain: bool = True,
+    effective_config: str = "e" * 64,
     layer_cycles_text: str | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
@@ -159,7 +160,13 @@ def bundle(
             "build": {"nsx_modules": {}, "offline": False},
             "work_dir": None,
         },
-        "engine": {"type": "helia-aot", "version": engine_version, "backend": backend},
+        "engine": {
+            "type": "helia-aot",
+            "version": engine_version,
+            "backend": backend,
+            "effective_config_sha256": effective_config,
+            "effective_config_keys": ["memory", "module", "optimization", "platform"],
+        },
         "platform": {"link_family": link_family},
         "build_images": [{"role": "profile", "architecture_flags": {flags: 12}}],
         "dependencies": {
@@ -367,6 +374,8 @@ def test_the_setup_covers_the_held_settings_and_nothing_swept_or_run_only(tmp_pa
         "config.build.nsx_modules",
         "toolchain.compiler_version",
         "engine.version",
+        "engine.effective_config_sha256",
+        "engine.effective_config_keys.0",
         "build.architecture_flags",
         "kernel.build",
     }
@@ -548,6 +557,11 @@ def test_bundles_under_other_conditions_are_refused(tmp_path: Path) -> None:
             ("'-mcpu=cortex-m55\\+nomve'", "'-mcpu=cortex-m55'"),
         ),
         ({"kernel_commit": "d" * 40}, "kernel.build", ("'commit:dddd", "'commit:cccc")),
+        (
+            {"effective_config": "f" * 64},
+            "engine.effective_config_sha256",
+            ("'ffff", "'eeee"),
+        ),
     ],
 )
 def test_a_held_setting_that_differs_is_refused_naming_it(
@@ -1067,3 +1081,106 @@ def test_a_failed_write_removes_only_its_own_temporary_file(tmp_path: Path) -> N
     calibrate([auto], output=output)
     assert foreign.read_text(encoding="utf-8") == "another writer's data"
     assert sorted(p.name for p in tmp_path.glob(".cal.json.*")) == [foreign.name]
+
+
+def _aot_config(tmp_path: Path, name: str, text: str):
+    from helia_profiler.config import load_config
+
+    config_path = tmp_path / f"{name}.yml"
+    config_path.write_text(text, encoding="utf-8")
+    model = tmp_path / "kws.tflite"
+    model.write_bytes(b"\x00")
+    return load_config(
+        None,
+        {
+            "model": {"path": str(model), "weights_location": "mram"},
+            "engine": {"type": "helia-aot", "config_path": str(config_path)},
+            "target": {"board": "apollo510_evb"},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+
+
+def _digest(config) -> tuple[str, tuple[str, ...]]:
+    from helia_profiler.engines.helia_aot.compile import (
+        effective_aot_args,
+        effective_config_digest,
+    )
+
+    return effective_config_digest(
+        effective_aot_args(config),
+        module_name="hpx_model",
+        prefix="hpx",
+        aot_platform="apollo510_evb",
+    )
+
+
+def test_the_compiler_configuration_a_file_supplies_is_part_of_the_setup(tmp_path: Path) -> None:
+    """Two runs differing only in a placement rule from engine.config_path do not merge."""
+    sram = _aot_config(
+        tmp_path,
+        "sram",
+        "memory:\n  tensors:\n    - type: constant\n      id: '0:w'\n      attributes: {memory: sram}\n",
+    )
+    dtcm = _aot_config(
+        tmp_path,
+        "dtcm",
+        "memory:\n  tensors:\n    - type: constant\n      id: '0:w'\n      attributes: {memory: dtcm}\n",
+    )
+    sram_digest, keys = _digest(sram)
+    assert sram_digest != _digest(dtcm)[0]
+    assert keys == ("force", "memory", "module", "platform", "result_views")
+    # The knob values are the swept inputs: a config that differs only there digests the same.
+    generic = _aot_config(
+        tmp_path, "generic", "optimization:\n  knobs: {kernel: generic}\nmemory: {}\n"
+    )
+    specialized = _aot_config(
+        tmp_path, "specialized", "optimization:\n  knobs: {kernel: specialized}\nmemory: {}\n"
+    )
+    assert _digest(generic) == _digest(specialized)
+    assert _digest(generic)[0] != sram_digest
+    # And the bundles those runs write refuse one another on that field.
+    one = bundle(
+        tmp_path / "one", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, effective_config=sram_digest
+    )
+    other = bundle(
+        tmp_path / "other",
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+        effective_config=_digest(dtcm)[0],
+    )
+    with pytest.raises(CalibrationError, match="engine.effective_config_sha256 is"):
+        calibrate([one, other], output=tmp_path / "out.json")
+    same = bundle(
+        tmp_path / "same",
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+        effective_config=sram_digest,
+    )
+    assert calibrate([one, same], output=tmp_path / "out.json").price_count == 4
+
+
+def test_the_run_metadata_records_the_effective_configuration() -> None:
+    from helia_profiler.report.metadata import _metadata_to_dict
+    from helia_profiler.results import EngineInfo, RunMetadata
+
+    recorded = _metadata_to_dict(
+        RunMetadata(
+            engine=EngineInfo(
+                type="helia-aot",
+                version="0.33.0",
+                effective_config_sha256="e" * 64,
+                effective_config_keys=("memory", "module"),
+            )
+        )
+    )
+    assert recorded["engine"] == {
+        "type": "helia-aot",
+        "version": "0.33.0",
+        "effective_config_sha256": "e" * 64,
+        "effective_config_keys": ("memory", "module"),
+    }
+    assert json.loads(json.dumps(recorded))["engine"]["effective_config_keys"] == [
+        "memory",
+        "module",
+    ]

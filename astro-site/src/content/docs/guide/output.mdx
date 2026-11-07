@@ -315,7 +315,7 @@ The provenance of the run, from `report/contracts.py`:
 | `platform` | `board`, `soc`, `core`, `link_family` (`gnu` for GCC and ATfE, `armlink` for armclang), the resolved clock tier |
 | `model` | `name`, `size` in bytes, `sha256` |
 | `toolchain` | `compiler`, `compiler_version`, `cmake_version` as found on the host |
-| `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT) |
+| `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT); for heliaAOT also `effective_config_sha256`, the digest of the configuration the compiler received (the merged arguments with hpx's forced fields and placement rulesets, every knob value removed) and `effective_config_keys`, the top-level keys it covers |
 | `build_images[]` | one entry per built target (`profile`, and `power` on a power run): `target_name`, `binary_name`, `sha256` of the linked ELF, `flash_sha256` of the flat `.bin` image the probe writes (no host paths; `null` when the build left none), `size_bytes`, `architecture_flags` counted from the configured build tree's `compile_commands.json`, `translation_units` |
 | `firmware` | `arena_size`, `allocated_arena`, `model_size` as the firmware reported them |
 | `conditions` | the same block `summary.json` carries: the board conditions the measurements refer to |
