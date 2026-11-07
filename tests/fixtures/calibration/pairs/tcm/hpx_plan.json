@@ -1,0 +1,316 @@
+{
+  "generator": {
+    "cmsis_nn_required": "7.47.0",
+    "helia_aot": "0.33.0"
+  },
+  "model": {
+    "file": "kws_model.tflite",
+    "sha256": "935c513a5f4dbfe6458c16b0a791e916f5e89d6c9b02ffbefce49c06fbbdf038",
+    "subgraph": 0
+  },
+  "module_prefix": "hpx",
+  "operators": [
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1",
+      "id_source": "tensor_name",
+      "index": 0,
+      "kernel": {
+        "entry": "arm_convolve_s8_small_cin",
+        "local_scratch_bytes": 192,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "0",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1",
+      "id_source": "tensor_name",
+      "index": 1,
+      "kernel": {
+        "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+        "local_scratch_bytes": 3344,
+        "provider": "builtin-core-depthwise/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "1",
+      "op_type": "DEPTHWISE_CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1",
+      "id_source": "tensor_name",
+      "index": 2,
+      "kernel": {
+        "entry": "arm_convolve_1x1_s8_fast",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "2",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1",
+      "id_source": "tensor_name",
+      "index": 3,
+      "kernel": {
+        "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+        "local_scratch_bytes": 3344,
+        "provider": "builtin-core-depthwise/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "3",
+      "op_type": "DEPTHWISE_CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1",
+      "id_source": "tensor_name",
+      "index": 4,
+      "kernel": {
+        "entry": "arm_convolve_1x1_s8_fast",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "4",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1",
+      "id_source": "tensor_name",
+      "index": 5,
+      "kernel": {
+        "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+        "local_scratch_bytes": 3344,
+        "provider": "builtin-core-depthwise/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "5",
+      "op_type": "DEPTHWISE_CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1",
+      "id_source": "tensor_name",
+      "index": 6,
+      "kernel": {
+        "entry": "arm_convolve_1x1_s8_fast",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "6",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1",
+      "id_source": "tensor_name",
+      "index": 7,
+      "kernel": {
+        "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+        "local_scratch_bytes": 3344,
+        "provider": "builtin-core-depthwise/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "7",
+      "op_type": "DEPTHWISE_CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1",
+      "id_source": "tensor_name",
+      "index": 8,
+      "kernel": {
+        "entry": "arm_convolve_1x1_s8_fast",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-convolution/7.45.0/2"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "8",
+      "op_type": "CONV_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/average_pooling2d/AvgPool",
+      "id_source": "tensor_name",
+      "index": 9,
+      "kernel": {
+        "entry": "arm_avgpool_s8",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-pooling/7.44.2/1"
+      },
+      "knobs": {},
+      "node_id": "9",
+      "op_type": "AVERAGE_POOL_2D"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/flatten/Reshape",
+      "id_source": "tensor_name",
+      "index": 10,
+      "kernel": null,
+      "knobs": {},
+      "node_id": "10",
+      "op_type": "RESHAPE"
+    },
+    {
+      "fixed": {},
+      "id": "0:functional_1/dense/BiasAdd",
+      "id_source": "tensor_name",
+      "index": 11,
+      "kernel": {
+        "entry": "arm_fully_connected_per_channel_packed_s8",
+        "local_scratch_bytes": 0,
+        "provider": "builtin-core-fully-connected/7.44.2/1"
+      },
+      "knobs": {
+        "kernel": {
+          "approximate": false,
+          "requested": "auto",
+          "resolved_by": "auto_table",
+          "source": {
+            "kind": "default",
+            "rule": null
+          },
+          "value": "specialized"
+        }
+      },
+      "node_id": "11",
+      "op_type": "FULLY_CONNECTED"
+    },
+    {
+      "fixed": {},
+      "id": "0:Identity",
+      "id_source": "tensor_name",
+      "index": 12,
+      "kernel": null,
+      "knobs": {},
+      "node_id": "12",
+      "op_type": "SOFTMAX"
+    }
+  ],
+  "optimization": {
+    "allow_approximate": false,
+    "goal": "balanced",
+    "knobs": {}
+  },
+  "platform": {
+    "capabilities": [
+      "DSP",
+      "FP16",
+      "MCU",
+      "MVE"
+    ],
+    "cpu": "cortex-m55",
+    "name": "apollo510_evb",
+    "supports_fp16": true
+  },
+  "schema_version": 1,
+  "tensors": []
+}

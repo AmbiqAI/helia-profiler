@@ -1,0 +1,1536 @@
+[
+  {
+    "idx": 0,
+    "id": 0,
+    "source_indices": [
+      0
+    ],
+    "op_type": "CONV_2D",
+    "name": "conv_2d_0",
+    "kernel_calls": {
+      "run": "arm_convolve_s8_small_cin"
+    },
+    "inputs": [
+      {
+        "id": "0",
+        "name": "input_1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "input",
+        "nbytes": 490,
+        "shape": [
+          1,
+          49,
+          10,
+          1
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 490,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "22",
+        "name": "functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "17",
+        "name": "functional_1/conv2d/Conv2D",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 2560,
+        "shape": [
+          64,
+          10,
+          4,
+          1
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 0,
+        "allocation_size": 2560,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_0_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 192,
+        "shape": [
+          192
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8496,
+        "allocation_size": 192,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_0_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 2560,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_0_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 2816,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_0_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3072,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 1,
+    "id": 1,
+    "source_indices": [
+      1
+    ],
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_1",
+    "kernel_calls": {
+      "run": "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+    },
+    "inputs": [
+      {
+        "id": "22",
+        "name": "functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "23",
+        "name": "functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "5",
+        "name": "functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3328,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_1_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 3344,
+        "shape": [
+          3344
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 3344,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_1_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 3904,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_1_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4160,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_1_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4416,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 2,
+    "id": 2,
+    "source_indices": [
+      2
+    ],
+    "op_type": "CONV_2D",
+    "name": "conv_2d_2",
+    "kernel_calls": {
+      "run": "arm_convolve_1x1_s8_fast"
+    },
+    "inputs": [
+      {
+        "id": "23",
+        "name": "functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "24",
+        "name": "functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "18",
+        "name": "functional_1/conv2d_1/Conv2D",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 4672,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_2_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 8768,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_2_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9024,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_2_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9280,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 3,
+    "id": 3,
+    "source_indices": [
+      3
+    ],
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_3",
+    "kernel_calls": {
+      "run": "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+    },
+    "inputs": [
+      {
+        "id": "24",
+        "name": "functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "25",
+        "name": "functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "8",
+        "name": "functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 9536,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_3_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 3344,
+        "shape": [
+          3344
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 3344,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_3_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10112,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_3_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10368,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_3_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10624,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 4,
+    "id": 4,
+    "source_indices": [
+      4
+    ],
+    "op_type": "CONV_2D",
+    "name": "conv_2d_4",
+    "kernel_calls": {
+      "run": "arm_convolve_1x1_s8_fast"
+    },
+    "inputs": [
+      {
+        "id": "25",
+        "name": "functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "26",
+        "name": "functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "19",
+        "name": "functional_1/conv2d_2/Conv2D",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 10880,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_4_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 14976,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_4_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15232,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_4_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15488,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 5,
+    "id": 5,
+    "source_indices": [
+      5
+    ],
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_5",
+    "kernel_calls": {
+      "run": "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+    },
+    "inputs": [
+      {
+        "id": "26",
+        "name": "functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "27",
+        "name": "functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "11",
+        "name": "functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 15744,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_5_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 3344,
+        "shape": [
+          3344
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 3344,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_5_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16320,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_5_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16576,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_5_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 16832,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 6,
+    "id": 6,
+    "source_indices": [
+      6
+    ],
+    "op_type": "CONV_2D",
+    "name": "conv_2d_6",
+    "kernel_calls": {
+      "run": "arm_convolve_1x1_s8_fast"
+    },
+    "inputs": [
+      {
+        "id": "27",
+        "name": "functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "28",
+        "name": "functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "20",
+        "name": "functional_1/conv2d_3/Conv2D",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 17088,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_6_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21184,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_6_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21440,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_6_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21696,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 7,
+    "id": 7,
+    "source_indices": [
+      7
+    ],
+    "op_type": "DEPTHWISE_CONV_2D",
+    "name": "depthwise_conv_2d_7",
+    "kernel_calls": {
+      "run": "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+    },
+    "inputs": [
+      {
+        "id": "28",
+        "name": "functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "29",
+        "name": "functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "14",
+        "name": "functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 576,
+        "shape": [
+          1,
+          3,
+          3,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 21952,
+        "allocation_size": 576,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_7_scratch",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 3344,
+        "shape": [
+          3344
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16000,
+        "allocation_size": 3344,
+        "arena_region_id": 0,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_7_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 22528,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_7_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 22784,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "depthwise_conv_2d_7_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 23040,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 8,
+    "id": 8,
+    "source_indices": [
+      8
+    ],
+    "op_type": "CONV_2D",
+    "name": "conv_2d_8",
+    "kernel_calls": {
+      "run": "arm_convolve_1x1_s8_fast"
+    },
+    "inputs": [
+      {
+        "id": "29",
+        "name": "functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "30",
+        "name": "functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "21",
+        "name": "functional_1/conv2d_4/Conv2D",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 4096,
+        "shape": [
+          64,
+          1,
+          1,
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 23296,
+        "allocation_size": 4096,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_8_weight_sum",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27392,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_8_multiplier",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27648,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      },
+      {
+        "id": "conv_2d_8_shift",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 256,
+        "shape": [
+          64
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 27904,
+        "allocation_size": 256,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 9,
+    "id": 9,
+    "source_indices": [
+      9
+    ],
+    "op_type": "AVERAGE_POOL_2D",
+    "name": "average_pool_2d_9",
+    "kernel_calls": {
+      "run": "arm_avgpool_s8"
+    },
+    "inputs": [
+      {
+        "id": "30",
+        "name": "functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 8000,
+        "shape": [
+          1,
+          25,
+          5,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 8000,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "31",
+        "name": "functional_1/average_pooling2d/AvgPool",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "shape": [
+          1,
+          1,
+          1,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 10,
+    "id": 10,
+    "source_indices": [
+      10
+    ],
+    "op_type": "RESHAPE",
+    "name": "reshape_10",
+    "kernel_calls": {
+      "run": "arm_memcpy_s8"
+    },
+    "inputs": [
+      {
+        "id": "31",
+        "name": "functional_1/average_pooling2d/AvgPool",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "shape": [
+          1,
+          1,
+          1,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "32",
+        "name": "functional_1/flatten/Reshape",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "shape": [
+          1,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "2",
+        "name": "functional_1/flatten/Const",
+        "dtype": "int32",
+        "ctype": "int32_t",
+        "kind": "constant",
+        "nbytes": 8,
+        "shape": [
+          2
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 28160,
+        "allocation_size": 8,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 11,
+    "id": 11,
+    "source_indices": [
+      11
+    ],
+    "op_type": "FULLY_CONNECTED",
+    "name": "fully_connected_11",
+    "kernel_calls": {
+      "run": "arm_fully_connected_per_channel_packed_s8"
+    },
+    "inputs": [
+      {
+        "id": "32",
+        "name": "functional_1/flatten/Reshape",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 64,
+        "shape": [
+          1,
+          64
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 8000,
+        "allocation_size": 64,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "33",
+        "name": "functional_1/dense/BiasAdd",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 12,
+        "shape": [
+          1,
+          12
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "local_tensors": [
+      {
+        "id": "fully_connected_11_packed",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "constant",
+        "nbytes": 912,
+        "shape": [
+          912
+        ],
+        "memory": "mram",
+        "source_memory": "mram",
+        "arena_role": "constant",
+        "offset": 28176,
+        "allocation_size": 912,
+        "arena_region_id": 1,
+        "staged": false
+      }
+    ]
+  },
+  {
+    "idx": 12,
+    "id": 12,
+    "source_indices": [
+      12
+    ],
+    "op_type": "SOFTMAX",
+    "name": "softmax_12",
+    "kernel_calls": {
+      "run": "arm_softmax_s8"
+    },
+    "inputs": [
+      {
+        "id": "33",
+        "name": "functional_1/dense/BiasAdd",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "scratch",
+        "nbytes": 12,
+        "shape": [
+          1,
+          12
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 0,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ],
+    "outputs": [
+      {
+        "id": "34",
+        "name": "Identity",
+        "dtype": "int8",
+        "ctype": "int8_t",
+        "kind": "output",
+        "nbytes": 12,
+        "shape": [
+          1,
+          12
+        ],
+        "memory": "dtcm",
+        "source_memory": "dtcm",
+        "arena_role": "scratch",
+        "offset": 16,
+        "allocation_size": 12,
+        "arena_region_id": 0,
+        "staged": false
+      }
+    ]
+  }
+]
