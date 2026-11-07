@@ -913,6 +913,7 @@ def test_merge_refuses_a_file_for_another_model(tmp_path: Path) -> None:
 
 
 _SETUP_TEXT = '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}'
+_MALFORMED = "is malformed: it needs model.sha256, model.subgraph, conditions and operator_cycles."
 _RECALIBRATE = (
     "A schema 2 file holds only the fields helia_profiler/data/calibration.schema.v2.json "
     "names, so this one was edited or written by another tool; calibrate the result bundles "
@@ -951,7 +952,12 @@ _RECALIBRATE = (
             "is calibration schema 1, which this release does not read",
             None,
         ),
-        ('{"schema_version": 2, "model": {"sha256": "a"}}', "malformed", None),
+        ('{"schema_version": 2, "model": {"sha256": "a"}}', _MALFORMED, None),
+        (
+            '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}}',
+            _MALFORMED,
+            None,
+        ),
         (
             '{"schema_version": 2, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
             '"operator_cycles": {"x": [{"knobs": {}, "cycles": 1, "facts": {}}]}}',
