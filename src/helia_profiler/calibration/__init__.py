@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+from .setup import SETUP_EXCLUDED, Setup
 from .table import (
     CALIBRATION_SCHEMA_VERSION,
     DEFAULT_TOLERANCE,
-    SETUP_EXCLUDED,
     CalibrationSource,
     CalibrationTable,
     OperatorSample,
     Price,
-    Setup,
     calibrate,
     merge_sources,
     read_bundle,

@@ -6,6 +6,7 @@ _semantic_hash.py
 _version.py
 api.py
 calibration/__init__.py
+calibration/setup.py
 calibration/table.py
 capture/__init__.py
 capture/parser.py
