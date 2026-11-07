@@ -102,6 +102,8 @@ def bundle(
     power_config: dict[str, Any] | None = None,
     with_toolchain: bool = True,
     effective_config: str = "e" * 64,
+    effective_config_pairing: str | None = "9" * 64,
+    weights_location: str | None = "tcm",
     layer_cycles_text: str | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
@@ -132,7 +134,7 @@ def bundle(
                 "path": str(path / "kws.tflite"),
                 "arena_size": 262144,
                 "arena_location": arena_location,
-                "weights_location": "tcm",
+                "weights_location": weights_location,
             },
             "engine": {
                 "type": "helia-aot",
@@ -173,6 +175,8 @@ def bundle(
             ]
         },
     }
+    if effective_config_pairing is not None:
+        metadata["engine"]["effective_config_pairing_sha256"] = effective_config_pairing
     if with_toolchain:
         metadata["toolchain"] = {"compiler": toolchain, "compiler_version": compiler_version}
     (path / "run_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -247,8 +251,35 @@ def two_bundles(tmp_path: Path) -> tuple[Path, Path]:
     auto = bundle(tmp_path / "auto", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
     wide = bundle(
         tmp_path / "wide",
-        cycles={0: 9000.0, 1: 3030.0, 2: 410.0},
+        cycles={0: 9000.0, 1: 3030.0, 2: 405.0},
         plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "fast"),
         knob_values={"accumulation": "fast"},
     )
     return auto, wide
+
+
+def pair(tmp_path: Path, slow_memory: str) -> tuple[Path, Path]:
+    """A capture with the weights in *slow_memory* (``mram`` or ``psram``) and one in TCM.
+
+    Everything else is held, as one operator session records it: the
+    compiler's configuration differs only in the constants' placement rule
+    hpx derives from ``weights_location``, so its pairing digest is shared,
+    and the PSRAM clock is recorded only by the run that used PSRAM.
+    """
+    slow_conditions: dict[str, Any] = {**CONDITIONS, "weights_memory": slow_memory}
+    if slow_memory == "psram":
+        slow_conditions["external_memory_clock"] = 48
+    slow = bundle(
+        tmp_path / f"{slow_memory}-pair" / slow_memory,
+        cycles={0: 15000.0, 1: 3600.0, 2: 400.0},
+        conditions=slow_conditions,
+        weights_location=slow_memory,
+        effective_config=hashlib.sha256(f"constants in {slow_memory}".encode()).hexdigest(),
+    )
+    fast = bundle(
+        tmp_path / f"{slow_memory}-pair" / "tcm",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        weights_location="tcm",
+        effective_config=hashlib.sha256(b"constants staged in dtcm").hexdigest(),
+    )
+    return slow, fast

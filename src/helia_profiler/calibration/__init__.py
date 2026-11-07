@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .setup import SETUP_EXCLUDED, Setup
+from .setup import PAIRING_EXCLUDED, SETUP_EXCLUDED, Setup
 from .table import (
     CALIBRATION_SCHEMA_VERSION,
     DEFAULT_TOLERANCE,
@@ -23,6 +23,7 @@ __all__ = [
     "CalibrationSource",
     "CalibrationTable",
     "OperatorSample",
+    "PAIRING_EXCLUDED",
     "Price",
     "SETUP_EXCLUDED",
     "Setup",

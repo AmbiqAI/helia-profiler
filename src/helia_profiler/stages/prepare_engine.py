@@ -62,4 +62,5 @@ class PrepareEngineStage:
             backend=artifacts.resolved_backend,
             effective_config_sha256=artifacts.effective_config_sha256,
             effective_config_keys=artifacts.effective_config_keys or None,
+            effective_config_pairing_sha256=artifacts.effective_config_pairing_sha256,
         )

@@ -6,6 +6,7 @@ extra; ``test_calibrate_no_aot.py`` holds what must run without it.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import re
@@ -19,6 +20,7 @@ from typer.testing import CliRunner
 
 from helia_profiler.calibration import (
     CALIBRATION_SCHEMA_VERSION,
+    PAIRING_EXCLUDED,
     SETUP_EXCLUDED,
     CalibrationTable,
     Price,
@@ -42,6 +44,7 @@ from tests.calibration_bundles import (
     _mark,
     _republish,
     bundle,
+    pair,
     two_bundles,
 )
 
@@ -53,6 +56,8 @@ def _real_bundle(path: Path, plan_name: str, *, offset: float = 0.0, **changes: 
 
     The effective configuration is the real digest of a real config that
     sets the plan's knob value, so a sweep's bundles carry real, equal digests.
+    The offset moves only the operators with knobs: the others ran the same
+    code in both captures.
     """
     plan = json.loads((PLANS / f"{plan_name}_plan.json").read_text(encoding="utf-8"))
     ops = plan["operators"]
@@ -62,7 +67,7 @@ def _real_bundle(path: Path, plan_name: str, *, offset: float = 0.0, **changes: 
     config = _aot_config(path.parent, plan_name, f"optimization: {{{knob}: {value}}}\n")
     return bundle(
         path,
-        cycles={op["index"]: 1000.0 + op["index"] + offset for op in ops},
+        cycles={op["index"]: 1000.0 + op["index"] + (offset if op["knobs"] else 0.0) for op in ops},
         ops=tuple(op["op_type"] for op in ops),
         plan_ops=ops,
         sha256=plan["model"]["sha256"],
@@ -242,6 +247,16 @@ def test_a_real_knob_sweep_prices_every_operator_the_knob_moves(
             assert entry["facts"]["kernel:entry"] == op["kernel"]["entry"]
             for name, choice in op["fixed"].items():
                 assert entry["facts"][f"fixed:{name}"] == choice["value"]
+    # Every plan operator is timed under the plan's knob vector, one entry per vector.
+    for value in values:
+        plan = json.loads((PLANS / f"{model}_{knob}_{value}_plan.json").read_text())
+        for op in plan["operators"]:
+            vector = {name: choice["value"] for name, choice in op["knobs"].items()}
+            cycles = 1000.0 + op["index"] + (500.0 if value == values[1] and vector else 0.0)
+            assert {"knobs": vector, "cycles": cycles} in written["operator_cycles"][op["id"]]
+    assert set(written["operator_cycles"]) == {op["id"] for op in plan["operators"]}
+    swept = [op for op, entries in written["operator_cycles"].items() if len(entries) == 2]
+    assert sorted(swept) == sorted(written["operators"])
     # Merging the same bundles again changes nothing.
     assert calibrate([first, second], output=output, merge=True) == table
 
@@ -775,14 +790,27 @@ def test_an_unverified_bundle_is_refused(tmp_path: Path) -> None:
         read_bundle(auto)
 
 
-def test_bundles_without_any_knob_are_refused(tmp_path: Path) -> None:
+def test_a_knobless_model_calibrates(tmp_path: Path) -> None:
     plain = bundle(
         tmp_path / "plain",
-        cycles={0: 1.0, 1: 1.0, 2: 1.0},
+        cycles={0: 1.0, 1: 2.0, 2: 3.0},
         plan_ops=[{**op, "knobs": {}} for op in PLAN_OPERATORS],
     )
-    with pytest.raises(CalibrationError, match="nothing to price"):
-        calibrate([plain], output=tmp_path / "out.json")
+    output = tmp_path / "out.json"
+    table = calibrate([plain], output=output)
+    written = json.loads(output.read_text(encoding="utf-8"))
+    assert written["operators"] == {} and table.price_count == 0
+    assert written["operator_cycles"] == {
+        "0:conv": [{"knobs": {}, "cycles": 1.0}],
+        "0:fc": [{"knobs": {}, "cycles": 2.0}],
+        "0:softmax": [{"knobs": {}, "cycles": 3.0}],
+    }
+    assert _CalibrationFile.model_validate(written).operators == {}
+    assert calibrate([plain], output=output, merge=True) == table
+    # Only a table with no operator timed at all has nothing to price.
+    source = dataclasses.replace(read_bundle(plain), samples=())
+    with pytest.raises(CalibrationError, match="No operator in the bundles was timed"):
+        merge_sources([source])
     with pytest.raises(CalibrationError, match="No result bundle"):
         merge_sources([])
     with pytest.raises(CalibrationError, match="No result bundle"):
@@ -922,6 +950,9 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     assert "--merge" in help_text and "--tolerance" in help_text
     assert "application_load=none" in help_text
     assert "capture.setup" in help_text
+    assert "operator_cycles[<id>]" in help_text and "pairing_digest" in help_text
+    assert "within --tolerance or within 8 cycles" in help_text
+    assert "--tolerance 0 is exact for prices but leaves the 8-cycle floor" in help_text
     assert "kws-sram" not in help_text
 
 
@@ -1080,6 +1111,10 @@ def test_the_run_metadata_records_the_effective_configuration() -> None:
         "effective_config_sha256": "e" * 64,
         "effective_config_keys": ("memory", "module"),
     }
+    paired = _metadata_to_dict(
+        RunMetadata(engine=EngineInfo(type="helia-aot", effective_config_pairing_sha256="9" * 64))
+    )
+    assert paired["engine"]["effective_config_pairing_sha256"] == "9" * 64
     assert json.loads(json.dumps(recorded))["engine"]["effective_config_keys"] == [
         "memory",
         "module",
@@ -1250,3 +1285,420 @@ def test_a_rule_with_attributes_digests_the_same_whatever_it_says_of_knobs(tmp_p
         tmp_path, "silent", "operators:\n  - type: conv_2d\n    attributes: {memory: sram}\n"
     )
     assert _digest(ruled) == _digest(silent)
+
+
+# -- operator_cycles and the pairing digest (#648, amendment 2) --
+
+EXPECTED_OPERATOR_CYCLES = {
+    "0:conv": [
+        {"knobs": {"accumulation": "fast"}, "cycles": 9000.0},
+        {"knobs": {"accumulation": "precise"}, "cycles": 12000.0},
+    ],
+    "0:fc": [{"knobs": {"accumulation": "precise", "kernel": "specialized"}, "cycles": 3000.0}],
+    "0:softmax": [{"knobs": {}, "cycles": 400.0}],
+}
+
+
+def _as_b1_file(path: Path) -> Path:
+    """The file as the release before operator_cycles and the pairing digest wrote it."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    del data["operator_cycles"]
+    del data["capture"]["setup"]["pairing_digest"]
+    del data["capture"]["setup"]["pairing_fields"]
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    return path
+
+
+def test_a_knob_sweep_times_the_swept_operator_once_per_vector(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+
+    table = calibrate([auto, wide], output=output)
+
+    written = json.loads(output.read_text(encoding="utf-8"))
+    # The precise capture came first, yet each list is in its knobs' canonical order.
+    assert written["operator_cycles"] == EXPECTED_OPERATOR_CYCLES
+    assert list(written)[-2:] == ["operator_cycles", "capture"]
+    assert read_calibration(output) == table
+    _CalibrationFile.model_validate(written)
+
+    def block() -> str:
+        return json.dumps(json.loads(output.read_text(encoding="utf-8"))["operator_cycles"])
+
+    # The block round-trips unchanged, and merging the captures again changes nothing.
+    first = block()
+    assert calibrate([wide], output=output, merge=True) == table
+    assert block() == first
+    assert calibrate([wide, auto], output=output, merge=True) == table
+    assert block() == first
+    # In a new file the first source's timing of a repeated vector is the one written.
+    reverse = calibrate([wide, auto], output=tmp_path / "reverse.json").to_dict()
+    assert reverse["operator_cycles"]["0:conv"] == EXPECTED_OPERATOR_CYCLES["0:conv"]
+    assert reverse["operator_cycles"]["0:softmax"] == [{"knobs": {}, "cycles": 405.0}]
+
+
+def test_a_b1_era_file_reads_and_merges(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    _as_b1_file(output)
+
+    old = read_calibration(output)
+    assert old.operator_cycles == {}
+    assert (old.setup.pairing_digest, old.setup.pairing_fields) == (None, None)
+    # A bundle this release writes merges into it: its ordinary digest is the one the file holds.
+    result = CliRunner().invoke(app, ["calibrate", str(wide), "-o", str(output), "--merge"])
+    assert result.exit_code == 0, result.output
+    written = json.loads(output.read_text(encoding="utf-8"))
+    _check_expected(written)
+    assert written["operator_cycles"] == {
+        "0:conv": [{"knobs": {"accumulation": "fast"}, "cycles": 9000.0}],
+        "0:fc": [{"knobs": {"accumulation": "precise", "kernel": "specialized"}, "cycles": 3030.0}],
+        "0:softmax": [{"knobs": {}, "cycles": 405.0}],
+    }
+    # The file carried no pairing digest, so the merge writes none.
+    assert written["capture"]["setup"]["pairing_digest"] is None
+    assert written["capture"]["setup"]["pairing_fields"] is None
+    _CalibrationFile.model_validate(written)
+
+
+def test_the_pairing_field_leaves_the_ordinary_digest_unchanged(tmp_path: Path) -> None:
+    recorded = read_bundle(bundle(tmp_path / "b2", cycles={0: 1.0, 1: 1.0, 2: 1.0}))
+    older = read_bundle(
+        bundle(tmp_path / "b1", cycles={0: 1.0, 1: 1.0, 2: 1.0}, effective_config_pairing=None)
+    )
+    assert recorded.setup.digest == older.setup.digest
+    assert recorded.setup.fields == older.setup.fields
+    assert "engine.effective_config_pairing_sha256" in SETUP_EXCLUDED
+    assert "engine.effective_config_pairing_sha256" not in recorded.setup.fields
+    assert "engine.effective_config_pairing_sha256" in (recorded.setup.pairing_fields or ())
+    assert (older.setup.pairing_digest, older.setup.pairing_fields) == (None, None)
+
+
+def test_a_bundle_without_the_pairing_configuration_calibrates_with_a_null_digest(
+    tmp_path: Path,
+) -> None:
+    old = bundle(tmp_path / "old", cycles={0: 1.0, 1: 1.0, 2: 1.0}, effective_config_pairing=None)
+    output = tmp_path / "out.json"
+    calibrate([old], output=output)
+    setup = json.loads(output.read_text(encoding="utf-8"))["capture"]["setup"]
+    assert setup["pairing_digest"] is None and setup["pairing_fields"] is None
+    assert re.fullmatch(r"[0-9a-f]{64}", setup["digest"])
+    assert read_calibration(output).setup.pairing_digest is None
+
+
+def test_a_merge_writes_the_pairing_digest_only_when_every_source_shares_it(
+    tmp_path: Path,
+) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    shared = calibrate([auto, wide], output=output).setup
+    assert shared.pairing_digest == read_bundle(auto).setup.pairing_digest
+    assert re.fullmatch(r"[0-9a-f]{64}", shared.pairing_digest or "")
+    assert (
+        shared.pairing_fields and "engine.effective_config_pairing_sha256" in shared.pairing_fields
+    )
+    assert read_calibration(output).setup == shared
+
+    older = bundle(
+        tmp_path / "older",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        effective_config_pairing=None,
+    )
+    other = bundle(
+        tmp_path / "other",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        effective_config_pairing="8" * 64,
+    )
+    for sources in ([auto, older], [older, auto], [auto, other]):
+        table = calibrate(sources, output=tmp_path / "mixed.json")
+        assert (table.setup.pairing_digest, table.setup.pairing_fields) == (None, None)
+        setup = json.loads((tmp_path / "mixed.json").read_text())["capture"]["setup"]
+        assert setup["pairing_digest"] is None and setup["pairing_fields"] is None
+    # The file is a source too: one written with a digest, merged with a bundle without one.
+    merged = calibrate([older], output=output, merge=True)
+    assert merged.setup.pairing_digest is None
+
+
+def _timed(path: Path, conv: float, softmax: float) -> Path:
+    return bundle(path, cycles={0: conv, 1: 3000.0, 2: softmax})
+
+
+def test_an_operator_timing_is_held_to_the_tolerance_or_8_cycles(tmp_path: Path) -> None:
+    base = _timed(tmp_path / "base", 12000.0, 100.0)
+    near = _timed(tmp_path / "near", 12000.0, 107.0)
+    far = _timed(tmp_path / "far", 12000.0, 109.0)
+
+    table = calibrate([base, near], output=tmp_path / "near.json")
+    assert table.operator_cycles[("0:softmax", ())] == 100.0
+    with pytest.raises(
+        CalibrationError,
+        match=r"0:softmax with the knobs at \{\} takes 100 cycles in .*base but 109 in .*far "
+        r"\(8\.3% apart, tolerance 2% or 8 cycles\)",
+    ):
+        calibrate([base, far], output=tmp_path / "far.json")
+    # The floor is for timings only: a price 7 cycles apart at 100 is still refused.
+    priced = bundle(tmp_path / "priced", cycles={0: 100.0, 1: 3000.0, 2: 100.0})
+    moved = bundle(tmp_path / "moved", cycles={0: 107.0, 1: 3000.0, 2: 100.0})
+    with pytest.raises(CalibrationError, match=r"0:conv accumulation=precise costs 100 cycles"):
+        calibrate([priced, moved], output=tmp_path / "priced.json")
+    # A file read for --merge contributes its timings and is held to them.
+    output = tmp_path / "kws.json"
+    calibrate([base], output=output)
+    assert read_calibration(output).operator_cycles[("0:softmax", ())] == 100.0
+    with pytest.raises(
+        CalibrationError, match=r"0:softmax with the knobs at \{\} takes 100 cycles in .*kws\.json"
+    ):
+        calibrate([far], output=output, merge=True)
+    assert json.loads(output.read_text())["operator_cycles"]["0:softmax"] == [
+        {"knobs": {}, "cycles": 100.0}
+    ]
+    assert calibrate([near], output=output, merge=True).operator_cycles[("0:softmax", ())] == 100.0
+    # Above the floor the tolerance governs: 2% of 12000 is 240 cycles.
+    wider = bundle(
+        tmp_path / "wider",
+        cycles={0: 9000.0, 1: 3230.0, 2: 100.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "fast"),
+    )
+    with pytest.raises(CalibrationError, match="costs 3000 cycles"):
+        calibrate([base, wider], output=tmp_path / "wider.json")
+
+
+def test_a_repeat_of_one_vector_is_refused_naming_the_operator_and_the_vector(
+    tmp_path: Path,
+) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    calibrate([auto, wide], output=output)
+    data = json.loads(output.read_text(encoding="utf-8"))
+    # A knob sweep's swept operator keeps one entry per vector, so a repeat
+    # of the fast capture is compared with its own entry only.
+    data["operator_cycles"]["0:conv"][0]["cycles"] = 8800.0
+    edited = tmp_path / "edited.json"
+    edited.write_text(json.dumps(data), encoding="utf-8")
+    # The price check runs first; with a wide tolerance the timing is compared alone.
+    with pytest.raises(
+        CalibrationError,
+        match=r"0:conv with the knobs at \{'accumulation': 'fast'\} takes 8800 cycles in "
+        r".*edited\.json but 9000 in .*wide",
+    ):
+        merge_sources(
+            [read_calibration(edited).as_source(str(edited)), read_bundle(wide)], tolerance=0.01
+        )
+
+
+def test_a_malformed_operator_cycles_block_is_refused(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    whole = json.loads(output.read_text(encoding="utf-8"))
+    for name, change, message in (
+        ("object", lambda d: d.update(operator_cycles=[]), "operator_cycles is not an object"),
+        ("list", lambda d: d["operator_cycles"].update({"0:conv": {}}), "0:conv is not a list"),
+        (
+            "cycles",
+            lambda d: d["operator_cycles"]["0:conv"][0].update(cycles=-1),
+            "0:conv has an entry without string knobs",
+        ),
+        (
+            "knobs",
+            lambda d: d["operator_cycles"]["0:conv"][0].update(knobs={"accumulation": 1}),
+            "0:conv has an entry without string knobs",
+        ),
+        (
+            "twice",
+            lambda d: d["operator_cycles"]["0:conv"].append(d["operator_cycles"]["0:conv"][0]),
+            r"0:conv lists the knobs \{'accumulation': 'precise'\} twice",
+        ),
+        (
+            "half",
+            lambda d: d["capture"]["setup"].update(pairing_fields=None),
+            "records no setup under capture.setup",
+        ),
+    ):
+        data = json.loads(json.dumps(whole))
+        change(data)
+        path = tmp_path / f"{name}.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with pytest.raises(CalibrationError, match=message):
+            read_calibration(path)
+
+
+@pytest.mark.parametrize("slow_memory", ["mram", "psram"])
+def test_a_synthetic_pair_shares_the_pairing_digest_but_not_the_setup(
+    tmp_path: Path, slow_memory: str
+) -> None:
+    slow, fast = pair(tmp_path, slow_memory)
+    slow_setup, fast_setup = read_bundle(slow).setup, read_bundle(fast).setup
+
+    assert slow_setup.pairing_digest is not None
+    assert slow_setup.pairing_digest == fast_setup.pairing_digest
+    assert slow_setup.pairing_fields == fast_setup.pairing_fields
+    assert slow_setup.digest != fast_setup.digest
+    assert "config.model.weights_location" in PAIRING_EXCLUDED
+    assert "config.model.weights_location" in slow_setup.fields
+    assert "config.model.weights_location" not in (slow_setup.pairing_fields or ())
+    assert "engine.effective_config_sha256" not in (slow_setup.pairing_fields or ())
+    for held in ("config.model.arena_size", "config.target.clock.cpu", "kernel.build"):
+        assert held in (slow_setup.pairing_fields or ()), held
+    # Each capture calibrates on its own, and the two files carry one pairing digest.
+    slow_file = calibrate([slow], output=tmp_path / "slow.json").setup
+    fast_file = calibrate([fast], output=tmp_path / "fast.json").setup
+    assert slow_file.pairing_digest == fast_file.pairing_digest == slow_setup.pairing_digest
+
+
+def _paired(path: Path, aot_args: dict[str, Any], **changes: Any) -> Setup:
+    return read_bundle(
+        _with_engine_config(bundle(path, cycles={0: 1.0, 1: 1.0, 2: 1.0}, **changes), aot_args)
+    ).setup
+
+
+def _tensors(*rules: dict[str, Any], **memory: Any) -> dict[str, Any]:
+    return {"memory": {"tensors": list(rules), **memory}}
+
+
+def test_the_pairing_digest_strips_only_the_constants_placement(tmp_path: Path) -> None:
+    plain = _paired(tmp_path / "plain", _tensors())
+    constant = _paired(
+        tmp_path / "constant",
+        _tensors(
+            {
+                "type": "Constant",
+                "attributes": {"memory": "mram", "constant_destination_memory": "dtcm"},
+            },
+            {"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}},
+        ),
+    )
+    assert constant.pairing_digest == plain.pairing_digest
+    assert constant.digest != plain.digest
+    # A scratch rule and the pool constraints are held: they change what the arena is.
+    dtcm = _paired(
+        tmp_path / "dtcm", _tensors({"type": "scratch", "attributes": {"memory": "dtcm"}})
+    )
+    sram = _paired(
+        tmp_path / "sram", _tensors({"type": "scratch", "attributes": {"memory": "sram"}})
+    )
+    assert dtcm.pairing_digest != sram.pairing_digest
+    small = _paired(tmp_path / "small", _tensors(constraints=[{"name": "dtcm", "max_size": 65536}]))
+    large = _paired(
+        tmp_path / "large", _tensors(constraints=[{"name": "dtcm", "max_size": 131072}])
+    )
+    assert small.pairing_digest != large.pairing_digest
+    # The arena's location stays held as well.
+    moved = _paired(tmp_path / "moved", _tensors(), arena_location="sram")
+    assert moved.pairing_digest != plain.pairing_digest
+
+
+def test_without_constant_placement_keeps_whatever_else_a_rule_sets() -> None:
+    from helia_profiler.engines.helia_aot.compile import without_constant_placement
+
+    args = _tensors(
+        {"type": "constant", "id": "0:w", "attributes": {"memory": "mram", "optimization": "x"}},
+        {"type": "CONSTANT", "attributes": {"constant_destination_memory": "dtcm"}},
+        {"type": "constant"},
+        {"type": "scratch", "attributes": {"memory": "dtcm"}},
+        {"type": "persistent", "attributes": {"memory": "sram"}},
+        planner="greedy",
+    )
+    before = json.loads(json.dumps(args))
+    assert without_constant_placement(args) == _tensors(
+        {"type": "constant", "id": "0:w", "attributes": {"optimization": "x"}},
+        {"type": "scratch", "attributes": {"memory": "dtcm"}},
+        {"type": "persistent", "attributes": {"memory": "sram"}},
+        planner="greedy",
+    )
+    assert args == before
+    assert without_constant_placement({"optimization": {"goal": "latency"}}) == {
+        "optimization": {"goal": "latency"}
+    }
+
+
+def _placed(tmp_path: Path, name: str, weights_location: str, text: str = "{}\n"):
+    (tmp_path / name).mkdir()
+    config = _aot_config(tmp_path / name, name, text)
+    return dataclasses.replace(
+        config, model=dataclasses.replace(config.model, weights_location=weights_location)
+    )
+
+
+def _pairing(config) -> str:
+    from helia_profiler.engines.helia_aot.compile import (
+        effective_aot_args,
+        effective_config_pairing_digest,
+    )
+
+    return effective_config_pairing_digest(
+        effective_aot_args(config),
+        module_name="hpx_model",
+        prefix="hpx",
+        aot_platform="apollo510_evb",
+    )[0]
+
+
+def test_the_compiler_configuration_pairs_across_the_weights_memory(tmp_path: Path) -> None:
+    """hpx's own constant rule follows weights_location; the pairing digest drops it."""
+    from helia_profiler.placement import Placement
+
+    tcm, mram, psram = (
+        _placed(tmp_path, name, placement)
+        for name, placement in (
+            ("tcm", Placement.TCM),
+            ("mram", Placement.MRAM),
+            ("psram", Placement.PSRAM),
+        )
+    )
+    assert len({_digest(config)[0] for config in (tcm, mram, psram)}) == 3
+    assert _pairing(tcm) == _pairing(mram) == _pairing(psram)
+    scratch = _placed(
+        tmp_path,
+        "scratch",
+        Placement.TCM,
+        "memory:\n  tensors:\n    - type: scratch\n      attributes: {memory: sram}\n",
+    )
+    assert _pairing(scratch) != _pairing(tcm)
+    constrained = _placed(
+        tmp_path,
+        "constrained",
+        Placement.TCM,
+        "memory:\n  constraints:\n    - {name: dtcm, max_size: 65536}\n",
+    )
+    assert _pairing(constrained) != _pairing(tcm)
+
+
+def test_every_helia_aot_bundle_records_the_pairing_configuration(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from helia_profiler.engines.helia_aot.compile import (
+        _DEFAULT_MODULE_NAME,
+        _DEFAULT_PREFIX,
+        effective_aot_args,
+        effective_config_pairing_digest,
+    )
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.report.metadata import _metadata_to_dict
+    from helia_profiler.stages import prepare_engine
+    from tests.test_helia_aot_adapter import _aot_cfg, _prepare
+
+    config = _aot_cfg({})
+    artifacts = _prepare(monkeypatch, tmp_path, config)
+    expected, _ = effective_config_pairing_digest(
+        effective_aot_args(config),
+        module_name=_DEFAULT_MODULE_NAME,
+        prefix=_DEFAULT_PREFIX,
+        aot_platform="apollo510_evb",
+    )
+    assert artifacts.effective_config_pairing_sha256 == expected
+    assert artifacts.effective_config_pairing_sha256 != artifacts.effective_config_sha256
+
+    class _Adapter:
+        name = "heliaAOT"
+
+        def prepare(self, _config, _work_dir):
+            return artifacts
+
+    monkeypatch.setattr(prepare_engine, "get_adapter", lambda _type: _Adapter())
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "stage")
+    prepare_engine.PrepareEngineStage().run(ctx)
+    engine = _metadata_to_dict(ctx.run_metadata)["engine"]
+    assert engine["effective_config_pairing_sha256"] == expected
+    assert engine["effective_config_sha256"] == artifacts.effective_config_sha256

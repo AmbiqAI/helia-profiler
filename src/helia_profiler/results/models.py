@@ -355,6 +355,9 @@ class EngineInfo:
     #: ``None`` for an engine that compiles nothing.
     effective_config_sha256: str | None = None
     effective_config_keys: tuple[str, ...] | None = None
+    #: The same digest less every placement rule of the constants, so two
+    #: runs that differ only in where the weights sit record the same value.
+    effective_config_pairing_sha256: str | None = None
 
 
 @dataclass(frozen=True)

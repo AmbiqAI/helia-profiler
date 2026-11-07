@@ -592,6 +592,64 @@ def effective_config_digest(
     return hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(data))
 
 
+#: The attributes of a ``memory.tensors[]`` rule that say where constants live.
+_CONSTANT_PLACEMENT_ATTRIBUTES = frozenset({"memory", "constant_destination_memory", "residency"})
+_CONSTANT_KIND = "constant"
+
+
+def without_constant_placement(aot_args: Mapping[str, Any]) -> dict[str, Any]:
+    """heliaAOT arguments less every placement of the constants, as a fresh dict.
+
+    In ``memory.tensors[]``, a rule whose ``type`` is ``constant`` (compared
+    ignoring case, as heliaAOT and :func:`user_wildcard_kinds` compare it)
+    and whose ``attributes`` hold nothing but ``memory``,
+    ``constant_destination_memory`` and ``residency`` is removed; a constant
+    rule that sets other attributes keeps them and loses only those three.
+    ``scratch`` and ``persistent`` rules are untouched. Two runs that differ
+    only in where the weights sit therefore give the same arguments.
+    """
+    data = copy.deepcopy(dict(aot_args))
+    memory = data.get("memory")
+    rules = memory.get("tensors") if isinstance(memory, dict) else None
+    if not isinstance(memory, dict) or not isinstance(rules, list):
+        return data
+    kept: list[Any] = []
+    for rule in rules:
+        kind = rule.get("type") if isinstance(rule, dict) else None
+        if not (isinstance(kind, str) and kind.casefold() == _CONSTANT_KIND):
+            kept.append(rule)
+            continue
+        attributes = rule.get("attributes")
+        rest = {
+            key: value
+            for key, value in (attributes if isinstance(attributes, dict) else {}).items()
+            if key not in _CONSTANT_PLACEMENT_ATTRIBUTES
+        }
+        if rest:
+            kept.append({**rule, "attributes": rest})
+    memory["tensors"] = kept
+    return data
+
+
+def effective_config_pairing_digest(
+    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+) -> tuple[str, tuple[str, ...]]:
+    """:func:`effective_config_digest` of the arguments less the constants' placement.
+
+    The arguments go through :func:`without_constant_placement` first, so two
+    conversions that differ only in where the weights sit digest the same.
+
+    Raises:
+        EngineError: as :func:`without_knob_values` raises it.
+    """
+    return effective_config_digest(
+        without_constant_placement(aot_args),
+        module_name=module_name,
+        prefix=prefix,
+        aot_platform=aot_platform,
+    )
+
+
 def _merge_aot_tensor_rulesets(
     profiler_rulesets: list[dict[str, Any]],
     user_tensors: list[Any],

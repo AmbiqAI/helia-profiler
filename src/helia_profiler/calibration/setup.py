@@ -2,7 +2,9 @@
 
 A capture's setup is one digest of its held settings as the bundle records
 them; :func:`_setup` builds it and :func:`_require_same_setup` refuses two
-sources whose setups differ, naming what differs when it can.
+sources whose setups differ, naming what differs when it can. Beside it,
+the pairing digest covers the same basis less where the constants sit, so
+captures that differ only in the weights memory share it.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..deps.compatibility import CMSIS_NN_PROVIDER_MODULES
-from ..engines.helia_aot.compile import non_finite_field
+from ..engines.helia_aot.compile import non_finite_field, without_constant_placement
 from ..errors import CalibrationError, EngineError, EngineMissingError
 from ..evaluation.compare import RunArtifacts
 from ..results.dimensions import derive_architecture_flags
@@ -45,12 +47,18 @@ SETUP_EXCLUDED: frozenset[str] = frozenset(
         "config.build.compiler_launcher",
         # CMake only drives the build; the flags come from the toolchain file.
         "toolchain.cmake_version",
+        # The pairing digest's own field; the setup holds the full configuration.
+        "engine.effective_config_pairing_sha256",
     }
 )
+#: What the pairing digest leaves out of the setup besides the constants'
+#: rules: hpx derives the constants' placement rule from it.
+PAIRING_EXCLUDED: frozenset[str] = frozenset({"config.model.weights_location"})
 #: Where the heliaAOT arguments sit in the frozen config; the knob values
 #: under them are removed by heliaAOT's own registry.
 _AOT_ARGS = ("config", "engine", "config", "aot_args")
 _EFFECTIVE_CONFIG = "effective_config_sha256"
+_PAIRING_CONFIG = "effective_config_pairing_sha256"
 _HELIA_AOT = "helia-aot"
 
 
@@ -69,20 +77,38 @@ class Setup:
     #: stripping depends on; ``None`` for another engine.
     helia_aot_version: str | None = None
     values: Mapping[str, Any] | None = field(default=None, compare=False, repr=False)
+    #: The digest of the basis less where the constants sit, and its fields;
+    #: ``None`` for both when unknown.
+    pairing_digest: str | None = None
+    pairing_fields: tuple[str, ...] | None = None
 
     @classmethod
-    def of(cls, basis: Mapping[str, Any], helia_aot_version: str | None = None) -> Setup:
-        """The setup of a nested *basis*: its canonical JSON digested, its leaves listed."""
-        leaves: dict[str, Any] = {}
-        _leaves("", basis, leaves)
-        return cls(_canonical_digest(basis), tuple(sorted(leaves)), helia_aot_version, basis)
+    def of(
+        cls,
+        basis: Mapping[str, Any],
+        helia_aot_version: str | None = None,
+        pairing: Mapping[str, Any] | None = None,
+    ) -> Setup:
+        """The setup of a nested *basis*, and of its *pairing* basis when known:
+        each one's canonical JSON digested, its leaves listed."""
+        pairing_digest, pairing_fields = (None, None) if pairing is None else _digested(pairing)
+        digest, fields = _digested(basis)
+        return cls(digest, fields, helia_aot_version, basis, pairing_digest, pairing_fields)
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "digest": self.digest,
             "fields": list(self.fields),
+            "pairing_digest": self.pairing_digest,
+            "pairing_fields": None if self.pairing_fields is None else list(self.pairing_fields),
             "helia_aot_version": self.helia_aot_version,
         }
+
+
+def _digested(basis: Mapping[str, Any]) -> tuple[str, tuple[str, ...]]:
+    leaves: dict[str, Any] = {}
+    _leaves("", basis, leaves)
+    return _canonical_digest(basis), tuple(sorted(leaves))
 
 
 def _require_same_setup(reference: CalibrationSource, other: CalibrationSource) -> None:
@@ -224,7 +250,29 @@ def _setup(run: RunArtifacts, source: str) -> Setup:
             "record cannot hold.",
             hint="Profile with a finite value there, or leave the setting at its default.",
         )
-    return Setup.of(basis, helia_aot_version)
+    return Setup.of(basis, helia_aot_version, _pairing_basis(basis, run))
+
+
+def _pairing_basis(basis: Mapping[str, Any], run: RunArtifacts) -> dict[str, Any] | None:
+    """The setup basis less where the constants sit; ``None`` when the bundle
+    records no ``engine.effective_config_pairing_sha256``.
+
+    ``config.model.weights_location`` goes, the constants' placement goes
+    from the heliaAOT arguments, already less their knob values, and the
+    compiler's configuration is held by its pairing digest.
+    """
+    recorded = nested_get(run.metadata, "engine", _PAIRING_CONFIG)
+    if not isinstance(recorded, str) or not isinstance(basis.get("engine"), dict):
+        return None
+    pairing = copy.deepcopy(dict(basis))
+    for excluded in PAIRING_EXCLUDED:
+        _remove(pairing, tuple(excluded.split(".")))
+    aot_args = _lookup(pairing, _AOT_ARGS)
+    if isinstance(aot_args, dict):
+        _lookup(pairing, _AOT_ARGS[:-1])[_AOT_ARGS[-1]] = without_constant_placement(aot_args)
+    pairing["engine"].pop(_EFFECTIVE_CONFIG, None)
+    pairing["engine"][_PAIRING_CONFIG] = recorded
+    return pairing
 
 
 def _lookup(data: Any, path: tuple[str, ...]) -> Any:
