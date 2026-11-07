@@ -84,6 +84,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, TypeGuard
 
+from ..engines.helia_aot.compile import non_finite_field
 from ..errors import CalibrationError
 from ..evaluation.compare import RunArtifacts, load_run_artifacts
 from ..results import (
@@ -730,8 +731,12 @@ def _conditions_refusal(recorded: Mapping[str, Any]) -> str | None:
     """Why *recorded* is not a conditions block a calibration file holds, or ``None``.
 
     One rule for a bundle and an existing file: the types ``Conditions``
-    reads, and a weights memory, which heliaOptimus matches a plan on.
+    reads, a weights memory, which heliaOptimus matches a plan on, and no NaN
+    or infinity anywhere in the block, since the file is written without them.
     """
+    unfit = non_finite_field(recorded, "conditions")
+    if unfit is not None:
+        return f"{unfit} is not a finite number"
     try:
         typed = Conditions.from_dict(recorded)
     except ValueError as exc:

@@ -684,6 +684,36 @@ def test_a_bundle_without_conditions_or_weights_memory_is_refused(tmp_path: Path
         read_bundle(unplaced)
 
 
+def test_a_non_finite_condition_is_refused_naming_its_path(tmp_path: Path) -> None:
+    """An open condition may hold any JSON value, but not one the writer cannot write."""
+    conditions = {**CONDITIONS, "board": {"coefficient": 12345.5}}
+    odd = bundle(tmp_path / "odd", cycles={0: 1.0, 1: 1.0, 2: 1.0}, conditions=conditions)
+    summary = odd / "summary.json"
+    summary.write_text(summary.read_text().replace("12345.5", "1e400"), encoding="utf-8")
+    _republish(odd)
+    output = tmp_path / "out.json"
+    with pytest.raises(
+        CalibrationError,
+        match=r"Bundle .*odd: conditions\.board\.coefficient is not a finite number\.",
+    ):
+        calibrate([odd], output=output)
+    assert not output.exists()
+    # A file holding one is refused on --merge, and left as it is.
+    auto, _ = two_bundles(tmp_path)
+    calibrate([auto], output=output)
+    data = json.loads(output.read_text(encoding="utf-8"))
+    data["conditions"]["board"] = {"coefficient": 12345.5}
+    output.write_text(json.dumps(data).replace("12345.5", "1e400"), encoding="utf-8")
+    before = output.read_bytes()
+    with pytest.raises(CalibrationError) as refused:
+        calibrate([auto], output=output, merge=True)
+    assert refused.value.args[0] == (
+        f"Calibration file {output} is malformed: conditions.board.coefficient is not a "
+        "finite number."
+    )
+    assert output.read_bytes() == before
+
+
 def test_a_run_the_profiler_marked_invalid_is_refused(tmp_path: Path) -> None:
     bad = bundle(tmp_path / "bad", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
     _mark(bad, ResultValidity.INVALID, "firmware.model_mismatch")

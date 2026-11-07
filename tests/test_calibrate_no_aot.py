@@ -104,9 +104,9 @@ _ACCEPTED: dict[str, Change] = {
 }
 #: What only the reader can refuse, as JSON Schema cannot say it: an
 #: integer-valued float in an integer field, a vector listed twice, NaN and
-#: infinity (Python's JSON parser reads 1e400 as infinity), and a final
-#: newline (jsonschema's pattern search lets ``$`` match before it, which the
-#: reader's full match does not).
+#: infinity in the cycles or in an open condition (Python's JSON parser reads
+#: 1e400 as infinity), and a final newline (jsonschema's pattern search lets
+#: ``$`` match before it, which the reader's full match does not).
 _READER_ONLY: dict[str, Change] = {
     "version 2.0": lambda d: d.update(schema_version=2.0),
     "subgraph 0.0": lambda d: d["model"].update(subgraph=0.0),
@@ -114,6 +114,9 @@ _READER_ONLY: dict[str, Change] = {
     "a vector listed twice": lambda d: d["operator_cycles"]["0:fc"].append(_entry(d)),
     "NaN cycles": lambda d: _entry(d).update(cycles=float("nan")),
     "infinite cycles": lambda d: _entry(d).update(cycles=float("inf")),
+    "an infinite open condition": lambda d: d["conditions"].update(
+        board={"coefficient": float("inf")}
+    ),
     "a fact name with a final newline": lambda d: _entry(d)["facts"].update({"fixed:a\n": "x"}),
     "a digest with a final newline": lambda d: _setup(d).update(digest=_setup(d)["digest"] + "\n"),
 }
