@@ -7,6 +7,7 @@ import dataclasses
 import hashlib
 import json
 import os
+import re
 import stat
 from pathlib import Path
 from typing import Any
@@ -17,9 +18,10 @@ from typer.testing import CliRunner
 
 from helia_profiler.calibration import (
     CALIBRATION_SCHEMA_VERSION,
-    CAPTURE_DIMENSIONS,
+    SETUP_EXCLUDED,
     CalibrationTable,
     Price,
+    Setup,
     calibrate,
     merge_sources,
     read_bundle,
@@ -59,18 +61,6 @@ PLAN_OPERATORS = [
     {"id": "0:softmax", "index": 2, "op_type": "softmax", "knobs": {}},
 ]
 
-#: What every synthetic bundle records of its capture setup.
-DIMENSIONS = {
-    **{dimension.value: None for dimension in CAPTURE_DIMENSIONS},
-    "model_sha256": SHA,
-    "link_family": "gnu",
-    "toolchain": "arm-none-eabi-gcc",
-    "engine_version": "0.33.0",
-    "kernel_version": "7.0.0",
-    "kernel_commit": "c" * 40,
-    "arena_memory": "DTCM",
-}
-
 PLANS = Path(__file__).parent / "fixtures" / "calibration"
 
 
@@ -96,13 +86,20 @@ def bundle(
     plan_schema: int = 1,
     plan_files: tuple[str, ...] = ("hpx_plan.json",),
     toolchain: str = "arm-none-eabi-gcc",
+    compiler_version: str = "13.2.1",
     engine_version: str = "0.33.0",
+    backend: str | None = None,
     link_family: str = "gnu",
-    kernel_version: Any = "7.0.0",
-    kernel_commit: str = "c" * 40,
-    arena_region: str = "DTCM",
-    layer_cycles_text: str | None = None,
+    arena_location: str | None = None,
+    knob_values: dict[str, str] | None = None,
+    jlink_serial: str = "1160002204",
+    flags: str = "-mcpu=cortex-m55",
+    kernel_commit: str | None = "c" * 40,
+    kernel_content: str = "k" * 64,
     power: dict[str, Any] | None = None,
+    power_config: dict[str, Any] | None = None,
+    with_toolchain: bool = True,
+    layer_cycles_text: str | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
     path.mkdir(parents=True)
@@ -113,21 +110,8 @@ def bundle(
         "layers": len(cycles),
         "total_cycles": sum(cycles.values()),
         "overflow_detected": overflow is not None,
-        "identity": {
-            "model_sha256": sha256,
-            "kernels": {"library": "cmsis-nn", "version": kernel_version, "commit": kernel_commit},
-        },
+        "identity": {"model_sha256": sha256},
         "top_layers": [],
-        "memory_plan": {
-            "engine": "helia-aot",
-            "regions": [
-                {
-                    "region": arena_region,
-                    "consumers": [{"name": "scratch", "size": 1024, "kind": "arena"}],
-                },
-                {"region": "MRAM", "consumers": [{"name": "code", "size": 1, "kind": "code"}]},
-            ],
-        },
         "validity": "valid",
         "issues": [],
     }
@@ -136,14 +120,60 @@ def bundle(
     if power is not None:
         summary["power"] = power
     (path / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
-    metadata = {
+    metadata: dict[str, Any] = {
         "schema": "hpx.run-metadata",
         "schema_version": 1,
         "model": {"sha256": sha256},
-        "config": {"engine": {"type": "helia-aot"}, "target": {"toolchain": toolchain}},
-        "engine": {"type": "helia-aot", "version": engine_version},
+        "config": {
+            "model": {
+                "path": str(path / "kws.tflite"),
+                "arena_size": 262144,
+                "arena_location": arena_location,
+                "weights_location": "tcm",
+            },
+            "engine": {
+                "type": "helia-aot",
+                "backend": backend,
+                "config_path": None,
+                "config": {
+                    "aot_args": {
+                        "optimization": {
+                            "goal": "balanced",
+                            "knobs": knob_values or {"accumulation": "auto"},
+                        },
+                        "operators": [{"type": "conv_2d", "knobs": knob_values or {}}],
+                    }
+                },
+            },
+            "target": {
+                "board": "apollo510_evb",
+                "toolchain": toolchain,
+                "jlink_serial": jlink_serial,
+                "transport": "rtt",
+                "clock": {"cpu": "hp"},
+            },
+            "profiling": {"iterations": 100, "pmu_counters": ["cpu:default"]},
+            "power": power_config or {"enabled": False, "mode": "external"},
+            "output": {"dir": str(path), "format": "csv"},
+            "timeouts": {"build_s": 600},
+            "build": {"nsx_modules": {}, "offline": False},
+            "work_dir": None,
+        },
+        "engine": {"type": "helia-aot", "version": engine_version, "backend": backend},
         "platform": {"link_family": link_family},
+        "build_images": [{"role": "profile", "architecture_flags": {flags: 12}}],
+        "dependencies": {
+            "modules": [
+                {
+                    "name": "nsx-cmsis-nn",
+                    "peeled_commit": kernel_commit,
+                    "content_hash": {"algorithm": "sha256", "value": kernel_content},
+                }
+            ]
+        },
     }
+    if with_toolchain:
+        metadata["toolchain"] = {"compiler": toolchain, "compiler_version": compiler_version}
     (path / "run_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     with (path / "profile_results.csv").open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["id", "op", "cycles", "overflow"])
@@ -232,6 +262,7 @@ def two_bundles(tmp_path: Path) -> tuple[Path, Path]:
         tmp_path / "wide",
         cycles={0: 9000.0, 1: 3030.0, 2: 410.0},
         plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+        knob_values={"accumulation": "int16"},
     )
     return auto, wide
 
@@ -240,28 +271,29 @@ def _price(cycles: float, **others: str) -> dict[str, Any]:
     return {"others": others, "facts": {}}
 
 
-EXPECTED = {
-    "schema_version": 1,
-    "model": {"sha256": SHA, "subgraph": 0},
-    "conditions": CONDITIONS,
-    "operators": {
-        "0:conv": {"accumulation": {"int16": {"cycles": 9000.0}, "int32": {"cycles": 12000.0}}},
-        "0:fc": {
-            "accumulation": {"int32": {"cycles": 3000.0}},
-            "weights": {"packed": {"cycles": 3000.0}},
-        },
-    },
-    "capture": {
-        "dimensions": DIMENSIONS,
-        "prices": {
-            "0:conv": {"accumulation": {"int32": _price(12000.0), "int16": _price(9000.0)}},
-            "0:fc": {
-                "accumulation": {"int32": _price(3000.0, weights="packed")},
-                "weights": {"packed": _price(3000.0, accumulation="int32")},
-            },
-        },
+EXPECTED_OPERATORS = {
+    "0:conv": {"accumulation": {"int16": {"cycles": 9000.0}, "int32": {"cycles": 12000.0}}},
+    "0:fc": {
+        "accumulation": {"int32": {"cycles": 3000.0}},
+        "weights": {"packed": {"cycles": 3000.0}},
     },
 }
+EXPECTED_PRICES = {
+    "0:conv": {"accumulation": {"int32": _price(12000.0), "int16": _price(9000.0)}},
+    "0:fc": {
+        "accumulation": {"int32": _price(3000.0, weights="packed")},
+        "weights": {"packed": _price(3000.0, accumulation="int32")},
+    },
+}
+
+
+def _check_expected(written: dict[str, Any]) -> None:
+    assert written["schema_version"] == 1
+    assert written["model"] == {"sha256": SHA, "subgraph": 0}
+    assert written["conditions"] == CONDITIONS
+    assert written["operators"] == EXPECTED_OPERATORS
+    assert written["capture"]["prices"] == EXPECTED_PRICES
+    assert set(written["capture"]) == {"setup", "prices"}
 
 
 # -- the heliaOptimus shape, as helia_optimus.cost.calibration reads it --
@@ -301,7 +333,7 @@ def test_two_bundles_price_every_knob_value_under_its_vector(tmp_path: Path) -> 
     table = calibrate([auto, wide], output=output)
 
     written = json.loads(output.read_text(encoding="utf-8"))
-    assert written == EXPECTED
+    _check_expected(written)
     assert "0:softmax" not in written["operators"]
     assert table.price_count == 4
     assert read_calibration(output) == table
@@ -310,6 +342,53 @@ def test_two_bundles_price_every_knob_value_under_its_vector(tmp_path: Path) -> 
     assert file.conditions == _Conditions.model_validate(CONDITIONS)
     assert file.operators["0:conv"]["accumulation"]["int16"].cycles == 9000.0
     assert not any(output.parent.glob(".kws.json.*"))
+
+
+def test_the_setup_covers_the_held_settings_and_nothing_swept_or_run_only(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+
+    setup = json.loads(output.read_text(encoding="utf-8"))["capture"]["setup"]
+
+    assert re.fullmatch(r"[0-9a-f]{64}", setup["digest"])
+    fields = set(setup["fields"])
+    held = {
+        "config.target.toolchain",
+        "config.target.board",
+        "config.target.clock.cpu",
+        "config.model.arena_location",
+        "config.model.arena_size",
+        "config.model.weights_location",
+        "config.engine.backend",
+        "config.engine.config.aot_args.optimization.goal",
+        "config.engine.config.aot_args.operators.0.type",
+        "config.profiling.iterations",
+        "config.build.nsx_modules",
+        "toolchain.compiler_version",
+        "engine.version",
+        "build.architecture_flags",
+        "kernel.build",
+    }
+    assert held <= fields, held - fields
+    swept_or_run_only = {
+        "config.engine.config.aot_args.optimization.knobs.accumulation",
+        "config.engine.config.aot_args.operators.0.knobs",
+        "config.power.enabled",
+        "config.output.dir",
+        "config.timeouts.build_s",
+        "config.target.jlink_serial",
+        "config.model.path",
+        "config.work_dir",
+        "config.build.offline",
+    }
+    assert not swept_or_run_only & fields
+    assert "config.power" in SETUP_EXCLUDED
+    source = read_bundle(auto)
+    assert source.setup.digest == setup["digest"]
+    assert source.setup.values is not None
+    assert source.setup.values["kernel.build"] == "commit:" + "c" * 40
+    assert source.setup.values["build.architecture_flags"] == "-mcpu=cortex-m55"
 
 
 def test_an_approximate_value_is_still_priced(tmp_path: Path) -> None:
@@ -330,7 +409,12 @@ def test_a_real_knob_sweep_prices_every_operator_the_knob_moves(
 ) -> None:
     """heliaAOT's knobs exist to change the kernel entry and the choices that follow it."""
     first = _real_bundle(tmp_path / values[0], f"{model}_{knob}_{values[0]}")
-    second = _real_bundle(tmp_path / values[1], f"{model}_{knob}_{values[1]}", offset=500.0)
+    second = _real_bundle(
+        tmp_path / values[1],
+        f"{model}_{knob}_{values[1]}",
+        offset=500.0,
+        knob_values={knob: values[1]},
+    )
     output = tmp_path / f"{model}.json"
 
     table = calibrate([first, second], output=output)
@@ -354,75 +438,36 @@ def test_a_real_knob_sweep_prices_every_operator_the_knob_moves(
     assert calibrate([first, second], output=output, merge=True) == table
 
 
-def test_a_hand_written_file_merges_with_a_real_plan_and_again(tmp_path: Path) -> None:
-    real = _real_bundle(tmp_path / "specialized", "kws_int8_kernel_specialized")
-    generic = _real_bundle(tmp_path / "generic", "kws_int8_kernel_generic", offset=500.0)
-    plan = json.loads((PLANS / "kws_int8_kernel_specialized_plan.json").read_text())
-    conv = plan["operators"][0]["id"]
-    hand = _hand_written(
-        tmp_path / "hand.json",
-        {conv: {"kernel": {"generic": {"cycles": 1500}}}},
-        sha256=plan["model"]["sha256"],
-    )
-
-    table = calibrate([real], output=hand, merge=True)
-
-    assert table.operators[conv]["kernel"] == {"generic": 1500.0, "specialized": 1000.0}
-    assert table.dimensions == {**DIMENSIONS, "model_sha256": plan["model"]["sha256"]}
-    written = json.loads(hand.read_text(encoding="utf-8"))
-    assert "generic" not in written["capture"]["prices"][conv]["kernel"]
-    assert written["capture"]["prices"][conv]["kernel"]["specialized"]["others"] == {}
-    # The hand-written price gains its vector when a bundle prices the same key.
-    again = calibrate([generic], output=hand, merge=True)
-    assert again.prices[(conv, "kernel", "generic")] == Price(
-        1500.0, {}, {"kernel:entry": "arm_convolve_s8"}
-    )
-    assert calibrate([generic, real], output=hand, merge=True) == again
-
-
 def test_merge_then_merge_again(tmp_path: Path) -> None:
     """The documented workflow: write, --merge, --merge the same bundle."""
-    auto = bundle(tmp_path / "auto", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
+    auto, wide = two_bundles(tmp_path)
     output = tmp_path / "cal.json"
     calibrate([auto], output=output)
+
+    once = calibrate([wide], output=output, merge=True)
+    twice = calibrate([wide], output=output, merge=True)
+
+    assert once == twice
+    _check_expected(json.loads(output.read_text(encoding="utf-8")))
+
+
+def test_a_second_vector_for_one_value_is_refused_naming_both(tmp_path: Path) -> None:
+    auto = bundle(tmp_path / "auto", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
     flat = bundle(
         tmp_path / "flat",
         cycles={0: 12000.0, 1: 2500.0, 2: 400.0},
         plan_ops=_knob(PLAN_OPERATORS, "0:fc", "weights", "flat"),
     )
-
-    once = calibrate([flat], output=output, merge=True)
-    twice = calibrate([flat], output=output, merge=True)
-
-    assert once == twice
-    written = json.loads(output.read_text(encoding="utf-8"))
-    assert written["operators"]["0:fc"] == {
-        "accumulation": {"int32": {"cycles": 3000.0}},
-        "weights": {"flat": {"cycles": 2500.0}, "packed": {"cycles": 3000.0}},
-    }
-    # The file holds one price per value: accumulation=int32 keeps the price
-    # measured with weights=packed, and records that vector.
-    assert written["capture"]["prices"]["0:fc"]["accumulation"]["int32"]["others"] == {
-        "weights": "packed"
-    }
-    assert written["capture"]["prices"]["0:fc"]["weights"]["flat"]["others"] == {
-        "accumulation": "int32"
-    }
-
-
-def test_every_knob_is_priced_under_the_vector_it_ran_with(tmp_path: Path) -> None:
-    auto = bundle(tmp_path / "auto", cycles={0: 1.0, 1: 3000.0, 2: 1.0})
-    both = bundle(
-        tmp_path / "both",
-        cycles={0: 1.0, 1: 2000.0, 2: 1.0},
-        plan_ops=_knob(
-            _knob(PLAN_OPERATORS, "0:fc", "weights", "flat"), "0:fc", "accumulation", "int16"
-        ),
-    )
-    table = calibrate([auto, both], output=tmp_path / "out.json")
-    assert table.prices[("0:fc", "accumulation", "int16")] == Price(2000.0, {"weights": "flat"})
-    assert table.prices[("0:fc", "weights", "flat")] == Price(2000.0, {"accumulation": "int16"})
-    assert table.prices[("0:fc", "weights", "packed")] == Price(3000.0, {"accumulation": "int32"})
+    with pytest.raises(
+        CalibrationError,
+        match=r"0:fc accumulation=int32 is priced with the other knobs at \{'weights': 'packed'\} "
+        r"in .*auto but at \{'weights': 'flat'\} in .*flat",
+    ):
+        calibrate([auto, flat], output=tmp_path / "out.json")
+    output = tmp_path / "cal.json"
+    calibrate([auto], output=output)
+    with pytest.raises(CalibrationError, match=r"in .*cal.json but at \{'weights': 'flat'\}"):
+        calibrate([flat], output=output, merge=True)
 
 
 def test_facts_of_one_vector_are_recorded_once(tmp_path: Path) -> None:
@@ -485,146 +530,211 @@ def test_bundles_under_other_conditions_are_refused(tmp_path: Path) -> None:
         calibrate([auto, loaded], output=tmp_path / "out.json")
 
 
-UNTAGGED = {"unknown": "the lock states no release tag for ns-cmsis-nn"}
-
-
 @pytest.mark.parametrize(
-    ("change", "name", "values"),
+    ("change", "field", "values"),
     [
-        ({"link_family": "armlink"}, "link_family", ("'armlink'", "'gnu'")),
-        ({"kernel_version": "7.1.0"}, "kernel_version", ("'7.1.0'", "'7.0.0'")),
-        ({"kernel_commit": "d" * 40}, "kernel_commit", ("'dddd", "'cccc")),
+        (
+            {"toolchain": "armclang"},
+            "config.target.toolchain",
+            ("'armclang'", "'arm-none-eabi-gcc'"),
+        ),
+        ({"compiler_version": "14.1.0"}, "toolchain.compiler_version", ("'14.1.0'", "'13.2.1'")),
+        ({"engine_version": "0.34.0"}, "engine.version", ("'0.34.0'", "'0.33.0'")),
+        ({"backend": "ethos_u"}, "config.engine.backend", ("'ethos_u'", "None")),
+        ({"arena_location": "sram"}, "config.model.arena_location", ("'sram'", "None")),
+        (
+            {"flags": "-mcpu=cortex-m55+nomve"},
+            "build.architecture_flags",
+            ("'-mcpu=cortex-m55\\+nomve'", "'-mcpu=cortex-m55'"),
+        ),
+        ({"kernel_commit": "d" * 40}, "kernel.build", ("'commit:dddd", "'commit:cccc")),
     ],
 )
-def test_captures_from_another_setup_are_refused(
-    tmp_path: Path, change: dict[str, Any], name: str, values: tuple[str, str]
-) -> None:
-    auto, _ = two_bundles(tmp_path)
-    other = bundle(tmp_path / "other", cycles={0: 1.0, 1: 1.0, 2: 1.0}, **change)
-    with pytest.raises(CalibrationError, match=f"has {name} {values[0]}.*;.*has {values[1]}"):
-        calibrate([auto, other], output=tmp_path / "out.json")
-    # The file remembers its setup, so a later merge is held to it too.
-    output = tmp_path / "kws.json"
-    calibrate([auto], output=output)
-    assert json.loads(output.read_text())["capture"]["dimensions"] == DIMENSIONS
-    with pytest.raises(CalibrationError, match=f"has {name} {values[0]}.*;.*kws.json has"):
-        calibrate([other], output=output, merge=True)
-
-
-def test_the_kernel_commit_tells_untagged_builds_apart(tmp_path: Path) -> None:
-    """A SHA-pinned ns-cmsis-nn records no release tag, so only the commit identifies it."""
-    before = bundle(
-        tmp_path / "before",
-        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
-        kernel_version=UNTAGGED,
-        kernel_commit="a" * 40,
-    )
-    after = bundle(
-        tmp_path / "after",
-        cycles={0: 12000.0, 1: 2500.0, 2: 400.0},
-        kernel_version=UNTAGGED,
-        kernel_commit="b" * 40,
-        plan_ops=_knob(PLAN_OPERATORS, "0:fc", "weights", "flat"),
-    )
-    with pytest.raises(CalibrationError, match="has kernel_commit 'bbbb"):
-        calibrate([before, after], output=tmp_path / "out.json")
-    # One side untagged, same commit: the version cannot differ, the build is one.
-    tagged = bundle(
-        tmp_path / "tagged", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, kernel_commit="a" * 40
-    )
-    table = calibrate([before, tagged], output=tmp_path / "out.json")
-    assert table.dimensions["kernel_version"] == UNTAGGED
-
-
-@pytest.mark.parametrize(
-    ("change", "name", "values"),
-    [
-        ({"toolchain": "armclang"}, "toolchain", ("'armclang'", "'arm-none-eabi-gcc'")),
-        ({"engine_version": "0.34.0"}, "engine_version", ("'0.34.0'", "'0.33.0'")),
-        ({"arena_region": "SRAM"}, "arena_memory", ("'SRAM'", "'DTCM'")),
-    ],
-)
-def test_a_dimension_that_changes_cycles_is_refused_though_compare_only_reports_it(
-    tmp_path: Path, change: dict[str, Any], name: str, values: tuple[str, str]
+def test_a_held_setting_that_differs_is_refused_naming_it(
+    tmp_path: Path, change: dict[str, Any], field: str, values: tuple[str, str]
 ) -> None:
     auto, _ = two_bundles(tmp_path)
     other = bundle(tmp_path / "other", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, **change)
-    with pytest.raises(CalibrationError, match=f"has {name} {values[0]};.*has {values[1]}"):
+    message = (
+        f"different setups: .*{re.escape(field)} is .*{values[0]}.* in .*other"
+        f".*{values[1]}.* in .*auto|different setups: .*{re.escape(field)} is "
+        f".*{values[1]}.* in .*auto.*{values[0]}.* in .*other"
+    )
+    with pytest.raises(CalibrationError, match=message):
         calibrate([auto, other], output=tmp_path / "out.json")
+    with pytest.raises(CalibrationError, match=message):
+        calibrate([other, auto], output=tmp_path / "out.json")
+    # The file remembers its setup, so a later merge is held to it too.
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    with pytest.raises(CalibrationError, match="different setups"):
+        calibrate([other], output=output, merge=True)
 
 
-def test_a_power_only_difference_still_merges(tmp_path: Path) -> None:
-    """A power scope is a blocking dimension for power metrics, which no price is."""
+def test_local_kernel_trees_are_told_apart_by_their_content(tmp_path: Path) -> None:
+    """A local or vendored ns-cmsis-nn records no commit, only a content hash."""
+    one = bundle(
+        tmp_path / "one",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        kernel_commit=None,
+        kernel_content="1" * 64,
+    )
+    other = bundle(
+        tmp_path / "other",
+        cycles={0: 5000.0, 1: 3000.0, 2: 400.0},
+        kernel_commit=None,
+        kernel_content="2" * 64,
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+    )
+    with pytest.raises(CalibrationError, match="kernel.build is 'content:2222"):
+        calibrate([one, other], output=tmp_path / "out.json")
+    same = bundle(
+        tmp_path / "same",
+        cycles={0: 5000.0, 1: 3000.0, 2: 400.0},
+        kernel_commit=None,
+        kernel_content="1" * 64,
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+    )
+    assert calibrate([one, same], output=tmp_path / "out.json").price_count == 4
+
+
+def test_a_setting_absent_on_one_side_is_a_mismatch(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    bare = bundle(tmp_path / "bare", cycles={0: 12000.0, 1: 3000.0, 2: 400.0}, with_toolchain=False)
+    with pytest.raises(
+        CalibrationError,
+        match="toolchain.compiler_version is None in .*bare but '13.2.1' in .*auto",
+    ):
+        calibrate([auto, bare], output=tmp_path / "out.json")
+    with pytest.raises(CalibrationError, match="different setups"):
+        calibrate([bare, auto], output=tmp_path / "out.json")
+
+
+def test_swept_and_run_only_settings_do_not_block_a_merge(tmp_path: Path) -> None:
+    auto, _ = two_bundles(tmp_path)
+    other = bundle(
+        tmp_path / "other",
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+        knob_values={"accumulation": "int16"},
+        jlink_serial="1160009999",
+        power_config={"enabled": True, "mode": "external", "serial": "004204"},
+    )
+    assert calibrate([auto, other], output=tmp_path / "out.json").price_count == 4
+
+
+def test_power_measurement_state_never_takes_part(tmp_path: Path) -> None:
     auto, _ = two_bundles(tmp_path)
     gated = bundle(
         tmp_path / "gated",
-        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
-        power={"measurement_scope": "gpio_gated_clean_window", "integrity": "valid"},
+        cycles={0: 9000.0, 1: 3000.0, 2: 400.0},
+        plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "int16"),
+        knob_values={"accumulation": "int16"},
+        power={
+            "measurement_scope": "gpio_gated_clean_window",
+            "integrity": "valid",
+            "firmware_code_fingerprint": "1" * 64,
+        },
+        power_config={"enabled": True, "mode": "external"},
     )
-    table = calibrate([auto, gated], output=tmp_path / "out.json")
-    assert table.price_count == 3
-    assert table.dimensions["power_scope"] is None
-    whole = bundle(
-        tmp_path / "whole",
+    assert calibrate([auto, gated], output=tmp_path / "out.json").price_count == 4
+    # Two power-measured runs whose rendered firmware differs with the knob.
+    other_print = bundle(
+        tmp_path / "print",
         cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
-        power={"measurement_scope": "whole_capture_window", "integrity": "valid"},
+        power={
+            "measurement_scope": "whole_capture_window",
+            "integrity": "degraded",
+            "firmware_code_fingerprint": "2" * 64,
+        },
+        power_config={"enabled": True, "mode": "external"},
     )
-    with pytest.raises(CalibrationError, match="has power_scope 'whole_capture_window'"):
-        calibrate([gated, whole], output=tmp_path / "out.json")
+    assert calibrate([gated, other_print], output=tmp_path / "out.json").price_count == 4
 
 
-def test_a_file_that_records_no_setup_takes_the_bundles_setup(tmp_path: Path) -> None:
+def test_the_setup_check_does_not_depend_on_bundle_order(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    odd = bundle(
+        tmp_path / "odd",
+        cycles={0: 1.0, 1: 1.0, 2: 1.0},
+        toolchain="armclang",
+        plan_ops=_knob(PLAN_OPERATORS, "0:fc", "weights", "flat"),
+    )
+    for order in ([auto, wide, odd], [odd, auto, wide], [auto, odd, wide]):
+        with pytest.raises(CalibrationError, match="different setups: config.target.toolchain"):
+            calibrate(order, output=tmp_path / "out.json")
+
+
+def test_a_file_hpx_did_not_write_cannot_be_merged_into(tmp_path: Path) -> None:
     auto, _ = two_bundles(tmp_path)
-    output = _hand_written(
+    hand = _hand_written(
         tmp_path / "hand.json", {"0:conv": {"accumulation": {"int16": {"cycles": 9000}}}}
     )
+    with pytest.raises(CalibrationError, match="records no setup under capture.setup") as refused:
+        calibrate([auto], output=hand, merge=True)
+    assert "heliaOptimus reads a hand-written table directly" in str(refused.value)
+    assert json.loads(hand.read_text())["operators"] == {
+        "0:conv": {"accumulation": {"int16": {"cycles": 9000}}}
+    }
 
-    table = calibrate([auto], output=output, merge=True)
 
-    assert table.operators["0:conv"]["accumulation"] == {"int16": 9000.0, "int32": 12000.0}
-    assert table.dimensions == DIMENSIONS
-    assert json.loads(output.read_text())["capture"]["dimensions"] == DIMENSIONS
-    # The bundles must still agree among themselves, file or no file.
-    other = bundle(tmp_path / "other", cycles={0: 1.0, 1: 1.0, 2: 1.0}, link_family="armlink")
-    hand = _hand_written(
-        tmp_path / "hand2.json", {"0:conv": {"accumulation": {"int16": {"cycles": 9000}}}}
-    )
-    with pytest.raises(CalibrationError, match="has link_family 'armlink';.*auto has"):
-        calibrate([auto, other], output=hand, merge=True)
-    assert "capture" not in json.loads(hand.read_text())
+def test_a_damaged_file_cannot_be_merged_into(tmp_path: Path) -> None:
+    auto, wide = two_bundles(tmp_path)
+    output = tmp_path / "cal.json"
+    calibrate([auto], output=output)
+    whole = json.loads(output.read_text(encoding="utf-8"))
+
+    damaged = tmp_path / "no_setup.json"
+    data = json.loads(json.dumps(whole))
+    del data["capture"]["setup"]
+    damaged.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(CalibrationError, match="records no setup under capture.setup"):
+        calibrate([wide], output=damaged, merge=True)
+
+    edited = tmp_path / "edited.json"
+    data = json.loads(json.dumps(whole))
+    data["capture"]["setup"]["digest"] = "not a digest"
+    edited.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(CalibrationError, match="records no setup under capture.setup"):
+        calibrate([wide], output=edited, merge=True)
+
+    malformed = tmp_path / "malformed.json"
+    data = json.loads(json.dumps(whole))
+    data["capture"]["prices"]["0:fc"]["accumulation"]["int32"]["others"] = ["weights"]
+    malformed.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(CalibrationError, match="0:fc accumulation=int32 has no well-formed record"):
+        calibrate([wide], output=malformed, merge=True)
+
+    unrecorded = tmp_path / "unrecorded.json"
+    data = json.loads(json.dumps(whole))
+    del data["capture"]["prices"]["0:conv"]
+    unrecorded.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(CalibrationError, match="0:conv accumulation=int32 has no well-formed"):
+        calibrate([wide], output=unrecorded, merge=True)
+
+
+def test_two_files_are_held_to_the_tolerance(tmp_path: Path) -> None:
+    low = bundle(tmp_path / "low", cycles={0: 1000.0, 1: 1.0, 2: 1.0})
+    high = bundle(tmp_path / "high", cycles={0: 9000.0, 1: 1.0, 2: 1.0})
+    first = calibrate([low], output=tmp_path / "f1.json").as_source("f1")
+    second = calibrate([high], output=tmp_path / "f2.json").as_source("f2")
+    with pytest.raises(CalibrationError, match="costs 1000 cycles in f1 but 9000 in f2"):
+        merge_sources([first, second])
 
 
 def test_merge_never_replaces_a_price_the_file_holds(tmp_path: Path) -> None:
     auto, _ = two_bundles(tmp_path)
-    uneven = _hand_written(
-        tmp_path / "uneven.json",
-        {
-            "0:fc": {
-                "accumulation": {"int32": {"cycles": 3000}},
-                "weights": {"packed": {"cycles": 5000}},
-            }
-        },
-    )
-    with pytest.raises(
-        CalibrationError, match=r"0:fc weights=packed costs 5000 cycles in .*uneven.json but 3000"
-    ):
-        calibrate([auto], output=uneven, merge=True)
-    assert json.loads(uneven.read_text())["operators"]["0:fc"]["weights"]["packed"] == {
-        "cycles": 5000
+    output = tmp_path / "kws.json"
+    calibrate([auto], output=output)
+    disagreeing = bundle(tmp_path / "disagreeing", cycles={0: 12000.0, 1: 4000.0, 2: 400.0})
+    with pytest.raises(CalibrationError, match=r"costs 3000 cycles in .*kws\.json but 4000"):
+        calibrate([disagreeing], output=output, merge=True)
+    assert json.loads(output.read_text())["operators"]["0:fc"]["weights"]["packed"] == {
+        "cycles": 3000.0
     }
-    agreeing = bundle(tmp_path / "agreeing", cycles={0: 12000.0, 1: 3050.0, 2: 1.0})
-    even = _hand_written(
-        tmp_path / "even.json",
-        {
-            "0:fc": {
-                "accumulation": {"int32": {"cycles": 3000}},
-                "weights": {"packed": {"cycles": 3000}},
-            }
-        },
-    )
-    table = calibrate([agreeing], output=even, merge=True)
+    agreeing = bundle(tmp_path / "agreeing", cycles={0: 12000.0, 1: 3050.0, 2: 400.0})
+    table = calibrate([agreeing], output=output, merge=True)
     assert table.prices[("0:fc", "accumulation", "int32")] == Price(3000.0, {"weights": "packed"})
-    assert table.prices[("0:fc", "weights", "packed")] == Price(3000.0, {"accumulation": "int32"})
 
 
 def test_a_bundle_without_conditions_or_weights_memory_is_refused(tmp_path: Path) -> None:
@@ -705,6 +815,7 @@ def test_a_cycle_count_too_large_for_a_float_is_refused(tmp_path: Path) -> None:
     output = tmp_path / "big.json"
     output.write_text(
         '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+        '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}, '
         '"operators": {"x": {"k": {"v": {"cycles": ' + huge + "}}}}}",
         encoding="utf-8",
     )
@@ -829,12 +940,7 @@ def test_merge_holds_the_existing_file_to_the_same_rules(tmp_path: Path) -> None
     assert "int16" not in json.loads(output.read_text())["operators"]["0:conv"]["accumulation"]
 
     calibrate([wide], output=output, merge=True)
-    assert json.loads(output.read_text()) == EXPECTED
-
-    disagreeing = bundle(tmp_path / "disagreeing", cycles={0: 12000.0, 1: 4000.0, 2: 400.0})
-    with pytest.raises(CalibrationError, match=r"costs 3000 cycles in .*kws\.json but 4000"):
-        calibrate([disagreeing], output=output, merge=True)
-    assert json.loads(output.read_text()) == EXPECTED
+    _check_expected(json.loads(output.read_text()))
 
     with pytest.raises(CalibrationError, match="Nothing to merge into"):
         calibrate([auto], output=tmp_path / "missing.json", merge=True)
@@ -850,7 +956,7 @@ def test_merge_refuses_a_file_for_another_model(tmp_path: Path) -> None:
                 subgraph=0,
                 conditions=CONDITIONS,
                 prices={("0:conv", "accumulation", "int32"): Price(1.0, {})},
-                dimensions={},
+                setup=Setup.of({"config.target.board": "apollo510_evb"}),
             ).to_dict()
         )
     )
@@ -867,16 +973,24 @@ def test_merge_refuses_a_file_for_another_model(tmp_path: Path) -> None:
         (
             '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, '
             '"conditions": {}, "operators": {"x": {"k": {"v": {}}}}}',
+            "records no setup",
+        ),
+        (
+            '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+            '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}, '
+            '"operators": {"x": {"k": {"v": {}}}}}',
             "no finite, non-negative cycles",
         ),
         (
-            '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, '
-            '"conditions": {}, "operators": {"x": {"k": {"v": {"cycles": NaN}}}}}',
+            '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+            '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}, '
+            '"operators": {"x": {"k": {"v": {"cycles": NaN}}}}}',
             "no finite, non-negative cycles",
         ),
         (
-            '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, '
-            '"conditions": {}, "operators": {"x": {"k": {"v": {"cycles": -1}}}}}',
+            '{"schema_version": 1, "model": {"sha256": "a", "subgraph": 0}, "conditions": {}, '
+            '"capture": {"setup": {"digest": "' + "0" * 64 + '", "fields": []}}, '
+            '"operators": {"x": {"k": {"v": {"cycles": -1}}}}}',
             "no finite, non-negative cycles",
         ),
     ],
@@ -897,7 +1011,7 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "2 operators, 4 prices" in result.output
-    assert json.loads(output.read_text(encoding="utf-8")) == EXPECTED
+    _check_expected(json.loads(output.read_text(encoding="utf-8")))
 
     strict = runner.invoke(
         app, ["calibrate", str(auto), str(wide), "-o", str(output), "--tolerance", "0.005"]
@@ -917,6 +1031,7 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
     assert "without knobs" in help_text and "left out" in help_text
     assert "--merge" in help_text and "--tolerance" in help_text
     assert "application_load=none" in help_text
+    assert "capture.setup" in help_text
     assert "kws-sram" not in help_text
 
 

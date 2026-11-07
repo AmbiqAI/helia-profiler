@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from .table import (
     CALIBRATION_SCHEMA_VERSION,
-    CAPTURE_DIMENSIONS,
-    CYCLE_DIMENSIONS,
     DEFAULT_TOLERANCE,
+    SETUP_EXCLUDED,
     CalibrationSource,
     CalibrationTable,
     OperatorSample,
     Price,
+    Setup,
     calibrate,
     merge_sources,
     read_bundle,
@@ -20,13 +20,13 @@ from .table import (
 
 __all__ = [
     "CALIBRATION_SCHEMA_VERSION",
-    "CAPTURE_DIMENSIONS",
-    "CYCLE_DIMENSIONS",
     "DEFAULT_TOLERANCE",
     "CalibrationSource",
     "CalibrationTable",
     "OperatorSample",
     "Price",
+    "SETUP_EXCLUDED",
+    "Setup",
     "calibrate",
     "merge_sources",
     "read_bundle",
