@@ -126,6 +126,10 @@ class PowerError(HpxError):
     """Power measurement failure — Joulescope not found, calibration error."""
 
 
+class CalibrationError(HpxError):
+    """``hpx calibrate`` refused a bundle, a price or an existing file."""
+
+
 class ReportError(HpxError):
     """Report generation failure — output path not writable, format error."""
 

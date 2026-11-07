@@ -63,10 +63,10 @@ def test_the_walk_finds_every_group_and_leaf(cli_payload):
     """
     counts = cli_payload["counts"]
     assert counts["groups"] == 8, counts["group_names"]
-    assert counts["leaf_commands"] == 23, counts["leaf_command_names"]
-    assert counts["top_level_entries"] == 17
-    assert counts["options"] == 134
-    assert counts["arguments"] == 15
+    assert counts["leaf_commands"] == 24, counts["leaf_command_names"]
+    assert counts["top_level_entries"] == 18
+    assert counts["options"] == 137
+    assert counts["arguments"] == 16
     assert {"results inspect", "results show", "results export"} <= set(
         counts["leaf_command_names"]
     )

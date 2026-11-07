@@ -217,6 +217,7 @@ readers/profile_view.py
 readers/run_view.py
 report/__init__.py
 report/aot.py
+report/conditions.py
 report/contracts.py
 report/csv_writer.py
 report/json_writer.py
