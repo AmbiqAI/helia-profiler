@@ -84,7 +84,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, TypeGuard
 
-from ..engines.helia_aot.compile import non_finite_field
+from ..engines.helia_aot.compile import nesting_depth, non_finite_field
 from ..errors import CalibrationError
 from ..evaluation.compare import RunArtifacts, load_run_artifacts
 from ..results import (
@@ -105,6 +105,9 @@ PLAN_SCHEMA_VERSION = 1
 #: Largest relative disagreement two samples of one key may have.
 DEFAULT_TOLERANCE = 0.02
 
+#: How deeply a conditions block may nest: 1 is the flat record itself, and
+#: an open condition may hold objects or lists inside it to this depth.
+CONDITIONS_DEPTH = 8
 #: Cycles two samples of one key may differ by whatever the tolerance.
 _CYCLES_FLOOR = 8.0
 #: The one metric family whose confined errors leave the cycles usable.
@@ -731,9 +734,13 @@ def _conditions_refusal(recorded: Mapping[str, Any]) -> str | None:
     """Why *recorded* is not a conditions block a calibration file holds, or ``None``.
 
     One rule for a bundle and an existing file: the types ``Conditions``
-    reads, a weights memory, which heliaOptimus matches a plan on, and no NaN
-    or infinity anywhere in the block, since the file is written without them.
+    reads, a weights memory, which heliaOptimus matches a plan on, nesting no
+    deeper than :data:`CONDITIONS_DEPTH`, since conditions are a flat record,
+    and no NaN or infinity anywhere in the block, since the file is written
+    without them.
     """
+    if nesting_depth(recorded) > CONDITIONS_DEPTH:
+        return f"conditions nest deeper than {CONDITIONS_DEPTH} levels"
     unfit = non_finite_field(recorded, "conditions")
     if unfit is not None:
         return f"{unfit} is not a finite number"

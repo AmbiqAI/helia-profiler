@@ -18,7 +18,7 @@ import json
 import logging
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -542,21 +542,67 @@ def without_knob_values(
     return data
 
 
+#: A key a path names as written; any other key is shown JSON-quoted.
+_PLAIN_KEY = re.compile(r"[A-Za-z0-9_-]+")
+
+#: A node's place in the document: the parent's link and the node's key.
+_Link = tuple[Any, Any] | None
+
+
+def _nodes(value: Any) -> Iterator[tuple[Any, _Link, int]]:
+    """Every node of a JSON value in document order, with its link and depth.
+
+    Walks with an explicit stack, so no nesting exhausts Python's recursion
+    limit; a node's path is built only from its link, when it is reported.
+    A scalar is at depth 0 and the members of a container one deeper than it.
+    """
+    stack: list[tuple[Any, _Link, int]] = [(value, None, 0)]
+    while stack:
+        node, link, depth = stack.pop()
+        yield node, link, depth
+        if isinstance(node, dict):
+            children = list(node.items())
+        elif isinstance(node, list):
+            children = list(enumerate(node))
+        else:
+            continue
+        stack.extend((item, (link, key), depth + 1) for key, item in reversed(children))
+
+
+def _path(link: _Link, prefix: str) -> str:
+    """The dotted path of a link: plain keys as written, any other JSON-quoted in brackets."""
+    keys: list[Any] = []
+    while link is not None:
+        link, key = link
+        keys.append(key)
+    path = prefix
+    for key in reversed(keys):
+        if isinstance(key, int) or _PLAIN_KEY.fullmatch(key):
+            path = f"{path}.{key}" if path else str(key)
+        else:
+            path = f"{path}[{json.dumps(key)}]"
+    return path or "<root>"
+
+
 def non_finite_field(value: Any, prefix: str = "") -> str | None:
-    """The dotted name of the first NaN or infinity in *value*, else ``None``."""
-    if isinstance(value, float) and not math.isfinite(value):
-        return prefix or "<root>"
-    if isinstance(value, dict):
-        for key, item in value.items():
-            found = non_finite_field(item, f"{prefix}.{key}" if prefix else str(key))
-            if found is not None:
-                return found
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            found = non_finite_field(item, f"{prefix}.{index}" if prefix else str(index))
-            if found is not None:
-                return found
+    """The path of the first NaN or infinity in *value*, after *prefix*, else ``None``.
+
+    A key other than letters, digits, ``_`` and ``-`` is shown JSON-quoted,
+    so a dot, a newline or an escape sequence in it cannot change how the
+    path reads.
+    """
+    for node, link, _ in _nodes(value):
+        if isinstance(node, float) and not math.isfinite(node):
+            return _path(link, prefix)
     return None
+
+
+def nesting_depth(value: Any) -> int:
+    """How deeply *value* nests containers: 0 for a scalar, 1 for a flat object or list."""
+    return max(
+        (depth + 1 for node, _, depth in _nodes(value) if isinstance(node, (dict, list))),
+        default=0,
+    )
 
 
 def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:

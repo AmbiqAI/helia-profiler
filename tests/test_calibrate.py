@@ -714,6 +714,69 @@ def test_a_non_finite_condition_is_refused_naming_its_path(tmp_path: Path) -> No
     assert output.read_bytes() == before
 
 
+def _nested(levels: int) -> str:
+    """JSON text of *levels* objects, one inside the next, around a 1."""
+    return '{"a": ' * levels + "1" + "}" * levels
+
+
+def _deep_bundle(path: Path, levels: int) -> Path:
+    """A bundle whose open condition ``board`` nests *levels* objects deep."""
+    deep = bundle(path, cycles={0: 1.0, 1: 1.0, 2: 1.0}, conditions={**CONDITIONS, "board": "DEEP"})
+    summary = deep / "summary.json"
+    summary.write_text(summary.read_text().replace('"DEEP"', _nested(levels)), encoding="utf-8")
+    _republish(deep)
+    return deep
+
+
+def test_conditions_nested_deeper_than_a_flat_record_are_refused(tmp_path: Path) -> None:
+    """Fail closed on depth, without recursion: 3000 levels are refused cleanly."""
+    from helia_profiler.calibration.table import CONDITIONS_DEPTH
+
+    message = f"conditions nest deeper than {CONDITIONS_DEPTH} levels"
+    output = tmp_path / "out.json"
+    # The block itself is one level, so board may hold CONDITIONS_DEPTH - 1 objects.
+    legal = calibrate([_deep_bundle(tmp_path / "legal", CONDITIONS_DEPTH - 1)], output=output)
+    assert json.loads(output.read_text())["conditions"] == legal.conditions
+    for levels in (CONDITIONS_DEPTH, 3000):
+        deep = _deep_bundle(tmp_path / f"deep-{levels}", levels)
+        with pytest.raises(CalibrationError, match=rf"Bundle .*deep-{levels}: {message}\."):
+            calibrate([deep], output=tmp_path / f"deep-{levels}.json")
+        assert not (tmp_path / f"deep-{levels}.json").exists()
+    # A file holding such a block is refused on --merge, and left as it is.
+    auto, _ = two_bundles(tmp_path)
+    calibrate([auto], output=output)
+    data = json.loads(output.read_text(encoding="utf-8"))
+    data["conditions"]["board"] = "DEEP"
+    output.write_text(json.dumps(data).replace('"DEEP"', _nested(3000)), encoding="utf-8")
+    before = output.read_bytes()
+    with pytest.raises(CalibrationError) as refused:
+        calibrate([auto], output=output, merge=True)
+    assert refused.value.args[0] == f"Calibration file {output} is malformed: {message}."
+    assert output.read_bytes() == before
+
+
+def test_a_key_in_a_refusal_path_is_shown_quoted(tmp_path: Path) -> None:
+    """A dotted key or one with a newline or an escape cannot change how the path reads."""
+    auto, _ = two_bundles(tmp_path)
+    output = tmp_path / "out.json"
+    calibrate([auto], output=output)
+    data = json.loads(output.read_text(encoding="utf-8"))
+    for key, shown in (
+        ("a.b", 'conditions.board["a.b"]'),
+        ("\x1b[2J\nFAKE: ok", 'conditions.board["\\u001b[2J\\nFAKE: ok"]'),
+        ("plain_key-1", "conditions.board.plain_key-1"),
+    ):
+        data["conditions"]["board"] = {key: float("inf")}
+        path = tmp_path / "keyed.json"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with pytest.raises(CalibrationError) as refused:
+            read_calibration(path)
+        assert refused.value.args[0] == (
+            f"Calibration file {path} is malformed: {shown} is not a finite number."
+        ), key
+        assert "\n" not in refused.value.args[0] and "\x1b" not in refused.value.args[0]
+
+
 def test_a_run_the_profiler_marked_invalid_is_refused(tmp_path: Path) -> None:
     bad = bundle(tmp_path / "bad", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
     _mark(bad, ResultValidity.INVALID, "firmware.model_mismatch")

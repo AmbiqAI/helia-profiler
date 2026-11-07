@@ -6,9 +6,10 @@ in one board session, identical but for ``model.weights_location`` (``mram``,
 ``engine.config.aot_args.memory.allocate_arenas: false``. hpx accepts PSRAM
 weights only in that mode, and the setting is held by the pairing digest, so
 a TCM or MRAM capture left at the default does not pair with the PSRAM one.
-Each bundle goes under ``tests/fixtures/calibration/pairs/<weights_location>/``;
-the real-data test skips while any is missing. Reading a bundle needs
-heliaAOT, as ``test_calibrate.py`` does.
+The three bundles are committed under
+``tests/fixtures/calibration/pairs/<weights_location>/``, and a missing one
+fails the real-data test. Reading a bundle needs heliaAOT, as
+``test_calibrate.py`` does.
 """
 
 from __future__ import annotations
@@ -27,10 +28,6 @@ pytestmark = pytest.mark.usefixtures("schema_checked_writes")
 
 PAIRS = Path(__file__).parent / "fixtures" / "calibration" / "pairs"
 WEIGHTS_LOCATIONS = ("mram", "psram", "tcm")
-
-
-def _committed() -> bool:
-    return all((PAIRS / name / "result_manifest.json").is_file() for name in WEIGHTS_LOCATIONS)
 
 
 def _pairs(slow: dict[str, Any], fast: dict[str, Any]) -> bool:
@@ -69,14 +66,9 @@ def _check(bundles: dict[str, Path], tmp_path: Path) -> None:
         assert _pairs(files[slow], fast), slow
 
 
-@pytest.mark.skipif(
-    not _committed(),
-    reason=(
-        "the three KWS result bundles of one board session (weights_location mram, psram "
-        "and tcm) are not yet committed under tests/fixtures/calibration/pairs/"
-    ),
-)
 def test_real_captures_pair_across_the_weights_memory(tmp_path: Path) -> None:
+    for name in WEIGHTS_LOCATIONS:
+        assert (PAIRS / name / "result_manifest.json").is_file(), f"{PAIRS / name} is missing"
     _check({name: PAIRS / name for name in WEIGHTS_LOCATIONS}, tmp_path)
 
 
