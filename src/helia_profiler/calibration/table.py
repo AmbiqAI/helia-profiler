@@ -3,30 +3,32 @@
 A bundle's ``summary.json`` records the conditions it measured under and the
 model it profiled; its per-layer table records each execution position's
 cycles; heliaAOT's pinned ``<prefix>_plan.json`` names the operator at each
-position and the knob values the compiler chose for it. Joining the three
-prices every (operator, knob, value) the run exercised::
+position, the knob values the compiler chose for it, its fixed choices and
+its kernel entry. Joining the three times every operator the plan lists,
+knobbed or not, under the whole knob vector the capture compiled it with::
 
-    operators[<plan operator id>][<knob>][<value>] = {"cycles": <cycles>}
+    operator_cycles[<plan operator id>] = [
+        {"knobs": {<knob>: <value>}, "cycles": <cycles>, "facts": {<fact>: <value>}}, ...
+    ]
 
-and times every operator the plan lists, knobbed or not, under the knob
-vector the capture compiled it with::
+This is calibration schema 2, whose exported schema is
+``helia_profiler/data/calibration.schema.v2.json``, and these samples are the
+only thing the file stores: a reader derives whatever price it needs from
+them. Each operator has one entry per distinct vector, its list in the order
+of the canonical JSON of its ``knobs``; an operator without knobs has one
+entry whose ``knobs`` is empty. Operators keep the order they were first
+seen in: the existing file first under ``--merge``, then the bundles, each in
+plan order. A sample is keyed by the operator and its knob vector, so any set
+of vectors merges: one knob at a time from a common baseline, several at
+once, or every combination.
 
-    operator_cycles[<plan operator id>] = [{"knobs": {<knob>: <value>}, "cycles": <cycles>}, ...]
-
-one entry per distinct vector, each operator's list in the order of the
-canonical JSON of its ``knobs``; an operator without knobs has one entry whose
-``knobs`` is empty. A knob sweep adds a second entry for the swept operator.
-
-A price is keyed by the operator, the knob, its value and the operator's
-other knobs' values in that capture; the file holds one price per (operator,
-knob, value), so a second vector for one of them is an error. With the
-capture setup held equal, whatever else the plan reports for the operator
-(its fixed choices, the kernel entry) follows from the knob values, so it is
-recorded with the price as a fact and never compared. Two sources timing
-one operator under one vector must agree within the tolerance of the larger
-value or within 8 cycles, whichever is looser, since a small operator
-without knobs moves by a few cycles of layout jitter; a price is held to the
-tolerance alone.
+The facts are the plan's fixed choices (``fixed:<name>``) and its kernel
+entry (``kernel:entry``). With the capture setup held equal they follow from
+the knob values, so they are not part of the key, but two samples of one key
+must report the same ones. Two samples of one key must also agree within the
+tolerance of the larger value or within 8 cycles, whichever is looser, since
+a small operator moves by a few cycles of layout jitter; the first source's
+sample is the one kept.
 
 The setup is one digest of the run's frozen settings as the bundle records
 them: the frozen config less the heliaAOT knob values (``optimization.<knob>``
@@ -59,14 +61,14 @@ MRAM capture does not pair with a PSRAM one. A bundle that does not record
 the pairing configuration, and a merge whose sources do not all share one
 pairing digest, write ``null`` for both.
 
-Everything that would make a price mean something else is an error, never a
-silent skip: another model, other conditions, another setup, a run whose
+Everything that would make a sample mean something else is an error, never
+a silent skip: another model, other conditions, another setup, a run whose
 cycles the profiler flagged, an overflowed counter, a position the plan and
-the capture disagree on, two prices of one key that disagree, or two
-records of one vector's facts that disagree. The file is schema version 1
-as ``helia_optimus.cost.calibration`` reads it; what hpx needs for a later
-``--merge`` sits under ``capture``, a key heliaOptimus ignores, and only a
-file that carries it can be merged into.
+the capture disagree on, or two samples of one key whose cycles or facts
+disagree. What hpx needs for a later ``--merge`` sits under ``capture``, and
+only a schema 2 file that carries it can be merged into: a schema 1 file is
+refused, to be calibrated again from its bundles, and a key schema 2 does not
+define is refused rather than dropped when the file is written again.
 """
 
 from __future__ import annotations
@@ -95,15 +97,15 @@ from ..results.models import Conditions
 from ..results.serde import nested_get
 from .setup import Setup, _canonical, _require_same_setup, _setup
 
-#: The calibration file shape this release writes; heliaOptimus checks it.
-CALIBRATION_SCHEMA_VERSION = 1
+#: The calibration file shape this release writes, and the only one it reads back.
+CALIBRATION_SCHEMA_VERSION = 2
 #: heliaAOT's plan schema this release reads.
 PLAN_SCHEMA_VERSION = 1
-#: Largest relative disagreement two prices of one key may have.
+#: Largest relative disagreement two samples of one key may have.
 DEFAULT_TOLERANCE = 0.02
 
-#: Cycles two timings of one (operator, vector) may differ by whatever the tolerance.
-_OPERATOR_CYCLES_FLOOR = 8.0
+#: Cycles two samples of one key may differ by whatever the tolerance.
+_CYCLES_FLOOR = 8.0
 #: The one metric family whose confined errors leave the cycles usable.
 _EXCUSED_METRIC_GROUP = "power"
 
@@ -132,6 +134,20 @@ _MERGE_HINT = (
     "hpx calibrate merges only into a file it wrote; heliaOptimus reads a hand-written "
     "table directly."
 )
+_UNDEFINED_HINT = (
+    "A schema 2 file holds only the fields helia_profiler/data/calibration.schema.v2.json "
+    "names, so this one was edited or written by another tool; calibrate the result bundles "
+    "again without --merge."
+)
+#: The keys calibration schema 2 defines, by where they sit.
+_TOP_KEYS = frozenset({"schema_version", "model", "conditions", "operator_cycles", "capture"})
+_MODEL_KEYS = frozenset({"sha256", "subgraph"})
+_CAPTURE_KEYS = frozenset({"setup"})
+_SETUP_KEYS = frozenset(
+    {"digest", "fields", "pairing_digest", "pairing_fields", "helia_aot_version"}
+)
+_ENTRY_KEYS = frozenset({"knobs", "cycles", "facts"})
+_FACT_NAME = re.compile(r"fixed:.+|kernel:entry")
 
 
 #: A knob vector as a key: its (knob, value) pairs, sorted.
@@ -150,17 +166,7 @@ class OperatorSample:
     operator: str
     knobs: Mapping[str, str]
     cycles: float
-    #: The fixed choices and the kernel entry: recorded, never compared.
-    facts: Mapping[str, str] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class Price:
-    """One price as a file holds it: the cycles, the key's vector and its facts."""
-
-    cycles: float
-    #: The other knobs' values the price was measured under.
-    others: Mapping[str, str]
+    #: The fixed choices and the kernel entry: held equal on merge, not part of the key.
     facts: Mapping[str, str] = field(default_factory=dict)
 
 
@@ -175,10 +181,6 @@ class CalibrationSource:
     conditions: Mapping[str, Any]
     setup: Setup
     samples: tuple[OperatorSample, ...] = ()
-    #: A file's prices as it holds them, by (operator, knob, value).
-    prices: Mapping[tuple[str, str, str], Price] = field(default_factory=dict)
-    #: A file's operator timings as it holds them, by (operator, knob vector).
-    operator_cycles: Mapping[tuple[str, KnobVector], float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -188,55 +190,37 @@ class CalibrationTable:
     model_sha256: str
     subgraph: int
     conditions: Mapping[str, Any]
-    #: (operator id, knob, value) -> the price, with its vector and facts.
-    prices: Mapping[tuple[str, str, str], Price]
     setup: Setup
-    #: (operator id, knob vector) -> the cycles of every operator timed.
-    operator_cycles: Mapping[tuple[str, KnobVector], float] = field(default_factory=dict)
+    #: (operator id, knob vector) -> the sample, operators in first-seen order.
+    samples: Mapping[tuple[str, KnobVector], OperatorSample]
 
     @property
-    def operators(self) -> dict[str, dict[str, dict[str, float]]]:
-        """operator id -> knob -> value -> cycles, as the file lays them out."""
-        out: dict[str, dict[str, dict[str, float]]] = {}
-        for (operator, knob, value), price in self.prices.items():
-            out.setdefault(operator, {}).setdefault(knob, {})[value] = price.cycles
-        return out
-
-    @property
-    def price_count(self) -> int:
-        return len(self.prices)
+    def operator_count(self) -> int:
+        """The number of distinct operators timed."""
+        return len({operator for operator, _ in self.samples})
 
     def to_dict(self) -> dict[str, Any]:
-        recorded: dict[str, dict[str, dict[str, dict[str, Any]]]] = {}
-        for (operator, knob, value), price in self.prices.items():
-            recorded.setdefault(operator, {}).setdefault(knob, {})[value] = {
-                "others": dict(price.others),
-                "facts": dict(price.facts),
-            }
         return {
             "schema_version": CALIBRATION_SCHEMA_VERSION,
             "model": {"sha256": self.model_sha256, "subgraph": self.subgraph},
             "conditions": dict(self.conditions),
-            "operators": {
-                operator: {
-                    knob: {value: {"cycles": cycles} for value, cycles in sorted(values.items())}
-                    for knob, values in knobs.items()
-                }
-                for operator, knobs in self.operators.items()
-            },
             "operator_cycles": self._operator_cycles_dict(),
-            "capture": {"setup": self.setup.to_dict(), "prices": recorded},
+            "capture": {"setup": self.setup.to_dict()},
         }
 
     def _operator_cycles_dict(self) -> dict[str, list[dict[str, Any]]]:
         """operator id -> one entry per vector, in the order of its knobs' canonical JSON."""
-        timed: dict[str, list[tuple[KnobVector, float]]] = {}
-        for (operator, vector), cycles in self.operator_cycles.items():
-            timed.setdefault(operator, []).append((vector, cycles))
+        timed: dict[str, list[OperatorSample]] = {}
+        for (operator, _), sample in self.samples.items():
+            timed.setdefault(operator, []).append(sample)
         return {
             operator: [
-                {"knobs": dict(vector), "cycles": cycles}
-                for vector, cycles in sorted(entries, key=lambda entry: _canonical(dict(entry[0])))
+                {
+                    "knobs": dict(sorted(sample.knobs.items())),
+                    "cycles": float(sample.cycles),
+                    "facts": dict(sorted(sample.facts.items())),
+                }
+                for sample in sorted(entries, key=lambda sample: _canonical(dict(sample.knobs)))
             ]
             for operator, entries in timed.items()
         }
@@ -249,8 +233,7 @@ class CalibrationTable:
             subgraph=self.subgraph,
             conditions=self.conditions,
             setup=self.setup,
-            prices=self.prices,
-            operator_cycles=self.operator_cycles,
+            samples=tuple(self.samples.values()),
         )
 
 
@@ -261,13 +244,14 @@ def calibrate(
     merge: bool = False,
     tolerance: float = DEFAULT_TOLERANCE,
 ) -> CalibrationTable:
-    """Price every knob value the bundles exercised and write *output*.
+    """Time every operator the bundles' plans list and write *output*.
 
-    With ``merge``, the prices already in *output*, a file hpx wrote, take
-    part under the same rules as a bundle's, and every one of them is kept.
+    With ``merge``, the samples already in *output*, a schema 2 file hpx
+    wrote, take part under the same rules as a bundle's, and every one of
+    them is kept.
 
     Raises:
-        CalibrationError: when a bundle, a price or the existing file breaks a rule.
+        CalibrationError: when a bundle, a sample or the existing file breaks a rule.
     """
     if not bundles:
         raise CalibrationError("No result bundle to calibrate from.")
@@ -323,15 +307,16 @@ def write_calibration(table: CalibrationTable, path: Path) -> Path:
 
 
 def read_calibration(path: Path) -> CalibrationTable:
-    """Read a calibration file hpx wrote.
+    """Read a calibration schema 2 file hpx wrote.
 
-    A file without ``operator_cycles`` or a pairing digest, as an earlier
-    release wrote it, reads with none.
+    hpx writes the file it reads again, so a key schema 2 does not define is
+    refused rather than dropped.
 
     Raises:
-        CalibrationError: when the file is not JSON, another schema version,
-            malformed, or carries no well-formed ``capture`` block (one hpx
-            did not write, or one that was edited).
+        CalibrationError: when the file is not JSON, not calibration schema 2,
+            holds a key schema 2 does not define, is malformed, or carries no
+            well-formed ``capture`` block (one hpx did not write, or one that
+            was edited).
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -339,25 +324,50 @@ def read_calibration(path: Path) -> CalibrationTable:
         raise CalibrationError(f"Could not read calibration file {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise CalibrationError(f"Calibration file {path} is not a JSON object.")
-    if data.get("schema_version") != CALIBRATION_SCHEMA_VERSION:
+    version = data.get("schema_version")
+    if type(version) is int and version == 1:
         raise CalibrationError(
-            f"Calibration file {path} is schema version {data.get('schema_version')!r}; "
-            f"this release reads version {CALIBRATION_SCHEMA_VERSION}.",
+            f"Calibration file {path} is calibration schema 1, which this release does not "
+            "read: schema 2 stores only operator_cycles.",
+            hint=(
+                "Write it again from the result bundles it came from: hpx calibrate <bundles> "
+                f"--output {path}, without --merge."
+            ),
+        )
+    if type(version) is int and version > CALIBRATION_SCHEMA_VERSION:
+        raise CalibrationError(
+            f"Calibration file {path} is calibration schema {version}, newer than the version "
+            f"{CALIBRATION_SCHEMA_VERSION} this release reads.",
+            hint=(
+                "Merge with the helia-profiler release that wrote it, or calibrate the bundles "
+                "again without --merge."
+            ),
+        )
+    if type(version) is not int or version != CALIBRATION_SCHEMA_VERSION:
+        raise CalibrationError(
+            f"Calibration file {path} has schema_version {version!r}; this release reads the "
+            f"integer {CALIBRATION_SCHEMA_VERSION}.",
+            hint=_UNDEFINED_HINT,
+        )
+    where = _undefined(data)
+    if where is not None:
+        raise CalibrationError(
+            f"Calibration file {path} holds {where}, which calibration schema 2 does not define.",
+            hint=_UNDEFINED_HINT,
         )
     sha256 = nested_get(data, "model", "sha256")
     subgraph = nested_get(data, "model", "subgraph")
     conditions = data.get("conditions")
-    operators = data.get("operators")
     if (
         not isinstance(sha256, str)
         or not sha256
         or type(subgraph) is not int
         or not isinstance(conditions, dict)
-        or not isinstance(operators, dict)
+        or "operator_cycles" not in data
     ):
         raise CalibrationError(
             f"Calibration file {path} is malformed: it needs model.sha256, model.subgraph, "
-            "conditions and operators.",
+            "conditions and operator_cycles.",
         )
     digest = nested_get(data, "capture", "setup", "digest")
     fields = nested_get(data, "capture", "setup", "fields")
@@ -377,40 +387,10 @@ def read_calibration(path: Path) -> CalibrationTable:
             f"Calibration file {path} records no setup under capture.setup.",
             hint=_MERGE_HINT,
         )
-    recorded = nested_get(data, "capture", "prices")
-    prices: dict[tuple[str, str, str], Price] = {}
-    for operator, knobs in operators.items():
-        if not isinstance(knobs, dict):
-            raise CalibrationError(
-                f"Calibration file {path}: operator {operator} is not an object."
-            )
-        for knob, values in knobs.items():
-            if not isinstance(values, dict):
-                raise CalibrationError(
-                    f"Calibration file {path}: operator {operator} knob {knob} is not an object."
-                )
-            for value, cost in values.items():
-                cycles = cost.get("cycles") if isinstance(cost, dict) else None
-                if not _is_cycle_count(cycles):
-                    raise CalibrationError(
-                        f"Calibration file {path}: operator {operator} {knob}={value} "
-                        "has no finite, non-negative cycles."
-                    )
-                entry = nested_get(recorded, operator, knob, value)
-                others = _string_map(nested_get(entry, "others"))
-                facts = _string_map(nested_get(entry, "facts"))
-                if others is None or facts is None:
-                    raise CalibrationError(
-                        f"Calibration file {path}: operator {operator} {knob}={value} has no "
-                        "well-formed record under capture.prices.",
-                        hint=_MERGE_HINT,
-                    )
-                prices[(operator, knob, value)] = Price(float(cycles), others, facts)
     return CalibrationTable(
         model_sha256=sha256,
         subgraph=subgraph,
         conditions=conditions,
-        prices=prices,
         setup=Setup(
             digest,
             tuple(fields),
@@ -418,36 +398,71 @@ def read_calibration(path: Path) -> CalibrationTable:
             pairing_digest=pairing_digest,
             pairing_fields=None if pairing_fields is None else tuple(pairing_fields),
         ),
-        operator_cycles=_read_operator_cycles(path, data.get("operator_cycles", {})),
+        samples=_read_operator_cycles(path, data["operator_cycles"]),
     )
 
 
-def _read_operator_cycles(path: Path, recorded: Any) -> dict[tuple[str, KnobVector], float]:
-    """A file's ``operator_cycles``, by (operator, knob vector)."""
+def _undefined(data: Mapping[str, Any]) -> str | None:
+    """The first key calibration schema 2 does not define, as its path in the file."""
+    blocks = (
+        ("", data, _TOP_KEYS),
+        ("model.", data.get("model"), _MODEL_KEYS),
+        ("capture.", data.get("capture"), _CAPTURE_KEYS),
+        ("capture.setup.", nested_get(data, "capture", "setup"), _SETUP_KEYS),
+    )
+    for prefix, block, known in blocks:
+        if isinstance(block, dict):
+            for key in block:
+                if key not in known:
+                    return f"{prefix}{key}"
+    timed = data.get("operator_cycles")
+    if not isinstance(timed, dict):
+        return None
+    for operator, entries in timed.items():
+        if not isinstance(entries, list):
+            continue
+        for index, entry in enumerate(entries):
+            if isinstance(entry, dict):
+                for key in entry:
+                    if key not in _ENTRY_KEYS:
+                        return f"operator_cycles[{operator}][{index}].{key}"
+    return None
+
+
+def _read_operator_cycles(
+    path: Path, recorded: Any
+) -> dict[tuple[str, KnobVector], OperatorSample]:
+    """A file's ``operator_cycles``, by (operator, knob vector), in the file's order."""
     if not isinstance(recorded, dict):
         raise CalibrationError(f"Calibration file {path}: operator_cycles is not an object.")
-    timed: dict[tuple[str, KnobVector], float] = {}
+    samples: dict[tuple[str, KnobVector], OperatorSample] = {}
     for operator, entries in recorded.items():
         if not isinstance(entries, list):
             raise CalibrationError(
                 f"Calibration file {path}: operator_cycles {operator} is not a list."
             )
+        if not entries:
+            raise CalibrationError(
+                f"Calibration file {path}: operator_cycles {operator} lists no entry."
+            )
         for entry in entries:
             knobs = _string_map(entry.get("knobs")) if isinstance(entry, dict) else None
             cycles = entry.get("cycles") if isinstance(entry, dict) else None
-            if knobs is None or not _is_cycle_count(cycles):
+            facts = _facts(entry.get("facts")) if isinstance(entry, dict) else None
+            if knobs is None or facts is None or not _is_cycle_count(cycles):
                 raise CalibrationError(
                     f"Calibration file {path}: operator_cycles {operator} has an entry without "
-                    "string knobs and finite, non-negative cycles."
+                    "string knobs, finite non-negative cycles and string facts named "
+                    "fixed:<name> or kernel:entry."
                 )
             key = (operator, _vector(knobs))
-            if key in timed:
+            if key in samples:
                 raise CalibrationError(
                     f"Calibration file {path}: operator_cycles {operator} lists the knobs "
                     f"{dict(key[1])} twice."
                 )
-            timed[key] = float(cycles)
-    return timed
+            samples[key] = OperatorSample(operator, knobs, float(cycles), facts)
+    return samples
 
 
 def _is_digest(value: Any) -> TypeGuard[str]:
@@ -463,6 +478,14 @@ def _string_map(value: Any) -> dict[str, str] | None:
     if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
         return None
     return dict(value)
+
+
+def _facts(value: Any) -> dict[str, str] | None:
+    """An entry's facts, or ``None`` when one is not a string named as schema 2 names facts."""
+    facts = _string_map(value)
+    if facts is None or not all(_FACT_NAME.fullmatch(name) for name in facts):
+        return None
+    return facts
 
 
 def read_bundle(path: Path) -> CalibrationSource:
@@ -546,28 +569,20 @@ def merge_sources(
     sources: Sequence[CalibrationSource], *, tolerance: float = DEFAULT_TOLERANCE
 ) -> CalibrationTable:
     """One table from every source, holding them to one model, one set of
-    conditions, one setup, and agreeing prices and timings.
+    conditions, one setup, and agreeing samples.
 
     Every source is compared with the first: the setup digests must be
     equal, which needs every covered field present on both sides with the
-    same value. A price is keyed by operator, knob, value and the other
-    knobs' values; two prices of one key must agree within *tolerance*,
-    relative to the larger, and a file's price is never replaced. The file
-    holds one price per (operator, knob, value), so a second vector for one
-    is an error naming both. A vector's facts may be recorded once; a
-    differing record is an error.
-
-    The prices are checked first, then the operator timings: two timings of
-    one operator under one knob vector must agree within *tolerance* of the
-    larger or within 8 cycles, whichever is looser, and the first source's
-    value is the one kept; different vectors of one operator are kept side
-    by side. A file written before ``operator_cycles`` contributes no
-    timings; they are not rebuilt from its prices. The pairing digest is
-    written only when every source carries the same one.
+    same value. A sample is keyed by its operator and its whole knob vector,
+    so any set of vectors merges. The first sample of a key keeps its cycles,
+    facts and source, and a file's sample is never replaced; a repeat must
+    agree within *tolerance* of the larger value or within 8 cycles,
+    whichever is looser, and must report the same facts. The pairing digest
+    is written only when every source carries the same one.
 
     Raises:
         CalibrationError: on no source, another model, other conditions,
-            another setup, a disagreeing price, vector, fact or timing, or no
+            another setup, a repeat whose cycles or facts disagree, or no
             operator timed at all.
     """
     if not sources:
@@ -591,51 +606,22 @@ def merge_sources(
                 ),
             )
         _require_same_setup(first, other)
-    prices: dict[tuple[str, str, str], Price] = {}
-    origins: dict[tuple[str, str, str], str] = {}
+    samples: dict[tuple[str, KnobVector], OperatorSample] = {}
+    origins: dict[tuple[str, KnobVector], str] = {}
     for source in sources:
-        contributed: list[tuple[tuple[str, str, str], Price]] = list(source.prices.items())
         for sample in source.samples:
-            for knob, value in sample.knobs.items():
-                others = {name: v for name, v in sample.knobs.items() if name != knob}
-                contributed.append(
-                    ((sample.operator, knob, value), Price(sample.cycles, others, sample.facts))
-                )
-        for key, price in contributed:
-            held = prices.get(key)
+            key = (sample.operator, _vector(sample.knobs))
+            held = samples.get(key)
             if held is None:
-                prices[key] = Price(price.cycles, dict(price.others), dict(price.facts))
+                samples[key] = OperatorSample(
+                    sample.operator, dict(sample.knobs), sample.cycles, dict(sample.facts)
+                )
                 origins[key] = source.source
                 continue
-            operator, knob, value = key
-            if dict(held.others) != dict(price.others):
-                raise CalibrationError(
-                    f"{operator} {knob}={value} is priced with the other knobs at "
-                    f"{dict(held.others)} in {origins[key]} but at {dict(price.others)} in "
-                    f"{source.source}; the file holds one price per value.",
-                    hint="Sweep one knob at a time; keep the others at one value.",
-                )
-            scale = max(held.cycles, price.cycles)
-            if abs(held.cycles - price.cycles) > tolerance * scale:
-                apart = abs(held.cycles - price.cycles) / scale * 100
-                raise CalibrationError(
-                    f"{operator} {knob}={value} costs {held.cycles:g} cycles in "
-                    f"{origins[key]} but {price.cycles:g} in {source.source} "
-                    f"({apart:.1f}% apart, tolerance {tolerance * 100:g}%).",
-                    hint="Raise --tolerance, or leave out the bundle that disagrees.",
-                )
-            if dict(held.facts) != dict(price.facts):
-                raise CalibrationError(
-                    f"{operator} {knob}={value} with the other knobs at {dict(price.others)} "
-                    f"reports {dict(price.facts)} in {source.source} but {dict(held.facts)} "
-                    f"in {origins[key]}, so something other than the knobs changed between "
-                    "the captures.",
-                    hint="Calibrate captures from one build; write another file for the other.",
-                )
-    operator_cycles = _merge_operator_cycles(sources, tolerance)
-    if not prices and not operator_cycles:
+            _require_agreement(held, sample, origins[key], source.source, tolerance)
+    if not samples:
         raise CalibrationError(
-            "No operator in the bundles was timed, so there is nothing to price.",
+            "No operator in the bundles was timed, so there is nothing to calibrate.",
             hint="hpx calibrate reads the cycles of every operator heliaAOT's plan lists.",
         )
     pairing = {source.setup.pairing_digest for source in sources}
@@ -648,46 +634,40 @@ def merge_sources(
         model_sha256=first.model_sha256,
         subgraph=first.subgraph,
         conditions=first.conditions,
-        prices=prices,
         setup=setup,
-        operator_cycles=operator_cycles,
+        samples=samples,
     )
 
 
-def _merge_operator_cycles(
-    sources: Sequence[CalibrationSource], tolerance: float
-) -> dict[tuple[str, KnobVector], float]:
-    """Every source's timings by (operator, knob vector), repeats held to one another."""
-    timed: dict[tuple[str, KnobVector], float] = {}
-    origins: dict[tuple[str, KnobVector], str] = {}
-    for source in sources:
-        contributed = list(source.operator_cycles.items()) + [
-            ((sample.operator, _vector(sample.knobs)), sample.cycles) for sample in source.samples
-        ]
-        for key, cycles in contributed:
-            held = timed.get(key)
-            if held is None:
-                timed[key] = cycles
-                origins[key] = source.source
-                continue
-            scale = max(held, cycles)
-            if abs(held - cycles) > max(tolerance * scale, _OPERATOR_CYCLES_FLOOR):
-                operator, vector = key
-                apart = abs(held - cycles) / scale * 100
-                raise CalibrationError(
-                    f"{operator} with the knobs at {dict(vector)} takes {held:g} cycles in "
-                    f"{origins[key]} but {cycles:g} in {source.source} ({apart:.1f}% apart, "
-                    f"tolerance {tolerance * 100:g}% or {_OPERATOR_CYCLES_FLOOR:g} cycles).",
-                    hint="Raise --tolerance, or leave out the bundle that disagrees.",
-                )
-    return timed
+def _require_agreement(
+    held: OperatorSample, sample: OperatorSample, origin: str, source: str, tolerance: float
+) -> None:
+    """Refuse a repeat of a held sample whose cycles or facts disagree with it."""
+    vector = dict(_vector(sample.knobs))
+    scale = max(held.cycles, sample.cycles)
+    if abs(held.cycles - sample.cycles) > max(tolerance * scale, _CYCLES_FLOOR):
+        apart = abs(held.cycles - sample.cycles) / scale * 100
+        raise CalibrationError(
+            f"{sample.operator} with the knobs at {vector} takes {held.cycles:g} cycles in "
+            f"{origin} but {sample.cycles:g} in {source} ({apart:.1f}% apart, "
+            f"tolerance {tolerance * 100:g}% or {_CYCLES_FLOOR:g} cycles).",
+            hint="Raise --tolerance, or leave out the bundle that disagrees.",
+        )
+    if dict(held.facts) != dict(sample.facts):
+        raise CalibrationError(
+            f"{sample.operator} with the knobs at {vector} reports "
+            f"{dict(sorted(sample.facts.items()))} in {source} but "
+            f"{dict(sorted(held.facts.items()))} in {origin}, so something other than the "
+            "knobs changed between the captures.",
+            hint="Calibrate captures from one build; write another file for the other.",
+        )
 
 
 def _require_usable_cycles(run: RunArtifacts, source: str) -> None:
     """Refuse a run whose cycle counts the profiler flagged.
 
     The verdict follows the issue registry as ``hpx compare`` applies it: an
-    invalid run is priced only when every error is one the registry confines
+    invalid run is calibrated only when every error is one the registry confines
     to power metrics and that family has a metric-blocking code; an
     unrecognized code or another family confines nothing, and an invalid run
     with no error to explain it is refused. A run carrying an issue after
@@ -826,9 +806,9 @@ def _firmware_label(op: str) -> str:
 def _plan_operator(entry: Any, source: str) -> tuple[OperatorSample, int, str]:
     """One plan operator as a sample without cycles, with its position and op_type.
 
-    Every knob value is priced, an approximate one included. The facts are
+    Every knob value is timed, an approximate one included. The facts are
     the fixed choices (``fixed:<name>``) and the kernel entry
-    (``kernel:entry``), recorded with the price and never compared.
+    (``kernel:entry``), held equal on merge.
     """
     operator = entry.get("id") if isinstance(entry, dict) else None
     position = entry.get("index") if isinstance(entry, dict) else None

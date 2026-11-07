@@ -31,9 +31,7 @@ def _cmd_calibrate(
     except OSError as exc:
         console.print_error(HpxError(f"Could not write {output}: {exc}"))
         sys.exit(1)
-    timed = {operator for operator, _ in table.operator_cycles}
     print(
         f"Wrote calibration: {output} "
-        f"({len(table.operators)} operators, {table.price_count} prices; "
-        f"{len(timed)} operators timed, {len(table.operator_cycles)} timings)"
+        f"({table.operator_count} operators, {len(table.samples)} samples)"
     )

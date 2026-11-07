@@ -20,9 +20,10 @@ from typing import Any
 import pytest
 
 from helia_profiler.calibration import calibrate
-from tests.calibration_bundles import pair
+from tests.calibration_bundles import pair, schema_checked_writes  # noqa: F401
 
 pytest.importorskip("helia_aot")
+pytestmark = pytest.mark.usefixtures("schema_checked_writes")
 
 PAIRS = Path(__file__).parent / "fixtures" / "calibration" / "pairs"
 WEIGHTS_LOCATIONS = ("mram", "psram", "tcm")

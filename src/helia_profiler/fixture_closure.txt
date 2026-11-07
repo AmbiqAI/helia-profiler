@@ -49,6 +49,7 @@ console/results.py
 console/tables.py
 console/validation.py
 data/armv8m_pmu_events.json
+data/calibration.schema.v2.json
 data/comparison_profile.schema.v1.json
 data/compatibility-baseline-v1.json
 data/profile_results.schema.v1.json

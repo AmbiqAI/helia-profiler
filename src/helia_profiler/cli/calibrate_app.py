@@ -25,12 +25,16 @@ def register(app: typer.Typer) -> None:
             "Examples:\n\n"
             "  hpx calibrate results/kws-auto results/kws-mve --output kws-calibration.json\n\n"
             "  hpx calibrate results/kws-int16 --output kws-calibration.json --merge\n\n"
-            "Each bundle prices every operator its plan lists with knobs, as "
-            "operators[<id>][<knob>][<value>], where an operator without knobs has no "
-            "slot and is left out; and it times every operator the plan lists, with "
-            "knobs or without, as operator_cycles[<id>], one entry of knobs and cycles "
-            "per knob vector, so a knob sweep adds an entry. Every bundle must profile the same "
-            "model under the same recorded conditions and setup: a digest of the run's "
+            "The file is calibration schema 2: each bundle times every operator its plan "
+            "lists, with knobs or without, as operator_cycles[<id>], one entry of knobs, "
+            "cycles and facts per knob vector, where knobs is the whole vector and facts are "
+            "the plan's fixed choices and kernel entry. Any set of knob vectors merges, one "
+            "knob at a time from a common baseline, several at once or every combination, "
+            "since each vector is its own sample. Two samples of one operator and knob vector "
+            "must agree within --tolerance of the larger or within 8 cycles, whichever is "
+            "looser, so --tolerance 0 still allows 8 cycles, and they must report the same "
+            "facts. Every bundle must profile the same model under the same recorded "
+            "conditions and setup: a digest of the run's "
             "frozen settings less the heliaAOT knob values (optimization.<knob> and "
             "operators[].optimization.<knob>), the power, output and timeout sections "
             "and the run-only fields, plus the resolved toolchain and engine, the "
@@ -47,22 +51,17 @@ def register(app: typer.Typer) -> None:
             "must carry cycles the profiler "
             "did not flag: an invalid run counts only when the issue registry confines "
             "every error to power metrics, and a run whose cycle counter was flagged is "
-            "refused whatever its verdict. Two sources pricing one value under the "
-            "same other knobs must agree within --tolerance, and a second vector for "
-            "one value is an error; two sources timing one operator under one knob "
-            "vector must agree within --tolerance or within 8 cycles, whichever is "
-            "looser, so --tolerance 0 is exact for prices but leaves the 8-cycle floor "
-            "for operator_cycles; anything else is an error too. The plan's fixed "
-            "choices and kernel entry are recorded with each price, never compared. "
-            "Reading a bundle needs the aot extra installed, since the knob values are "
-            "stripped by heliaAOT's own registry, and the file records the heliaAOT "
-            "release the captures compiled with; captures compiled by different releases "
-            "do not merge. --merge accepts only a file hpx wrote and keeps every price and "
-            "timing it holds; a file written before operator_cycles contributes no "
-            "timings, which are not rebuilt from its prices; "
-            "heliaOptimus reads a hand-written table directly. heliaOptimus matches "
-            "the file when the planner passes the same conditions, including "
-            "application_load=none and, with PSRAM, external_memory_clock."
+            "refused whatever its verdict. Reading a bundle needs the aot extra installed, "
+            "since the knob values are stripped by heliaAOT's own registry, and the file "
+            "records the heliaAOT release the captures compiled with; captures compiled by "
+            "different releases do not merge. --merge accepts only a calibration schema 2 "
+            "file hpx wrote and keeps every sample it holds; a schema 1 file is refused and "
+            "must be written again from its bundles without --merge, and a file of a newer "
+            "schema is merged with the release that wrote it; heliaOptimus reads a "
+            "hand-written table directly. The file's schema is "
+            "helia_profiler/data/calibration.schema.v2.json. heliaOptimus matches the file "
+            "when the planner passes the same conditions, including application_load=none "
+            "and, with PSRAM, external_memory_clock."
         ),
     )(calibrate_command)
 
@@ -76,13 +75,13 @@ def calibrate_command(
     ],
     output: Annotated[
         Path,
-        typer.Option("--output", "-o", help="Calibration file to write (schema version 1)"),
+        typer.Option("--output", "-o", help="Calibration file to write (calibration schema 2)"),
     ],
     merge: Annotated[
         bool,
         typer.Option(
             "--merge",
-            help="Read the existing --output file first and hold its prices to the same rules",
+            help=("Read the existing --output file first and hold its samples to the same rules"),
         ),
     ] = False,
     tolerance: Annotated[
@@ -90,9 +89,9 @@ def calibrate_command(
         typer.Option(
             "--tolerance",
             help=(
-                "Largest relative disagreement two prices of one value may have, as a "
-                "fraction (default: 0.02, two percent); two timings in operator_cycles may "
-                "also differ by 8 cycles"
+                "Largest relative disagreement two samples of one operator and knob vector "
+                "may have, as a fraction of the larger (default: 0.02, two percent); they "
+                "may always differ by 8 cycles"
             ),
         ),
     ] = DEFAULT_TOLERANCE,

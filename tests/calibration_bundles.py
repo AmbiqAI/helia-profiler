@@ -2,6 +2,10 @@
 
 Needs no heliaAOT: the tests that read these bundles skip without the aot
 extra, the ones that only need a bundle on disk run everywhere.
+
+``python -m tests.calibration_bundles <out>`` writes the calibration file of
+:func:`golden_bundles` to *out*, which needs the aot extra; the committed
+``tests/fixtures/calibration/hpx_calibration.v2.json`` is written this way.
 """
 
 from __future__ import annotations
@@ -10,8 +14,14 @@ import csv
 import dataclasses
 import hashlib
 import json
+import sys
+import tempfile
+from collections.abc import Iterator
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from helia_profiler.results import ResultValidity
 from helia_profiler.results.manifest import ResultIssue, load_result_manifest
@@ -46,6 +56,8 @@ PLAN_OPERATORS = [
 ]
 
 PLANS = Path(__file__).parent / "fixtures" / "calibration"
+#: The calibration file hpx's writer produces for :func:`golden_bundles`.
+GOLDEN = PLANS / "hpx_calibration.v2.json"
 
 
 def _aot_args(
@@ -236,14 +248,15 @@ def _mark(path: Path, validity: ResultValidity, *codes: str, severity: str = "er
     _republish(path, validity=validity, issues=issues)
 
 
-def _hand_written(path: Path, operators: dict[str, Any], sha256: str = SHA) -> Path:
+def _hand_written(path: Path, operator_cycles: dict[str, Any], sha256: str = SHA) -> Path:
+    """A schema 2 table as a person writes it for heliaOptimus: no ``capture`` block."""
     path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "model": {"sha256": sha256, "subgraph": 0},
                 "conditions": CONDITIONS,
-                "operators": operators,
+                "operator_cycles": operator_cycles,
             }
         ),
         encoding="utf-8",
@@ -296,3 +309,81 @@ def pair(tmp_path: Path, slow_memory: str) -> tuple[Path, Path]:
         effective_config=hashlib.sha256(b"constants staged in dtcm").hexdigest(),
     )
     return slow, fast
+
+
+def _golden_plan(changes: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
+    """:data:`PLAN_OPERATORS` with *changes* applied to the knobs, each operator's
+    kernel entry named after its vector, and the fc's fixed weight layout."""
+    ops = json.loads(json.dumps(PLAN_OPERATORS))
+    for op in ops:
+        for knob, value in changes.get(op["id"], {}).items():
+            op["knobs"][knob] = {"value": value, "approximate": value == "fast"}
+        vector = sorted((knob, choice["value"]) for knob, choice in op["knobs"].items())
+        op["kernel"] = {"entry": "_".join([op["op_type"], *(f"{k}_{v}" for k, v in vector)])}
+        if op["id"] == "0:fc":
+            op["fixed"] = {"weight_layout": {"value": "packed", "set_by": "heuristic"}}
+    return ops
+
+
+def golden_bundles(path: Path) -> tuple[Path, Path, Path, Path]:
+    """Four bundles of :data:`PLAN_OPERATORS`: a base and one knob moved in each other.
+
+    ``0:fc``'s two knobs are swept one at a time from the base's
+    ``(precise, specialized)``; together they write 3 operators and 6 samples.
+    """
+    base = {0: 12000.0, 1: 3000.0, 2: 400.0}
+    sweeps = (
+        ("base", {}, {}, {}),
+        ("conv_fast", {"0:conv": {"accumulation": "fast"}}, {0: 9000.0}, {"accumulation": "fast"}),
+        ("fc_generic", {"0:fc": {"kernel": "generic"}}, {1: 3600.0}, {"kernel": "generic"}),
+        ("fc_fast", {"0:fc": {"accumulation": "fast"}}, {1: 2400.0}, {"accumulation": "fast"}),
+    )
+    first, second, third, fourth = (
+        bundle(
+            path / name,
+            cycles={**base, **cycles},
+            plan_ops=_golden_plan(changes),
+            knob_values=knob_values or None,
+        )
+        for name, changes, cycles, knob_values in sweeps
+    )
+    return first, second, third, fourth
+
+
+def _calibration_schema() -> dict[str, Any]:
+    text = files("helia_profiler").joinpath("data/calibration.schema.v2.json").read_text("utf-8")
+    return json.loads(text)
+
+
+@pytest.fixture
+def schema_checked_writes(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Validate every file ``calibrate`` writes against the exported schema."""
+    from jsonschema import Draft202012Validator
+
+    from helia_profiler.calibration import table
+
+    validator = Draft202012Validator(_calibration_schema())
+    original = table.write_calibration
+
+    def checked(written: Any, path: Path) -> Path:
+        result = original(written, path)
+        validator.validate(json.loads(path.read_text(encoding="utf-8")))
+        return result
+
+    monkeypatch.setattr(table, "write_calibration", checked)
+    yield
+
+
+def write_golden(output: Path) -> Path:
+    """Calibrate :func:`golden_bundles` into *output* with hpx's own writer."""
+    from helia_profiler.calibration import calibrate
+
+    with tempfile.TemporaryDirectory() as directory:
+        calibrate(golden_bundles(Path(directory)), output=output)
+    return output
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: python -m tests.calibration_bundles <out>")
+    write_golden(Path(sys.argv[1]))
