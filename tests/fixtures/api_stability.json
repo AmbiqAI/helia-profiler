@@ -16,6 +16,7 @@
   "CompatibilityBaseline": "stable",
   "CompatibilityResolution": "stable",
   "CompiledBuild": "experimental",
+  "Conditions": "experimental",
   "ConfigError": "stable",
   "DependencyError": "experimental",
   "DependencyLockProvenance": "experimental",

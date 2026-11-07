@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -124,3 +125,23 @@ def _write_aot_memory_layers(ctx: PipelineContext, output_dir: Path) -> Path | N
     write_dict_csv(out_path, fieldnames, rows)
     log.info("Wrote AOT memory placement CSV: %s", out_path)
     return out_path
+
+
+def _write_aot_plan(ctx: PipelineContext, output_dir: Path) -> list[Path]:
+    """Copy heliaAOT's ``<prefix>_plan.json`` and ``<prefix>_report.json`` into the bundle.
+
+    The plan names every operator the compiler emitted, with the knob values
+    it chose, keyed by the execution position the firmware labels layers
+    with; ``hpx calibrate`` joins the two (#648). Empty for other engines
+    and for a heliaAOT release that writes neither file.
+    """
+    artifacts = getattr(ctx, "engine_artifacts", None)
+    if not isinstance(artifacts, HeliaAotArtifacts):
+        return []
+    written: list[Path] = []
+    for source in artifacts.report_files:
+        out_path = output_dir / source.name
+        shutil.copyfile(source, out_path)
+        log.info("Pinned heliaAOT %s: %s", source.name, out_path)
+        written.append(out_path)
+    return written

@@ -151,6 +151,7 @@ if TYPE_CHECKING:
         PowerMetadata,
     )
     from .results import (
+        Conditions,
         DependencyLockProvenance,
         FirmwareMeta,
         LayerResult,
@@ -311,6 +312,7 @@ _EXPORTS = {
     "PowerIntegrity": (".power.metadata", "PowerIntegrity", "experimental"),
     "PowerMetadata": (".power.metadata", "PowerMetadata", "experimental"),
     "DependencyLockProvenance": (".results", "DependencyLockProvenance", "experimental"),
+    "Conditions": (".results", "Conditions", "experimental"),
     "FirmwareMeta": (".results", "FirmwareMeta", "stable"),
     "LayerResult": (".results", "LayerResult", "stable"),
     "NsxModuleRef": (".results", "NsxModuleRef", "implementation"),
@@ -569,6 +571,7 @@ __all__ = [
     "PresetResult",
     "LayerResult",
     "FirmwareMeta",
+    "Conditions",
     "RunMetadata",
     "NsxModuleRef",
     "ModelAnalysis",

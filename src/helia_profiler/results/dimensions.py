@@ -77,6 +77,10 @@ class ComparisonDimension(StrEnum):
     ENGINE_VERSION = "engine_version"
     ARCHITECTURE_FLAGS = "architecture_flags"
     ENGINE_BACKEND = "engine_backend"
+    WEIGHTS_MEMORY = "weights_memory"
+    WEIGHTS_CACHE = "weights_cache"
+    EXTERNAL_MEMORY_CLOCK = "external_memory_clock"
+    APPLICATION_LOAD = "application_load"
 
 
 class DimensionEffect(StrEnum):
@@ -418,6 +422,59 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         ArtifactSource.RUN_METADATA,
         ("engine", "backend"),
         label="Engine backend",
+    ),
+    # The recorded conditions (summary.conditions, #648), appended in the
+    # same append-only convention. Informative, not blocking, like the
+    # placement intent above them: a weights-in-DTCM against weights-in-MRAM
+    # comparison is one someone ran on purpose. Each hint says what a
+    # difference does to the cycle counts, which the generic "dimension
+    # differs" line cannot. Absent on artifacts predating schema v20 -- the
+    # comparator's None-skip rule applies. The core clock already takes part
+    # as CPU_CLOCK and SYSTEM_CLOCK_HZ.
+    DimensionSpec(
+        ComparisonDimension.WEIGHTS_MEMORY,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.SUMMARY,
+        ("conditions", "weights_memory"),
+        label="Weights memory",
+        mismatch_hint=(
+            "The runs keep their constants in different memories, so each "
+            "layer's cycle count measures a different memory path; the "
+            "deltas say what moving the weights changed, not what the code did."
+        ),
+    ),
+    DimensionSpec(
+        ComparisonDimension.WEIGHTS_CACHE,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.SUMMARY,
+        ("conditions", "weights_cache"),
+        label="Weights cache",
+        mismatch_hint=(
+            "The runs read their weights through different cache states, so "
+            "the cycle counts are not the same measurement."
+        ),
+    ),
+    DimensionSpec(
+        ComparisonDimension.EXTERNAL_MEMORY_CLOCK,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.SUMMARY,
+        ("conditions", "external_memory_clock"),
+        label="External memory clock",
+        mismatch_hint=(
+            "The runs clocked their PSRAM differently, so every access to it "
+            "took a different number of core cycles."
+        ),
+    ),
+    DimensionSpec(
+        ComparisonDimension.APPLICATION_LOAD,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.SUMMARY,
+        ("conditions", "application_load"),
+        label="Application load",
+        mismatch_hint=(
+            "The runs shared the core with different application loads, so "
+            "the cycle counts include different interference."
+        ),
     ),
 )
 

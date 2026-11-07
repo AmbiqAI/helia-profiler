@@ -107,6 +107,8 @@ def _write_summary(
         summary["dependencies"] = ctx.run_metadata.dependencies.to_dict()
     if ctx.run_metadata.identity is not None:
         summary["identity"] = ctx.run_metadata.identity.to_dict()
+    if ctx.run_metadata.conditions is not None:
+        summary["conditions"] = ctx.run_metadata.conditions.to_dict()
 
     summary["top_layers"] = [
         {

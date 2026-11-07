@@ -22,6 +22,7 @@ from typing import Any
 import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
+from ...engines import EngineType
 from ...errors import ConfigError, EngineError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
@@ -118,6 +119,18 @@ def aot_platform_for_board(board: str) -> str | None:
     return aot_platform
 
 
+def aot_target_name(config: ProfileConfig) -> str:
+    """heliaAOT's name for the configured board, for the recorded conditions.
+
+    A heliaAOT run names the platform it compiled for, override included.
+    Any other engine names the board's mapped platform, or the board itself
+    when heliaAOT has no name for it, so every run records a target.
+    """
+    if config.engine.type is EngineType.HELIA_AOT:
+        return _resolve_aot_platform(config)
+    return _BOARD_TO_AOT_PLATFORM.get(config.target.board, config.target.board)
+
+
 def _resolve_aot_platform(config: ProfileConfig) -> str:
     """Map the profiler's target board to a heliaAOT platform name.
 
@@ -165,6 +178,11 @@ _AOT_MEMORY_ALIASES: dict[str, Placement] = {
     "dram": Placement.SRAM,
     "itcm": Placement.TCM,
 }
+
+
+def placement_memory_type(placement: Placement) -> str:
+    """heliaAOT's lowercase memory type for a logical placement."""
+    return _PLACEMENT_TO_AOT_MEMTYPE[placement]
 
 
 def _resolve_aot_placement_intent(
@@ -408,14 +426,19 @@ def _merge_aot_tensor_rulesets(
     user rules (for example, a constant selected by ``id``) remain additive
     and override the matching wildcard in heliaAOT.
     """
-    wildcard_kinds = {
+    wildcard_kinds = user_wildcard_kinds(user_tensors)
+    return [rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds] + list(
+        user_tensors
+    )
+
+
+def user_wildcard_kinds(user_tensors: list[Any]) -> set[str]:
+    """The tensor kinds whose placement a user's type-only rule takes over from hpx."""
+    return {
         str(rule.get("type"))
         for rule in user_tensors
         if isinstance(rule, dict) and "type" in rule and "id" not in rule
     }
-    return [rule for rule in profiler_rulesets if rule.get("type") not in wildcard_kinds] + list(
-        user_tensors
-    )
 
 
 def _prepare_aot_memory_config(

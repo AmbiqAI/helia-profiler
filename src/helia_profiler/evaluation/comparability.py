@@ -310,11 +310,15 @@ def assess_comparability(
             and candidate_value is not None
             and baseline_value != candidate_value
         ):
+            message = (
+                DIMENSION_REGISTRY[dimension].mismatch_hint
+                or f"Comparison dimension differs: {dimension}."
+            )
             issues.append(
                 _family_issue(
                     DIMENSION_DIFFERS,
                     dimension,
-                    f"Comparison dimension differs: {dimension}.",
+                    message,
                     baseline=baseline_value,
                     candidate=candidate_value,
                 )

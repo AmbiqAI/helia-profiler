@@ -13,7 +13,7 @@ of the API contract.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -190,6 +190,86 @@ class FirmwareMeta:
 
 
 @dataclass(frozen=True)
+class Conditions:
+    """The board conditions a run's measurements refer to.
+
+    Derived once, when the report is written, from the frozen configuration
+    and the capture; readers take the recorded facts rather than deriving
+    them again. The field names match heliaOptimus's ``Conditions`` so a
+    calibration table written from a run prices a plan made under the same
+    conditions.
+
+    Attributes:
+        target: heliaAOT's canonical name for the board profiled.
+        cpu_hz: The core clock, measured on the device when the firmware
+            reported one, otherwise the configured clock.
+        weights_memory: The memory hpx placed the model's constants in, as a
+            lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
+            ``psram``); ``None`` when hpx set no placement rule for them.
+        weights_cache: Whether the weights are read through the cache. Every
+            run this release makes records ``on``; ``off`` and
+            ``emulated:<bytes>`` await the firmware work of
+            AmbiqAI/helia-profiler#648.
+        external_memory_clock: The PSRAM interface clock in MHz; ``None``
+            when the run used no PSRAM.
+        application_load: What else the core ran during the capture; ``none``
+            for every run this release makes.
+    """
+
+    target: str
+    cpu_hz: int | None = None
+    weights_memory: str | None = None
+    weights_cache: str = "on"
+    external_memory_clock: int | None = None
+    application_load: str = "none"
+
+    def to_dict(self) -> dict[str, Any]:
+        """JSON-ready form; ``external_memory_clock`` is absent without PSRAM."""
+        out: dict[str, Any] = {
+            "target": self.target,
+            "cpu_hz": self.cpu_hz,
+            "weights_memory": self.weights_memory,
+            "weights_cache": self.weights_cache,
+        }
+        if self.external_memory_clock is not None:
+            out["external_memory_clock"] = self.external_memory_clock
+        out["application_load"] = self.application_load
+        return out
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> Conditions:
+        """Read a recorded ``conditions`` block.
+
+        Raises:
+            ValueError: when a field is missing or has the wrong type.
+        """
+        target = data.get("target")
+        if not isinstance(target, str) or not target:
+            raise ValueError("conditions.target must be a non-empty string")
+        cpu_hz = data.get("cpu_hz")
+        if cpu_hz is not None and (isinstance(cpu_hz, bool) or not isinstance(cpu_hz, int)):
+            raise ValueError("conditions.cpu_hz must be an integer or null")
+        weights_memory = data.get("weights_memory")
+        if weights_memory is not None and not isinstance(weights_memory, str):
+            raise ValueError("conditions.weights_memory must be a string or null")
+        clock = data.get("external_memory_clock")
+        if clock is not None and (isinstance(clock, bool) or not isinstance(clock, int)):
+            raise ValueError("conditions.external_memory_clock must be an integer when present")
+        weights_cache = data.get("weights_cache", "on")
+        application_load = data.get("application_load", "none")
+        if not isinstance(weights_cache, str) or not isinstance(application_load, str):
+            raise ValueError("conditions.weights_cache and application_load must be strings")
+        return cls(
+            target=target,
+            cpu_hz=cpu_hz,
+            weights_memory=weights_memory,
+            weights_cache=weights_cache,
+            external_memory_clock=clock,
+            application_load=application_load,
+        )
+
+
+@dataclass(frozen=True)
 class PmuResult:
     """Complete PMU profiling result across all presets."""
 
@@ -322,6 +402,9 @@ class RunMetadata:
     #: What ran, in the vocabulary fixture builds share. Set when the report
     #: is written, once the capture it hashes is complete.
     identity: "RunIdentity | None" = None
+    #: The conditions the measurements refer to. Set when the report is
+    #: written, from the frozen configuration and the capture.
+    conditions: Conditions | None = None
 
 
 @dataclass(frozen=True)

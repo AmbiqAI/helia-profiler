@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from .models import (
         BinarySections,
         BuildImage,
+        Conditions,
         ConsumerKind,
         ConsumerReconciliation,
         EngineInfo,
@@ -139,6 +140,7 @@ _EXPORTS = {
     "load_result_manifest": (".manifest", "load_result_manifest"),
     "BinarySections": (".models", "BinarySections"),
     "BuildImage": (".models", "BuildImage"),
+    "Conditions": (".models", "Conditions"),
     "ConsumerKind": (".models", "ConsumerKind"),
     "ConsumerReconciliation": (".models", "ConsumerReconciliation"),
     "EngineInfo": (".models", "EngineInfo"),
@@ -193,6 +195,7 @@ __all__ = [
     "ComparabilitySeverity",
     "ComparisonDimension",
     "CompatibilityResolution",
+    "Conditions",
     "ConsumerKind",
     "ContentDigest",
     "DependencyLockMode",

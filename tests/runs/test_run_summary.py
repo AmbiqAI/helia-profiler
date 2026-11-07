@@ -199,7 +199,7 @@ def test_healthy_producer_shape_passes_the_check() -> None:
     )
 
 
-@pytest.mark.parametrize("version", [1, 18, 20, True, 19.0, "19", None])
+@pytest.mark.parametrize("version", [1, 19, 21, True, 20.0, "20", None])
 def test_summary_readers_refuse_unsupported_versions(tmp_path: Path, version) -> None:
     data = _base_summary(schema_version=version)
     path = tmp_path / "summary.json"
