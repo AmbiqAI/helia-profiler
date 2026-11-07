@@ -121,7 +121,14 @@ def _aot_artifacts(
 
 
 def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
-    ctx = _ctx(tmp_path, engine="helia-aot", extra={"engine": {"config": {"platform_name": "x"}}})
+    ctx = _ctx(
+        tmp_path,
+        engine="helia-aot",
+        extra={
+            "engine": {"config": {"platform_name": "x"}},
+            "model": {"weights_location": "mram"},
+        },
+    )
     ctx.engine_artifacts = _aot_artifacts(tmp_path)
     assert run_conditions(ctx).target == "x"
     assert run_conditions(ctx).weights_memory == "mram"
@@ -139,6 +146,40 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     specific = {"tensors": [{"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}}]}
     ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(specific))
     assert run_conditions(ctx).weights_memory == "mram"
+
+
+def test_aot_weights_memory_is_the_constant_rule_the_compiler_received(tmp_path: Path) -> None:
+    """The rule, not the planner's region: Ethos-U moves auto-placed weights to MRAM."""
+    auto = _ctx(tmp_path, engine="helia-aot", extra={"model": {"arena_size": 1024}})
+    auto.engine_artifacts = _aot_artifacts(tmp_path)
+    auto.weights_region = Placement.TCM
+    assert run_conditions(auto).weights_memory == "dtcm"
+
+    npu = _ctx(
+        tmp_path,
+        engine="helia-aot",
+        extra={"model": {"arena_size": 1024}, "engine": {"backend": "ethos_u"}},
+    )
+    npu.engine_artifacts = _aot_artifacts(tmp_path)
+    npu.weights_region = Placement.TCM
+    assert run_conditions(npu).weights_memory == "mram"
+
+    pinned = _ctx(
+        tmp_path,
+        engine="helia-aot",
+        extra={
+            "model": {"arena_size": 1024, "weights_location": "tcm"},
+            "engine": {"backend": "ethos_u"},
+        },
+    )
+    pinned.engine_artifacts = _aot_artifacts(tmp_path)
+    assert run_conditions(pinned).weights_memory == "dtcm"
+
+    # A user catch-all rule's staging attribute applies under hpx's rule.
+    staged = _ctx(tmp_path, engine="helia-aot", extra={"model": {"weights_location": "mram"}})
+    intent = {"tensors": [{"type": "*", "attributes": {"constant_destination_memory": "sram"}}]}
+    staged.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(intent))
+    assert run_conditions(staged).weights_memory == "sram"
 
 
 def test_a_legacy_board_alias_records_the_aot_platform(tmp_path: Path) -> None:
