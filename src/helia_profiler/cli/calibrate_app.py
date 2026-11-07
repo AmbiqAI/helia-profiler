@@ -24,13 +24,17 @@ def register(app: typer.Typer) -> None:
         epilog=(
             "Examples:\n\n"
             "  hpx calibrate results/kws-auto results/kws-mve --output kws-calibration.json\n\n"
-            "  hpx calibrate results/kws-sram --output kws-calibration.json --merge\n\n"
+            "  hpx calibrate results/kws-int16 --output kws-calibration.json --merge\n\n"
             "Each bundle contributes the cycles of every operator its plan lists with "
             "knobs, as operators[<id>][<knob>][<value>]; an operator without knobs has "
             "no slot in the file and is left out. Every bundle must profile the same "
-            "model under the same recorded conditions, with no overflowed layer, and "
-            "two bundles pricing one value must agree within --tolerance; anything "
-            "else is an error."
+            "model under the same recorded conditions and capture setup (toolchain, "
+            "engine and kernel versions, arena memory), be a valid run with no "
+            "overflowed layer, sweep at most one knob per operator, and two bundles "
+            "pricing one value must agree within --tolerance; anything else is an "
+            "error. heliaOptimus matches the file when the planner passes the same "
+            "conditions, including application_load=none and, with PSRAM, "
+            "external_memory_clock."
         ),
     )(calibrate_command)
 

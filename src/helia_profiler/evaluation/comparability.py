@@ -353,7 +353,13 @@ def read_dimensions(run: RunArtifacts) -> dict[str, Any]:
     power_dict = power if isinstance(power, dict) else None
     for spec in DIMENSION_REGISTRY.values():
         if spec.source in (ArtifactSource.RUN_METADATA, ArtifactSource.SUMMARY):
-            dimensions[spec.dimension] = _read_artifact_value(run, spec.source, spec.path)
+            dimensions[spec.dimension] = (
+                spec.derive(
+                    run.metadata if spec.source is ArtifactSource.RUN_METADATA else run.summary
+                )
+                if spec.derive is not None
+                else _read_artifact_value(run, spec.source, spec.path)
+            )
         elif spec.source is ArtifactSource.SUMMARY_POWER:
             if power_dict is not None:
                 dimensions[spec.dimension] = (

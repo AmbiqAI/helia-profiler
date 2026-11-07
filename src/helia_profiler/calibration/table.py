@@ -9,22 +9,31 @@ prices every (operator, knob, value) the run exercised::
     operators[<plan operator id>][<knob>][<value>] = {"cycles": <cycles>}
 
 Everything that would make a price mean something else is an error, never a
-silent skip: another model, other conditions, an overflowed counter, a
-position the plan and the capture disagree on, or two bundles that price one
-value differently. The file is schema version 1 as ``helia_optimus.cost.calibration``
-reads it.
+silent skip: another model, other conditions, a run the profiler marked
+invalid, a capture whose toolchain, engine, kernel library or arena memory
+differs from another's, an overflowed counter, a position the plan and the
+capture disagree on, an operator whose other knobs did not hold still, or
+two bundles that price one value differently. The file is schema version 1
+as ``helia_optimus.cost.calibration`` reads it; what hpx needs for a later
+``--merge`` sits under ``capture``, a key heliaOptimus ignores.
 """
 
 from __future__ import annotations
 
 import json
+import math
+import os
+import re
+import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 
 from ..errors import CalibrationError
+from ..evaluation.comparability import read_dimensions
 from ..evaluation.compare import RunArtifacts, load_run_artifacts
+from ..results import ComparisonDimension, ResultValidity
 from ..results.models import Conditions
 from ..results.serde import nested_get
 
@@ -35,20 +44,41 @@ PLAN_SCHEMA_VERSION = 1
 #: Largest relative disagreement two prices of one value may have.
 DEFAULT_TOLERANCE = 0.02
 
+#: Facts of a capture that change cycles without being conditions. Every
+#: bundle in a file, and the file itself under ``--merge``, must agree on them.
+#: The comparison dimensions are read as ``hpx compare`` reads them; the
+#: power family is left out because no price is a power figure.
+CAPTURE_DIMENSIONS: tuple[ComparisonDimension, ...] = (
+    ComparisonDimension.BOARD,
+    ComparisonDimension.SOC,
+    ComparisonDimension.CPU_CLOCK,
+    ComparisonDimension.ENGINE,
+    ComparisonDimension.ENGINE_VERSION,
+    ComparisonDimension.ENGINE_BACKEND,
+    ComparisonDimension.TOOLCHAIN,
+    ComparisonDimension.COMPILER_VERSION,
+    ComparisonDimension.LINK_FAMILY,
+    ComparisonDimension.ARCHITECTURE_FLAGS,
+    ComparisonDimension.ARENA_LOCATION,
+)
+#: The CORE (kernel library) identity and the planned arena memory, which are
+#: not comparison dimensions.
+_KERNEL_LIBRARY = "kernel_library"
+_KERNEL_VERSION = "kernel_version"
+_ARENA_MEMORY = "arena_memory"
+
 _PLAN_ARTIFACT = "helia-aot.plan"
 _PLAN_SUFFIX = "_plan.json"
+_LAYER_SUFFIX = re.compile(r":-?\d+$")
 
 
 @dataclass(frozen=True)
-class Price:
-    """One measured cost: the cycles an operator took with one knob value."""
+class OperatorSample:
+    """One measured operator: the whole knob vector it ran with, and its cycles."""
 
     operator: str
-    knob: str
-    value: str
+    knobs: Mapping[str, str]
     cycles: float
-    #: The bundle or file the price came from, for the messages.
-    source: str
 
 
 @dataclass(frozen=True)
@@ -60,7 +90,9 @@ class CalibrationSource:
     subgraph: int
     #: The recorded block as written: heliaOptimus compares every field.
     conditions: Mapping[str, Any]
-    prices: tuple[Price, ...]
+    #: The capture facts, by name; every source in a file must agree.
+    dimensions: Mapping[str, Any]
+    samples: tuple[OperatorSample, ...]
 
 
 @dataclass(frozen=True)
@@ -72,6 +104,10 @@ class CalibrationTable:
     conditions: Mapping[str, Any]
     #: operator id -> knob -> value -> cycles.
     operators: Mapping[str, Mapping[str, Mapping[str, float]]]
+    #: The capture facts the prices were measured with; empty for a file hpx did not write.
+    dimensions: Mapping[str, Any]
+    #: operator id -> the knobs that held still while its priced knob was swept.
+    contexts: Mapping[str, Mapping[str, str]]
 
     @property
     def price_count(self) -> int:
@@ -89,21 +125,44 @@ class CalibrationTable:
                 }
                 for operator, knobs in self.operators.items()
             },
+            "capture": {
+                "dimensions": dict(self.dimensions),
+                "knobs": {operator: dict(knobs) for operator, knobs in self.contexts.items()},
+            },
         }
 
-    def prices(self, source: str) -> CalibrationSource:
-        """The table as a source, so ``--merge`` holds it to the same rules."""
+    def as_source(self, source: str) -> CalibrationSource:
+        """The table as a source, so ``--merge`` holds it to the same rules.
+
+        Raises:
+            CalibrationError: when an operator prices several knobs at several
+                values each, so the file cannot say which knob was swept.
+        """
+        samples: list[OperatorSample] = []
+        for operator, knobs in self.operators.items():
+            context = dict(self.contexts.get(operator, {}))
+            if len(knobs) == 1:
+                (knob,) = knobs
+                for value, cycles in knobs[knob].items():
+                    samples.append(OperatorSample(operator, {**context, knob: value}, cycles))
+            elif all(len(values) == 1 for values in knobs.values()):
+                # No knob was swept: every knob was priced from the one vector.
+                vector = {**context, **{knob: next(iter(values)) for knob, values in knobs.items()}}
+                cycles = next(iter(next(iter(knobs.values())).values()))
+                samples.append(OperatorSample(operator, vector, cycles))
+            else:
+                raise CalibrationError(
+                    f"{source}: operator {operator} prices knobs {', '.join(sorted(knobs))} at "
+                    "several values each, so the file cannot say which knob was swept.",
+                    hint="Write a new file from the bundles instead of merging into this one.",
+                )
         return CalibrationSource(
             source=source,
             model_sha256=self.model_sha256,
             subgraph=self.subgraph,
             conditions=self.conditions,
-            prices=tuple(
-                Price(operator, knob, value, cycles, source)
-                for operator, knobs in self.operators.items()
-                for knob, values in knobs.items()
-                for value, cycles in values.items()
-            ),
+            dimensions=self.dimensions,
+            samples=tuple(samples),
         )
 
 
@@ -124,8 +183,10 @@ def calibrate(
     """
     if not bundles:
         raise CalibrationError("No result bundle to calibrate from.")
-    if tolerance < 0:
-        raise CalibrationError(f"--tolerance must not be negative (got {tolerance}).")
+    if not math.isfinite(tolerance) or not 0 <= tolerance < 1:
+        raise CalibrationError(
+            f"--tolerance must be a fraction from 0 up to but not including 1 (got {tolerance})."
+        )
     sources: list[CalibrationSource] = []
     if merge:
         if not output.is_file():
@@ -133,7 +194,7 @@ def calibrate(
                 f"Nothing to merge into: {output} does not exist.",
                 hint="Drop --merge to write a new file.",
             )
-        sources.append(read_calibration(output).prices(str(output)))
+        sources.append(read_calibration(output).as_source(str(output)))
     sources.extend(read_bundle(bundle) for bundle in bundles)
     table = merge_sources(sources, tolerance=tolerance)
     write_calibration(table, output)
@@ -141,8 +202,19 @@ def calibrate(
 
 
 def write_calibration(table: CalibrationTable, path: Path) -> Path:
+    """Write the file whole: a temporary file beside it, then one rename."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(table.to_dict(), indent=2) + "\n", encoding="utf-8", newline="\n")
+    rendered = json.dumps(table.to_dict(), indent=2, allow_nan=False) + "\n"
+    handle = tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", newline="\n", dir=path.parent, prefix=path.name, delete=False
+    )
+    try:
+        with handle:
+            handle.write(rendered)
+        os.replace(handle.name, path)
+    except BaseException:
+        Path(handle.name).unlink(missing_ok=True)
+        raise
     return path
 
 
@@ -193,14 +265,28 @@ def read_calibration(path: Path) -> CalibrationTable:
             typed[operator][knob] = {}
             for value, cost in values.items():
                 cycles = cost.get("cycles") if isinstance(cost, dict) else None
-                if isinstance(cycles, bool) or not isinstance(cycles, (int, float)):
+                if not _is_cycle_count(cycles):
                     raise CalibrationError(
                         f"Calibration file {path}: operator {operator} {knob}={value} "
-                        "has no numeric cycles."
+                        "has no finite, non-negative cycles."
                     )
                 typed[operator][knob][value] = float(cycles)
+    dimensions = nested_get(data, "capture", "dimensions")
+    contexts = nested_get(data, "capture", "knobs")
+    if not isinstance(dimensions, dict):
+        dimensions = {}
+    if not isinstance(contexts, dict) or not all(
+        isinstance(knobs, dict) and all(isinstance(v, str) for v in knobs.values())
+        for knobs in contexts.values()
+    ):
+        contexts = {}
     return CalibrationTable(
-        model_sha256=sha256, subgraph=subgraph, conditions=conditions, operators=typed
+        model_sha256=sha256,
+        subgraph=subgraph,
+        conditions=conditions,
+        operators=typed,
+        dimensions=dimensions,
+        contexts=contexts,
     )
 
 
@@ -208,13 +294,15 @@ def read_bundle(path: Path) -> CalibrationSource:
     """Join one result bundle's capture to its pinned heliaAOT plan.
 
     Raises:
-        CalibrationError: when the bundle records no conditions or no usable
-            weights memory, has no plan or a plan for another model, a layer
-            overflowed, or the plan and the capture disagree on a position.
+        CalibrationError: when the profiler marked the run invalid, the bundle
+            records no conditions or no usable weights memory, has no plan or
+            a plan for another model, a layer overflowed, or the plan and the
+            capture disagree on a position or an operator type.
         ReportError: when the bundle is not a verified, current result bundle.
     """
     run = load_run_artifacts(path)
     source = str(run.path)
+    _require_valid(run, source)
     conditions = _conditions(run, source)
     model_sha256 = _model_sha256(run, source)
     plan = _plan(run, source)
@@ -232,11 +320,17 @@ def read_bundle(path: Path) -> CalibrationSource:
     operators = plan.get("operators")
     if not isinstance(operators, list):
         raise CalibrationError(f"Bundle {source}: the plan has no operators list.")
-    prices: list[Price] = []
-    seen: set[int] = set()
+    samples: list[OperatorSample] = []
+    positions: set[int] = set()
+    ids: set[str] = set()
     for entry in operators:
-        operator, position, knobs = _plan_operator(entry, source)
-        seen.add(position)
+        operator, position, op_type, knobs = _plan_operator(entry, source)
+        if position in positions:
+            raise CalibrationError(f"Bundle {source}: the plan lists position {position} twice.")
+        if operator in ids:
+            raise CalibrationError(f"Bundle {source}: the plan lists operator {operator} twice.")
+        positions.add(position)
+        ids.add(operator)
         if position not in layers:
             raise CalibrationError(
                 f"Bundle {source}: plan operator {operator} at position {position} has no "
@@ -244,9 +338,15 @@ def read_bundle(path: Path) -> CalibrationSource:
                 hint="The plan and the capture come from different builds; profile again.",
             )
         cycles, op = layers[position]
-        for knob, value in knobs.items():
-            prices.append(Price(operator, knob, value, cycles, source))
-    unplanned = sorted(set(layers) - seen)
+        if _firmware_label(op_type) != _firmware_label(op):
+            raise CalibrationError(
+                f"Bundle {source}: the plan has {op_type} at position {position} but the "
+                f"capture measured {op} there.",
+                hint="The plan and the capture come from different builds; profile again.",
+            )
+        if knobs:
+            samples.append(OperatorSample(operator, knobs, cycles))
+    unplanned = sorted(set(layers) - positions)
     if unplanned:
         position = unplanned[0]
         raise CalibrationError(
@@ -259,23 +359,29 @@ def read_bundle(path: Path) -> CalibrationSource:
         model_sha256=model_sha256,
         subgraph=subgraph,
         conditions=conditions,
-        prices=tuple(prices),
+        dimensions=_capture_dimensions(run),
+        samples=tuple(samples),
     )
 
 
 def merge_sources(
     sources: Sequence[CalibrationSource], *, tolerance: float = DEFAULT_TOLERANCE
 ) -> CalibrationTable:
-    """One table from every source, holding them to one model, one set of conditions
-    and agreeing prices.
+    """One table from every source, holding them to one model, one set of
+    conditions, one capture setup, one swept knob per operator, and agreeing prices.
 
-    The first price of a value is the one kept; a later one must agree with
-    it within *tolerance*, relative to the larger of the two.
+    An operator's knob is priced only when every other knob of that operator
+    held the same value in every source; when no knob varied, every knob is
+    priced. The first price of a value is the one kept; a later one must agree
+    with it within *tolerance*, relative to the larger of the two.
 
     Raises:
-        CalibrationError: on another model, other conditions, a disagreeing
-            price, or no price at all.
+        CalibrationError: on no source, another model, other conditions, a
+            differing capture fact, two knobs of one operator varying, a
+            disagreeing price, or no price at all.
     """
+    if not sources:
+        raise CalibrationError("No result bundle to calibrate from.")
     first = sources[0]
     for other in sources[1:]:
         if (other.model_sha256, other.subgraph) != (first.model_sha256, first.subgraph):
@@ -294,27 +400,61 @@ def merge_sources(
                     "for the other."
                 ),
             )
-    kept: dict[tuple[str, str, str], Price] = {}
+        for name in sorted(set(first.dimensions) & set(other.dimensions)):
+            if first.dimensions[name] != other.dimensions[name]:
+                raise CalibrationError(
+                    f"{other.source} has {name} {other.dimensions[name]!r}; {first.source} has "
+                    f"{first.dimensions[name]!r}, so their cycles are not one measurement.",
+                    hint="Calibrate captures from one setup; write another file for the other.",
+                )
+    vectors: dict[str, list[Mapping[str, str]]] = {}
+    for source in sources:
+        for sample in source.samples:
+            vectors.setdefault(sample.operator, []).append(sample.knobs)
+    swept: dict[str, str | None] = {}
+    contexts: dict[str, dict[str, str]] = {}
+    for operator, seen in vectors.items():
+        knobs = sorted({knob for vector in seen for knob in vector})
+        varying = [knob for knob in knobs if len({vector.get(knob) for vector in seen}) > 1]
+        if len(varying) > 1:
+            raise CalibrationError(
+                f"Operator {operator} ran with different values of knobs "
+                f"{', '.join(varying)} across the sources, so no cycles can be credited to "
+                "one knob.",
+                hint="Sweep one knob at a time; keep the others at one value.",
+            )
+        swept[operator] = varying[0] if varying else None
+        # When nothing varied every knob is priced, so no knob is context.
+        contexts[operator] = (
+            {knob: seen[0][knob] for knob in knobs if knob != varying[0] and knob in seen[0]}
+            if varying
+            else {}
+        )
+    kept: dict[tuple[str, str, str], tuple[float, str]] = {}
     operators: dict[str, dict[str, dict[str, float]]] = {}
     for source in sources:
-        for price in source.prices:
-            key = (price.operator, price.knob, price.value)
-            earlier = kept.get(key)
-            if earlier is None:
-                kept[key] = price
-                operators.setdefault(price.operator, {}).setdefault(price.knob, {})[price.value] = (
-                    price.cycles
-                )
-                continue
-            scale = max(abs(earlier.cycles), abs(price.cycles))
-            if abs(earlier.cycles - price.cycles) > tolerance * scale:
-                apart = abs(earlier.cycles - price.cycles) / scale * 100 if scale else 0.0
-                raise CalibrationError(
-                    f"{price.operator} {price.knob}={price.value} costs {earlier.cycles:g} "
-                    f"cycles in {earlier.source} but {price.cycles:g} in {price.source} "
-                    f"({apart:.1f}% apart, tolerance {tolerance * 100:g}%).",
-                    hint="Raise --tolerance, or leave out the bundle that disagrees.",
-                )
+        for sample in source.samples:
+            knob = swept[sample.operator]
+            priced = [knob] if knob is not None else list(sample.knobs)
+            for name in priced:
+                value = sample.knobs[name]
+                earlier = kept.get((sample.operator, name, value))
+                if earlier is None:
+                    kept[(sample.operator, name, value)] = (sample.cycles, source.source)
+                    operators.setdefault(sample.operator, {}).setdefault(name, {})[value] = (
+                        sample.cycles
+                    )
+                    continue
+                cycles, origin = earlier
+                scale = max(cycles, sample.cycles)
+                if abs(cycles - sample.cycles) > tolerance * scale:
+                    apart = abs(cycles - sample.cycles) / scale * 100
+                    raise CalibrationError(
+                        f"{sample.operator} {name}={value} costs {cycles:g} cycles in {origin} "
+                        f"but {sample.cycles:g} in {source.source} ({apart:.1f}% apart, "
+                        f"tolerance {tolerance * 100:g}%).",
+                        hint="Raise --tolerance, or leave out the bundle that disagrees.",
+                    )
     if not kept:
         raise CalibrationError(
             "No operator in the bundles has a knob, so there is nothing to price.",
@@ -325,16 +465,26 @@ def merge_sources(
         subgraph=first.subgraph,
         conditions=first.conditions,
         operators=operators,
+        dimensions=first.dimensions,
+        contexts={operator: context for operator, context in contexts.items() if context},
     )
+
+
+def _require_valid(run: RunArtifacts, source: str) -> None:
+    if run.manifest is None:
+        raise CalibrationError(f"Bundle {source} has no result manifest.")
+    if run.manifest.validity is ResultValidity.INVALID:
+        codes = sorted({issue.code for issue in run.manifest.issues if issue.severity == "error"})
+        raise CalibrationError(
+            f"Bundle {source} is {run.manifest.validity.value}: {', '.join(codes) or 'no code'}.",
+            hint="hpx compare refuses this run for the same reason; profile again.",
+        )
 
 
 def _conditions(run: RunArtifacts, source: str) -> Mapping[str, Any]:
     recorded = run.summary.get("conditions")
     if not isinstance(recorded, dict):
-        raise CalibrationError(
-            f"Bundle {source} records no conditions.",
-            hint="It was written by a heliaPROFILER before run-summary schema 20; profile again.",
-        )
+        raise CalibrationError(f"Bundle {source} records no conditions.")
     try:
         typed = Conditions.from_dict(recorded)
     except ValueError as exc:
@@ -349,6 +499,42 @@ def _conditions(run: RunArtifacts, source: str) -> Mapping[str, Any]:
             ),
         )
     return recorded
+
+
+def _capture_dimensions(run: RunArtifacts) -> dict[str, Any]:
+    """The capture facts a file must agree on, read as ``hpx compare`` reads them."""
+    dimensions = read_dimensions(run)
+    facts: dict[str, Any] = {
+        dimension.value: dimensions.get(dimension) for dimension in CAPTURE_DIMENSIONS
+    }
+    kernels = nested_get(run.summary, "identity", "kernels")
+    facts[_KERNEL_LIBRARY] = _plain(nested_get(kernels, "library"))
+    facts[_KERNEL_VERSION] = _plain(nested_get(kernels, "version"))
+    plan = run.summary.get("memory_plan")
+    regions = plan.get("regions") if isinstance(plan, dict) else None
+    if isinstance(regions, list):
+        arena = sorted(
+            {
+                str(region.get("region"))
+                for region in regions
+                if isinstance(region, dict)
+                and any(
+                    isinstance(consumer, dict) and consumer.get("kind") == "arena"
+                    for consumer in region.get("consumers") or ()
+                )
+            }
+        )
+        facts[_ARENA_MEMORY] = ",".join(arena) if arena else None
+    else:
+        facts[_ARENA_MEMORY] = None
+    return facts
+
+
+def _plain(value: Any) -> Any:
+    """An identity fact as a comparable scalar; an unknown fact compares by its reason."""
+    if isinstance(value, dict) and set(value) == {"unknown"}:
+        return f"unknown: {value['unknown']}"
+    return value
 
 
 def _model_sha256(run: RunArtifacts, source: str) -> str:
@@ -412,27 +598,52 @@ def _layers(run: RunArtifacts, source: str) -> dict[int, tuple[float, str]]:
                 hint="Profile again with fewer iterations or a narrower counter set.",
             )
         cycles = row.get("cycles")
-        if isinstance(cycles, bool) or not isinstance(cycles, (int, float)):
-            raise CalibrationError(f"Bundle {source}: layer {position} ({op}) has no cycles.")
+        if not _is_cycle_count(cycles):
+            raise CalibrationError(
+                f"Bundle {source}: layer {position} ({op}) has no finite, non-negative cycles."
+            )
         layers[position] = (float(cycles), op)
     if not layers:
         raise CalibrationError(f"Bundle {source} measured no layers.")
     return layers
 
 
-def _plan_operator(entry: Any, source: str) -> tuple[str, int, dict[str, str]]:
-    """``(id, index, {knob: value})`` of one plan operator; every knob value is priced,
-    an approximate one included."""
+def _is_cycle_count(value: Any) -> TypeGuard[int | float]:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and math.isfinite(value)
+        and value >= 0
+    )
+
+
+def _firmware_label(op: str) -> str:
+    """The label the firmware gives an operator type, for the plan and the capture alike.
+
+    The capture's label may carry a ``:<index>`` suffix; the plan's op_type is
+    a lowercase key. Both reduce to upper case with every character outside
+    ``A-Z``, ``0-9`` and ``_`` replaced by ``_``.
+    """
+    return re.sub(r"[^A-Z0-9_]", "_", _LAYER_SUFFIX.sub("", op).upper())
+
+
+def _plan_operator(entry: Any, source: str) -> tuple[str, int, str, dict[str, str]]:
+    """``(id, index, op_type, {knob: value})`` of one plan operator; every knob
+    value is priced, an approximate one included."""
     operator = entry.get("id") if isinstance(entry, dict) else None
     position = entry.get("index") if isinstance(entry, dict) else None
+    op_type = entry.get("op_type") if isinstance(entry, dict) else None
     knobs = entry.get("knobs", {}) if isinstance(entry, dict) else None
     if (
         not isinstance(operator, str)
         or isinstance(position, bool)
         or not isinstance(position, int)
+        or not isinstance(op_type, str)
         or not isinstance(knobs, dict)
     ):
-        raise CalibrationError(f"Bundle {source}: a plan operator lacks id, index or knobs.")
+        raise CalibrationError(
+            f"Bundle {source}: a plan operator lacks id, index, op_type or knobs."
+        )
     values: dict[str, str] = {}
     for knob, choice in knobs.items():
         value = choice.get("value") if isinstance(choice, dict) else None
@@ -441,4 +652,4 @@ def _plan_operator(entry: Any, source: str) -> tuple[str, int, dict[str, str]]:
                 f"Bundle {source}: plan operator {operator} knob {knob} has no value."
             )
         values[str(knob)] = value
-    return operator, position, values
+    return operator, position, op_type, values

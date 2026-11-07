@@ -28,6 +28,9 @@ def _cmd_calibrate(
     except HpxError as exc:
         console.print_error(exc)
         sys.exit(1)
+    except OSError as exc:
+        console.print_error(HpxError(f"Could not write {output}: {exc}"))
+        sys.exit(1)
     print(
         f"Wrote calibration: {output} "
         f"({len(table.operators)} operators, {table.price_count} prices)"
