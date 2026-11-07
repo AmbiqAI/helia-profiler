@@ -26,7 +26,7 @@ import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
 from ...engines import EngineType
-from ...errors import ConfigError, EngineError
+from ...errors import ConfigError, EngineError, EngineMissingError
 from ...placement import Placement, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
@@ -467,16 +467,17 @@ def without_knob_values(
     sets them.
 
     Raises:
-        EngineError: when heliaAOT is not installed, when heliaAOT rejects
-            the arguments (its own message and the config hint), or when a
-            value that stays is not a finite number, naming the field.
+        EngineMissingError: when heliaAOT is not installed, with the install hint.
+        EngineError: when heliaAOT rejects the arguments (its own message and
+            the config hint), or when a value that stays is not a finite
+            number, naming the field.
     """
     try:
         from helia_aot import ConvertArgs
         from helia_aot.defines import ModuleType
         from helia_aot.optimization import KNOBS
     except ImportError as exc:
-        raise EngineError(
+        raise EngineMissingError(
             "heliaAOT package not installed",
             hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
         ) from exc

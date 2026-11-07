@@ -25,8 +25,10 @@ compiler received (``engine.effective_config_sha256``); the build's ISA
 flags; and the kernel build (its commit, else its content hash). The hpx
 version and the contents of locally overridden modules are not held. Power
 sync adds code to the image, which a power-measured and a non-power capture
-are allowed to differ in by this design. The file records the digest and the
-fields it covers so a reader can see what was held.
+are allowed to differ in by this design. The file records the digest, the
+fields it covers and the heliaAOT release the captures compiled with, whose
+knob registry the stripping depends on; captures compiled by different
+releases do not merge. Reading a bundle needs heliaAOT installed.
 
 Everything that would make a price mean something else is an error, never a
 silent skip: another model, other conditions, another setup, a run whose
@@ -55,7 +57,7 @@ from typing import Any, TypeGuard
 
 from ..deps.compatibility import CMSIS_NN_PROVIDER_MODULES
 from ..engines.helia_aot.compile import non_finite_field
-from ..errors import CalibrationError, EngineError
+from ..errors import CalibrationError, EngineError, EngineMissingError
 from ..evaluation.compare import RunArtifacts, load_run_artifacts
 from ..results import (
     METRIC_BLOCKING_CODE_BY_GROUP,
@@ -687,6 +689,7 @@ def _setup(run: RunArtifacts, source: str) -> Setup:
             holds a NaN or infinity, heliaAOT rejects the recorded engine
             arguments, or a helia-aot bundle records no
             ``engine.effective_config_sha256``.
+        EngineMissingError: when heliaAOT is not installed on this host.
     """
     config = run.metadata.get("config")
     if not isinstance(config, dict) or not config:
@@ -714,11 +717,12 @@ def _setup(run: RunArtifacts, source: str) -> Setup:
         helia_aot_version = version if isinstance(version, str) else None
         try:
             stripped = without_knob_values(aot_args if isinstance(aot_args, dict) else {})
+        except EngineMissingError:
+            # Nothing about the bundle: the host lacks heliaAOT, and the
+            # install hint says what to do.
+            raise
         except EngineError as exc:
-            raise CalibrationError(
-                f"Bundle {source}: {str(exc).replace(chr(10) + '  Hint: ', '; ')}",
-                hint="The recorded engine arguments are not ones this heliaAOT accepts.",
-            ) from exc
+            raise CalibrationError(f"Bundle {source}: {exc.args[0]}", hint=exc.hint) from exc
         _lookup(basis, _AOT_ARGS[:-1])[_AOT_ARGS[-1]] = stripped
     basis["build"] = {"architecture_flags": derive_architecture_flags(run.metadata)}
     basis["kernel"] = {"build": _kernel_build(run)}

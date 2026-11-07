@@ -1422,3 +1422,25 @@ def test_a_rule_setting_operator_attributes_is_part_of_the_setup(tmp_path: Path)
     )
     with pytest.raises(CalibrationError, match="engine.effective_config_sha256 is"):
         calibrate([one, other], output=tmp_path / "out.json")
+
+
+def test_a_host_without_heliaaot_gets_the_install_hint(tmp_path: Path, monkeypatch) -> None:
+    import sys
+
+    from helia_profiler.errors import EngineMissingError
+
+    auto, wide = two_bundles(tmp_path)
+    for name in [m for m in sys.modules if m == "helia_aot" or m.startswith("helia_aot.")]:
+        monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setitem(sys.modules, "helia_aot", None)
+    with pytest.raises(EngineMissingError, match="heliaAOT package not installed") as caught:
+        calibrate([auto, wide], output=tmp_path / "out.json")
+    assert caught.value.hint == (
+        "Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot"
+    )
+    result = CliRunner().invoke(
+        app, ["calibrate", str(auto), str(wide), "--output", str(tmp_path / "cli.json")]
+    )
+    assert result.exit_code == 1, result.output
+    assert "heliaAOT package not installed" in result.output
+    assert "pip install 'helia-profiler[aot]'" in result.output

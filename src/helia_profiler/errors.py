@@ -42,6 +42,10 @@ class EngineError(HpxError):
     """Engine adapter failure — AOT compile error, missing static lib, etc."""
 
 
+class EngineMissingError(EngineError):
+    """The engine's package is not installed; the hint says how to install it."""
+
+
 class FirmwareError(HpxError):
     """Firmware generation failure — template rendering, file I/O."""
 
