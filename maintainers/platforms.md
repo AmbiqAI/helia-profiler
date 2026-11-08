@@ -50,8 +50,10 @@ Positional link files are checked by binary header, regardless of extension:
 GNU linkers can treat an unknown text input as an implicit script. A missing
 file qualifies only when CMake declares it as a binary library/object product;
 an existing file must pass the format check even if it is a declared product.
-Named toolchain library searches remain toolchain inputs. Opaque response files
-and unsupported script selections leave source verification unavailable.
+Named library searches without explicit search paths remain toolchain inputs.
+Explicit library search paths, opaque response files and unsupported script
+selections leave source verification unavailable; HPX does not resolve a second
+library graph to characterize possible scripts in those searches.
 
 Automatic placement uses the same interval-constrained capacity before AOT
 conversion and during memory planning. Custom or uncharacterized layouts retain

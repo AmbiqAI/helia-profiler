@@ -443,3 +443,38 @@ def test_only_pending_declared_binary_products_can_qualify_before_build(configur
     _json(reply / "model.json", model)
     _json(reply / "future.json", {"type": "STATIC_LIBRARY", "artifacts": [{"path": product.name}]})
     assert _verify(configured).verified is (not existing)
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+@pytest.mark.parametrize(
+    "search",
+    ["-L{path}", "-Wl,-L,{path}", "-L {path}", "--library-path={path}", "--userlibpath={path}"],
+)
+def test_explicit_library_search_cannot_hide_implicit_scripts(configured, role, search):
+    _, build, _, _, _ = configured
+    directory = build / "local"
+    directory.mkdir()
+    (directory / "libcustom.a").write_text("SECTIONS {}", encoding="utf-8")
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].extend(
+        [
+            {"role": "libraryPath", "fragment": search.format(path=directory)},
+            {"role": "libraries", "fragment": "-lcustom"},
+        ]
+    )
+    path.write_text(json.dumps(data), encoding="utf-8")
+    result = _verify(configured, role=role)
+    assert not result.verified
+    assert "search paths" in result.reason
+
+
+@pytest.mark.parametrize("fragment", ["-lm", "-l m", "--library=m"])
+def test_default_toolchain_library_search_remains_supported(configured, fragment):
+    _, build, _, _, _ = configured
+    path = build / ".cmake/api/v1/reply/hpx_profiler.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append({"role": "libraries", "fragment": fragment})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _verify(configured).verified

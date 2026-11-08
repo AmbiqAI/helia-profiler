@@ -21,8 +21,6 @@ _OPERAND_OPTIONS = frozenset(
         "--keep",
         "-o",
         "--output",
-        "-L",
-        "--library-path",
         "-l",
         "--library",
     }
@@ -73,6 +71,8 @@ def validate_link_inputs(
     operand = None
     for fragment in fragments:
         for token in _tokens(fragment):
+            if token.startswith(("-L", "--library-path", "--userlibpath")):
+                raise ValueError("Explicit linker library search paths are not characterized")
             if token.startswith(
                 ("@", "--via", "-T", "-dT", "--script", "--default-script", "--scatter")
             ):
