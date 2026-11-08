@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class CatalogSource:
+    """Identity of an explicit source included in a catalog."""
+
     label: str
     schema_version: int
     sha256: str
@@ -26,6 +28,8 @@ class CatalogSource:
 
 @dataclass(frozen=True)
 class CatalogProvenance:
+    """Catalog package, schema and data identities recorded at resolution."""
+
     package_version: str
     schema_version: int
     catalog_digest: str
@@ -34,6 +38,8 @@ class CatalogProvenance:
 
 @dataclass(frozen=True)
 class TargetSelection:
+    """Requested target resolution and named HPX compatibility choices."""
+
     origin: Literal["catalog", "hpx-custom", "sdk-descriptor"]
     catalog: CatalogProvenance | None
     target_id: str | None = None
@@ -46,12 +52,16 @@ class TargetSelection:
 
 @dataclass(frozen=True)
 class RegionExtent:
+    """A retained application address range for one linker region."""
+
     region: MemoryRegion
     extent: MemoryRange
 
 
 @dataclass(frozen=True)
 class PlatformSnapshot:
+    """Effective HPX platform views and the catalog selection that supplied their facts."""
+
     board: BoardDef
     soc: SocDef
     selection: TargetSelection
