@@ -328,3 +328,29 @@ def test_actual_source_admission_refuses_before_link(linked_pipeline):
     with pytest.raises(PlatformError, match="application budget of 4128768 B"):
         build_app(ctx)
     assert events == ["mutex-enter", "prepare", "configure", "current-lock", "mutex-exit"]
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+@pytest.mark.parametrize(
+    ("fragment_role", "fragment"),
+    [
+        ("flags", "-Wl,@override.rsp"),
+        ("flags", "@override.rsp"),
+        ("flags", "--via=override.rsp"),
+        ("libraries", "-Wl,-T,alternate.ld"),
+        ("libraries", "--scatter=alternate.sct"),
+        ("libraries", '"alternate.ld"'),
+    ],
+)
+def test_opaque_or_additional_script_inputs_never_qualify(
+    configured, role, fragment_role, fragment
+):
+    _, build, _, _, _ = configured
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text())
+    data["link"]["commandFragments"].append({"role": fragment_role, "fragment": fragment})
+    path.write_text(json.dumps(data))
+    result = _verify(configured, role=role)
+    assert not result.verified
+    assert result.reason is not None

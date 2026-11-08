@@ -13,7 +13,8 @@ from ..results.dependencies import DependencyModule, validate_sdk_modules
 
 _CLIENT = "client-hpx-linker"
 _SCRIPT_OPTIONS = ("-T", "--scatter=", "-Wl,-T,", "-Wl,--script=", "--script=")
-_SCRIPT_FLAG = re.compile(r"(?:^|[\s,])(?:-T|--script|--scatter)")
+_SCRIPT_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:-T|--script|--scatter)")
+_RESPONSE_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:@|--via(?:[=,\s]|$))")
 
 
 def request_linker_information(build_dir: Path) -> None:
@@ -46,8 +47,6 @@ def _argument(value: str, *, quoted: bool = False) -> str:
 def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
     scripts = []
     for entry in fragments:
-        if entry.get("role") != "flags":
-            continue
         value = entry["fragment"]
         if not isinstance(value, str):
             raise ValueError("Backend link fragment is not text")
@@ -55,6 +54,12 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
         quoted = value.startswith(('"', "'")) and value.endswith(value[0])
         if quoted:
             value = value[1:-1]
+        if _RESPONSE_FLAG.search(value):
+            raise ValueError("Opaque linker response inputs have no characterized source closure")
+        if entry.get("role") != "flags":
+            if _SCRIPT_FLAG.search(value) or Path(value).suffix.lower() in {".ld", ".sct"}:
+                raise ValueError("Additional linker script input outside supported flags")
+            continue
         prefix = next((flag for flag in _SCRIPT_OPTIONS if value.startswith(flag)), None)
         if prefix is not None:
             argument = _argument(value[len(prefix) :], quoted=quoted)

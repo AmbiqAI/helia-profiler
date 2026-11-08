@@ -128,7 +128,10 @@ class LinkerVerification:
         return self.layout is not None
 
     def to_dict(self) -> dict[str, Any]:
-        return TypeAdapter(LinkerVerification).dump_python(self, mode="json")
+        adapter = TypeAdapter(LinkerVerification)
+        value = adapter.dump_python(self, mode="json")
+        adapter.validate_json(json.dumps(value, allow_nan=False), strict=True)
+        return value
 
     @classmethod
     def from_dict(cls, value: object) -> LinkerVerification:

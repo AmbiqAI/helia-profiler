@@ -84,7 +84,10 @@ class PlatformSnapshot:
             raise ValueError("Expected linker input differs from its recorded platform view")
 
     def to_dict(self) -> dict[str, Any]:
-        return TypeAdapter(PlatformSnapshot).dump_python(self, mode="json")
+        adapter = TypeAdapter(PlatformSnapshot)
+        value = adapter.dump_python(self, mode="json")
+        adapter.validate_json(json.dumps(value, allow_nan=False), strict=True)
+        return value
 
     @classmethod
     def from_dict(cls, value: object) -> PlatformSnapshot:
