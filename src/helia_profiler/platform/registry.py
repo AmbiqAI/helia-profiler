@@ -78,12 +78,15 @@ def build_platform_registry(
         board_socs = dict(base.board_socs)
     if socs:
         merged_socs.update(socs)
+    previous_boards = dict(merged_boards)
     if boards:
         merged_boards.update(boards)
     for name, board in merged_boards.items():
         if (socs and board.soc in socs) or (boards and name in boards):
             selections[name] = TargetSelection("hpx-custom", catalog)
-            board_socs.pop(name, None)
+            previous = previous_boards.get(name)
+            if (socs and board.soc in socs) or previous is None or previous.soc != board.soc:
+                board_socs.pop(name, None)
     return _freeze_registry(merged_socs, merged_boards, selections, catalog, board_socs)
 
 

@@ -699,3 +699,91 @@ def test_earlier_metadata_contract_is_refused_without_relabelling(tmp_path):
     edit_document(path, "run_metadata.json", lambda value: value.update(schema_version=1))
     with pytest.raises(ResultReadError, match="Expected hpx.run-metadata version 2"):
         load_result(path)
+
+
+def _platform_bundle(root):
+    from helia_profiler.platform.provenance import platform_snapshot
+
+    path = bundle(root)
+    snapshot = platform_snapshot("apollo510_evb").to_dict()
+    edit_document(path, "summary.json", lambda d: d.update(platform_provenance=snapshot))
+    edit_document(
+        path,
+        "run_metadata.json",
+        lambda d: d.update(
+            platform_provenance=snapshot,
+            platform={"board": "apollo510_evb"},
+        ),
+    )
+    edit_manifest(path, lambda d: d["provenance"].update(platform=snapshot))
+    return path, snapshot
+
+
+def _set_platform_copy(path, copy, snapshot):
+    if copy == "manifest":
+        edit_manifest(path, lambda d: d["provenance"].update(platform=snapshot))
+    else:
+        name = "summary.json" if copy == "summary" else "run_metadata.json"
+        edit_document(path, name, lambda d: d.update(platform_provenance=snapshot))
+
+
+@pytest.mark.parametrize("copy", ["summary", "metadata", "manifest"])
+@pytest.mark.parametrize("bad", [None, {"not": "a platform snapshot"}])
+def test_each_supplied_platform_copy_must_be_typed(tmp_path, copy, bad):
+    path, _ = _platform_bundle(tmp_path)
+    _set_platform_copy(path, copy, bad)
+    with pytest.raises(ResultReadError):
+        load_result(path)
+
+
+@pytest.mark.parametrize("copy", ["summary", "metadata", "manifest"])
+def test_platform_copies_must_agree_without_resolving_today(tmp_path, copy):
+    path, snapshot = _platform_bundle(tmp_path)
+    snapshot["soc"]["jlink_device"] = "DifferentProbe"
+    _set_platform_copy(path, copy, snapshot)
+    with pytest.raises(ResultReadError, match="platform snapshots differ"):
+        load_result(path)
+
+
+def test_platform_board_must_agree_with_retained_target_identity(tmp_path):
+    path, snapshot = _platform_bundle(tmp_path)
+    snapshot["board"]["name"] = "another-board"
+    for copy in ("summary", "metadata", "manifest"):
+        _set_platform_copy(path, copy, snapshot)
+    with pytest.raises(ResultReadError, match="platform board differs"):
+        load_result(path)
+
+
+def test_platform_board_must_agree_with_summary_build_identity(tmp_path):
+    path, _ = _platform_bundle(tmp_path)
+    edit_document(
+        path,
+        "summary.json",
+        lambda d: d.update(
+            identity=_identity(build={"board": "another-board"}),
+        ),
+    )
+    with pytest.raises(ResultReadError, match="platform board differs"):
+        load_result(path)
+
+
+def test_platform_receipt_read_uses_only_recorded_facts(tmp_path, monkeypatch):
+    path, snapshot = _platform_bundle(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("saved evidence must not query the current platform")
+
+    monkeypatch.setattr("helia_profiler.platform.provenance.platform_snapshot", forbidden)
+    record = _profile(path)
+    assert record.metadata is not None and record.metadata["platform_provenance"] == snapshot
+
+
+def test_partial_profile_can_retain_a_platform_without_missing_artifacts(tmp_path):
+    from helia_profiler.platform.provenance import platform_snapshot
+
+    path = bundle(tmp_path, status="failed")
+    snapshot = platform_snapshot("apollo510_evb").to_dict()
+    edit_manifest(path, lambda d: d.update(artifacts=[], provenance={"platform": snapshot}))
+    record = _profile(path)
+    assert record.summary is None and record.metadata is None
+    assert record.manifest.provenance["platform"] == snapshot

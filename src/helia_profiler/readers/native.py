@@ -15,6 +15,7 @@ from typing import Any
 
 from .._semantic_hash import Kind, require
 from ..errors import ConfigError, ReportError
+from ..platform.provenance import PlatformSnapshot
 from ..results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from ..results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
@@ -211,6 +212,40 @@ def _reconcile_identities(
             raise ResultReadError("identity_mismatch", f"Native identities differ for {dimension}")
 
 
+def _reconcile_platform(
+    manifest: ResultManifest, summary: dict[str, Any] | None, metadata: dict[str, Any] | None
+) -> None:
+    snapshots: list[PlatformSnapshot] = []
+    for label, document, key in (
+        ("summary", summary, "platform_provenance"),
+        ("metadata", metadata, "platform_provenance"),
+        ("manifest", manifest.provenance, "platform"),
+    ):
+        if document is not None and key in document:
+            try:
+                snapshots.append(PlatformSnapshot.from_dict(document[key]))
+            except (TypeError, ValueError) as exc:
+                raise ResultReadError(
+                    "invalid_evidence", f"Invalid {label} platform: {exc}"
+                ) from exc
+    if not snapshots:
+        return
+    platform = snapshots[0]
+    if any(other != platform for other in snapshots[1:]):
+        raise ResultReadError("identity_mismatch", "Native platform snapshots differ")
+    boards = (
+        manifest.comparability.get(ComparisonDimension.BOARD),
+        nested_get(metadata, *DIMENSION_REGISTRY[ComparisonDimension.BOARD].path),
+        nested_get(metadata, "platform", "board"),
+        nested_get(metadata, "identity", "build", "board"),
+        nested_get(summary, "identity", "build", "board"),
+    )
+    if any(board is not None and board != platform.board.name for board in boards):
+        raise ResultReadError(
+            "identity_mismatch", "Recorded platform board differs from native identity"
+        )
+
+
 def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
     """Strictly load an ordinary profile manifest, a saved run result, or the directory of either.
 
@@ -333,6 +368,7 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
                         "identity_mismatch", f"Metadata differs from manifest model {field}"
                     )
     _reconcile_identities(manifest, summary, metadata)
+    _reconcile_platform(manifest, summary_data, metadata)
     if manifest.status is RunStatus.COMPLETE and (summary is None or metadata is None):
         raise ResultReadError(
             "incomplete_result", "Completed profile lacks native summary/metadata"

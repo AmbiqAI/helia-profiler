@@ -64,7 +64,9 @@ fixture receipt retain the same snapshot. Portable run observations expose it
 in their producer extension under mapping `hpx-run-3`.
 
 Loading a current-format receipt validates its retained facts and files without
-resolving a replacement platform. Replaying a plan or capturing a standalone
+resolving a replacement platform. The ordinary reader parses every supplied
+platform snapshot, requires the copies to agree, and checks their board name
+against the retained target/build identity. Replaying a plan or capturing a standalone
 fixture checks the current catalog and HPX settings before device access. If
 they differ, use the matching producer environment or freeze and build again.
 This catches accidental environment drift; it is not an authentication scheme.

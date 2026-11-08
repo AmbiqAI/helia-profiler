@@ -224,3 +224,20 @@ def test_null_child_psram_restores_the_soc_default(base, parent_capacity, defaul
     )
     assert get_soc_for_board("parent", registry=registry).memory.psram_kb == parent_capacity
     assert get_soc_for_board("child", registry=registry).memory.psram_kb == default_capacity
+
+
+def test_board_only_registry_override_keeps_its_concrete_soc_view():
+    base = build_platform_registry()
+    board = replace(base.boards["apollo4l_blue_evb"], default_sync_gpio_pin=12)
+    changed = build_platform_registry(base=base, boards={board.name: board})
+    assert get_soc_for_board(board.name, registry=changed).jlink_device == "AMA4B2KL-KXR"
+    assert changed.boards[board.name].default_sync_gpio_pin == 12
+    assert changed.selections[board.name].origin == "hpx-custom"
+    assert base.boards[board.name].default_sync_gpio_pin != 12
+
+
+def test_direct_board_soc_switch_discards_the_old_concrete_probe():
+    base = build_platform_registry()
+    board = replace(base.boards["apollo4l_blue_evb"], soc="apollo510")
+    changed = build_platform_registry(base=base, boards={board.name: board})
+    assert get_soc_for_board(board.name, registry=changed).jlink_device == "AP510NFA-CBR"
