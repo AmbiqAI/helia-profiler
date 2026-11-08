@@ -15,6 +15,7 @@ _CLIENT = "client-hpx-linker"
 _SCRIPT_OPTIONS = ("-T", "--scatter=", "-Wl,-T,", "-Wl,--script=", "--script=")
 _SCRIPT_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:-T|--script|--scatter)")
 _RESPONSE_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:@|--via(?:[=,\s]|$))")
+_SCRIPT_FILE = re.compile(r"\.(?:lds?|sct)(?=$|[\s,\"'])", re.IGNORECASE)
 
 
 def request_linker_information(build_dir: Path) -> None:
@@ -56,11 +57,7 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
             value = value[1:-1]
         if _RESPONSE_FLAG.search(value):
             raise ValueError("Opaque linker response inputs have no characterized source closure")
-        script_input = _SCRIPT_FLAG.search(value) or Path(value).suffix.lower() in {
-            ".ld",
-            ".lds",
-            ".sct",
-        }
+        script_input = _SCRIPT_FLAG.search(value) or _SCRIPT_FILE.search(value)
         if entry.get("role") != "flags":
             if script_input:
                 raise ValueError("Additional linker script input outside supported flags")

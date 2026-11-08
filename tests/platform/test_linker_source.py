@@ -144,10 +144,14 @@ def test_missing_or_ambiguous_backend_information_is_unavailable(configured):
     assert not result.verified and "unavailable" in result.reason
 
 
-def test_source_matching_is_independent_of_checkout_line_endings(configured):
+@pytest.mark.parametrize("initial_newline", ["\n", "\r\n"])
+def test_source_matching_is_independent_of_checkout_line_endings(configured, initial_newline):
     _, _, root, layout, _ = configured
     path = root / layout.script.path
-    path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+    source = path.read_text(encoding="utf-8")
+    path.write_bytes(source.replace("\n", initial_newline).encode("utf-8"))
+    assert _verify(configured).verified
+    path.write_bytes(path.read_text(encoding="utf-8").replace("\n", "\r\n").encode("utf-8"))
     assert _verify(configured).verified
 
 
@@ -343,6 +347,10 @@ def test_actual_source_admission_refuses_before_link(linked_pipeline):
         ("libraries", "-Wl,-T,alternate.ld"),
         ("libraries", "--scatter=alternate.sct"),
         ("libraries", '"alternate.ld"'),
+        ("libraries", "alternate.ld libhelper.a"),
+        ("flags", "-Wl,alternate.ld,-Map,out.map"),
+        ("libraries", '"path with spaces/alternate.lds" libhelper.a'),
+        ("flags", "-Wl,--start-group,alternate.sct,libhelper.a,--end-group"),
     ],
 )
 def test_opaque_or_additional_script_inputs_never_qualify(
@@ -357,3 +365,15 @@ def test_opaque_or_additional_script_inputs_never_qualify(
     result = _verify(configured, role=role)
     assert not result.verified
     assert result.reason is not None
+
+
+@pytest.mark.parametrize("fragment", ["libnot.ld.a", "path.ld/libhelper.a"])
+@pytest.mark.parametrize("role", ["profile", "power"])
+def test_library_names_are_not_mistaken_for_script_inputs(configured, fragment, role):
+    _, build, _, _, _ = configured
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append({"role": "libraries", "fragment": fragment})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _verify(configured, role=role).verified
