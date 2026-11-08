@@ -17,10 +17,9 @@ Design contract (#187 Tier 2, D1–D6):
 * D1 — the compile command is extracted from the workspace's own
   ``build.ninja`` per-TU stanza (DEFINES/INCLUDES/FLAGS) and its compiler
   from ``rules.ninja``. No configure step, no workspace mutation.
-* D2 — vendored ``modules/`` include dirs are passed as ``-isystem`` so
-  warnings located inside vendor headers (the ``AM_SHARED_RW`` redefinition
-  in every production build) do not gate OUR code; the rendered TU itself
-  compiles at full ``-Werror``.
+* D2 — include classifications come from the production compile command.
+  The gate preserves explicit ``-isystem`` paths without promoting other
+  module paths to system headers; rendered TUs compile at full ``-Werror``.
 * D3 — the matrix below; legs whose workspace is absent skip with reason.
 * D4 — ``-fsyntax-only``: codegen-only diagnostics are not this gate's bug
   class, and no objects means no launcher/cache interplay.
@@ -391,14 +390,6 @@ def _split_ninja(value: str) -> list[str]:
     return [token.replace("\x01", " ").replace("\x00", "$") for token in protected.split()]
 
 
-def _vendor_headers_as_system(includes: list[str], app_dir: Path) -> list[str]:
-    """D2: vendored module headers are not ours to clean — ``-isystem`` them
-    so a diagnostic located inside them (``AM_SHARED_RW``) does not gate the
-    rendered TU, which stays fully ``-Werror``."""
-    del app_dir  # module dirs are recognised by path shape, not root
-    return [flag.replace("-I", "-isystem", 1) if "/modules/" in flag else flag for flag in includes]
-
-
 def _compile_command(
     workspace: _Workspace, case: _HwCase, scratch: Path, tu: Path
 ) -> list[str] | str:
@@ -411,7 +402,6 @@ def _compile_command(
     # The scratch dir replaces the workspace src include so the CURRENT
     # CHECKOUT's rendered headers win (D6); keep everything else verbatim.
     includes = [f"-I{scratch}" if inc == f"-I{workspace_src}" else inc for inc in includes]
-    includes = _vendor_headers_as_system(includes, workspace.app_dir)
     flags = [
         # -MMD/-MP/-MD write .d depfiles into the CWD even under
         # -fsyntax-only — a filesystem side effect this read-only gate must
@@ -943,11 +933,24 @@ class TestNinjaStanzaParser:
     def test_missing_stanza_is_none_not_a_guess(self):
         assert _tu_variables(_SYNTHETIC_NINJA, "hpx_profiler", "src/other.cc") is None
 
-    def test_vendor_modules_become_isystem_and_nothing_else_does(self):
-        flags = ["-I/ws/src", "-isystem", "/x", "-I/ws/modules/nsx-core/includes-api"]
-        out = _vendor_headers_as_system(flags, Path("/ws"))
-        assert out[0] == "-I/ws/src"
-        assert out[3] == "-isystem/ws/modules/nsx-core/includes-api"
+    def test_production_include_classifications_are_preserved(self):
+        ninja = (
+            "build CMakeFiles/hpx_profiler.dir/src/main.cc.obj: C ../src/main.cc\n"
+            "  INCLUDES = -I/ws/src -I/ws/modules/nsx-core/includes-api "
+            "-isystem /ws/modules/vendor/include -isystem/other/include\n"
+            "  FLAGS = -Wall\n"
+        )
+        ws = _Workspace(Path("/ws"), Path("/ws/build/b"), Path("/usr/bin/g++"), ninja)
+        command = _compile_command(ws, _MATRIX[0], Path("/scratch"), Path("/scratch/main.cc"))
+        assert isinstance(command, list)
+        assert command[1:6] == [
+            "-I/scratch",
+            "-I/ws/modules/nsx-core/includes-api",
+            "-isystem",
+            "/ws/modules/vendor/include",
+            "-isystem/other/include",
+        ]
+        assert "-Werror" in command
 
     def test_compiler_comes_from_the_rules_file(self):
         rules = (

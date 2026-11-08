@@ -303,8 +303,8 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     )
     assert probe.stdout.splitlines() == [
         "0.9.2",
-        "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
-        "c6be3d29b88bf909164958347e046636ca3cf684a3d2892007014830c20db928",
+        "5585350def5fdced39d42bba150042f92f23cf18",
+        "a4192c0116f10fc1feb22f5380f84df7427b2300f1be7549e2ace05bd844b5ec",
     ]
 
 

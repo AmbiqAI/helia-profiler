@@ -11,12 +11,12 @@ Stage 5 combines its identity and canonical hash with the NSX registry hash,
 target, engine, overrides, and relevant build inputs to select an isolated
 dependency workspace.
 
-The current baseline is `hpx-neuralspotx-0.9.2-2026-11-07.1`:
+The current baseline is `hpx-neuralspotx-0.9.2-2026-11-08.1`:
 
 | Identity | Qualified reference |
 | --- | --- |
 | `neuralspotx` package | `0.9.2`, wheel SHA-256 `c3816103…df79`, tag peeled to `62ca121a…7c5d` |
-| `nsx-ambiq-sdk` | `v5.2.27`, commit `993b7901…f6a8` |
+| `nsx-ambiq-sdk` | `v5.2.29`, commit `5585350d…f18` |
 | `nsx-ethos-u-driver` | `f0f99bb1…5a8` (peeled from `nsx-ethos-u-driver-v0.1.2`; pulled transitively by `nsx-npu`) |
 | `nsx-pmu-armv8m` | `5725c065…c88` |
 | `nsx-tflite-micro` | `7afcf2b4…333` |
@@ -109,6 +109,14 @@ and consumer builds verify artifact integration, not model accuracy.
 
 <details>
 <summary>Why earlier promotions changed these pins</summary>
+
+On 2026-11-08, `nsx-ambiq-sdk` moves `v5.2.27 → v5.2.29` while NSX remains
+0.9.2 and the runtime pins remain unchanged. This adopts the SDK's matching
+`AM_SHARED_RW` definitions in either header order. The real-header compile
+gate now preserves production include classifications instead of promoting
+all module includes to system headers. Qualification covers host compiler
+and linker checks; it does not establish new board-execution or inference
+results. See [neuralspotx#242](https://github.com/AmbiqAI/neuralspotx/issues/242).
 
 On 2026-11-07, heliaRT 2.5.0 (`3d704a71…647`) becomes the default.
 Both the `helia-rt` project and `nsx-helia-rt` module pin select that published
