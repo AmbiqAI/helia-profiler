@@ -10,7 +10,7 @@ import RefParams from '@ambiqai/helia-ui/astro/RefParams';
 import RefSection from '@ambiqai/helia-ui/astro/RefSection';
 import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
 
-Replayable run plans: every resolved setting, the model's hash and the toolchain and runtime identities, saved so another host can rebuild the same run.
+Replayable run plans: every resolved setting, the model's hash and the toolchain and runtime identities, saved so another host can rebuild the same run. Retained platform snapshots identify the catalog selection and effective profiler settings.
 
 Every name on this page is imported from `helia_profiler`.
 
@@ -20,7 +20,494 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/frozen_run.json)
 
-<RefMembers label="On this page" items={[{"id":"helia_profiler.FrozenModel","name":"FrozenModel","kind":"class","summary":"The model a plan was frozen against, identified by content."},{"id":"helia_profiler.ToolchainIdentity","name":"ToolchainIdentity","kind":"class","summary":"The compiler a plan expects: name and exact version, never a path."},{"id":"helia_profiler.FrozenRuntime","name":"FrozenRuntime","kind":"class","summary":"The engine and kernel sources a profile build uses."},{"id":"helia_profiler.LocalInput","name":"LocalInput","kind":"class","summary":"A local file or directory the build reads instead of a pinned source."},{"id":"helia_profiler.FrozenRun","name":"FrozenRun","kind":"class","summary":"A resolved, replayable run plan."}]} />
+<RefMembers label="On this page" items={[{"id":"helia_profiler.CatalogSource","name":"CatalogSource","kind":"class","summary":"Identity of an explicit source included in a catalog."},{"id":"helia_profiler.CatalogProvenance","name":"CatalogProvenance","kind":"class","summary":"Catalog package, schema and data identities recorded at resolution."},{"id":"helia_profiler.TargetSelection","name":"TargetSelection","kind":"class","summary":"Requested target resolution and named HPX compatibility choices."},{"id":"helia_profiler.RegionExtent","name":"RegionExtent","kind":"class","summary":"A retained application address range for one linker region."},{"id":"helia_profiler.PlatformSnapshot","name":"PlatformSnapshot","kind":"class","summary":"Effective HPX platform views and the catalog selection that supplied their facts."},{"id":"helia_profiler.FrozenModel","name":"FrozenModel","kind":"class","summary":"The model a plan was frozen against, identified by content."},{"id":"helia_profiler.ToolchainIdentity","name":"ToolchainIdentity","kind":"class","summary":"The compiler a plan expects: name and exact version, never a path."},{"id":"helia_profiler.FrozenRuntime","name":"FrozenRuntime","kind":"class","summary":"The engine and kernel sources a profile build uses."},{"id":"helia_profiler.LocalInput","name":"LocalInput","kind":"class","summary":"A local file or directory the build reads instead of a pinned source."},{"id":"helia_profiler.FrozenRun","name":"FrozenRun","kind":"class","summary":"A resolved, replayable run plan."}]} />
+
+<RefSymbol
+  id={"helia_profiler.CatalogSource"}
+  name={"CatalogSource"}
+  kind={"class"}
+  language={"python"}
+  signature={"CatalogSource(label: str, schema_version: int, sha256: str, distribution_version: str | None = None) -> None"}
+  level={2}
+  summary={"Identity of an explicit source included in a catalog."}
+  source={{"path":"src/helia_profiler/platform/provenance.py","line":19,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L19"}}
+>
+
+  `dataclass`
+
+  Identity of an explicit source included in a catalog.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.CatalogSource.label"}
+    name={"label"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"label: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L23"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogSource.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":24,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L24"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogSource.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":25,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L25"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogSource.distribution_version"}
+    name={"distribution_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"distribution_version: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":26,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L26"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.CatalogProvenance"}
+  name={"CatalogProvenance"}
+  kind={"class"}
+  language={"python"}
+  signature={"CatalogProvenance(\n    package_version: str,\n    schema_version: int,\n    catalog_digest: str,\n    sources: tuple[CatalogSource, ...] = (),\n) -> None"}
+  level={2}
+  summary={"Catalog package, schema and data identities recorded at resolution."}
+  source={{"path":"src/helia_profiler/platform/provenance.py","line":29,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L29"}}
+>
+
+  `dataclass`
+
+  Catalog package, schema and data identities recorded at resolution.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.CatalogProvenance.package_version"}
+    name={"package_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"package_version: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":33,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L33"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogProvenance.schema_version"}
+    name={"schema_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"schema_version: int"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":34,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L34"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogProvenance.catalog_digest"}
+    name={"catalog_digest"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"catalog_digest: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":35,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L35"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.CatalogProvenance.sources"}
+    name={"sources"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sources: tuple[CatalogSource, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":36,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L36"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.TargetSelection"}
+  name={"TargetSelection"}
+  kind={"class"}
+  language={"python"}
+  signature={"TargetSelection(\n    origin: Literal['catalog', 'hpx-custom', 'sdk-descriptor'],\n    catalog: CatalogProvenance | None,\n    target_id: str | None = None,\n    core: str | None = None,\n    boot: str | None = None,\n    implementation: str | None = None,\n    addons: tuple[str, ...] = (),\n    compatibility: tuple[str, ...] = (),\n) -> None"}
+  level={2}
+  summary={"Requested target resolution and named HPX compatibility choices."}
+  source={{"path":"src/helia_profiler/platform/provenance.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L39"}}
+>
+
+  `dataclass`
+
+  Requested target resolution and named HPX compatibility choices.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.origin"}
+    name={"origin"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"origin: Literal['catalog', 'hpx-custom', 'sdk-descriptor']"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":43,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L43"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.catalog"}
+    name={"catalog"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"catalog: CatalogProvenance | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":44,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L44"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.target_id"}
+    name={"target_id"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"target_id: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L45"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.core"}
+    name={"core"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"core: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.boot"}
+    name={"boot"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"boot: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":47,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L47"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.implementation"}
+    name={"implementation"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"implementation: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":48,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L48"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.addons"}
+    name={"addons"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"addons: tuple[str, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":49,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L49"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.TargetSelection.compatibility"}
+    name={"compatibility"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"compatibility: tuple[str, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":50,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L50"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RegionExtent"}
+  name={"RegionExtent"}
+  kind={"class"}
+  language={"python"}
+  signature={"RegionExtent(region: MemoryRegion, extent: MemoryRange) -> None"}
+  level={2}
+  summary={"A retained application address range for one linker region."}
+  source={{"path":"src/helia_profiler/platform/provenance.py","line":53,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L53"}}
+>
+
+  `dataclass`
+
+  A retained application address range for one linker region.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.RegionExtent.region"}
+    name={"region"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"region: MemoryRegion"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":57,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L57"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RegionExtent.extent"}
+    name={"extent"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"extent: MemoryRange"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":58,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L58"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.PlatformSnapshot"}
+  name={"PlatformSnapshot"}
+  kind={"class"}
+  language={"python"}
+  signature={"PlatformSnapshot(\n    board: BoardDef,\n    soc: SocDef,\n    selection: TargetSelection,\n    link_family: LinkFamily,\n    linker_profile: str,\n    app_regions: tuple[RegionExtent, ...],\n    load_address: int | None,\n) -> None"}
+  level={2}
+  summary={"Effective HPX platform views and the catalog selection that supplied their facts."}
+  source={{"path":"src/helia_profiler/platform/provenance.py","line":61,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L61"}}
+>
+
+  `dataclass`
+
+  Effective HPX platform views and the catalog selection that supplied their facts.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.board"}
+    name={"board"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"board: BoardDef"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":65,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L65"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.soc"}
+    name={"soc"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"soc: SocDef"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":66,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L66"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.selection"}
+    name={"selection"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"selection: TargetSelection"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":67,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L67"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.link_family"}
+    name={"link_family"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"link_family: LinkFamily"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":68,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L68"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.linker_profile"}
+    name={"linker_profile"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"linker_profile: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L69"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.app_regions"}
+    name={"app_regions"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"app_regions: tuple[RegionExtent, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":70,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L70"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.load_address"}
+    name={"load_address"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"load_address: int | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":71,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L71"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":73,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L73"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.from_dict"}
+    name={"from_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"from_dict(value: object) -> PlatformSnapshot"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":76,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L76"}}
+  >
+
+    `classmethod`
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.PlatformSnapshot.verify_current"}
+    name={"verify_current"}
+    kind={"method"}
+    language={"python"}
+    signature={"verify_current() -> None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/provenance.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/provenance.py#L85"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
 
 <RefSymbol
   id={"helia_profiler.FrozenModel"}
@@ -30,7 +517,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FrozenModel(path: str, sha256: str, size_bytes: int) -> None"}
   level={2}
   summary={"The model a plan was frozen against, identified by content."}
-  source={{"path":"src/helia_profiler/runs/plan.py","line":104,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L104"}}
+  source={{"path":"src/helia_profiler/runs/plan.py","line":106,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L106"}}
 >
 
   `dataclass`
@@ -46,7 +533,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"path: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":108,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L108"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L110"}}
   >
 
 
@@ -60,7 +547,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"sha256: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":109,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L109"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L111"}}
   >
 
 
@@ -74,7 +561,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"size_bytes: int"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":110,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L110"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L112"}}
   >
 
 
@@ -91,7 +578,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"ToolchainIdentity(name: str, version: str | None, unavailable_reason: str | None = None) -> None"}
   level={2}
   summary={"The compiler a plan expects: name and exact version, never a path."}
-  source={{"path":"src/helia_profiler/runs/plan.py","line":116,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L116"}}
+  source={{"path":"src/helia_profiler/runs/plan.py","line":118,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L118"}}
 >
 
   `dataclass`
@@ -111,7 +598,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"name: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":125,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L125"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":127,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L127"}}
   >
 
 
@@ -125,7 +612,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"version: str | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":126,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L126"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":128,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L128"}}
   >
 
 
@@ -139,7 +626,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"unavailable_reason: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":127,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L127"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":129,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L129"}}
   >
 
 
@@ -154,7 +641,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"lines: tuple[str, ...]"}
     level={3}
     summary={"The version-bearing lines version joins, or none when it is unknown."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L130"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":132,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L132"}}
   >
 
     The version-bearing lines ``version`` joins, or none when it is unknown.
@@ -171,7 +658,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"FrozenRuntime(\n    name: str,\n    version: str | None,\n    source_commit: str | None,\n    kernels_module: str | None = None,\n    kernels_commit: str | None = None,\n    unavailable_reason: str | None = None,\n) -> None"}
   level={2}
   summary={"The engine and kernel sources a profile build uses."}
-  source={{"path":"src/helia_profiler/runs/plan.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L135"}}
+  source={{"path":"src/helia_profiler/runs/plan.py","line":137,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L137"}}
 >
 
   `dataclass`
@@ -191,7 +678,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"name: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":144,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L144"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":146,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L146"}}
   >
 
 
@@ -205,7 +692,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"version: str | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":145,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L145"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L147"}}
   >
 
 
@@ -219,7 +706,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"source_commit: str | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":146,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L146"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":148,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L148"}}
   >
 
 
@@ -233,7 +720,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"kernels_module: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":147,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L147"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":149,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L149"}}
   >
 
 
@@ -247,7 +734,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"kernels_commit: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":148,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L148"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":150,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L150"}}
   >
 
 
@@ -261,7 +748,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"unavailable_reason: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":149,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L149"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":151,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L151"}}
   >
 
 
@@ -278,7 +765,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"LocalInput(setting: str, path: str, kind: str, sha256: str | None = None) -> None"}
   level={2}
   summary={"A local file or directory the build reads instead of a pinned source."}
-  source={{"path":"src/helia_profiler/runs/plan.py","line":152,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L152"}}
+  source={{"path":"src/helia_profiler/runs/plan.py","line":154,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L154"}}
 >
 
   `dataclass`
@@ -297,7 +784,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"setting: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":160,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L160"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":162,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L162"}}
   >
 
 
@@ -311,7 +798,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"path: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":161,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L161"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":163,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L163"}}
   >
 
 
@@ -325,7 +812,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"kind: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":162,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L162"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":164,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L164"}}
   >
 
 
@@ -339,7 +826,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"sha256: str | None = None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":163,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L163"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":165,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L165"}}
   >
 
 
@@ -353,10 +840,10 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"FrozenRun"}
   kind={"class"}
   language={"python"}
-  signature={"FrozenRun(\n    settings: Mapping[str, Any],\n    model: FrozenModel,\n    baseline_id: str,\n    baseline_fingerprint: str,\n    qualification: str,\n    overrides: tuple[str, ...],\n    local_inputs: tuple[LocalInput, ...],\n    environment: Mapping[str, str],\n    toolchain: ToolchainIdentity,\n    runtime: FrozenRuntime | None,\n    hpx_version: str,\n) -> None"}
+  signature={"FrozenRun(\n    settings: Mapping[str, Any],\n    model: FrozenModel,\n    baseline_id: str,\n    baseline_fingerprint: str,\n    qualification: str,\n    overrides: tuple[str, ...],\n    local_inputs: tuple[LocalInput, ...],\n    environment: Mapping[str, str],\n    toolchain: ToolchainIdentity,\n    runtime: FrozenRuntime | None,\n    hpx_version: str,\n    platform: PlatformSnapshot | None = None,\n) -> None"}
   level={2}
   summary={"A resolved, replayable run plan."}
-  source={{"path":"src/helia_profiler/runs/plan.py","line":174,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L174"}}
+  source={{"path":"src/helia_profiler/runs/plan.py","line":176,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L176"}}
 >
 
   `dataclass`
@@ -372,7 +859,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"settings: Mapping[str, Any]"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":178,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L178"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L180"}}
   >
 
 
@@ -386,7 +873,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"model: FrozenModel"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":179,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L179"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L181"}}
   >
 
 
@@ -400,7 +887,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"baseline_id: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":180,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L180"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L182"}}
   >
 
 
@@ -414,7 +901,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"baseline_fingerprint: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L181"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":183,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L183"}}
   >
 
 
@@ -428,7 +915,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"qualification: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L182"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L184"}}
   >
 
 
@@ -442,7 +929,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"overrides: tuple[str, ...]"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":183,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L183"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L185"}}
   >
 
 
@@ -456,7 +943,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"local_inputs: tuple[LocalInput, ...]"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L184"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":186,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L186"}}
   >
 
 
@@ -470,7 +957,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"environment: Mapping[str, str]"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":185,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L185"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":187,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L187"}}
   >
 
 
@@ -484,7 +971,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"toolchain: ToolchainIdentity"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":186,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L186"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":188,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L188"}}
   >
 
 
@@ -498,7 +985,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"runtime: FrozenRuntime | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":187,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L187"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":189,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L189"}}
   >
 
 
@@ -512,7 +999,21 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"hpx_version: str"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":188,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L188"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":190,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L190"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FrozenRun.platform"}
+    name={"platform"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"platform: PlatformSnapshot | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":191,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L191"}}
   >
 
 
@@ -527,7 +1028,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"intent_hash: str"}
     level={3}
     summary={"The hpx.intent hash of what this plan asks for; the HPX release is not part of it."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":199,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L199"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":202,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L202"}}
   >
 
     The ``hpx.intent`` hash of what this plan asks for; the HPX release is not part of it.
@@ -542,7 +1043,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"portable: bool"}
     level={3}
     summary={"Whether every input is pinned or content-identified, so another host can rebuild it."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":204,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L204"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":207,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L207"}}
   >
 
     Whether every input is pinned or content-identified, so another host can rebuild it.
@@ -561,7 +1062,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"to_dict() -> dict[str, Any]"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":218,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L218"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":221,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L221"}}
   >
 
 
@@ -575,7 +1076,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"from_dict(data: Mapping[str, Any]) -> FrozenRun"}
     level={3}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":235,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L235"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":239,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L239"}}
   >
 
     `classmethod`
@@ -590,7 +1091,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"save(path: str | Path) -> Path"}
     level={3}
     summary={"Write the plan as JSON, refusing its source model path or aliases."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":295,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L295"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":300,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L300"}}
   >
 
     Write the plan as JSON, refusing its source model path or aliases.
@@ -605,7 +1106,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"load(path: str | Path) -> FrozenRun"}
     level={3}
     summary={"Read a plan written by :meth:save, verifying its intent hash."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":313,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L313"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":318,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L318"}}
   >
 
     `classmethod`
@@ -622,7 +1123,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"config(*, model: str | Path | None = None, host: Mapping[str, Any] | None = None) -> ProfileConfig"}
     level={3}
     summary={"The :class:ProfileConfig this plan describes, on this host."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":327,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L327"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":332,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L332"}}
   >
 
     The :class:`ProfileConfig` this plan describes, on this host.
@@ -647,7 +1148,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild"}
     level={3}
     summary={"Compile this plan for fixture's pinned inputs; see :func:~heliaprofiler.build."}
-    source={{"path":"src/helia_profiler/runs/plan.py","line":376,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L376"}}
+    source={{"path":"src/helia_profiler/runs/plan.py","line":381,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L381"}}
   >
 
     Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`.

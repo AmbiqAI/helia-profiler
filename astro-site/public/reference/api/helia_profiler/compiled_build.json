@@ -229,9 +229,9 @@
               "returns": [],
               "signature": "save(path: str | Path, *, roots: Mapping[str, Path]) -> Path",
               "source": {
-                "line": 197,
+                "line": 199,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L197"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L199"
               },
               "summary": "Write the build as JSON with paths relative to roots and return its path."
             },
@@ -248,9 +248,9 @@
               "returns": [],
               "signature": "load(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild",
               "source": {
-                "line": 222,
+                "line": 224,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L222"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L224"
               },
               "summary": "Read and verify a build written by :meth:save, resolving paths under roots."
             },
@@ -276,9 +276,9 @@
               "returns": [],
               "signature": "run(\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,\n    power_guard: FixturePowerGuard | None = None,\n) -> RunResult",
               "source": {
-                "line": 264,
+                "line": 266,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L264"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L266"
               },
               "summary": "Flash the recorded image, capture one run and compare outputs when expect is given."
             }
@@ -512,9 +512,9 @@
               "returns": [],
               "signature": "compiled: CompiledBuild",
               "source": {
-                "line": 418,
+                "line": 420,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L418"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L420"
               },
               "summary": ""
             },
@@ -531,9 +531,9 @@
               "returns": [],
               "signature": "capture: FixtureCaptureResult",
               "source": {
-                "line": 419,
+                "line": 421,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L419"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L421"
               },
               "summary": ""
             },
@@ -550,9 +550,9 @@
               "returns": [],
               "signature": "identity: RunIdentity",
               "source": {
-                "line": 420,
+                "line": 422,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L420"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L422"
               },
               "summary": ""
             },
@@ -569,9 +569,9 @@
               "returns": [],
               "signature": "verification: Verification | None",
               "source": {
-                "line": 421,
+                "line": 423,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L421"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L423"
               },
               "summary": ""
             },
@@ -588,9 +588,9 @@
               "returns": [],
               "signature": "power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None",
               "source": {
-                "line": 422,
+                "line": 424,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L422"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L424"
               },
               "summary": ""
             },
@@ -607,9 +607,9 @@
               "returns": [],
               "signature": "succeeded: bool",
               "source": {
-                "line": 425,
+                "line": 427,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L425"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L427"
               },
               "summary": "True only for a success capture."
             },
@@ -626,9 +626,9 @@
               "returns": [],
               "signature": "energy: FixtureRailEnergy | None",
               "source": {
-                "line": 430,
+                "line": 432,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L430"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L432"
               },
               "summary": "The capture's gross MCU-rail energy, or None when it measured none."
             },
@@ -650,9 +650,9 @@
               "returns": [],
               "signature": "save(path: str | Path, *, roots: Mapping[str, Path], build: str | Path) -> Path",
               "source": {
-                "line": 441,
+                "line": 443,
                 "path": "src/helia_profiler/runs/compiled.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L441"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L443"
               },
               "summary": "Write the run as a hpx.run-result with paths relative to roots and return its path."
             }
@@ -663,9 +663,9 @@
           "returns": [],
           "signature": "RunResult(\n    compiled: CompiledBuild,\n    capture: FixtureCaptureResult,\n    identity: RunIdentity,\n    verification: Verification | None,\n    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,\n) -> None",
           "source": {
-            "line": 411,
+            "line": 413,
             "path": "src/helia_profiler/runs/compiled.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L411"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L413"
           },
           "summary": "One capture from a :class:CompiledBuild."
         },
@@ -682,9 +682,9 @@
           "returns": [],
           "signature": "build(\n    plan: FrozenRun,\n    fixture: TypedFixture,\n    *,\n    method: FixtureMethod,\n    lifecycle: Lifecycle = Lifecycle.CARRY,\n    runtime: PreparedUpstreamRuntime | None = None,\n    model: str | Path | None = None,\n    host: Mapping[str, object] | None = None,\n    observe_aot_arenas: bool = False,\n    observe_ram: bool = False,\n) -> CompiledBuild",
           "source": {
-            "line": 460,
+            "line": 462,
             "path": "src/helia_profiler/runs/compiled.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L460"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L462"
           },
           "summary": "Compile plan for fixture's pinned inputs and return the compiled build."
         },
@@ -701,9 +701,9 @@
           "returns": [],
           "signature": "load_build(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild",
           "source": {
-            "line": 666,
+            "line": 668,
             "path": "src/helia_profiler/runs/compiled.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L666"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L668"
           },
           "summary": "Read and verify a compiled build written by :meth:CompiledBuild.save."
         },
@@ -720,9 +720,9 @@
           "returns": [],
           "signature": "run_build(\n    compiled: CompiledBuild,\n    *,\n    guard: FixtureCaptureGuard,\n    jlink_serial: str,\n    evidence_dir: Path,\n    settle_seconds: float,\n    expect: Expect | None = None,\n    expected_duration_s: float | None = None,\n    power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None,\n    power_guard: FixturePowerGuard | None = None,\n) -> RunResult",
           "source": {
-            "line": 671,
+            "line": 673,
             "path": "src/helia_profiler/runs/compiled.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L671"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/compiled.py#L673"
           },
           "summary": "Flash compiled's image, capture one run and compare outputs; see :meth:CompiledBuild.run."
         }

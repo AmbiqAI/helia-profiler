@@ -134,9 +134,9 @@
               "returns": [],
               "signature": "board: str",
               "source": {
-                "line": 23,
+                "line": 24,
                 "path": "src/helia_profiler/fixtures/target.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L23"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L24"
               },
               "summary": ""
             },
@@ -153,9 +153,9 @@
               "returns": [],
               "signature": "device: str",
               "source": {
-                "line": 24,
+                "line": 25,
                 "path": "src/helia_profiler/fixtures/target.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L24"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L25"
               },
               "summary": ""
             },
@@ -172,9 +172,9 @@
               "returns": [],
               "signature": "load_address: int",
               "source": {
-                "line": 25,
+                "line": 26,
                 "path": "src/helia_profiler/fixtures/target.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L25"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L26"
               },
               "summary": ""
             },
@@ -189,11 +189,11 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "verify() -> None",
+              "signature": "verify(*, platform: PlatformSnapshot | None = None) -> None",
               "source": {
-                "line": 27,
+                "line": 28,
                 "path": "src/helia_profiler/fixtures/target.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L27"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L28"
               },
               "summary": ""
             }
@@ -204,9 +204,9 @@
           "returns": [],
           "signature": "FixtureTarget(board: str, device: str, load_address: int) -> None",
           "source": {
-            "line": 19,
+            "line": 20,
             "path": "src/helia_profiler/fixtures/target.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L19"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/target.py#L20"
           },
           "summary": "The board a fixture image runs on, its J-Link device and the image's load address."
         },
@@ -230,9 +230,9 @@
               "returns": [],
               "signature": "check(*, require_free: bool, remaining_s: float) -> None",
               "source": {
-                "line": 41,
+                "line": 42,
                 "path": "src/helia_profiler/fixtures/capture.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L41"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L42"
               },
               "summary": ""
             },
@@ -249,9 +249,9 @@
               "returns": [],
               "signature": "verify_target(*, target: FixtureTarget, jlink_serial: str) -> None",
               "source": {
-                "line": 43,
+                "line": 44,
                 "path": "src/helia_profiler/fixtures/capture.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L43"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L44"
               },
               "summary": "Require caller-verified physical board/serial identity and exclusive ownership."
             }
@@ -262,9 +262,9 @@
           "returns": [],
           "signature": "FixtureCaptureGuard()",
           "source": {
-            "line": 38,
+            "line": 39,
             "path": "src/helia_profiler/fixtures/capture.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L38"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/capture.py#L39"
           },
           "summary": "Caller-owned authorization and remaining-window checks."
         },
