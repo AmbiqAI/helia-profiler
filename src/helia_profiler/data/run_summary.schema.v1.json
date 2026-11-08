@@ -15,7 +15,7 @@
   ],
   "properties": {
     "schema": {"const": "hpx.run-summary"},
-    "schema_version": {"const": 20},
+    "schema_version": {"const": 21},
     "engine": {"type": "string", "minLength": 1},
     "layers": {"type": "integer", "minimum": 0},
     "total_cycles": {"type": ["number", "null"]},
@@ -72,7 +72,7 @@
         },
         "intent_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.intent/1:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
+            {"type": "string", "pattern": "^hpx\\.intent/2:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
             {"type": "null"}
           ]
         }

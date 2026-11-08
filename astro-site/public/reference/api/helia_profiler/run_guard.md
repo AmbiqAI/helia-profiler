@@ -97,7 +97,7 @@ The board a fixture image runs on, its J-Link device and the image's load addres
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/target.py:19`
+Source: `src/helia_profiler/fixtures/target.py:20`
 
 ### helia_profiler.FixtureTarget.board
 
@@ -107,7 +107,7 @@ Source: `src/helia_profiler/fixtures/target.py:19`
 board: str
 ```
 
-Source: `src/helia_profiler/fixtures/target.py:23`
+Source: `src/helia_profiler/fixtures/target.py:24`
 
 ### helia_profiler.FixtureTarget.device
 
@@ -117,7 +117,7 @@ Source: `src/helia_profiler/fixtures/target.py:23`
 device: str
 ```
 
-Source: `src/helia_profiler/fixtures/target.py:24`
+Source: `src/helia_profiler/fixtures/target.py:25`
 
 ### helia_profiler.FixtureTarget.load_address
 
@@ -127,17 +127,17 @@ Source: `src/helia_profiler/fixtures/target.py:24`
 load_address: int
 ```
 
-Source: `src/helia_profiler/fixtures/target.py:25`
+Source: `src/helia_profiler/fixtures/target.py:26`
 
 ### helia_profiler.FixtureTarget.verify
 
 `method` · `python`
 
 ```python
-verify() -> None
+verify(*, platform: PlatformSnapshot | None = None) -> None
 ```
 
-Source: `src/helia_profiler/fixtures/target.py:27`
+Source: `src/helia_profiler/fixtures/target.py:28`
 
 ## helia_profiler.FixtureCaptureGuard
 
@@ -151,7 +151,7 @@ Caller-owned authorization and remaining-window checks.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/capture.py:38`
+Source: `src/helia_profiler/fixtures/capture.py:39`
 
 ### helia_profiler.FixtureCaptureGuard.check
 
@@ -161,7 +161,7 @@ Source: `src/helia_profiler/fixtures/capture.py:38`
 check(*, require_free: bool, remaining_s: float) -> None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:41`
+Source: `src/helia_profiler/fixtures/capture.py:42`
 
 ### helia_profiler.FixtureCaptureGuard.verify_target
 
@@ -176,7 +176,7 @@ Require caller-verified physical board/serial identity and exclusive ownership.
 Core CPUID and probe enumeration cannot establish the physical board.
 Reject if the caller has no current independent board/serial evidence.
 
-Source: `src/helia_profiler/fixtures/capture.py:43`
+Source: `src/helia_profiler/fixtures/capture.py:44`
 
 ## helia_profiler.FixtureBoardPowerRequest
 

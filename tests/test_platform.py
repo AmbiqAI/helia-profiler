@@ -52,7 +52,7 @@ def test_apollo3p_evb_resolves_to_cortex_m4():
     assert not soc.has_mve
     assert soc.profiling_backends == ("dwt",)
     assert soc.profiling_domains == ("cpu",)
-    assert soc.memory.psram_kb == 8192
+    assert soc.memory.psram_kb == 0
 
 
 def test_apollo4p_evb_has_no_populated_psram():
@@ -84,7 +84,8 @@ def test_apollo510_family_uses_ap5_rtt_scan_window():
 def test_cortex_m4_socs_use_ap3_ap4_rtt_scan_window():
     for soc in list_socs():
         if soc.family in (SocFamily.AP3, SocFamily.AP4):
-            assert soc.rtt_scan_ranges == ((0x10000000, 0x100000),)
+            size = 768 * 1024 if soc.name == "apollo3p" else 1024 * 1024
+            assert soc.rtt_scan_ranges == ((0x10000000, size),)
 
 
 def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
@@ -96,14 +97,10 @@ def test_every_soc_declares_cmsis_header_and_rtt_scan_ranges():
 
 
 def test_ap5_socs_expose_expected_psram_capacity():
-    # apollo510b_evb populates a 64 MB APS512XXN part (confirmed via XIP
-    # address-aliasing); other AP5 boards assume 32 MB until validated on
-    # hardware. atomiq110's only realization is the FPGA "turbo" board,
-    # which has no PSRAM/MSPI populated at all.
-    expected_kb = {"apollo510": 65536, "apollo510b": 65536, "atomiq110": 0}
+    expected_kb = {"apollo510": 65536, "apollo510b": 65536, "apollo5b": 32768}
     for soc in list_socs():
         if soc.family is SocFamily.AP5:
-            assert soc.memory.psram_kb == expected_kb.get(soc.name, 32768)
+            assert soc.memory.psram_kb == expected_kb.get(soc.name, 0)
 
 
 def test_apollo330_is_ap5_family():
@@ -156,7 +153,7 @@ def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
     assert soc.memory.mram_kb == 1552
-    assert soc.memory.psram_kb == 32768
+    assert soc.memory.psram_kb == 0
     assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
     assert soc.ssram_full_power_enum == "AM_HAL_PWRCTRL_SRAM_1P75M"
     assert soc.pmu_max_ops == 512
@@ -691,13 +688,13 @@ def test_overriding_memory_does_not_drop_an_inherited_address():
 def test_a_board_psram_override_does_not_cost_a_builtin_soc_its_address():
     """Provenance must survive ``get_soc_for_board``'s ``replace`` copy.
 
-    Seven built-in boards override ``psram_kb``, and for those the SoC handed
-    to the pipeline is a copy, not the registered object.  Gating the address
+    A board-specific ``psram_kb`` override makes the resolved SoC
+    a copy rather than the registered object.  Gating the address
     lookup on object identity silently reclassified those copies as unknown
-    parts -- so the map-derived address would vanish on exactly the boards
+    parts -- so the registered boot address would vanish on exactly the boards
     that populate PSRAM, which is why this is a typed field.
     """
-    soc = get_soc_for_board("apollo3p_evb")
+    soc = get_soc_for_board("apollo3p_evb_cygnus")
 
     assert soc is not get_soc("apollo3p")  # a replace() copy
     assert soc.memory.psram_kb == 8192
@@ -792,7 +789,7 @@ def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_map():
 
     Stated on its own rather than only through ``get_soc_for_board`` so that
     tightening ``is_builtin`` into an identity check -- the bug ``origin``
-    replaced -- fails here even if the seven ``psram_kb`` boards ever stop
+    replaced -- fails here even if board-specific PSRAM overrides stop
     being the way a built-in copy is made.
     """
     from dataclasses import replace
@@ -968,6 +965,9 @@ def test_the_custom_soc_keys_are_a_pinned_subset_of_the_soc_definition():
         "name",  # the mapping key
         "origin",  # stamped by the registry, never declared
         "registered_name",  # stamped by the registry alongside `origin`
+        "catalog_target_id",
+        "catalog_app_flash_load_addr",
+        "catalog_has_dcache",
         "swo_trace_clock_mhz",
         "has_usb",
         "ssram_full_power_enum",

@@ -6,7 +6,7 @@ description: "Current summary.json reader and writer boundaries, with the histor
 ## Current contract
 
 The ordinary profile artifact `summary.json` uses schema `hpx.run-summary`.
-The current version is 20, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
+The current version is 21, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
 `helia_profiler.results.run_summary` and re-exported by `report.contracts`.
 This schema is separate from the saved-run `hpx.run-result` format.
 
@@ -162,3 +162,11 @@ name for the board), `cpu_hz` (the configured core clock; the on-device measurem
 `weights_cache`, `external_memory_clock` and `application_load` are informative comparison
 dimensions. This is additive; no existing field changes meaning.
 [#648](https://github.com/AmbiqAI/helia-profiler/issues/648).
+
+### Version 21
+
+Adds `platform_provenance`, the recorded catalog identity, target selection and
+effective HPX platform facts. The plan's intent basis becomes `hpx.intent/2`
+because it now binds that input; `hpx.target-config/1` is unchanged. This does
+not turn configured CPU rates into measured rates or establish cross-producer
+hardware equivalence. See [Platform facts and policy](../../guide/concepts/platforms/).

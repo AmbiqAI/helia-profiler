@@ -43,6 +43,22 @@ BASES: dict[tuple[str, int], set[frozenset[str]]] = {
             }
         )
     },
+    ("intent", 2): {
+        frozenset(
+            {
+                "settings",
+                "model_sha256",
+                "baseline_fingerprint",
+                "qualification",
+                "overrides",
+                "local_inputs",
+                "toolchain",
+                "environment",
+                "runtime",
+                "platform",
+            }
+        )
+    },
     ("build", 1): {frozenset({"image", "lock", "runtime_archive", "model"})},
     ("observation", 1): {
         # A profile's PMU result.

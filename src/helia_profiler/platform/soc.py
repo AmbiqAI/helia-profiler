@@ -2,8 +2,7 @@
 
 The platform model is a two-level hierarchy: Board -> SoC.  SoC determines the
 core architecture, PMU capabilities, memory layout, and supported clock modes.
-Board selects a concrete EVB (or, in the future, a custom target) that maps to
-exactly one SoC.
+Board selects a concrete target that references exactly one SoC.
 
 Architecture note: AP330 (apollo330P) is Cortex-M55 and belongs to the AP5
 family despite the "3" in its name.
@@ -11,7 +10,7 @@ family despite the "3" in its name.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -38,33 +37,7 @@ class PmuTier(Enum):
 
 
 class SocOrigin(Enum):
-    """Where a :class:`SocDef`'s platform facts came from.
-
-    This is not decoration: some policy in
-    :mod:`~helia_profiler.platform.capabilities` is only sound for parts this
-    repo has actually characterised.  The app-image flash address is the live
-    case -- its per-SoC and per-family tables were checked part by part against
-    NSX's ``cmake/socs/facts/*.cmake``, and neither table can speak for a SoC
-    that was never in them.
-
-    ``CUSTOM`` is the default precisely so that a ``SocDef`` arriving from
-    anywhere other than this module's registry -- ``target.custom_socs``, a
-    test fixture, a caller of the public API -- is treated as uncharacterised
-    unless something deliberately says otherwise.  ``_register_soc`` is that
-    something, and is the only place ``BUILTIN`` is set.
-
-    Provenance is a *field* rather than an ``is _SOCS[name]`` identity check
-    because a built-in SoC does not always survive as the registered object:
-    :func:`~helia_profiler.platform.registry.get_soc_for_board` returns a
-    ``dataclasses.replace`` copy whenever the board overrides ``psram_kb`` (7
-    of the built-in boards do).  An identity check silently reclassifies those
-    copies as unknown parts; ``replace`` carries this field through untouched.
-
-    Carrying through untouched is exactly why this field is not the whole
-    test on its own: ``replace`` also carries it onto a copy whose ``name``
-    was changed to another part's.  Read provenance through
-    :attr:`SocDef.is_builtin`, never through this field alone.
-    """
+    """Whether a view was registered as a supported built-in or supplied by a caller."""
 
     BUILTIN = "builtin"
     CUSTOM = "custom"
@@ -72,7 +45,7 @@ class SocOrigin(Enum):
 
 @dataclass(frozen=True)
 class MemoryLayout:
-    """Memory sizes in KB.  0 means not present on this SoC."""
+    """Profiler placement capacities in KiB; zero means unavailable to the profiler."""
 
     mram_kb: int = 0
     sram_kb: int = 0
@@ -188,20 +161,8 @@ class SocDef:
     #: backend and the ``ethos_npu`` PMU counter group.
     npu: str | None = None
 
-    #: This part's own app-image flash (``LoadFile``) address -- the first
-    #: MRAM/flash address above its bootloader-reserved region, NOT the MRAM
-    #: *region* base.  ``None`` means "this SocDef does not state one"; the
-    #: address is then resolved by
-    #: :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`,
-    #: which is the single place that policy lives.
-    #:
-    #: The built-in registry deliberately leaves this ``None``; its parts
-    #: load at the start of their verified linked MRAM window in
-    #: ``platform.memory_map``.  This field exists for SoCs that map cannot
-    #: speak for -- above all
-    #: ``target.custom_socs`` entries, where a user-named novel part must be
-    #: able to say ``app_flash_load_addr:`` instead of being routed through a
-    #: family tag that, in this model, only records a core tier.
+    #: Explicit user-provided application address. Registered catalog facts are
+    #: separate so a renamed copy cannot inherit another target's boot address.
     app_flash_load_addr: int | None = None
 
     #: Name of the part whose resolved placement-base map this SoC's memory
@@ -214,43 +175,20 @@ class SocDef:
     #: map through its own family/name, not by claiming another part's.
     memory_bases_like: str | None = None
 
-    #: Whether this definition comes from the built-in registry below.  See
-    #: :class:`SocOrigin`; set by ``_register_soc`` and by nothing else.
+    #: Registration provenance; caller-constructed views remain custom.
     origin: SocOrigin = SocOrigin.CUSTOM
-
-    #: The name this definition was registered under, stamped alongside
-    #: :attr:`origin` by ``_register_soc``.  ``None`` on anything that never
-    #: went through the registry.  Read only via :attr:`is_builtin`, which is
-    #: where the reason it exists is written down.
+    #: Original registered spelling, retained by a board-specific copy.
     registered_name: str | None = None
+    #: Catalog selection behind a registered view; absent on the SDK descriptor.
+    catalog_target_id: str | None = None
+    #: Boot fact of the registered catalog target; not an explicit user override.
+    catalog_app_flash_load_addr: int | None = None
+    #: Catalog-backed hardware input, absent on caller-constructed definitions.
+    catalog_has_dcache: bool | None = None
 
     @property
     def is_builtin(self) -> bool:
-        """Whether the name-keyed built-in tables may speak for this part.
-
-        Both halves are load-bearing, and each covers a hole the other leaves:
-
-        * :attr:`origin` alone is too loose.  It survives ``dataclasses.replace``
-          by design -- that is the point, see :class:`SocOrigin` -- but so does
-          a ``replace`` that *changes the name*, which is the obvious way to
-          build a custom ``SocDef`` from a built-in programmatically.  Nothing
-          documents that path -- the ``guide/boards`` page shows a fresh
-          ``SocDef(...)`` constructor instead, which defaults to
-          ``CUSTOM``/``None`` and is safe -- but a caller reaching for
-          ``replace`` unprompted is precisely the case a default-safe field
-          cannot catch.
-          ``replace(get_soc("apollo510"), name="atomiq110")`` would otherwise
-          keep ``BUILTIN`` and read atomiq110's MRAM origin -- an address
-          belonging to a different part.
-        * An ``is _SOCS[name]`` identity check alone is too strict, and was the
-          bug ``origin`` replaced: ``get_soc_for_board`` returns a ``replace``
-          copy whenever the board overrides ``psram_kb`` (7 built-in boards do),
-          and identity silently reclassifies those as unknown parts.
-
-        Requiring the *stamped* name to still match :attr:`name` accepts every
-        copy that is still describing the part it was registered as, and
-        rejects every copy that has been renamed into another part's shoes.
-        """
+        """Whether this view still names the built-in it was registered as."""
         return self.origin is SocOrigin.BUILTIN and self.registered_name == self.name
 
     def clock_domain(self, name: str) -> ClockDomain | None:
@@ -323,432 +261,6 @@ class SocDef:
             domains.append("ethos_npu")
         return tuple(domains)
 
-
-_SOCS: dict[str, SocDef] = {}
-
-
-def _register_soc(soc: SocDef) -> SocDef:
-    """Register *soc* as a built-in part.
-
-    Stamping :attr:`SocOrigin.BUILTIN` here rather than on each definition
-    below keeps "built-in" meaning exactly "registered by this module", with
-    one place to read it and no way for a definition to claim it by omission.
-
-    The name is stamped alongside it, so that a later ``dataclasses.replace``
-    that renames the copy can be told apart from one that only resizes it --
-    see :attr:`SocDef.is_builtin`.
-    """
-    registered = replace(soc, origin=SocOrigin.BUILTIN, registered_name=soc.name)
-    _SOCS[registered.name] = registered
-    return registered
-
-
-_register_soc(
-    SocDef(
-        name="apollo3p",
-        family=SocFamily.AP3,
-        core=CoreArch.CORTEX_M4,
-        pmu_tier=PmuTier.DWT_ONLY,
-        has_mve=False,
-        # Apollo3p (Blue Plus): 2 MB NOR flash (ROMEM, 2,048,000 B usable above
-        # the 0xC000 bootloader region), a real 64 KB low-latency TCM at
-        # 0x10000000, and 700 KB main SRAM ("RWMEM") at 0x10011000.
-        #
-        # The TCM is genuine tightly-coupled memory in silicon (datasheet: "64
-        # kB TCM", zero-wait-state, DMA-excluded); the nsx linker's default
-        # `.bss`/`.data` targets RWMEM, not TCM. dtcm_kb=64 here (and the
-        # Placement.TCM base below) require nsx-ambiq-sdk#29's dedicated
-        # NOLOAD `.tcm_bss` section for NSX_MEM_FAST_BSS data placement — an
-        # nsx-ambiq-sdk revision without it silently places the "TCM" arena
-        # in RWMEM instead.
-        memory=MemoryLayout(mram_kb=2000, sram_kb=700, dtcm_kb=64),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                # Apollo3/3P run at 48 MHz HFRC in normal mode.  The 96 MHz
-                # "burst" (TurboSPOT) tier is NOT reachable through NSX
-                # (nsx_platform_set_perf_mode is a no-op on Apollo3), so the
-                # firmware enables it directly via am_hal_burst_mode_enable()
-                # when "hp" is selected and mirrors the real 96 MHz into
-                # SystemCoreClock.  Host-side timing and the SWO trace-clock
-                # (cpu_speed passed to JLink.swo_enable) follow the selected
-                # ClockSpeed.mhz, so they stay matched to the actual device
-                # clock for both tiers.  Default remains 48 MHz.
-                (
-                    ClockSpeed("lp", 48, PerfTier.LOW),
-                    ClockSpeed("hp", 96, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO3P",
-        cmsis_header="apollo3p.h",
-        rtt_scan_ranges=((0x10000000, 0x100000),),
-        jlink_device="AMA3B2KK-KBR",
-        # Apollo3's TPIU TRACECLKIN is a dedicated 48 MHz-domain clock, NOT the
-        # core clock — TurboSPOT burst (hp/96 MHz) does not change the SWO baud,
-        # so the host always programs J-Link's SWO prescaler against 48 MHz.
-        swo_trace_clock_mhz=48,
-        # No nsx-ambiq-usb support on Apollo3/3P — usb_cdc transport unavailable.
-        has_usb=False,
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo4p",
-        family=SocFamily.AP4,
-        core=CoreArch.CORTEX_M4,
-        pmu_tier=PmuTier.DWT_ONLY,
-        has_mve=False,
-        memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 192, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO4P",
-        cmsis_header="apollo4p.h",
-        rtt_scan_ranges=((0x10000000, 0x100000),),
-        jlink_device="AMAP42KP-KBR",
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo4l",
-        family=SocFamily.AP4,
-        core=CoreArch.CORTEX_M4,
-        pmu_tier=PmuTier.DWT_ONLY,
-        has_mve=False,
-        memory=MemoryLayout(mram_kb=2000, sram_kb=1024, dtcm_kb=384),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 192, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO4L",
-        cmsis_header="apollo4l.h",
-        rtt_scan_ranges=((0x10000000, 0x100000),),
-        jlink_device="AMAP42KL-KBR",
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo510",
-        family=SocFamily.AP5,
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        memory=MemoryLayout(
-            mram_kb=4096,
-            sram_kb=3072,
-            dtcm_kb=512,
-            itcm_kb=256,
-            # apollo510_evb populates an AP Memory APS512XXB (512 Mbit =
-            # 64 MB) hex PSRAM on MSPI0, confirmed via XIP address-aliasing
-            # (+32 MB holds distinct data).
-            psram_kb=65536,
-            nvm_kb=8192,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 250, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO510",
-        cmsis_header="apollo510.h",
-        # On the cache-coherent M55 parts RTT is pinned to non-cached TCM
-        # (default .bss) by nsx-segger-rtt. DTCM is based at 0x20000000 (512 KB), so the
-        # fallback scan covers that window. The known-address fast path (nm/map)
-        # is the primary route and skips scanning entirely.
-        rtt_scan_ranges=((0x20000000, 0x80000),),
-        jlink_device="AP510NFA-CBR",
-        pmu_max_ops=4096,
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo510b",
-        family=SocFamily.AP5,
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        memory=MemoryLayout(
-            mram_kb=4096,
-            sram_kb=3072,
-            dtcm_kb=512,
-            itcm_kb=256,
-            # apollo510b_evb populates an AP Memory APS512XXN (512 Mbit =
-            # 64 MB) hex PSRAM on MSPI0, confirmed via XIP address-aliasing
-            # (+32 MB is distinct storage, +64 MB wraps).
-            psram_kb=65536,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 250, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO510B",
-        cmsis_header="apollo510.h",
-        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
-        rtt_scan_ranges=((0x20000000, 0x80000),),
-        jlink_device="AP510BFA-CBR",
-        pmu_max_ops=4096,
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo5b",
-        family=SocFamily.AP5,
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        memory=MemoryLayout(
-            mram_kb=4096,
-            sram_kb=3072,
-            dtcm_kb=512,
-            itcm_kb=256,
-            psram_kb=32768,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 250, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO5B",
-        cmsis_header="apollo510.h",
-        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @ 0x20000000.
-        rtt_scan_ranges=((0x20000000, 0x80000),),
-        jlink_device="AP510NFA-CBR",
-        pmu_max_ops=4096,
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo330P",
-        family=SocFamily.AP5,
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        memory=MemoryLayout(
-            # Values match this Rev1 EVB's NSX linker script
-            # (nsx-core/src/apollo330P/gcc/linker_script_sbl.ld): MCU_TCM
-            # 240 KB, SHARED_SRAM 1792 KB. No separate ITCM region is
-            # declared -- TCM is unified into MCU_TCM, so itcm_kb=0.
-            #
-            # dtcm_kb/sram_kb/mram_kb are direct arena/weights placement
-            # CAPACITY CHECKS (plan_memory.py, validation/matrix.py), so
-            # they must reflect the linker region, not the larger hardware
-            # aperture. 240 KB is the gcc LINKER region, the right ceiling
-            # for these checks; the hardware DTCM aperture is 256 KB (SDK
-            # DTCM_MAX_SIZE). memory_map.py records that aperture
-            # separately (#176); do not cite this block as
-            # "hardware-confirmed 240".
-            # Linker MCU_MRAM; radio firmware sits above.
-            mram_kb=1552,
-            sram_kb=1792,
-            dtcm_kb=240,
-            itcm_kb=0,
-            psram_kb=32768,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 250, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO330P",
-        cmsis_header="apollo330P.h",
-        # See apollo510: M55 RTT lives in non-cached TCM (.bss), DTCM @
-        # 0x20000000.  Scan length matches this part's REAL 240 KB MCU_TCM
-        # (0x3C000, from the linker script — see the MemoryLayout comment
-        # above), not AP510's 512 KB (0x80000): scanning past the end of
-        # physical TCM risks bus-faulting the debug read or matching
-        # garbage in unmapped space.
-        rtt_scan_ranges=((0x20000000, 0x3C000),),
-        # J-Link device string for AP330 is NOT in JLinkExe's stock device
-        # database -- it's a custom Ambiq-provided entry
-        # ("Apollo330P_510L", inheriting AP510NFA-CBR's debug/reset
-        # sequence in ~/.config/SEGGER/JLinkDevices/AmbiqMicro/JLinkDevices.xml).
-        # "AP330NFA-CBR" (the datasheet part number) is NOT a registered
-        # device string at all and silently fails core identification
-        # (JLinkExe still resets generically via -autoconnect without
-        # full device-DB knowledge, but never prints the "Cortex-M55
-        # identified" banner inspect_probe_target()/probes match parses,
-        # so probe resolution always reports "unknown target").
-        jlink_device="Apollo330P_510L",
-        # Bounds the static per-layer PMU buffer (HpxPmuProfiler/g_profiler
-        # reserves ~24 bytes per entry). Smaller than apollo510's 4096 to
-        # fit this board's tighter 240 KB MCU_TCM budget.
-        pmu_max_ops=512,
-        # This board's SSRAM capacity is ~1.75 MB, not AP510's 3 MB -- its
-        # HAL only defines AM_HAL_PWRCTRL_SRAM_1P75M (no SRAM_3M).
-        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
-        # AP330P's TPIU trace clock is a FIXED 48 MHz XTAL_HS, NOT the CPU
-        # clock -- unlike apollo510/5B (core-clocked HFRC_96MHz path).
-        # Ground truth: NSX's nsx_system_platform.c groups APOLLO330P with
-        # APOLLO510L ("Trace clock on these parts = XTAL_HS 48 MHz.  JLink
-        # SWO viewer: -cpufreq 48000000") and NSX's
-        # cmake/socs/facts/apollo330P.cmake sets NSX_SEGGER_CPUFREQ=48000000.
-        # Without this the host programs the SWO prescaler against the CPU
-        # clock (96/250 MHz) and decodes garbage -> "no data" on the swo
-        # transport even though the firmware is printing. Same quirk (and
-        # same field/comment pattern) as apollo3p above.
-        swo_trace_clock_mhz=48,
-        # apollo330P's HAL defines am_hal_pwrctrl_rss_pwroff() (unlike the
-        # plain apollo510/apollo510b HAL variants this project builds
-        # against) -- see SocDef.has_radio_subsystem docstring.
-        has_radio_subsystem=True,
-    )
-)
-
-_register_soc(
-    SocDef(
-        name="apollo510L",
-        family=SocFamily.AP5,
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        # Same linked memory map as apollo330P; boards decide if PSRAM is fitted.
-        memory=MemoryLayout(
-            # Linker MCU_MRAM; radio firmware sits above.
-            mram_kb=1552,
-            sram_kb=1792,
-            dtcm_kb=240,
-            itcm_kb=0,
-            psram_kb=32768,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                (
-                    ClockSpeed("lp", 96, PerfTier.LOW),
-                    ClockSpeed("hp", 250, PerfTier.HIGH),
-                ),
-                default="lp",
-            ),
-        ),
-        c_define="AM_PART_APOLLO510L",
-        cmsis_header="apollo510L.h",
-        # 240 KB MCU_TCM, as on apollo330P (see that entry).
-        rtt_scan_ranges=((0x20000000, 0x3C000),),
-        # Ambiq's J-Link device pack entry (with flash loader); NSX's
-        # "AP510DLA-CBR" is not in J-Link's stock device database.
-        jlink_device="AP510L",
-        # Same 240 KB TCM budget as apollo330P; see its pmu_max_ops note.
-        pmu_max_ops=512,
-        # Largest SSRAM enum the HAL defines, as on apollo330P.
-        ssram_full_power_enum="AM_HAL_PWRCTRL_SRAM_1P75M",
-        # Fixed 48 MHz XTAL_HS trace clock (NSX SoC facts), as on apollo330P.
-        swo_trace_clock_mhz=48,
-        # apollo510L's HAL defines am_hal_pwrctrl_rss_pwroff() like apollo330P.
-        has_radio_subsystem=True,
-    )
-)
-
-# Atomiq110 (R6-generation Cortex-M55 + Ethos-U85 NPU). The only upstream
-# realization today is the atomiq110_fpga_turbo FPGA board -- all facts below
-# are sourced from the real nsx-ambiq-sdk atomiq110 SoC/board files (not
-# copy-pasted from apollo510), per the same bring-up discipline as apollo330P
-# above:
-#   - cmake/socs/facts/atomiq110.cmake (NSX_SEGGER_*, NSX_SOC_* facts)
-#   - modules/nsx-core/src/atomiq110/gcc/linker_script_nbl.ld (memory map)
-#   - modules/nsx-ambiqsuite/sdk/mcu/atomiq110/hal/am_hal_pwrctrl.h (SRAM enum)
-_register_soc(
-    SocDef(
-        name="atomiq110",
-        family=SocFamily.AP5,  # CM55 + MVE + full PMU, same tier as AP5
-        core=CoreArch.CORTEX_M55,
-        pmu_tier=PmuTier.ARMV8M_PMU,
-        has_mve=True,
-        memory=MemoryLayout(
-            # FPGA "nbl" (no-bootloader) memory map -- MRAM/SRAM are
-            # FPGA-emulated at 0x22000000/0x21000000, not the Apollo5
-            # silicon addresses (see linker_script_nbl.ld comment block).
-            #   MCU_ITCM    0x00000000, LENGTH=262144  -> 256 KB
-            #   MCU_MRAM    0x22000000, LENGTH=4194304 -> 4096 KB
-            #   MCU_TCM     0x20000000, LENGTH=507904  ->  496 KB (DTCM)
-            #   SHARED_SRAM 0x21000000, LENGTH=3145728 -> 3072 KB
-            # No PSRAM/MSPI populated on this FPGA carrier board.
-            mram_kb=4096,
-            sram_kb=3072,
-            dtcm_kb=496,
-            itcm_kb=256,
-        ),
-        clocks=(
-            ClockDomain(
-                "cpu",
-                # The FPGA "turbo" bitstream runs the core at a single fixed
-                # clock (NSX_SEGGER_CPUFREQ=25000000 in
-                # cmake/socs/facts/atomiq110.cmake) -- there is no faster
-                # "hp" tier to expose on this realization, unlike the
-                # silicon AP5 parts. Declaring a real second speed here
-                # would be fabricated, not measured.
-                (ClockSpeed("lp", 25, PerfTier.LOW),),
-                default="lp",
-            ),
-        ),
-        # The SoC facts expose PART_atomiq110 through
-        # NSX_SOC_COMPILE_DEFINITIONS; neuralspotx's board target additionally
-        # defines AM_PART_ATOMIQ110 for HAL-facing compile gates.
-        c_define="PART_atomiq110",
-        cmsis_header="atomiq110.h",
-        # M55 RTT lives in non-cached TCM (.bss); scan window matches the
-        # real 496 KB MCU_TCM region above, not AP510's 512 KB.
-        rtt_scan_ranges=((0x20000000, 0x7C000),),
-        # NSX_SEGGER_DEVICE in cmake/socs/facts/atomiq110.cmake.
-        jlink_device="Atomiq110",
-        swo_trace_clock_mhz=48,
-        pmu_max_ops=4096,
-        # No nsx-ambiq-usb compatibility entry for atomiq110/atomiq110_fpga_turbo
-        # (modules/nsx-ambiq-usb/nsx-module.yaml's compatibility.socs list does
-        # not include it) -- usb_cdc transport is unavailable, same posture as
-        # apollo3p above.
-        has_usb=False,
-        # am_hal_pwrctrl_rss_pwroff() is declared in this part's
-        # am_hal_pwrctrl.h but NOT implemented in the compiled
-        # lib/gcc/atomiq110/libam_hal.a (confirmed via nm) -- calling it
-        # would be a link error, unlike apollo330P/apollo510L where the
-        # symbol is genuinely present. Left at the dataclass default (False).
-        # Ethos-U85 in the 256-MAC configuration (matches the Vela
-        # --accelerator-config the NPU bitstream was generated for).
-        npu="ethos-u85-256",
-    )
-)
 
 # MemoryLayout size field backing each placement region.
 _PLACEMENT_SIZE_FIELD: dict[Placement, str] = {

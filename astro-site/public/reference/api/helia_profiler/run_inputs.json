@@ -225,9 +225,9 @@
               "returns": [],
               "signature": "INVOKE_ONLY = 'invoke_only'",
               "source": {
-                "line": 32,
+                "line": 33,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L32"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L33"
               },
               "summary": ""
             },
@@ -244,9 +244,9 @@
               "returns": [],
               "signature": "RESTORE_AND_INVOKE = 'restore_and_invoke'",
               "source": {
-                "line": 33,
+                "line": 34,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L33"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L34"
               },
               "summary": ""
             }
@@ -257,9 +257,9 @@
           "returns": [],
           "signature": "FixtureTimingScope()",
           "source": {
-            "line": 24,
+            "line": 25,
             "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L24"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L25"
           },
           "summary": "What the timed span covers."
         },
@@ -322,9 +322,9 @@
               "returns": [],
               "signature": "CARRY = 'carry'",
               "source": {
-                "line": 39,
+                "line": 40,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L39"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L40"
               },
               "summary": ""
             }
@@ -335,9 +335,9 @@
           "returns": [],
           "signature": "FixtureStatePolicy()",
           "source": {
-            "line": 36,
+            "line": 37,
             "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L36"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L37"
           },
           "summary": "Internal state behavior; input restoration is independent of this policy."
         },
@@ -361,9 +361,9 @@
               "returns": [],
               "signature": "SIGNAL = 'signal'",
               "source": {
-                "line": 45,
+                "line": 46,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L45"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L46"
               },
               "summary": ""
             },
@@ -380,9 +380,9 @@
               "returns": [],
               "signature": "AUX = 'aux'",
               "source": {
-                "line": 46,
+                "line": 47,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L46"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L47"
               },
               "summary": ""
             }
@@ -393,9 +393,9 @@
           "returns": [],
           "signature": "FixtureRole()",
           "source": {
-            "line": 42,
+            "line": 43,
             "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L42"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L43"
           },
           "summary": "Role of one fixture tensor; outputs are always SIGNAL."
         },
@@ -456,83 +456,6 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/analysis.py#L44"
           },
           "summary": "API tier: experimental"
-        },
-        {
-          "description": "`dataclass`\n\nSelect input-restoration timing and, optionally, the internal-state policy.\n\nCarry initializes the engine once, then retains internal state through\nwarmups and measurements. It is how fixtures always run, so a build of a\nmodel with internal state records it when no policy is given. Fixed external\ninputs are still restored each invocation; no internal reset or\nsource-initializer equivalence is implied.\n\n**API tier:** `experimental`",
-          "examples": [],
-          "id": "helia_profiler.FixtureMethod",
-          "kind": "class",
-          "language": "python",
-          "members": [
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureMethod.timing_scope",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "timing_scope",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "timing_scope: FixtureTimingScope",
-              "source": {
-                "line": 60,
-                "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L60"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureMethod.state_policy",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "state_policy",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "state_policy: FixtureStatePolicy | None = None",
-              "source": {
-                "line": 61,
-                "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L61"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureMethod.power_sync",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "power_sync",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "power_sync: FixturePowerSync | None = None",
-              "source": {
-                "line": 62,
-                "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L62"
-              },
-              "summary": ""
-            }
-          ],
-          "name": "FixtureMethod",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "FixtureMethod(\n    timing_scope: FixtureTimingScope,\n    state_policy: FixtureStatePolicy | None = None,\n    power_sync: FixturePowerSync | None = None,\n) -> None",
-          "source": {
-            "line": 49,
-            "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L49"
-          },
-          "summary": "Select input-restoration timing and, optionally, the internal-state policy."
         },
         {
           "description": "`dataclass`\n\n**API tier:** `experimental`",
@@ -610,6 +533,83 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/analysis.py#L50"
           },
           "summary": "API tier: experimental"
+        },
+        {
+          "description": "`dataclass`\n\nSelect input-restoration timing and, optionally, the internal-state policy.\n\nCarry initializes the engine once, then retains internal state through\nwarmups and measurements. It is how fixtures always run, so a build of a\nmodel with internal state records it when no policy is given. Fixed external\ninputs are still restored each invocation; no internal reset or\nsource-initializer equivalence is implied.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureMethod",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureMethod.timing_scope",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "timing_scope",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "timing_scope: FixtureTimingScope",
+              "source": {
+                "line": 61,
+                "path": "src/helia_profiler/fixtures/types.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L61"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureMethod.state_policy",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "state_policy",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "state_policy: FixtureStatePolicy | None = None",
+              "source": {
+                "line": 62,
+                "path": "src/helia_profiler/fixtures/types.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L62"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureMethod.power_sync",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "power_sync",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "power_sync: FixturePowerSync | None = None",
+              "source": {
+                "line": 63,
+                "path": "src/helia_profiler/fixtures/types.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L63"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureMethod",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureMethod(\n    timing_scope: FixtureTimingScope,\n    state_policy: FixtureStatePolicy | None = None,\n    power_sync: FixturePowerSync | None = None,\n) -> None",
+          "source": {
+            "line": 50,
+            "path": "src/helia_profiler/fixtures/types.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L50"
+          },
+          "summary": "Select input-restoration timing and, optionally, the internal-state policy."
         },
         {
           "description": "Read a model's public inputs and outputs as *engine*'s fixture integration admits them.\n\n**API tier:** `experimental`",
@@ -809,9 +809,9 @@
               "returns": [],
               "signature": "tensor: FixtureTensor",
               "source": {
-                "line": 119,
+                "line": 120,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L119"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L120"
               },
               "summary": ""
             },
@@ -828,9 +828,9 @@
               "returns": [],
               "signature": "data: FixtureFile",
               "source": {
-                "line": 120,
+                "line": 121,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L120"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L121"
               },
               "summary": ""
             },
@@ -847,9 +847,9 @@
               "returns": [],
               "signature": "role: FixtureRole = FixtureRole.SIGNAL",
               "source": {
-                "line": 121,
+                "line": 122,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L121"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L122"
               },
               "summary": ""
             }
@@ -860,50 +860,11 @@
           "returns": [],
           "signature": "FixtureIO(tensor: FixtureTensor, data: FixtureFile, role: FixtureRole = FixtureRole.SIGNAL) -> None",
           "source": {
-            "line": 115,
+            "line": 116,
             "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L115"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L116"
           },
           "summary": "One model input with its fixed bytes, or one output with its expected bytes."
-        },
-        {
-          "description": "`dataclass`\n\nOne complete output declaration, without a reference answer.\n\n**API tier:** `experimental`",
-          "examples": [],
-          "id": "helia_profiler.FixtureOutput",
-          "kind": "class",
-          "language": "python",
-          "members": [
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureOutput.tensor",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "tensor",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "tensor: FixtureTensor",
-              "source": {
-                "line": 128,
-                "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L128"
-              },
-              "summary": ""
-            }
-          ],
-          "name": "FixtureOutput",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "FixtureOutput(tensor: FixtureTensor) -> None",
-          "source": {
-            "line": 124,
-            "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L124"
-          },
-          "summary": "One complete output declaration, without a reference answer."
         },
         {
           "description": "`dataclass`\n\nA model's public inputs and outputs in model order, with its graph facts.\n\n**API tier:** `experimental`",
@@ -1135,6 +1096,45 @@
           "summary": "A model's public inputs and outputs in model order, with its graph facts."
         },
         {
+          "description": "`dataclass`\n\nOne complete output declaration, without a reference answer.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureOutput",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureOutput.tensor",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "tensor",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "tensor: FixtureTensor",
+              "source": {
+                "line": 129,
+                "path": "src/helia_profiler/fixtures/types.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L129"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureOutput",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureOutput(tensor: FixtureTensor) -> None",
+          "source": {
+            "line": 125,
+            "path": "src/helia_profiler/fixtures/types.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L125"
+          },
+          "summary": "One complete output declaration, without a reference answer."
+        },
+        {
           "description": "`dataclass`\n\nFixed input bytes and complete ordered outputs for a model.\n\nOutputs are descriptors, or legacy ``FixtureIO`` references. Reference\nbytes are not needed for measurement; legacy identities remain unchanged.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.TypedFixture",
@@ -1154,9 +1154,9 @@
               "returns": [],
               "signature": "model: FixtureFile",
               "source": {
-                "line": 139,
+                "line": 140,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L139"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L140"
               },
               "summary": ""
             },
@@ -1173,9 +1173,9 @@
               "returns": [],
               "signature": "inputs: tuple[FixtureIO, ...]",
               "source": {
-                "line": 140,
+                "line": 141,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L140"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L141"
               },
               "summary": ""
             },
@@ -1192,9 +1192,9 @@
               "returns": [],
               "signature": "outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]",
               "source": {
-                "line": 141,
+                "line": 142,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L141"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L142"
               },
               "summary": ""
             },
@@ -1211,9 +1211,9 @@
               "returns": [],
               "signature": "expected: FixtureFile | None",
               "source": {
-                "line": 161,
+                "line": 162,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L161"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L162"
               },
               "summary": ""
             },
@@ -1230,9 +1230,9 @@
               "returns": [],
               "signature": "identity: str",
               "source": {
-                "line": 166,
+                "line": 167,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L166"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L167"
               },
               "summary": ""
             },
@@ -1249,9 +1249,9 @@
               "returns": [],
               "signature": "verify() -> None",
               "source": {
-                "line": 143,
+                "line": 144,
                 "path": "src/helia_profiler/fixtures/types.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L143"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L144"
               },
               "summary": ""
             }
@@ -1262,9 +1262,9 @@
           "returns": [],
           "signature": "TypedFixture(\n    model: FixtureFile,\n    inputs: tuple[FixtureIO, ...],\n    outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...],\n) -> None",
           "source": {
-            "line": 131,
+            "line": 132,
             "path": "src/helia_profiler/fixtures/types.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L131"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L132"
           },
           "summary": "Fixed input bytes and complete ordered outputs for a model."
         }

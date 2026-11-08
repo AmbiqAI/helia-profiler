@@ -36,7 +36,12 @@ from helia_profiler.runs.expect import (
     Verification,
     compare_outputs,
 )
-from helia_profiler.runs.record import RunResultError, RunResultRecord, _identity
+from helia_profiler.runs.record import (
+    RUN_RESULT_SCHEMA_VERSION,
+    RunResultError,
+    RunResultRecord,
+    _identity,
+)
 from tests.fixtures_api.test_fixture_record import _build, _pin
 from tests.runs.helpers import ATFE_OUTPUT, atfe_build, compiled, plan_for
 from tests.runs.test_run_power import _energy, _powered, _rail
@@ -228,7 +233,7 @@ def _schema(data: dict[str, Any]) -> None:
 
 
 def _version(data: dict[str, Any]) -> None:
-    data["schema_version"] = 2
+    data["schema_version"] = RUN_RESULT_SCHEMA_VERSION + 1
 
 
 def _extra(data: dict[str, Any]) -> None:
@@ -407,7 +412,7 @@ def test_a_timing_only_run_maps_latency_memory_and_states_no_energy(root, record
     view = observations(loaded)
 
     _validate(view)
-    assert view["producer"]["mapping_version"] == "hpx-run-2"
+    assert view["producer"]["mapping_version"] == "hpx-run-3"
     assert view["native_result"]["identity"] == loaded.sha256
     latency = _items(view)["latency.invoke.v1"]
     assert latency["value"] == pytest.approx(65536 / 32768 / 100 * 1000)

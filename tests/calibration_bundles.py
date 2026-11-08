@@ -145,7 +145,7 @@ def bundle(
     (path / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
     metadata: dict[str, Any] = {
         "schema": "hpx.run-metadata",
-        "schema_version": 1,
+        "schema_version": 2,
         "model": {"sha256": sha256},
         "config": {
             "model": {

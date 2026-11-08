@@ -40,6 +40,8 @@ def _metadata_to_dict(meta: RunMetadata) -> dict[str, Any]:
         d["config"] = meta.config_snapshot
     if meta.platform is not None:
         d["platform"] = asdict(meta.platform)
+    if meta.platform_provenance is not None:
+        d["platform_provenance"] = meta.platform_provenance.to_dict()
     if meta.model is not None:
         d["model"] = asdict(meta.model)
     if meta.toolchain is not None:

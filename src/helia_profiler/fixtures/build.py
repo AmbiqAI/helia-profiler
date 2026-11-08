@@ -9,6 +9,7 @@ from dataclasses import asdict, replace
 
 from .._files import FixtureFile
 from ..config import ProfileConfig
+from ..config.platform import config_platform
 from ..deps.compatibility import resolve_compatibility
 from ..engines import EngineType, get_adapter
 from ..engines.base import HeliaAotArtifacts, PreparedRuntimeAdapter
@@ -402,6 +403,7 @@ def build_fixed_fixture(
         engine_source=artifacts.source if artifacts else None,
         kernel_source=kernel_source,
         runtime_source=runtime_source,
+        platform=config_platform(config),
         dependency_state=dependency_state,
         psram_weights=_psram_weights(ctx, flat_binary),
         arena_location=config.model.arena_location,

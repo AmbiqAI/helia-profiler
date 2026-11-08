@@ -30,12 +30,45 @@ from helia_profiler.fixtures.record import (
     verify_fixture_build,
 )
 from helia_profiler.fixtures.target import supported_fixture_target
+from helia_profiler.platform.provenance import platform_snapshot
 
 
 def _pin(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
     return FixtureFile(path, hashlib.sha256(data).hexdigest())
+
+
+def test_saved_receipt_loads_without_querying_a_new_catalog(tmp_path, monkeypatch):
+    original = _build(tmp_path)
+    roots = {"run": tmp_path}
+    saved = dump_fixture_build(original, roots=roots)
+
+    def changed_environment(*args, **kwargs):
+        raise AssertionError("reading a saved measurement must not resolve a new platform")
+
+    monkeypatch.setattr("helia_profiler.platform.provenance.platform_snapshot", changed_environment)
+    assert load_fixture_build(saved, roots=roots) == original
+
+
+def test_recapture_refuses_changed_platform_before_returning_a_request(tmp_path, monkeypatch):
+    original = _build(tmp_path)
+    assert original.platform is not None and original.platform.selection.catalog is not None
+    different = replace(
+        original.platform,
+        selection=replace(
+            original.platform.selection,
+            catalog=replace(original.platform.selection.catalog, package_version="changed"),
+        ),
+    )
+    monkeypatch.setattr(
+        "helia_profiler.platform.provenance.platform_snapshot", lambda *a, **k: different
+    )
+    with pytest.raises(ValueError, match="matching HPX/catalog environment"):
+        fixture_capture_request(
+            original, jlink_serial="123", evidence_dir=tmp_path / "raw", settle_seconds=30
+        )
+    assert not (tmp_path / "raw").exists()
 
 
 def _build(root):
@@ -64,6 +97,7 @@ def _build(root):
         warmups=5,
         intent_identity="b" * 64,
         target=supported_fixture_target(),
+        platform=platform_snapshot("apollo510_evb"),
         toolchain=ToolchainInfo("clang", "22.1.0", "3.31"),
         dependency_state=state,
         state_policy=FixtureStatePolicy.CARRY,
@@ -99,7 +133,7 @@ def test_power_record_states_its_protocol(tmp_path):
     build = replace(build, build_identity=compiled_fixture_identity(build))
     record = dump_fixture_build(build, roots={"run": tmp_path})
     encoded = json.loads(record)
-    assert encoded["fixture_api"] == list(_RECORD_VERSION) == [7, 0]
+    assert encoded["fixture_api"] == list(_RECORD_VERSION) == [8, 0]
     assert encoded["build"]["power_sync"]["protocol_version"] == 2
     assert load_fixture_build(record, roots={"run": tmp_path}) == build
     with pytest.raises(ValueError, match="Unsupported fixture power protocol"):
@@ -114,7 +148,7 @@ def test_power_record_states_its_protocol(tmp_path):
             load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
 
 
-@pytest.mark.parametrize("version", [[5, 1], [5, 8], [6, 1], [7, 1], [8, 0], "7.0"])
+@pytest.mark.parametrize("version", [[5, 1], [5, 8], [6, 1], [7, 1], [8, 1], "7.0"])
 def test_a_record_of_another_version_names_the_release_that_reads_it(tmp_path, version):
     record = json.loads(dump_fixture_build(_build(tmp_path), roots={"run": tmp_path}))
     record["fixture_api"] = version
@@ -325,7 +359,7 @@ def test_power_build_identity_roundtrip(tmp_path):
 
 @pytest.mark.parametrize("value", [None, 7, True, [], "observe_ram"])
 def test_build_record_requires_an_object(tmp_path, value):
-    record = {"schema_version": 1, "fixture_api": [7, 0], "build": value}
+    record = {"schema_version": 1, "fixture_api": list(_RECORD_VERSION), "build": value}
     with pytest.raises(ValueError, match="JSON object"):
         load_fixture_build(json.dumps(record), roots={"run": tmp_path})
 

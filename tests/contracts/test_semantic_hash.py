@@ -29,7 +29,7 @@ GOLDEN: dict[str, tuple[Kind, Any, bytes, str]] = {
         "intent",
         {"settings": {"engine": {"type": "helia-aot"}}, "toolchain": ["atfe", "21.1.1"]},
         b'{"settings":{"engine":{"type":"helia-aot"}},"toolchain":["atfe","21.1.1"]}',
-        f"hpx.intent/1:sha256:{HEX}",
+        f"hpx.intent/2:sha256:{HEX}",
     ),
     "build": (
         "build",
@@ -73,7 +73,7 @@ GOLDEN: dict[str, tuple[Kind, Any, bytes, str]] = {
         "intent",
         {"note": "\N{MICRO SIGN}s \N{CHECK MARK}", "scale": 1e-05, "ratio": 0.1},
         f'{{"note":"{_U}00b5s {_U}2713","ratio":0.1,"scale":1e-05}}'.encode("ascii"),
-        "hpx.intent/1:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312",
+        "hpx.intent/2:sha256:78888b62d415f66c54322c1aa3ea08858c0ffd0df737e142b8c13424825ca312",
     ),
 }
 
@@ -82,7 +82,14 @@ DOCS = Path(__file__).resolve().parents[2] / "astro-site/src/content/docs/guide/
 
 def test_every_kind_has_a_golden_at_its_current_version():
     assert {kind for kind, *_ in GOLDEN.values()} == set(KIND_VERSIONS)
-    assert all(version == 1 for version in KIND_VERSIONS.values())
+    assert KIND_VERSIONS == {
+        "intent": 2,
+        "build": 1,
+        "observation": 1,
+        "binding": 1,
+        "inputs": 1,
+        "target-config": 1,
+    }
 
 
 @pytest.mark.parametrize("name", sorted(GOLDEN))
@@ -176,18 +183,18 @@ def test_construction_refuses_a_malformed_part(parts):
     [
         HEX,
         f"hpx.build/1:sha256:{HEX}",
-        f"hpx.intent/2:sha256:{HEX}",
+        f"hpx.intent/1:sha256:{HEX}",
         f"helx.intent/1:sha256:{HEX}",
         None,
     ],
 )
 def test_require_refuses_another_kind_version_or_producer(text):
-    with pytest.raises(ValueError, match=re.escape("not an hpx.intent/1:sha256:<hex> hash")):
+    with pytest.raises(ValueError, match=re.escape("not an hpx.intent/2:sha256:<hex> hash")):
         require(text, "intent")
 
 
 def test_require_returns_a_matching_hash():
-    assert require(f"hpx.intent/1:sha256:{HEX}", "intent") == f"hpx.intent/1:sha256:{HEX}"
+    assert require(f"hpx.intent/2:sha256:{HEX}", "intent") == f"hpx.intent/2:sha256:{HEX}"
 
 
 def test_the_summary_schema_pins_the_identity_kinds_at_their_versions():

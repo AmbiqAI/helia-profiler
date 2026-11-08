@@ -66,6 +66,8 @@ def test_public_surface_membership_snapshot() -> None:
         "CanonicalEngine",
         "CanonicalKernel",
         "CaptureError",
+        "CatalogProvenance",
+        "CatalogSource",
         "ClockSelection",
         "ComparabilityAssessment",
         "ComparabilityIssue",
@@ -155,6 +157,7 @@ def test_public_surface_membership_snapshot() -> None:
         "PerTensorQuantization",
         "Placement",
         "PlatformError",
+        "PlatformSnapshot",
         "PmuCounter",
         "PmuResult",
         "PowerConfig",
@@ -178,6 +181,7 @@ def test_public_surface_membership_snapshot() -> None:
         "QualifiedTarget",
         "ReferenceOrigin",
         "ReferenceOutputs",
+        "RegionExtent",
         "ReportError",
         "ResetStrategy",
         "ResolverPlan",
@@ -209,6 +213,7 @@ def test_public_surface_membership_snapshot() -> None:
         "SupportBundleOptions",
         "SupportBundleSection",
         "TargetConfig",
+        "TargetSelection",
         "TensorComparison",
         "TimeoutsConfig",
         "Tolerance",
@@ -285,3 +290,30 @@ def test_export_catalog_keys_are_literal_and_unique() -> None:
     keys = [ast.literal_eval(key) for key in catalog.keys if key is not None]
     assert len(keys) == len(catalog.keys) == len(set(keys))
     assert set(keys) == set(helia_profiler.__all__)
+
+
+def test_existing_positional_metadata_and_summary_calls_still_serialize() -> None:
+    from helia_profiler.report.metadata import _metadata_to_dict
+    from helia_profiler.results import ModelInfo
+    from helia_profiler.results.run_summary import RunSummary
+
+    model = ModelInfo(name="positional-model")
+    metadata = helia_profiler.RunMetadata("hpx", "run", "timestamp", {}, None, model)
+    assert _metadata_to_dict(metadata)["model"]["name"] == "positional-model"
+    layers = ({"op": "ADD", "cycles": 10.0},)
+    summary = RunSummary(
+        "litert",
+        1,
+        10.0,
+        False,
+        "valid",
+        (),
+        "hpx.run-summary",
+        21,
+        None,
+        None,
+        None,
+        None,
+        layers,
+    )
+    assert summary.to_dict()["top_layers"] == list(layers)

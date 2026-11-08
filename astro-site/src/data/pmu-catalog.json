@@ -517,21 +517,6 @@
       "pmuMaxOps": 4096
     },
     {
-      "soc": "apollo5b",
-      "family": "ap5",
-      "domains": [
-        "cpu",
-        "memory",
-        "mve"
-      ],
-      "groups": [
-        "cpu",
-        "memory",
-        "mve"
-      ],
-      "pmuMaxOps": 4096
-    },
-    {
       "soc": "apollo330P",
       "family": "ap5",
       "domains": [
@@ -573,6 +558,21 @@
       "groups": [
         "cpu",
         "ethos_npu",
+        "memory",
+        "mve"
+      ],
+      "pmuMaxOps": 4096
+    },
+    {
+      "soc": "apollo5b",
+      "family": "ap5",
+      "domains": [
+        "cpu",
+        "memory",
+        "mve"
+      ],
+      "groups": [
+        "cpu",
         "memory",
         "mve"
       ],

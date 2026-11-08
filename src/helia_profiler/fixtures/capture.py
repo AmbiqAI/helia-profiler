@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from .._files import FixtureFile
+from ..platform.provenance import PlatformSnapshot
 from ..target.probe.flash import flash_binary
 from ..target.probe.jlink import (
     attached_session,
@@ -100,6 +101,7 @@ class FixtureCaptureRequest:
     rail_power: FixtureRailPowerRequest | None = None
     board_power: FixtureBoardPowerRequest | None = None
     observe_ram: bool = False
+    platform: PlatformSnapshot | None = None
 
 
 @dataclass(frozen=True)
@@ -289,7 +291,9 @@ def capture_fixture(
     )
     require(isinstance(request.timing_scope, FixtureTimingScope), "Explicit timing scope required")
     require(isinstance(request.target, FixtureTarget), "Explicit typed fixture target required")
-    request.target.verify()
+    if request.platform is not None:
+        request.platform.verify_current()
+    request.target.verify(platform=request.platform)
     require(request.device == request.target.device, "Device differs from fixture target")
     directory = request.evidence_dir
     directory.mkdir(parents=True, exist_ok=False)
@@ -559,7 +563,7 @@ def capture_fixture(
         require(
             timing.iterations > 0
             and timing.timer_hz == FIXTURE_TIMER_HZ
-            and timing.cpu_hz == fixture_cpu_hz(request.target.board)
+            and timing.cpu_hz == fixture_cpu_hz(request.target.board, platform=request.platform)
             and 0 < timing.ticks < request.settle_seconds * timing.timer_hz
             and FIXTURE_SETTLE_TICKS[0] <= timing.settle_ticks <= FIXTURE_SETTLE_TICKS[1],
             "Invalid timing completion terminal",

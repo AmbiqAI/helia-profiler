@@ -314,31 +314,18 @@ def _placement_bases(soc: SocDef) -> Mapping[Placement, int]:
 
 
 def resolve_app_flash_load_addr(soc: SocDef) -> int | None:
-    """Resolve *soc*'s default app-image flash (``LoadFile``) address.
+    """Prefer an explicit override, then a registered target's catalog boot fact.
 
-    ``soc.app_flash_load_addr`` wins when set: it is the only source a
-    ``target.custom_socs`` entry can write.  Otherwise a **built-in** SoC
-    (:attr:`~helia_profiler.platform.soc.SocDef.is_builtin`) loads at the
-    start of its verified linked MRAM window from
-    :mod:`~helia_profiler.platform.memory_map` -- the SBL-excluded app origin
-    NSX's generated ``flash_cmds.jlink`` programs (the nbl origin on
-    atomiq110, whose default profile has no bootloader).
-
-    The flash fallback uses this address when the generated NSX recipe is
-    missing. A present recipe supplies its own address and takes precedence;
-    this default does not characterize arbitrary custom linker layouts.
-
-    A custom SoC resolves to ``None`` unless it states an address (directly
-    or inherited from its ``based_on`` part, which ``platform.custom``
-    resolves through this same function): a user-chosen name must not reach
-    a built-in's map, and nothing here was verified for a part hpx has never
-    seen.  ``None`` means "nobody knows"; the J-Link flash fallback refuses
-    to program rather than guess.
+    Unknown custom targets must state their address. Renamed copies cannot use
+    the original target's registered facts. The SDK descriptor retains its
+    HPX-owned map; generated flash recipes still take precedence at the caller.
     """
     if soc.app_flash_load_addr is not None:
         return soc.app_flash_load_addr
     if not soc.is_builtin:
         return None
+    if soc.catalog_target_id is not None:
+        return soc.catalog_app_flash_load_addr
     return mram_app_origin(soc.name)
 
 
@@ -361,7 +348,7 @@ def build_soc_capabilities(soc: SocDef) -> SocCapabilities:
         swo_trace_clock_mhz=soc.swo_trace_clock_mhz,
     )
     memory = MemoryCapabilities(
-        has_dcache=is_ap5,
+        has_dcache=soc.catalog_has_dcache if soc.catalog_has_dcache is not None else is_ap5,
         has_shared_ssram_power_domain=is_ap5,
         placement_bases=_placement_bases(soc),
         app_flash_load_addr=resolve_app_flash_load_addr(soc),

@@ -118,98 +118,6 @@ active_addresses: tuple[int, ...]
 
 Source: `src/helia_profiler/fixtures/psram.py:78`
 
-## helia_profiler.FixtureTiming
-
-`class` · `python`
-
-```python
-FixtureTiming(
-    ticks: int,
-    iterations: int,
-    warmups: int,
-    timer_hz: int,
-    settle_ticks: int,
-    cpu_hz: int,
-    timing_scope: FixtureTimingScope,
-) -> None
-```
-
-`dataclass`
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/fixtures/capture.py:105`
-
-### helia_profiler.FixtureTiming.ticks
-
-`attribute` · `python`
-
-```python
-ticks: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:107`
-
-### helia_profiler.FixtureTiming.iterations
-
-`attribute` · `python`
-
-```python
-iterations: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:108`
-
-### helia_profiler.FixtureTiming.warmups
-
-`attribute` · `python`
-
-```python
-warmups: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:109`
-
-### helia_profiler.FixtureTiming.timer_hz
-
-`attribute` · `python`
-
-```python
-timer_hz: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:110`
-
-### helia_profiler.FixtureTiming.settle_ticks
-
-`attribute` · `python`
-
-```python
-settle_ticks: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:111`
-
-### helia_profiler.FixtureTiming.cpu_hz
-
-`attribute` · `python`
-
-```python
-cpu_hz: int
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:112`
-
-### helia_profiler.FixtureTiming.timing_scope
-
-`attribute` · `python`
-
-```python
-timing_scope: FixtureTimingScope
-```
-
-Source: `src/helia_profiler/fixtures/capture.py:113`
-
 ## helia_profiler.FixtureBatchCompletion
 
 `class` · `python`
@@ -326,6 +234,98 @@ raw: FixtureFile
 
 Source: `src/helia_profiler/fixtures/power.py:117`
 
+## helia_profiler.FixtureTiming
+
+`class` · `python`
+
+```python
+FixtureTiming(
+    ticks: int,
+    iterations: int,
+    warmups: int,
+    timer_hz: int,
+    settle_ticks: int,
+    cpu_hz: int,
+    timing_scope: FixtureTimingScope,
+) -> None
+```
+
+`dataclass`
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/fixtures/capture.py:107`
+
+### helia_profiler.FixtureTiming.ticks
+
+`attribute` · `python`
+
+```python
+ticks: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:109`
+
+### helia_profiler.FixtureTiming.iterations
+
+`attribute` · `python`
+
+```python
+iterations: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:110`
+
+### helia_profiler.FixtureTiming.warmups
+
+`attribute` · `python`
+
+```python
+warmups: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:111`
+
+### helia_profiler.FixtureTiming.timer_hz
+
+`attribute` · `python`
+
+```python
+timer_hz: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:112`
+
+### helia_profiler.FixtureTiming.settle_ticks
+
+`attribute` · `python`
+
+```python
+settle_ticks: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:113`
+
+### helia_profiler.FixtureTiming.cpu_hz
+
+`attribute` · `python`
+
+```python
+cpu_hz: int
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:114`
+
+### helia_profiler.FixtureTiming.timing_scope
+
+`attribute` · `python`
+
+```python
+timing_scope: FixtureTimingScope
+```
+
+Source: `src/helia_profiler/fixtures/capture.py:115`
+
 ## helia_profiler.FixtureMemory
 
 `class` · `python`
@@ -338,7 +338,7 @@ FixtureMemory(capacity: int, after_io_access: int, after_warmup: int, after_invo
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/capture.py:116`
+Source: `src/helia_profiler/fixtures/capture.py:118`
 
 ### helia_profiler.FixtureMemory.capacity
 
@@ -348,7 +348,7 @@ Source: `src/helia_profiler/fixtures/capture.py:116`
 capacity: int
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:118`
+Source: `src/helia_profiler/fixtures/capture.py:120`
 
 ### helia_profiler.FixtureMemory.after_io_access
 
@@ -358,7 +358,7 @@ Source: `src/helia_profiler/fixtures/capture.py:118`
 after_io_access: int
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:119`
+Source: `src/helia_profiler/fixtures/capture.py:121`
 
 ### helia_profiler.FixtureMemory.after_warmup
 
@@ -368,7 +368,7 @@ Source: `src/helia_profiler/fixtures/capture.py:119`
 after_warmup: int
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:120`
+Source: `src/helia_profiler/fixtures/capture.py:122`
 
 ### helia_profiler.FixtureMemory.after_invoke
 
@@ -378,7 +378,7 @@ Source: `src/helia_profiler/fixtures/capture.py:120`
 after_invoke: int
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:121`
+Source: `src/helia_profiler/fixtures/capture.py:123`
 
 ## helia_profiler.FixtureRailEnergy
 
@@ -553,7 +553,7 @@ FixtureCaptureResult(
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/capture.py:124`
+Source: `src/helia_profiler/fixtures/capture.py:126`
 
 ### helia_profiler.FixtureCaptureResult.state
 
@@ -563,7 +563,7 @@ Source: `src/helia_profiler/fixtures/capture.py:124`
 state: str
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:126`
+Source: `src/helia_profiler/fixtures/capture.py:128`
 
 ### helia_profiler.FixtureCaptureResult.timing_scope
 
@@ -573,7 +573,7 @@ Source: `src/helia_profiler/fixtures/capture.py:126`
 timing_scope: FixtureTimingScope
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:127`
+Source: `src/helia_profiler/fixtures/capture.py:129`
 
 ### helia_profiler.FixtureCaptureResult.output
 
@@ -583,7 +583,7 @@ Source: `src/helia_profiler/fixtures/capture.py:127`
 output: FixtureFile | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:128`
+Source: `src/helia_profiler/fixtures/capture.py:130`
 
 ### helia_profiler.FixtureCaptureResult.status
 
@@ -593,7 +593,7 @@ Source: `src/helia_profiler/fixtures/capture.py:128`
 status: int | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:129`
+Source: `src/helia_profiler/fixtures/capture.py:131`
 
 ### helia_profiler.FixtureCaptureResult.checksum
 
@@ -603,7 +603,7 @@ Source: `src/helia_profiler/fixtures/capture.py:129`
 checksum: int | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:130`
+Source: `src/helia_profiler/fixtures/capture.py:132`
 
 ### helia_profiler.FixtureCaptureResult.timing
 
@@ -613,7 +613,7 @@ Source: `src/helia_profiler/fixtures/capture.py:130`
 timing: FixtureTiming | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:131`
+Source: `src/helia_profiler/fixtures/capture.py:133`
 
 ### helia_profiler.FixtureCaptureResult.memory
 
@@ -623,7 +623,7 @@ Source: `src/helia_profiler/fixtures/capture.py:131`
 memory: FixtureMemory | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:132`
+Source: `src/helia_profiler/fixtures/capture.py:134`
 
 ### helia_profiler.FixtureCaptureResult.artifacts
 
@@ -633,7 +633,7 @@ Source: `src/helia_profiler/fixtures/capture.py:132`
 artifacts: tuple[FixtureFile, ...] = ()
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:133`
+Source: `src/helia_profiler/fixtures/capture.py:135`
 
 ### helia_profiler.FixtureCaptureResult.error
 
@@ -643,7 +643,7 @@ Source: `src/helia_profiler/fixtures/capture.py:133`
 error: str | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:134`
+Source: `src/helia_profiler/fixtures/capture.py:136`
 
 ### helia_profiler.FixtureCaptureResult.outputs
 
@@ -653,7 +653,7 @@ Source: `src/helia_profiler/fixtures/capture.py:134`
 outputs: tuple[FixtureFile, ...] = ()
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:136`
+Source: `src/helia_profiler/fixtures/capture.py:138`
 
 ### helia_profiler.FixtureCaptureResult.arena_scan
 
@@ -663,7 +663,7 @@ Source: `src/helia_profiler/fixtures/capture.py:136`
 arena_scan: tuple[tuple[int, int], ...] = ()
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:139`
+Source: `src/helia_profiler/fixtures/capture.py:141`
 
 ### helia_profiler.FixtureCaptureResult.psram_weights
 
@@ -673,7 +673,7 @@ Source: `src/helia_profiler/fixtures/capture.py:139`
 psram_weights: FixturePsramObservation | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:140`
+Source: `src/helia_profiler/fixtures/capture.py:142`
 
 ### helia_profiler.FixtureCaptureResult.rail_energy
 
@@ -683,4 +683,4 @@ Source: `src/helia_profiler/fixtures/capture.py:140`
 rail_energy: FixtureRailEnergy | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/capture.py:141`
+Source: `src/helia_profiler/fixtures/capture.py:143`

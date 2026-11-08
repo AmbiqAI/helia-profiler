@@ -360,7 +360,7 @@ def test_session_reset_uses_board_and_serial(monkeypatch) -> None:
 
     hpx.Session().with_target(board="apollo4p_blue_kxr_evb", jlink_serial="456").reset()
 
-    assert calls == [{"device": "AMAP42KP-KBR", "serial": "456"}]
+    assert calls == [{"device": "AMA4B2KP-KXR", "serial": "456"}]
 
 
 def test_session_reset_rejects_unknown_kind() -> None:

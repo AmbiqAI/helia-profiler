@@ -23,7 +23,9 @@ from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hint
 
 from .._files import write_text_atomically
 from .._semantic_hash import require, semantic_hash
+from ..config.platform import config_platform
 from ..errors import ConfigError
+from ..platform.provenance import PlatformSnapshot
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -32,7 +34,7 @@ if TYPE_CHECKING:
     from .compiled import CompiledBuild
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
-FROZEN_RUN_SCHEMA_VERSION = 2
+FROZEN_RUN_SCHEMA_VERSION = 3
 
 _T = TypeVar("_T")
 
@@ -186,6 +188,7 @@ class FrozenRun:
     toolchain: ToolchainIdentity
     runtime: FrozenRuntime | None
     hpx_version: str
+    platform: PlatformSnapshot | None = None
     _intent: str = field(default="", init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
@@ -216,6 +219,12 @@ class FrozenRun:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize a complete plan, refusing missing recorded platform input."""
+        if self.platform is None:
+            raise ConfigError(
+                "Cannot serialize a frozen run without recorded platform provenance",
+                hint="Use Session.freeze() to capture a complete plan, or supply its recorded platform.",
+            )
         return {
             "schema": FROZEN_RUN_SCHEMA,
             "schema_version": FROZEN_RUN_SCHEMA_VERSION,
@@ -230,6 +239,7 @@ class FrozenRun:
             "toolchain": asdict(self.toolchain),
             "runtime": asdict(self.runtime) if self.runtime is not None else None,
             "hpx_version": self.hpx_version,
+            "platform": self.platform.to_dict(),
         }
 
     @classmethod
@@ -282,6 +292,7 @@ class FrozenRun:
                     else _record(FrozenRuntime, data["runtime"], "runtime")
                 ),
                 hpx_version=_typed(str, data["hpx_version"], "hpx_version"),
+                platform=PlatformSnapshot.from_dict(data["platform"]),
             )
         except (KeyError, TypeError, AttributeError, ValueError) as exc:
             raise ConfigError(f"Malformed frozen run plan: {exc}") from exc
@@ -416,6 +427,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
         toolchain=_toolchain_identity(config),
         runtime=_frozen_runtime(config),
         hpx_version=__version__,
+        platform=config_platform(config),
     )
 
 
@@ -564,6 +576,7 @@ def _check_replay(plan: FrozenRun, replayed: FrozenRun) -> None:
             ("local inputs", _input_keys(plan), _input_keys(replayed)),
             ("toolchain", _toolchain_fact(plan.toolchain), _toolchain_fact(replayed.toolchain)),
             ("engine runtime", plan.runtime, replayed.runtime),
+            ("platform catalog/settings", plan.platform, replayed.platform),
             ("qualification", plan.qualification, replayed.qualification),
             ("overrides", plan.overrides, replayed.overrides),
             ("environment", dict(plan.environment), dict(replayed.environment)),
@@ -750,6 +763,7 @@ def _intent_hash(plan: FrozenRun) -> str:
         "toolchain": [plan.toolchain.name, plan.toolchain.version],
         "environment": _thaw(plan.environment),
         "runtime": asdict(plan.runtime) if plan.runtime is not None else None,
+        "platform": plan.platform.to_dict() if plan.platform is not None else None,
     }
     try:
         return semantic_hash("intent", payload)

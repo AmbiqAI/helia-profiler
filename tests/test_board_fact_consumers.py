@@ -59,6 +59,8 @@ def test_fixture_clock_reads_fixed_low_platform_fact(monkeypatch, engine):
     assert "deployment_timing[5] = SystemCoreClock;" in source
 
 
-@pytest.mark.parametrize("board", ("apollo3p_evb", "apollo330mP_evb", "apollo3p_evb_cygnus"))
-def test_ambiguous_sibling_psram_facts_retained(board):
-    assert get_soc_for_board(board).memory.psram_kb > 0
+@pytest.mark.parametrize(
+    "board,expected", (("apollo3p_evb", 0), ("apollo330mP_evb", 0), ("apollo3p_evb_cygnus", 8192))
+)
+def test_board_psram_comes_from_fitted_catalog_components(board, expected):
+    assert get_soc_for_board(board).memory.psram_kb == expected

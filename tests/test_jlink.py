@@ -625,23 +625,23 @@ def test_a_custom_soc_cannot_forge_a_builtin_address() -> None:
     assert soc.capabilities.memory.app_flash_load_addr is None
 
 
-def test_a_soc_with_no_linked_map_resolves_to_none(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An unmapped built-in must yield None so the flash fallback refuses to run.
-
-    Pinning the registered values alone cannot see this: a default in the
-    lookup leaves every mapped part correct while silently handing the
-    Apollo5 address to any part added later -- reinstating exactly the bug
-    this field exists to prevent.
-    """
+def test_catalog_boot_origin_is_independent_of_linker_windows(monkeypatch) -> None:
     from helia_profiler.platform import get_soc, memory_map
 
     trimmed = dict(memory_map._MAPS)
     assert trimmed.pop("apollo510")
     monkeypatch.setattr(memory_map, "_MAPS", trimmed)
 
-    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr is None
+    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr == 0x410000
+
+
+def test_unknown_catalog_boot_origin_does_not_fall_back_to_windows() -> None:
+    from dataclasses import replace
+
+    from helia_profiler.platform import get_soc
+
+    soc = replace(get_soc("apollo510"), catalog_app_flash_load_addr=None)
+    assert soc.capabilities.memory.app_flash_load_addr is None
 
 
 def test_inspect_probe_target_retries_unknown_target() -> None:

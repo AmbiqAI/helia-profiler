@@ -143,6 +143,13 @@ if TYPE_CHECKING:
     from .placement import Placement
     from .platform import BoardDef, SocDef, build_platform_registry, get_soc
     from .platform.counters import PmuCounter
+    from .platform.provenance import (
+        CatalogProvenance,
+        CatalogSource,
+        PlatformSnapshot,
+        RegionExtent,
+        TargetSelection,
+    )
     from .power.base import PowerMode, PowerResult
     from .power.metadata import (
         MeasurementScope,
@@ -301,6 +308,11 @@ _EXPORTS = {
     "ProgressUpdate": (".pipeline", "ProgressUpdate", "stable"),
     "Placement": (".placement", "Placement", "stable"),
     "BoardDef": (".platform", "BoardDef", "implementation"),
+    "PlatformSnapshot": (".platform.provenance", "PlatformSnapshot", "experimental"),
+    "CatalogProvenance": (".platform.provenance", "CatalogProvenance", "experimental"),
+    "CatalogSource": (".platform.provenance", "CatalogSource", "experimental"),
+    "TargetSelection": (".platform.provenance", "TargetSelection", "experimental"),
+    "RegionExtent": (".platform.provenance", "RegionExtent", "experimental"),
     "SocDef": (".platform", "SocDef", "implementation"),
     "build_platform_registry": (".platform", "build_platform_registry", "implementation"),
     "get_soc": (".platform", "get_soc", "implementation"),
@@ -621,6 +633,11 @@ __all__ = [
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "PlatformSnapshot",
+    "CatalogProvenance",
+    "CatalogSource",
+    "TargetSelection",
+    "RegionExtent",
     "SocDef",
     "build_platform_registry",
     "get_soc",

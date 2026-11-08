@@ -22,11 +22,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
 
+from ..platform.provenance import PlatformSnapshot
 from .serde import to_float, to_int
 
 RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: Current summary format; historical changes are in the schema reference above.
-RUN_SUMMARY_SCHEMA_VERSION = 20
+RUN_SUMMARY_SCHEMA_VERSION = 21
 
 
 def _require_current_summary(data: Mapping[str, Any]) -> None:
@@ -467,6 +468,7 @@ class RunSummary:
     identity: Mapping[str, Any] | None = None
     #: The run's ``Conditions.to_dict()``; absent before schema v20.
     conditions: Mapping[str, Any] | None = None
+    platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)
     top_layers: tuple[Mapping[str, Any], ...] = ()
     memory: MemorySection | None = None
     psram: Mapping[str, Any] | None = None
@@ -498,6 +500,8 @@ class RunSummary:
         _put(out, "compatibility", self.compatibility)
         _put(out, "dependencies", self.dependencies)
         _put(out, "identity", self.identity)
+        if self.platform_provenance is not None:
+            out["platform_provenance"] = self.platform_provenance.to_dict()
         _put(out, "conditions", self.conditions)
         out["top_layers"] = list(self.top_layers)
         if self.memory is not None:
@@ -536,6 +540,7 @@ class RunSummary:
             "dependencies",
             "identity",
             "conditions",
+            "platform_provenance",
             "top_layers",
             "memory",
             "psram",
@@ -567,6 +572,9 @@ class RunSummary:
             dependencies=data.get("dependencies"),
             identity=data.get("identity"),
             conditions=data.get("conditions"),
+            platform_provenance=PlatformSnapshot.from_dict(data["platform_provenance"])
+            if data.get("platform_provenance") is not None
+            else None,
             top_layers=_tuple_of_mappings(data.get("top_layers")),
             memory=(MemorySection.from_dict(memory) if isinstance(memory, Mapping) else None),
             psram=data.get("psram"),

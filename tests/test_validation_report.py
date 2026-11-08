@@ -114,7 +114,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         json.dumps(
             {
                 "schema": "hpx.run-metadata",
-                "schema_version": 1,
+                "schema_version": 2,
                 "hpx_version": "0.1.0",
                 "toolchain": {
                     "compiler": "gcc",
@@ -183,7 +183,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "engine": {"type": "helia-rt", "version": "1.16.0"},
     }
     assert case["provenance"]["system_clock_hz"] == 96_000_000
-    assert case["provenance"]["run_metadata_schema_version"] == 1
+    assert case["provenance"]["run_metadata_schema_version"] == 2
     assert case["provenance"]["run_summary_schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert case["resources"]["binary_sections"] == {
         "text": 80_000,
@@ -402,7 +402,7 @@ def test_foreign_validation_workloads_are_normalized_for_display(tmp_path: Path,
         assert field not in loaded.cases[0].to_dict()
 
 
-@pytest.mark.parametrize("version", [19, 21, None])
+@pytest.mark.parametrize("version", [19, 20, 22, None])
 @pytest.mark.parametrize("writer", [build_manifest, write_validation_reports])
 def test_validation_report_refuses_unsupported_summary(tmp_path, version, writer, monkeypatch):
     monkeypatch.setattr(

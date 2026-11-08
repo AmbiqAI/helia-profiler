@@ -735,3 +735,25 @@ class TestHpxOwnedConsumers:
         merged = _add_hpx_owned_consumers(engine_plan, ctx)
         records = [c for r in merged.regions for c in r.consumers if c.name == "pmu_layer_records"]
         assert [c.size for c in records] == [1234]
+
+
+def test_explicit_custom_soc_psram_limit_rejects_an_oversized_arena(tmp_path):
+    ctx = _make_ctx(
+        tmp_path,
+        {
+            "model": {
+                "path": str(tmp_path / "model.tflite"),
+                "arena_size": 2 * 1024 * 1024,
+                "arena_location": "psram",
+                "weights_location": "mram",
+            },
+            "target": {
+                "board": "apollo510_evb",
+                "custom_socs": {
+                    "apollo510": {"based_on": "apollo510", "memory": {"psram_kb": 1024}}
+                },
+            },
+        },
+    )
+    with pytest.raises(PlatformError, match="PSRAM"):
+        PlanMemoryStage().run(ctx)

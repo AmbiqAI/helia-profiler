@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
-COMPILED_BUILD_SCHEMA_VERSION = 3
+COMPILED_BUILD_SCHEMA_VERSION = 4
 
 _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "binding", "build"})
 
@@ -124,6 +124,8 @@ class CompiledBuild:
                 raise ConfigError(
                     f"Compiled build's {name} {built!r} differs from its plan's {planned!r}"
                 )
+        if self.plan.platform is None or self.build.platform != self.plan.platform:
+            raise ConfigError("Compiled build platform provenance differs from its frozen plan")
         toolchain = self.build.toolchain
         version = self.plan.toolchain.version
         if (
