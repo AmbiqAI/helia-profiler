@@ -94,6 +94,10 @@
       "slug": "reference/api/helia_profiler/prepared_runtimes"
     },
     {
+      "label": "provenance",
+      "slug": "reference/api/helia_profiler/provenance"
+    },
+    {
       "label": "results",
       "collapsed": true,
       "items": [

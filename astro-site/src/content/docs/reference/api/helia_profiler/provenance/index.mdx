@@ -1,0 +1,744 @@
+---
+title: "provenance"
+description: "Recorded run metadata and linker provenance: expected source-bound layouts and per-executable verification, separate from measured results."
+sidebar:
+  order: 18
+---
+
+import RefMembers from '@ambiqai/helia-ui/astro/RefMembers';
+import RefParams from '@ambiqai/helia-ui/astro/RefParams';
+import RefSection from '@ambiqai/helia-ui/astro/RefSection';
+import RefSymbol from '@ambiqai/helia-ui/astro/RefSymbol';
+
+Recorded run metadata and linker provenance: expected source-bound layouts and per-executable verification, separate from measured results.
+
+Every name on this page is imported from `helia_profiler`.
+
+**API tier:** `stable`, `experimental`
+
+Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
+
+[Machine-readable model](/helia-profiler/reference/api/helia_profiler/provenance.json)
+
+<RefMembers label="On this page" items={[{"id":"helia_profiler.LinkerFile","name":"LinkerFile","kind":"class","summary":"One relative SDK input, identified by its UTF-8 source with LF line endings."},{"id":"helia_profiler.LinkerRegion","name":"LinkerRegion","kind":"class","summary":"One script region and its separately derived application intervals."},{"id":"helia_profiler.LinkerInput","name":"LinkerInput","kind":"class","summary":"Expected SDK/script input and its source-backed effective region data."},{"id":"helia_profiler.LinkerVerification","name":"LinkerVerification","kind":"class","summary":"Actual applicability decision for one executable at one build boundary."},{"id":"helia_profiler.RunMetadata","name":"RunMetadata","kind":"class","summary":"Accumulated run metadata — enriched by stages, consumed by reports."}]} />
+
+<RefSymbol
+  id={"helia_profiler.LinkerFile"}
+  name={"LinkerFile"}
+  kind={"class"}
+  language={"python"}
+  signature={"LinkerFile(path: str, sha256: str) -> None"}
+  level={2}
+  summary={"One relative SDK input, identified by its UTF-8 source with LF line endings."}
+  source={{"path":"src/helia_profiler/platform/linker/model.py","line":17,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L17"}}
+>
+
+  `dataclass`
+
+  One relative SDK input, identified by its UTF-8 source with LF line endings.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.LinkerFile.path"}
+    name={"path"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"path: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":21,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L21"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerFile.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":22,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L22"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.LinkerRegion"}
+  name={"LinkerRegion"}
+  kind={"class"}
+  language={"python"}
+  signature={"LinkerRegion(\n    region: MemoryRegion,\n    window: MemoryRange,\n    app_window: MemoryRange,\n    allowed: tuple[MemoryRange, ...] | None,\n    window_provenance: str,\n    fixed_stack_bytes: int = 0,\n    section_attributable: bool = True,\n) -> None"}
+  level={2}
+  summary={"One script region and its separately derived application intervals."}
+  source={{"path":"src/helia_profiler/platform/linker/model.py","line":31,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L31"}}
+>
+
+  `dataclass`
+
+  One script region and its separately derived application intervals.
+
+  ``allowed=None`` means hardware admission is unavailable. An empty tuple
+  means the inputs are known and leave no space. Fixed stack reservations
+  lie outside ``app_window`` and are accounted separately from app usage.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.region"}
+    name={"region"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"region: MemoryRegion"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":40,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L40"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.window"}
+    name={"window"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"window: MemoryRange"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":41,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L41"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.app_window"}
+    name={"app_window"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"app_window: MemoryRange"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":42,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L42"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.allowed"}
+    name={"allowed"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"allowed: tuple[MemoryRange, ...] | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":43,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L43"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.window_provenance"}
+    name={"window_provenance"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"window_provenance: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":44,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L44"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.fixed_stack_bytes"}
+    name={"fixed_stack_bytes"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"fixed_stack_bytes: int = 0"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":45,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L45"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.section_attributable"}
+    name={"section_attributable"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"section_attributable: bool = True"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":46,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L46"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerRegion.capacity"}
+    name={"capacity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"capacity: int | None"}
+    level={3}
+    summary={"Conservative contiguous admission capacity; None remains unavailable."}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":69,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L69"}}
+  >
+
+    Conservative contiguous admission capacity; ``None`` remains unavailable.
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.LinkerInput"}
+  name={"LinkerInput"}
+  kind={"class"}
+  language={"python"}
+  signature={"LinkerInput(\n    sdk_commit: str,\n    soc_name: str,\n    link_family: LinkFamily,\n    linker_profile: str,\n    script: LinkerFile,\n    files: tuple[LinkerFile, ...],\n    definition_sha256: str,\n    admission_source: Literal['catalog-and-linker', 'sdk-descriptor', 'unavailable'],\n    regions: tuple[LinkerRegion, ...],\n) -> None"}
+  level={2}
+  summary={"Expected SDK/script input and its source-backed effective region data."}
+  source={{"path":"src/helia_profiler/platform/linker/model.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L85"}}
+>
+
+  `dataclass`
+
+  Expected SDK/script input and its source-backed effective region data.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.sdk_commit"}
+    name={"sdk_commit"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sdk_commit: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L89"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.soc_name"}
+    name={"soc_name"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"soc_name: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":90,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L90"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.link_family"}
+    name={"link_family"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"link_family: LinkFamily"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":91,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L91"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.linker_profile"}
+    name={"linker_profile"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"linker_profile: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":92,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L92"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.script"}
+    name={"script"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"script: LinkerFile"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":93,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L93"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.files"}
+    name={"files"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"files: tuple[LinkerFile, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":94,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L94"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.definition_sha256"}
+    name={"definition_sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"definition_sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":95,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L95"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.admission_source"}
+    name={"admission_source"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"admission_source: Literal['catalog-and-linker', 'sdk-descriptor', 'unavailable']"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":96,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L96"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerInput.regions"}
+    name={"regions"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"regions: tuple[LinkerRegion, ...]"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":97,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L97"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.LinkerVerification"}
+  name={"LinkerVerification"}
+  kind={"class"}
+  language={"python"}
+  signature={"LinkerVerification(\n    role: Literal['profile', 'power'],\n    target: str,\n    layout: LinkerInput | None,\n    reason: str | None = None,\n) -> None"}
+  level={2}
+  summary={"Actual applicability decision for one executable at one build boundary."}
+  source={{"path":"src/helia_profiler/platform/linker/model.py","line":107,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L107"}}
+>
+
+  `dataclass`
+
+  Actual applicability decision for one executable at one build boundary.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.role"}
+    name={"role"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"role: Literal['profile', 'power']"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":111,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L111"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.target"}
+    name={"target"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"target: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":112,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L112"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.layout"}
+    name={"layout"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"layout: LinkerInput | None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":113,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L113"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.reason"}
+    name={"reason"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"reason: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":114,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L114"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.verified"}
+    name={"verified"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"verified: bool"}
+    level={3}
+    summary={"Whether actual SDK/script applicability was verified, independently of fit."}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":126,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L126"}}
+  >
+
+    Whether actual SDK/script applicability was verified, independently of fit.
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.to_dict"}
+    name={"to_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"to_dict() -> dict[str, Any]"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":130,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L130"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.LinkerVerification.from_dict"}
+    name={"from_dict"}
+    kind={"method"}
+    language={"python"}
+    signature={"from_dict(value: object) -> LinkerVerification"}
+    level={3}
+    source={{"path":"src/helia_profiler/platform/linker/model.py","line":136,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L136"}}
+  >
+
+    `classmethod`
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.RunMetadata"}
+  name={"RunMetadata"}
+  kind={"class"}
+  language={"python"}
+  signature={"RunMetadata(\n    hpx_version: str = '',\n    run_id: str = '',\n    timestamp: str = '',\n    config_snapshot: dict[str, Any] = dict(),\n    platform: PlatformInfo | None = None,\n    model: ModelInfo | None = None,\n    toolchain: ToolchainInfo | None = None,\n    build_images: tuple[BuildImage, ...] = (),\n    engine: EngineInfo | None = None,\n    firmware: FirmwareMeta | None = None,\n    memory_plan: 'MemoryPlan | None' = None,\n    timing: TimingInfo | None = None,\n    compatibility: CompatibilityResolution | None = None,\n    dependencies: 'DependencyProvenance | None' = None,\n    identity: 'RunIdentity | None' = None,\n    conditions: Conditions | None = None,\n    *,\n    platform_provenance: PlatformSnapshot | None = None,\n    linker_verifications: tuple[LinkerVerification, ...] = (),\n) -> None"}
+  level={2}
+  summary={"Accumulated run metadata — enriched by stages, consumed by reports."}
+  source={{"path":"src/helia_profiler/results/models.py","line":396,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L396"}}
+>
+
+  `dataclass`
+
+  Accumulated run metadata — enriched by stages, consumed by reports.
+
+  **API tier:** `stable`
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.hpx_version"}
+    name={"hpx_version"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"hpx_version: str = ''"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":400,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L400"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.run_id"}
+    name={"run_id"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"run_id: str = ''"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":401,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L401"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.timestamp"}
+    name={"timestamp"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"timestamp: str = ''"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":402,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L402"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.config_snapshot"}
+    name={"config_snapshot"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"config_snapshot: dict[str, Any] = field(default_factory=dict)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":403,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L403"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.platform"}
+    name={"platform"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"platform: PlatformInfo | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":404,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L404"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.platform_provenance"}
+    name={"platform_provenance"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":405,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L405"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.linker_verifications"}
+    name={"linker_verifications"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"linker_verifications: tuple[LinkerVerification, ...] = field(default=(), kw_only=True)"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":406,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L406"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.model"}
+    name={"model"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"model: ModelInfo | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":407,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L407"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.toolchain"}
+    name={"toolchain"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"toolchain: ToolchainInfo | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":408,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L408"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.build_images"}
+    name={"build_images"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"build_images: tuple[BuildImage, ...] = ()"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":411,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L411"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.engine"}
+    name={"engine"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"engine: EngineInfo | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":412,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L412"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.firmware"}
+    name={"firmware"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"firmware: FirmwareMeta | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":413,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L413"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.memory_plan"}
+    name={"memory_plan"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"memory_plan: 'MemoryPlan | None' = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":414,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L414"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.timing"}
+    name={"timing"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"timing: TimingInfo | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":415,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L415"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.compatibility"}
+    name={"compatibility"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"compatibility: CompatibilityResolution | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":416,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L416"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.dependencies"}
+    name={"dependencies"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"dependencies: 'DependencyProvenance | None' = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":417,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L417"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.identity"}
+    name={"identity"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"identity: 'RunIdentity | None' = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":420,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L420"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.RunMetadata.conditions"}
+    name={"conditions"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"conditions: Conditions | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":423,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L423"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+---
+
+Machine-readable: [`provenance.json`](/helia-profiler/reference/api/helia_profiler/provenance.json) · [`provenance.md`](/helia-profiler/reference/api/helia_profiler/provenance.md), complete and lossless.

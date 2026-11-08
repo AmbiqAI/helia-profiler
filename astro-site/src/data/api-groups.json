@@ -42,7 +42,14 @@
         "CatalogProvenance",
         "CatalogSource",
         "TargetSelection",
-        "RegionExtent",
+        "RegionExtent"
+      ]
+    },
+    {
+      "path": "helia_profiler.provenance",
+      "summary": "Recorded run metadata and linker provenance: expected source-bound layouts and per-executable verification, separate from measured results.",
+      "members": [
+        "RunMetadata",
         "LinkerFile",
         "LinkerInput",
         "LinkerRegion",
@@ -219,8 +226,7 @@
         "PresetResult",
         "LayerResult",
         "FirmwareMeta",
-        "Conditions",
-        "RunMetadata"
+        "Conditions"
       ]
     },
     {
