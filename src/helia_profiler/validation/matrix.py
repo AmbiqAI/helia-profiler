@@ -32,7 +32,10 @@ from ..modelcost._tflite_reader import (
     read_float_compute_types,
     read_tensor_types,
 )
+from ..placement import placement_capacities
 from ..platform import SocFamily, get_soc_for_board
+from ..platform.memory_map import link_family_for_toolchain
+from ..platform.provenance import platform_snapshot
 from ..runtime.records import runtime
 
 
@@ -278,8 +281,12 @@ def case_validity(case: CaseSpec) -> str | None:
         if case.engine is EngineType.EXECUTORCH and case.model.executorch is not None:
             workspace = case.model.executorch.runtime_workspace_size
         needed = workspace + weights
-        if weights and needed > soc.memory.dtcm_kb * 1024:
-            return f"arena+weights (~{needed // 1024} KB) cannot fit {soc.memory.dtcm_kb} KB DTCM"
+        platform = platform_snapshot(
+            case.board.id, link_family=link_family_for_toolchain(case.toolchain.value)
+        )
+        capacity = placement_capacities(soc, platform.expected_linker).tcm
+        if weights and needed > capacity:
+            return f"arena+weights (~{needed // 1024} KB) cannot fit {capacity} B application DTCM"
     # Apollo3 EVBs: the power-sync GPIOs (24/25/26, moved off the J-Link VCOM
     # UART pads) sit on the MSPI0 pads that external PSRAM needs, so PSRAM
     # placement and gated power capture are electrically exclusive there.

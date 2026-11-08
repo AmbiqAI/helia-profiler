@@ -723,3 +723,35 @@ class TestCaseValidityGuards:
 
         case = self._case(board=BOARDS["apollo510_evb"], power=True, memory=MemoryProfile.PSRAM)
         assert case_validity(case) is None
+
+
+@pytest.mark.parametrize(
+    ("toolchain", "needed_kib", "skipped"),
+    [
+        (Toolchain.ARM_NONE_EABI_GCC, 240, False),
+        (Toolchain.ARM_NONE_EABI_GCC, 248, True),
+        (Toolchain.ARMCLANG, 236, False),
+        (Toolchain.ARMCLANG, 240, True),
+    ],
+)
+def test_tcm_validation_uses_selected_application_capacity(
+    tmp_path, toolchain, needed_kib, skipped
+):
+    from helia_profiler.validation.matrix import BOARDS, MODELS
+
+    fixture = tmp_path / "boundary.tflite"
+    fixture.write_bytes(b"x" * ((needed_kib - 32) * 1024))
+    model = dataclasses.replace(MODELS["kws"], fixture_path=str(fixture))
+    case = CaseSpec(
+        model=model,
+        engine=EngineType.HELIA_RT,
+        power=False,
+        board=BOARDS["apollo330mP_evb"],
+        toolchain=toolchain,
+        memory=MemoryProfile.TCM,
+    )
+    reason = case_validity(case)
+    assert (reason is not None) is skipped
+    if skipped:
+        assert reason is not None
+        assert "application DTCM" in reason

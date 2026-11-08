@@ -3,27 +3,42 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 from pathlib import Path
 
 _OPERAND_OPTIONS = frozenset(
     {
-        "-Map",
-        "--Map",
-        "--entry",
-        "-e",
-        "-u",
-        "--undefined",
-        "--wrap",
-        "--diag_suppress",
-        "--list",
-        "--cpu",
-        "--keep",
-        "-o",
-        "--output",
-        "-l",
-        "--library",
+        "Map",
+        "entry",
+        "undefined",
+        "wrap",
+        "diag_suppress",
+        "list",
+        "cpu",
+        "keep",
+        "output",
+        "library",
     }
+)
+_FLAG_OPTIONS = frozenset(
+    {
+        "remove",
+        "map",
+        "symbols",
+        "gc-sections",
+        "start-group",
+        "end-group",
+        "whole-archive",
+        "no-whole-archive",
+    }
+)
+_SHORT_OPERANDS = {"-Map": "Map", "-e": "entry", "-u": "undefined", "-o": "output", "-l": "library"}
+_DRIVER_FLAG = re.compile(
+    r"-O(?:[0-3sgz]|fast)|-D[A-Za-z_]\w*(?:=.*)?|"
+    r"-m(?:cpu|arch|fpu|float-abi)=[A-Za-z0-9_.+-]+|-mthumb|"
+    r"-f(?:no-exceptions|use-ld=(?:lld|bfd|gold))|-nostartfiles|-static|"
+    r"--target=[A-Za-z0-9_.-]+|--config=newlib\.cfg"
 )
 _BINARY_HEADERS = (b"\x7fELF", b"!<arch>\n", b"!<thin>\n", b"BC\xc0\xde", b"\xde\xc0\x17\x0b")
 _SEARCH_OPTIONS = ("library-path", "userlibpath")
@@ -66,36 +81,56 @@ def _binary_input(argument: str, build_dir: Path, products: frozenset[Path]) -> 
         raise ValueError(f"Linker file input may be an implicit script: {argument}")
 
 
+def _option_value(option: str, value: str) -> None:
+    if not value or value.startswith(("-", "@")):
+        raise ValueError(f"Unsupported linker option operand: {option}")
+    if option == "library" and not re.fullmatch(r"[A-Za-z0-9_.+-]+", value):
+        raise ValueError("Opaque linker library filename search")
+
+
 def validate_link_inputs(
     fragments: tuple[str, ...], build_dir: Path, products: frozenset[Path]
 ) -> None:
-    """Accept binary files and declared build products, never infer their format from a suffix."""
+    """Recognize supported default options; unknown syntax cannot qualify a layout."""
     operand = None
     for fragment in fragments:
         for token in _tokens(fragment):
-            name = token.lstrip("-").partition("=")[0] if token.startswith("-") else ""
-            # https://sourceware.org/binutils/docs/ld/Options.html: aliases and abbreviations.
-            long_option = bool(name) and (token.startswith("--") or len(name) > 1)
+            if operand is not None:
+                _option_value(operand, token)
+                operand = None
+                continue
+            name, separator, value = token.lstrip("-").partition("=")
+            long_option = token.startswith("--") or (token.startswith("-") and len(name) > 1)
             if token.startswith("-L") or (
                 long_option
+                and name
                 and name != "library"
                 and any(o.startswith(name) for o in _SEARCH_OPTIONS)
             ):
                 raise ValueError("Explicit linker library search paths are not characterized")
             if token.startswith(("@", "-T", "-dT")) or (
-                long_option and any(o.startswith(name) for o in _SCRIPT_OPTIONS)
+                long_option and name and any(o.startswith(name) for o in _SCRIPT_OPTIONS)
             ):
                 raise ValueError("Additional or opaque linker script input")
-            if operand is not None:
-                if operand in ("-l", "--library") and token.startswith(":"):
-                    raise ValueError("Opaque linker library filename search")
-                operand = None
-            elif token in _OPERAND_OPTIONS:
-                operand = token
-            elif token.startswith(("-l:", "--library=:")):
-                raise ValueError("Opaque linker library filename search")
-            elif token.startswith("-"):
+            if _DRIVER_FLAG.fullmatch(token):
                 continue
+            if token.startswith("-") and name in _OPERAND_OPTIONS:
+                if separator:
+                    _option_value(name, value)
+                else:
+                    operand = name
+            elif token in _SHORT_OPERANDS:
+                operand = _SHORT_OPERANDS[token]
+            elif (
+                token.startswith("-")
+                and not token.startswith("--")
+                and token[:2] in _SHORT_OPERANDS
+            ):
+                _option_value(_SHORT_OPERANDS[token[:2]], token[2:])
+            elif token.startswith("-") and name in _FLAG_OPTIONS and not separator:
+                continue
+            elif token.startswith("-"):
+                raise ValueError(f"Unsupported linker option: {token}")
             else:
                 _binary_input(token, build_dir, products)
     if operand is not None:

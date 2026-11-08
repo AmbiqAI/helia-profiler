@@ -54,6 +54,10 @@ Named library searches without explicit search paths remain toolchain inputs.
 Explicit library search paths, opaque response files and unsupported script
 selections leave source verification unavailable; HPX does not resolve a second
 library graph to characterize possible scripts in those searches.
+Only the recorded default compiler/linker option grammar is recognized. Unknown
+options and end-of-options markers also leave verification unavailable. Extending
+that grammar requires an explicit operand interpretation and a real configuration
+control; unknown dash-prefixed arguments are never assumed harmless.
 
 Automatic placement uses the same interval-constrained capacity before AOT
 conversion and during memory planning. Custom or uncharacterized layouts retain

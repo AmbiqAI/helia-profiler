@@ -492,3 +492,49 @@ def test_default_toolchain_library_search_remains_supported(configured, fragment
     data["link"]["commandFragments"].append({"role": "libraries", "fragment": fragment})
     path.write_text(json.dumps(data), encoding="utf-8")
     assert _verify(configured).verified
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+@pytest.mark.parametrize(
+    "fragment",
+    [
+        "-Wl,--mri-script=alternate.mri",
+        "-Wl,-calternate.mri",
+        "-Wl,-mri-script=alternate.mri",
+        "-Wl,--mri-scr=alternate.mri",
+        "-library=:extra.txt",
+        "-Wl,-library=:extra.txt",
+        "-Wl,--,-extra.txt",
+        "-- -extra.txt",
+        "-Wl,--unrecognized-input-option=extra.txt",
+        "-Wl,--defsym=region_size=0x100000",
+        "--config=custom.cfg",
+    ],
+)
+def test_unknown_linker_option_syntax_cannot_qualify(configured, role, fragment):
+    _, build, _, _, _ = configured
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append({"role": "flags", "fragment": fragment})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert not _verify(configured, role=role).verified
+
+
+@pytest.mark.parametrize(
+    "fragment",
+    [
+        "-Wl,-u,SystemCoreClock,--entry,Reset_Handler,--wrap=_write_r",
+        "--diag_suppress 6236 --map --symbols --cpu=cortex-m55",
+        "--target=arm-none-eabi --config=newlib.cfg -mthumb -mcpu=cortex-m55 -mfloat-abi=hard",
+        "-Wl,--start-group,-lm,--end-group",
+        "-undefined SystemCoreClock -library m -o out.elf",
+    ],
+)
+def test_supported_option_operands_are_not_positional_inputs(configured, fragment):
+    _, build, _, _, _ = configured
+    path = build / ".cmake/api/v1/reply/hpx_profiler.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append({"role": "flags", "fragment": fragment})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _verify(configured).verified
