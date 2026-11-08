@@ -51,7 +51,7 @@ class _Basis(NamedTuple):
 #: - ``target-config``: retained board, device, load address, clock profile, configured
 #:   CPU rate and arena/weights placements; no workload or capacity.
 _KINDS: dict[Kind, _Basis] = {
-    "intent": _Basis(1),
+    "intent": _Basis(2),
     "build": _Basis(1),
     "observation": _Basis(1, non_finite_as_text=True),
     "binding": _Basis(1),

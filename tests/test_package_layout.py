@@ -261,6 +261,7 @@ def test_wheel_contains_only_canonical_evaluation_modules(tmp_path: Path) -> Non
     assert "helia_profiler/data/compatibility-baseline-v1.json" in names
     assert "helia_profiler/data/run_summary.schema.v1.json" in names
     assert "helia_profiler/data/run_metadata.schema.v1.json" in names
+    assert "helia_profiler/data/run_metadata.schema.v2.json" in names
     assert "helia_profiler/data/profile_results.schema.v1.json" in names
     assert "helia_profiler/data/session_intent.schema.v1.json" in names
 

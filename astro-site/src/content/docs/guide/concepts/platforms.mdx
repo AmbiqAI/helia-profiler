@@ -1,0 +1,89 @@
+---
+title: "Platform facts and profiler policy"
+description: "How the shared catalog supplies hardware facts, how HPX selects build and capture behavior, and how saved runs retain that input."
+---
+
+HPX reads built-in hardware, SDK and HAL facts from
+[helia-platforms](https://github.com/AmbiqAI/helia-platforms).
+The catalog describes a target; HPX decides whether and how to profile it.
+Installing a catalog entry does not enable an additional HPX board or qualify
+its firmware, transport, timing or energy measurements.
+
+## Ownership
+
+| Input | Owner | HPX implementation |
+|---|---|---|
+| Core, ISA, PMU presence, clock operating points, memory regions, fitted PSRAM, SDK symbols, boot origin and known probe device | helia-platforms | `platform/catalog.py` projects catalog facts into `SocDef` and `BoardDef` |
+| Accepted board spellings, stable/preview channel, exposed clock labels and default, firmware performance tier, GPIO measurement wiring, transport support and PMU storage limits | HPX | `platform/policy.py` |
+| Application linker windows and fit rules | HPX, derived from the SDK it builds against | `platform/memory_map.py`; these windows remain separate from physical catalog capacities |
+| Per-run custom board/SoC declarations | Caller, resolved by HPX | `platform/custom.py` and `platform/registry.py` |
+
+The adapter loads only the packaged built-in catalog, with plugins disabled.
+It does not discover overlays from environment variables or change per-run
+configuration. Each `ProfileConfig` gets its own frozen registry mappings;
+only the immutable built-in projections are cached. Explicit custom declarations
+continue to override those views and are labelled `hpx-custom`, rather than
+claimed as catalog targets.
+
+`apollo3p_evb_cygnus` selects the catalog's `apollo3p_evb` plus the `cygnus`
+add-on. `apollo5b_evb` remains an HPX SDK-descriptor compatibility route:
+the catalog deliberately excludes it because there is no sourced physical
+product identity. Its provenance says `sdk-descriptor`, with no catalog target.
+See the [catalog owner decision](https://github.com/AmbiqAI/helia-platforms/issues/64#issuecomment-6064752168).
+
+Some profiler routes still have explicit compatibility policy. The catalog
+has no J-Link device for Apollo330P, Apollo510 Lite or Atomiq110 FPGA, so
+HPX retains its named SDK probe aliases. Existing SWO probe clock controls
+and the Blue board's radio-reset BSP wiring are also retained separately.
+`TargetSelection.compatibility` names these exceptions; they are not catalog
+hardware facts or new hardware qualification.
+
+`MemoryLayout` is HPX's placement-capacity view, not an inventory of all
+physical banks. It keeps the existing selected-bank and linker-reservation
+conventions. The catalog corrects fitted PSRAM to zero on the plain Apollo3
+Plus and Apollo330P EVBs; Cygnus has 8 MiB. Apollo4's MRAM view is 1952 KiB,
+matching its existing application window. Apollo3's RTT scan now covers its
+contiguous 64 KiB TCM and 704 KiB SRAM from `0x10000000`. Blue Apollo4 boards use their concrete catalog
+J-Link device names. These corrections do not enlarge a pre-build fit budget.
+
+## Retained platform input
+
+`PlatformSnapshot` records the requested board, effective HPX board/SoC views,
+catalog package/schema version and digest, source identities, resolved target,
+core, boot configuration, implementation and add-ons. It also records the
+selected linker family, application windows and boot load address. Unknown
+facts stay absent; an application boot origin is never inferred from a linker
+window for a catalog-backed target.
+
+Ordinary profiling writes the snapshot as `platform_provenance` in metadata,
+summary and manifest provenance. A frozen run includes it as `platform`, and
+the plan's `hpx.intent/2` hash binds it. The compiled build and standalone
+fixture receipt retain the same snapshot. Portable run observations expose it
+in their producer extension under mapping `hpx-run-3`.
+
+Loading a current-format receipt validates its retained facts and files without
+resolving a replacement platform. Replaying a plan or capturing a standalone
+fixture checks the current catalog and HPX settings before device access. If
+they differ, use the matching producer environment or freeze and build again.
+This catches accidental environment drift; it is not an authentication scheme.
+
+The catalog digest does not establish physical equivalence between producers.
+`hpx.target-config/1` still hashes the same retained target/clock/placement
+facts. Configured CPU frequency remains distinct from firmware-reported or
+measured frequency; catalog adoption supplies no new measurement evidence.
+
+## Saved-format changes
+
+| Contract | Current version |
+|---|---|
+| `hpx.frozen-run` | 3 |
+| `hpx.compiled-build` (run API) | 4 |
+| Standalone fixture receipt `fixture_api` | `[8, 0]` (outer envelope remains 1) |
+| `hpx.run-result` | 2 |
+| `hpx.run-metadata` | 2 |
+| `hpx.run-summary` | 21 |
+
+These strict readers refuse earlier versions. Read historical evidence with
+the HPX release that wrote it; do not edit version fields or substitute current
+catalog facts into an old receipt. Existing Python calls and CLI commands keep
+their spellings. See [Output files](../../output/) for artifact fields.

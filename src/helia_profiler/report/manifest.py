@@ -184,6 +184,8 @@ def _provenance(ctx: PipelineContext) -> dict[str, Any]:
         provenance["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     if ctx.run_metadata.dependencies is not None:
         provenance["dependencies"] = ctx.run_metadata.dependencies.to_dict()
+    if ctx.run_metadata.platform_provenance is not None:
+        provenance["platform"] = ctx.run_metadata.platform_provenance.to_dict()
     return provenance
 
 

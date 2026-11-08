@@ -31,6 +31,7 @@ from helia_profiler.fixtures.capture import FixtureCaptureRequest
 from helia_profiler.fixtures.target import fixture_target_for_board
 from helia_profiler.identity import EnergyFacts, Unknown
 from helia_profiler.lifecycle import Lifecycle
+from helia_profiler.platform.provenance import platform_snapshot
 from helia_profiler.runs.compiled import CompiledBuild, _binding
 from helia_profiler.runtime.records import runtime
 from tests.fixtures_api.test_fixture_record import _build, _pin
@@ -614,7 +615,11 @@ def test_the_settle_limits_are_the_capture_s_own():
 
 
 def test_supply_only_timing_runs_on_ap510b(tmp_path, build, device):
-    ap510b = reseal(build, target=fixture_target_for_board("apollo510b_evb"))
+    ap510b = reseal(
+        build,
+        target=fixture_target_for_board("apollo510b_evb"),
+        platform=platform_snapshot("apollo510b_evb"),
+    )
     record = compiled(plan_for(ap510b, tmp_path / "model.tflite"), ap510b, Lifecycle.CARRY)
     device.reply = _invoke_only(tmp_path / "raw")
 

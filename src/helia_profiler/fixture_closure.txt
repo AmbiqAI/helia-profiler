@@ -35,6 +35,7 @@ cli/validate_cmd.py
 cli/validation_app.py
 config/__init__.py
 config/_yaml.py
+config/platform.py
 config/power.py
 console/__init__.py
 console/analysis.py
@@ -55,6 +56,7 @@ data/compatibility-baseline-v1.json
 data/profile_results.schema.v1.json
 data/result_manifest.schema.v1.json
 data/run_metadata.schema.v1.json
+data/run_metadata.schema.v2.json
 data/run_summary.schema.v1.json
 data/runtimes/executorch/0.1.0.json
 data/runtimes/helia-aot/0.33.0.json
@@ -188,11 +190,15 @@ placement.py
 platform/__init__.py
 platform/board.py
 platform/capabilities.py
+platform/catalog.py
 platform/counters.py
 platform/custom.py
 platform/memory_map.py
 platform/placement.py
+platform/policy.py
+platform/provenance.py
 platform/registry.py
+platform/sdk_descriptor.py
 platform/soc.py
 power/__init__.py
 power/base.py

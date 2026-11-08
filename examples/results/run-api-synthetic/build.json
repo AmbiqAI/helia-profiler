@@ -1,5 +1,5 @@
 {
-  "binding": "hpx.binding/1:sha256:5f8e121b65e5ec79ae5c098fe004a4fe9e1e0d31c771f87f6edd60650fe8389a",
+  "binding": "hpx.binding/1:sha256:84726db884c37e8919ab675a1d6345326cd55477cd2af25fd084d6bcb6309ab5",
   "build": {
     "build": {
       "aot_arena_scan": [],
@@ -15,7 +15,7 @@
         "root": "run",
         "sha256": "780d84b20d7ae7e6292919399348bdbf96025270136198083fc8a4da398b5ca9"
       },
-      "build_identity": "b68d4afdda0f891744f94153a658b627e2c10e7167706eb477eea90ec27ecef3",
+      "build_identity": "1a0b8cac989dc9524a52641607acf9c06535f274252ab3509260a1cfda6dc182",
       "built": true,
       "capabilities": [
         [
@@ -54,7 +54,7 @@
       "inputs": [
         {
           "data": {
-            "path": "inputs/input.bin",
+            "path": "inputs/input_0.bin",
             "root": "run",
             "sha256": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b"
           },
@@ -106,6 +106,134 @@
       "outputs": [],
       "planned_memory": null,
       "planned_memory_reason": "not_recorded",
+      "platform": {
+        "app_regions": [
+          {
+            "extent": {
+              "length": 262144,
+              "start": 0
+            },
+            "region": "ITCM"
+          },
+          {
+            "extent": {
+              "length": 4128768,
+              "start": 4259840
+            },
+            "region": "MRAM"
+          },
+          {
+            "extent": {
+              "length": 507904,
+              "start": 536870912
+            },
+            "region": "DTCM"
+          },
+          {
+            "extent": {
+              "length": 3145728,
+              "start": 537395200
+            },
+            "region": "SRAM"
+          },
+          {
+            "extent": {
+              "length": 67108864,
+              "start": 1610612736
+            },
+            "region": "PSRAM"
+          }
+        ],
+        "board": {
+          "ble_reset_gpio_pin": null,
+          "channel": "stable",
+          "default_go_gpio_pin": 14,
+          "default_state_gpio_pin": 36,
+          "default_sync_gpio_pin": 29,
+          "description": "",
+          "is_fpga": false,
+          "name": "apollo510_evb",
+          "psram_kb": 65536,
+          "soc": "apollo510",
+          "starter_profile_board": null
+        },
+        "link_family": "gnu",
+        "linker_profile": "default",
+        "load_address": 4259840,
+        "selection": {
+          "addons": [],
+          "boot": "sbl",
+          "catalog": {
+            "catalog_digest": "sha256:8866b3758a7923da88bc6c0713dba3b6812cf7ccb771af86a9f1aab4a56705c0",
+            "package_version": "0.2.0",
+            "schema_version": 1,
+            "sources": []
+          },
+          "compatibility": [
+            "probe-clock-compatibility",
+            "hpx-linker-capacity-view"
+          ],
+          "core": "cm55_0",
+          "implementation": null,
+          "origin": "catalog",
+          "target_id": "apollo510_evb"
+        },
+        "soc": {
+          "app_flash_load_addr": null,
+          "c_define": "AM_PART_APOLLO510",
+          "catalog_app_flash_load_addr": 4259840,
+          "catalog_has_dcache": true,
+          "catalog_target_id": "apollo510_evb",
+          "clocks": [
+            {
+              "default": "lp",
+              "name": "cpu",
+              "speeds": [
+                {
+                  "mhz": 96,
+                  "name": "lp",
+                  "perf_tier": "NSX_PERF_LOW"
+                },
+                {
+                  "mhz": 250,
+                  "name": "hp",
+                  "perf_tier": "NSX_PERF_HIGH"
+                }
+              ]
+            }
+          ],
+          "cmsis_header": "apollo510.h",
+          "core": "cortex-m55",
+          "family": "ap5",
+          "has_mve": true,
+          "has_radio_subsystem": false,
+          "has_usb": true,
+          "jlink_device": "AP510NFA-CBR",
+          "memory": {
+            "dtcm_kb": 512,
+            "itcm_kb": 256,
+            "mram_kb": 4096,
+            "nvm_kb": 0,
+            "psram_kb": 65536,
+            "sram_kb": 3072
+          },
+          "memory_bases_like": null,
+          "name": "apollo510",
+          "npu": null,
+          "origin": "builtin",
+          "pmu_max_ops": 4096,
+          "pmu_tier": "pmu",
+          "registered_name": "apollo510",
+          "rtt_scan_ranges": [
+            [
+              536870912,
+              524288
+            ]
+          ],
+          "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+          "swo_trace_clock_mhz": null
+        }
+      },
       "provider_provenance": "manifest-declared; independently audit the pinned build/source record",
       "psram_weights": null,
       "runtime_manifest": null,
@@ -127,7 +255,7 @@
       "weights_location": "mram"
     },
     "fixture_api": [
-      7,
+      8,
       0
     ],
     "schema_version": 1
@@ -135,12 +263,12 @@
   "lifecycle": "carry",
   "plan": {
     "baseline": {
-      "fingerprint": "be0055f2e94024a186387e3897646530981455ba79517b3aebfb4747288e9f2c",
-      "id": "hpx-neuralspotx-0.8.1-2026-10-19.2"
+      "fingerprint": "c6be3d29b88bf909164958347e046636ca3cf684a3d2892007014830c20db928",
+      "id": "hpx-neuralspotx-0.9.2-2026-11-07.1"
     },
     "environment": {},
-    "hpx_version": "0.3.0",
-    "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+    "hpx_version": "0.5.0",
+    "intent_hash": "hpx.intent/2:sha256:614ceb75b5e01f23200181ac9ea618fb79efe5435852e0557b16ffec4d78d931",
     "local_inputs": [],
     "model": {
       "path": "inputs/tiny_cnn.tflite",
@@ -148,6 +276,134 @@
       "size_bytes": 2480
     },
     "overrides": [],
+    "platform": {
+      "app_regions": [
+        {
+          "extent": {
+            "length": 262144,
+            "start": 0
+          },
+          "region": "ITCM"
+        },
+        {
+          "extent": {
+            "length": 4128768,
+            "start": 4259840
+          },
+          "region": "MRAM"
+        },
+        {
+          "extent": {
+            "length": 507904,
+            "start": 536870912
+          },
+          "region": "DTCM"
+        },
+        {
+          "extent": {
+            "length": 3145728,
+            "start": 537395200
+          },
+          "region": "SRAM"
+        },
+        {
+          "extent": {
+            "length": 67108864,
+            "start": 1610612736
+          },
+          "region": "PSRAM"
+        }
+      ],
+      "board": {
+        "ble_reset_gpio_pin": null,
+        "channel": "stable",
+        "default_go_gpio_pin": 14,
+        "default_state_gpio_pin": 36,
+        "default_sync_gpio_pin": 29,
+        "description": "",
+        "is_fpga": false,
+        "name": "apollo510_evb",
+        "psram_kb": 65536,
+        "soc": "apollo510",
+        "starter_profile_board": null
+      },
+      "link_family": "gnu",
+      "linker_profile": "default",
+      "load_address": 4259840,
+      "selection": {
+        "addons": [],
+        "boot": "sbl",
+        "catalog": {
+          "catalog_digest": "sha256:8866b3758a7923da88bc6c0713dba3b6812cf7ccb771af86a9f1aab4a56705c0",
+          "package_version": "0.2.0",
+          "schema_version": 1,
+          "sources": []
+        },
+        "compatibility": [
+          "probe-clock-compatibility",
+          "hpx-linker-capacity-view"
+        ],
+        "core": "cm55_0",
+        "implementation": null,
+        "origin": "catalog",
+        "target_id": "apollo510_evb"
+      },
+      "soc": {
+        "app_flash_load_addr": null,
+        "c_define": "AM_PART_APOLLO510",
+        "catalog_app_flash_load_addr": 4259840,
+        "catalog_has_dcache": true,
+        "catalog_target_id": "apollo510_evb",
+        "clocks": [
+          {
+            "default": "lp",
+            "name": "cpu",
+            "speeds": [
+              {
+                "mhz": 96,
+                "name": "lp",
+                "perf_tier": "NSX_PERF_LOW"
+              },
+              {
+                "mhz": 250,
+                "name": "hp",
+                "perf_tier": "NSX_PERF_HIGH"
+              }
+            ]
+          }
+        ],
+        "cmsis_header": "apollo510.h",
+        "core": "cortex-m55",
+        "family": "ap5",
+        "has_mve": true,
+        "has_radio_subsystem": false,
+        "has_usb": true,
+        "jlink_device": "AP510NFA-CBR",
+        "memory": {
+          "dtcm_kb": 512,
+          "itcm_kb": 256,
+          "mram_kb": 4096,
+          "nvm_kb": 0,
+          "psram_kb": 65536,
+          "sram_kb": 3072
+        },
+        "memory_bases_like": null,
+        "name": "apollo510",
+        "npu": null,
+        "origin": "builtin",
+        "pmu_max_ops": 4096,
+        "pmu_tier": "pmu",
+        "registered_name": "apollo510",
+        "rtt_scan_ranges": [
+          [
+            536870912,
+            524288
+          ]
+        ],
+        "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+        "swo_trace_clock_mhz": null
+      }
+    },
     "qualification": "qualified",
     "runtime": {
       "kernels_commit": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
@@ -158,7 +414,7 @@
       "version": "0.33.0"
     },
     "schema": "hpx.frozen-run",
-    "schema_version": 2,
+    "schema_version": 3,
     "settings": {
       "build": {
         "channel": null,
@@ -232,7 +488,6 @@
           "clock_hz": 48000000
         },
         "rtt_buffer_size_up": null,
-        "segger_rtt_path": null,
         "toolchain": "atfe",
         "transport": "rtt"
       }
@@ -244,5 +499,5 @@
     }
   },
   "schema": "hpx.compiled-build",
-  "schema_version": 3
+  "schema_version": 4
 }

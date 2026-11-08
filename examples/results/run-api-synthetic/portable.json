@@ -2,39 +2,39 @@
   "schema_version": "1.0-draft",
   "producer": {
     "name": "helia-profiler",
-    "version": "0.3.0",
+    "version": "0.5.0",
     "revision": null,
-    "mapping_version": "hpx-run-2"
+    "mapping_version": "hpx-run-3"
   },
   "native_result": {
     "schema": "hpx.run-result",
-    "identity": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
+    "identity": "296f0073fc186ae32e553ec565444b25edf2192a5f35f84803d697520d8a866c",
     "artifacts": [
       {
         "id": "native-result",
         "role": "hpx.run-result",
         "location": "result.json",
-        "sha256": "0e294713666105f63d7d2b83cca6e733d4f239661e6a1e23b4cbfdf3d1e2988c",
-        "size_bytes": 4409
+        "sha256": "296f0073fc186ae32e553ec565444b25edf2192a5f35f84803d697520d8a866c",
+        "size_bytes": 4461
       },
       {
         "id": "artifact:build.json",
         "role": "hpx.compiled-build",
         "location": "build.json",
-        "sha256": "01dd793a3fd87feb473c5344e9941997aad9281094de1a02c951ca198bd36ec6",
-        "size_bytes": 6996
+        "sha256": "06606ecd5cf884627dd74ddc616005bf47975f76bd5e199443a15b775d434317",
+        "size_bytes": 13735
       },
       {
-        "id": "artifact:evidence/output_0.bin",
+        "id": "artifact:evidence/captured/output_0.bin",
         "role": "hpx.capture-output",
-        "location": "evidence/output_0.bin",
+        "location": "evidence/captured/output_0.bin",
         "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
         "size_bytes": 4
       },
       {
-        "id": "artifact:result.reference_0.bin",
+        "id": "artifact:result.reference_0.d54b46067caf49db9148c06dcd2774c1.bin",
         "role": "hpx.reference-output",
-        "location": "result.reference_0.bin",
+        "location": "result.reference_0.d54b46067caf49db9148c06dcd2774c1.bin",
         "sha256": "9de1ee39e1f56d88108b62c11f5fddf01d87615258f8318898311ebf65f03941",
         "size_bytes": 4
       }
@@ -197,12 +197,13 @@
     }
   ],
   "verification": {
-    "verifier": "helia-profiler.run_record/run-1",
+    "verifier": "helia-profiler.run_record/run-2",
     "checks": [
       "run-result-schema-version",
       "compiled-build-path-size-sha256-and-verify",
       "evidence-path-size-sha256",
       "identity-recomputed",
+      "recorded-platform-provenance-bound-to-plan",
       "power-request-fits-build",
       "output-comparison-recomputed"
     ],
@@ -267,6 +268,134 @@
         },
         "unavailable_reasons": {}
       },
+      "platform_provenance": {
+        "board": {
+          "name": "apollo510_evb",
+          "soc": "apollo510",
+          "channel": "stable",
+          "psram_kb": 65536,
+          "default_sync_gpio_pin": 29,
+          "default_state_gpio_pin": 36,
+          "default_go_gpio_pin": 14,
+          "starter_profile_board": null,
+          "is_fpga": false,
+          "description": "",
+          "ble_reset_gpio_pin": null
+        },
+        "soc": {
+          "name": "apollo510",
+          "family": "ap5",
+          "core": "cortex-m55",
+          "pmu_tier": "pmu",
+          "has_mve": true,
+          "memory": {
+            "mram_kb": 4096,
+            "sram_kb": 3072,
+            "dtcm_kb": 512,
+            "itcm_kb": 256,
+            "psram_kb": 65536,
+            "nvm_kb": 0
+          },
+          "clocks": [
+            {
+              "name": "cpu",
+              "speeds": [
+                {
+                  "name": "lp",
+                  "mhz": 96,
+                  "perf_tier": "NSX_PERF_LOW"
+                },
+                {
+                  "name": "hp",
+                  "mhz": 250,
+                  "perf_tier": "NSX_PERF_HIGH"
+                }
+              ],
+              "default": "lp"
+            }
+          ],
+          "c_define": "AM_PART_APOLLO510",
+          "cmsis_header": "apollo510.h",
+          "rtt_scan_ranges": [
+            [
+              536870912,
+              524288
+            ]
+          ],
+          "jlink_device": "AP510NFA-CBR",
+          "pmu_max_ops": 4096,
+          "swo_trace_clock_mhz": null,
+          "has_usb": true,
+          "ssram_full_power_enum": "AM_HAL_PWRCTRL_SRAM_3M",
+          "has_radio_subsystem": false,
+          "npu": null,
+          "app_flash_load_addr": null,
+          "memory_bases_like": null,
+          "origin": "builtin",
+          "registered_name": "apollo510",
+          "catalog_target_id": "apollo510_evb",
+          "catalog_app_flash_load_addr": 4259840,
+          "catalog_has_dcache": true
+        },
+        "selection": {
+          "origin": "catalog",
+          "catalog": {
+            "package_version": "0.2.0",
+            "schema_version": 1,
+            "catalog_digest": "sha256:8866b3758a7923da88bc6c0713dba3b6812cf7ccb771af86a9f1aab4a56705c0",
+            "sources": []
+          },
+          "target_id": "apollo510_evb",
+          "core": "cm55_0",
+          "boot": "sbl",
+          "implementation": null,
+          "addons": [],
+          "compatibility": [
+            "probe-clock-compatibility",
+            "hpx-linker-capacity-view"
+          ]
+        },
+        "link_family": "gnu",
+        "linker_profile": "default",
+        "app_regions": [
+          {
+            "region": "ITCM",
+            "extent": {
+              "start": 0,
+              "length": 262144
+            }
+          },
+          {
+            "region": "MRAM",
+            "extent": {
+              "start": 4259840,
+              "length": 4128768
+            }
+          },
+          {
+            "region": "DTCM",
+            "extent": {
+              "start": 536870912,
+              "length": 507904
+            }
+          },
+          {
+            "region": "SRAM",
+            "extent": {
+              "start": 537395200,
+              "length": 3145728
+            }
+          },
+          {
+            "region": "PSRAM",
+            "extent": {
+              "start": 1610612736,
+              "length": 67108864
+            }
+          }
+        ],
+        "load_address": 4259840
+      },
       "cpu_clocks": {
         "schema_id": "hpx.cpu-clocks",
         "schema_version": 1,
@@ -290,13 +419,13 @@
         }
       },
       "semantic_hashes": {
-        "intent_hash": "hpx.intent/1:sha256:a909fc4ac24bb0f9e3aea4110062ade20ee6857733b7014baabc534985097eee",
+        "intent_hash": "hpx.intent/2:sha256:614ceb75b5e01f23200181ac9ea618fb79efe5435852e0557b16ffec4d78d931",
         "build_hash": {
           "unknown": "the dependency lock is not an NSX lock"
         },
         "inputs_hash": "hpx.inputs/1:sha256:2ca56ae8fa19aeebf0c53411603e6be71e50821f1c8b74735643928ee5191081",
         "observation_hash": "hpx.observation/1:sha256:45d6451bce4da231df4a00b43f52b4e9679f65dab05b2c50e9b5f5116aaf53e1",
-        "binding": "hpx.binding/1:sha256:5f8e121b65e5ec79ae5c098fe004a4fe9e1e0d31c771f87f6edd60650fe8389a"
+        "binding": "hpx.binding/1:sha256:84726db884c37e8919ab675a1d6345326cd55477cd2af25fd084d6bcb6309ab5"
       },
       "run": {
         "lifecycle": "carry",

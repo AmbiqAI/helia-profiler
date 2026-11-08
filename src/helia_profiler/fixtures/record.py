@@ -13,6 +13,8 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..platform.provenance import PlatformSnapshot
+
 if TYPE_CHECKING:
     from .capture import FixtureCaptureRequest
 
@@ -73,12 +75,13 @@ _FIELDS = frozenset(
         "clock_profile",
         "cpu_hz",
         "timer_hz",
+        "platform",
     )
 )
 
 
-#: The record's ``fixture_api`` version, inside ``hpx.compiled-build`` version 3.
-_RECORD_VERSION = (7, 0)
+#: The record's ``fixture_api`` version, inside a versioned ``hpx.compiled-build``.
+_RECORD_VERSION = (8, 0)
 
 #: Absent from a record when unknown.
 _SOURCE_FIELDS = ("kernel_source", "runtime_source")
@@ -101,6 +104,7 @@ def _read_json(value):
 def _payload(build: FixtureBuild, *, file, path) -> dict:
     """The single build schema, with different path encodings for identity/storage."""
     result = asdict(build)
+    result["platform"] = build.platform.to_dict() if build.platform is not None else None
     if not build.observe_ram:
         del result["observe_ram"]
     for name in _SOURCE_FIELDS:
@@ -171,7 +175,11 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Compiled fixture requires generated sources and complete IO")
     if not isinstance(build.target, FixtureTarget):
         raise ValueError("Explicit fixture target required")
-    build.target.verify()
+    if build.platform is None:
+        raise ValueError("Compiled fixture requires recorded platform provenance; build again")
+    if build.platform.board.name != build.target.board:
+        raise ValueError("Fixture target differs from its recorded platform")
+    build.target.verify(platform=build.platform)
     if not isinstance(build.engine, EngineType) or not isinstance(
         build.timing_scope, FixtureTimingScope
     ):
@@ -190,7 +198,11 @@ def verify_fixture_build(build: FixtureBuild) -> None:
     if build.target.board == "apollo510b_evb" and build.power_sync is not None:
         raise ValueError("AP510B fixture integration is timing-only")
     validate_fixture_placement(
-        build.arena_location, build.weights_location, build.engine, board=build.target.board
+        build.arena_location,
+        build.weights_location,
+        build.engine,
+        board=build.target.board,
+        platform=build.platform,
     )
     for name, low, high in (
         ("iterations", 1, 100_000),
@@ -202,7 +214,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
             raise ValueError(f"Invalid fixture {name}")
     if (build.clock_profile, build.cpu_hz, build.timer_hz) != (
         FIXTURE_CLOCK_PROFILE,
-        fixture_cpu_hz(build.target.board),
+        fixture_cpu_hz(build.target.board, platform=build.platform),
         STIMER_HZ,
     ):
         raise ValueError("Unsupported fixture clock/timer facts")
@@ -444,6 +456,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     optional = {"power_sync", "observe_ram", *_SOURCE_FIELDS} & set(outer["build"])
     value = dict(_object(outer["build"], _FIELDS | optional))
     try:
+        value["platform"] = PlatformSnapshot.from_dict(value["platform"])
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
             value[name] = mapping.read_file(value[name])
@@ -544,6 +557,8 @@ def fixture_capture_request(
 
     verify_fixture_build(build)
     assert build.binary is not None and build.flat_binary is not None
+    assert build.platform is not None
+    build.platform.verify_current()
     return FixtureCaptureRequest(
         elf=build.binary,
         image=build.flat_binary,
@@ -555,6 +570,7 @@ def fixture_capture_request(
         settle_seconds=settle_seconds,
         timing_scope=build.timing_scope,
         target=build.target,
+        platform=build.platform,
         arena_capacity=build.arena_capacity if build.engine is not EngineType.HELIA_AOT else None,
         expected_duration_s=expected_duration_s,
         extra_output_sizes=tuple(t.size_bytes for t in build.output_tensors[1:]),

@@ -8,6 +8,7 @@ from ..placement import Placement
 from ..platform import get_soc_for_board
 from ..platform.capabilities import resolve_app_flash_load_addr
 from ..platform.memory_map import LinkFamily, MemoryRegion, linked_memory_map
+from ..platform.provenance import PlatformSnapshot
 
 #: Default fixture target; existing requests and records keep this identity.
 FIXTURE_BOARD = "apollo510_evb"
@@ -24,10 +25,18 @@ class FixtureTarget:
     device: str
     load_address: int
 
-    def verify(self) -> None:
+    def verify(self, *, platform: PlatformSnapshot | None = None) -> None:
         if type(self.load_address) is not int:
             raise ValueError("Integer fixture load address required")
-        if self != fixture_target_for_board(self.board):
+        if platform is None:
+            expected = fixture_target_for_board(self.board)
+        else:
+            if platform.load_address is None:
+                raise ValueError("Recorded fixture platform has no application boot origin")
+            expected = FixtureTarget(
+                platform.board.name, platform.soc.jlink_device, platform.load_address
+            )
+        if self.board not in FIXTURE_BOARDS or self != expected:
             raise ValueError("Unsupported fixture target declaration")
 
 
@@ -58,19 +67,31 @@ def fixture_target_for_board(board: str) -> FixtureTarget:
     return FixtureTarget(board, soc.jlink_device, origin)
 
 
-def fixture_cpu_hz(board: str = FIXTURE_BOARD) -> int:
+def fixture_cpu_hz(board: str = FIXTURE_BOARD, *, platform: PlatformSnapshot | None = None) -> int:
     """The fixture board's CPU frequency at the fixture clock profile."""
-    speed = _fixture_soc(board).cpu_clock.speed(FIXTURE_CLOCK_PROFILE)
+    if platform is not None and platform.board.name != board:
+        raise ValueError("Fixture board differs from recorded platform")
+    soc = platform.soc if platform is not None else _fixture_soc(board)
+    speed = soc.cpu_clock.speed(FIXTURE_CLOCK_PROFILE)
     if speed is None:
         raise ValueError(f"{board} has no {FIXTURE_CLOCK_PROFILE!r} clock")
     return speed.mhz * 1_000_000
 
 
-def fixture_app_region(region: MemoryRegion, board: str = FIXTURE_BOARD) -> tuple[int, int]:
+def fixture_app_region(
+    region: MemoryRegion, board: str = FIXTURE_BOARD, *, platform: PlatformSnapshot | None = None
+) -> tuple[int, int]:
     """``[start, end)`` of the fixture board's linked application extent for ``region``.
 
     Fixture builds link with ATfE, which uses the GNU linker scripts.
     """
+    if platform is not None:
+        if platform.board.name != board:
+            raise ValueError("Fixture board differs from recorded platform")
+        recorded = next((r.extent for r in platform.app_regions if r.region is region), None)
+        if recorded is None:
+            raise ValueError(f"{board} recorded no linked {region} region")
+        return recorded.start, recorded.end
     windows = linked_memory_map(_fixture_soc(board))
     window = next((w for w in windows if w.region is region), None)
     if window is None:
@@ -81,7 +102,8 @@ def fixture_app_region(region: MemoryRegion, board: str = FIXTURE_BOARD) -> tupl
 
 def fixture_engines_for_board(board: str) -> tuple[EngineType, ...]:
     """Engines implemented by the fixture target."""
-    _fixture_soc(board)
+    if board not in FIXTURE_BOARDS:
+        raise ValueError(f"Unsupported fixture target board: {board}")
     engines = (EngineType.HELIA_AOT, EngineType.LITERT)
     return engines if board == "apollo510b_evb" else (*engines, EngineType.HELIA_RT)
 
@@ -92,9 +114,13 @@ def validate_fixture_placement(
     engine: EngineType | None = None,
     *,
     board: str = FIXTURE_BOARD,
+    platform: PlatformSnapshot | None = None,
 ) -> None:
     """Validate the fixture's implemented static arenas and weight backing."""
-    fixture_target_for_board(board)
+    if platform is None:
+        fixture_target_for_board(board)
+    elif platform.board.name != board or board not in FIXTURE_BOARDS:
+        raise ValueError("Fixture board differs from recorded platform")
     if board == "apollo510b_evb" and (
         engine not in fixture_engines_for_board(board)
         or weights not in (Placement.MRAM, Placement.TCM)
@@ -106,7 +132,7 @@ def validate_fixture_placement(
         raise ConfigError("Explicit fixture weight backing required")
     for placement in (arena, weights):
         try:
-            start, end = fixture_app_region(placement.region, board)
+            start, end = fixture_app_region(placement.region, board, platform=platform)
         except ValueError as exc:
             raise ConfigError("Fixture target has no selected memory bank") from exc
         if start >= end:

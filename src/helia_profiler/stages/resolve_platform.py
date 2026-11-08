@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 
+from ..config.platform import config_platform
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
 from ..platform import PmuTier, get_board, get_soc_for_board, link_family_for_toolchain
@@ -25,6 +26,7 @@ class ResolvePlatformStage:
         board_name = ctx.config.target.board
         board = get_board(board_name, registry=ctx.config.platform_registry)
         soc = get_soc_for_board(board_name, registry=ctx.config.platform_registry)
+        ctx.run_metadata.platform_provenance = config_platform(ctx.config)
         ctx.board = board
         ctx.soc = soc
 

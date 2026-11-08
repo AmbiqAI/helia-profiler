@@ -73,7 +73,7 @@ def test_target_reset_uses_noninteractive_wrapper(monkeypatch, capsys) -> None:
 
     cli._cmd_target_reset(board="apollo4p_blue_kxr_evb", jlink_serial="1160001481", kind="debug")
 
-    assert calls == [{"device": "AMAP42KP-KBR", "jlink_serial": "1160001481"}]
+    assert calls == [{"device": "AMA4B2KP-KXR", "jlink_serial": "1160001481"}]
     assert "Reset apollo4p_blue_kxr_evb" in capsys.readouterr().out
 
 

@@ -268,7 +268,7 @@ def _identity(**changes):
         "producer": "synthetic",
         "build_hash": f"hpx.build/1:sha256:{_HEX}",
         "observation_hash": f"hpx.observation/1:sha256:{_HEX}",
-        "intent_hash": f"hpx.intent/1:sha256:{_HEX}",
+        "intent_hash": f"hpx.intent/2:sha256:{_HEX}",
         **changes,
     }
     return {key: value for key, value in identity.items() if value is not _DROP}

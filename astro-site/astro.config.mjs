@@ -111,6 +111,7 @@ export default defineConfig({
                   items: [
                     { label: 'Overview', slug: 'guide/concepts' },
                     { label: 'Pipeline', slug: 'guide/concepts/pipeline' },
+                    { label: 'Platform facts and policy', slug: 'guide/concepts/platforms' },
                     {
                       label: 'Engine adapters',
                       slug: 'guide/concepts/engine-adapters',

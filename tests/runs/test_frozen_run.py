@@ -59,6 +59,26 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+def test_platform_input_is_bound_and_catalog_drift_refuses_replay(session, tmp_path, monkeypatch):
+    plan = session.freeze()
+    assert plan.platform is not None and plan.platform.selection.catalog is not None
+    assert plan.intent_hash.startswith("hpx.intent/2:")
+    changed = replace(
+        plan.platform,
+        selection=replace(
+            plan.platform.selection,
+            catalog=replace(plan.platform.selection.catalog, package_version="different"),
+        ),
+    )
+    assert replace(plan, platform=changed).intent_hash != plan.intent_hash
+    path = plan.save(tmp_path / "plan.json")
+    monkeypatch.setattr("helia_profiler.runs.plan.config_platform", lambda _: changed)
+    loaded = FrozenRun.load(path)
+    assert loaded.platform == plan.platform
+    with pytest.raises(ConfigError, match="platform catalog/settings"):
+        loaded.config()
+
+
 @pytest.mark.parametrize("alias", ["direct", "relative", "symlink", "hardlink"])
 def test_saving_a_plan_refuses_its_model(session, tmp_path, monkeypatch, alias):
     plan = session.freeze()
@@ -257,7 +277,7 @@ def test_an_edited_or_malformed_plan_file_is_refused(session, tmp_path):
 
 def test_the_intent_hash_is_a_semantic_hash(session):
     parsed = hpx.SemanticHash.parse(session.freeze().intent_hash)
-    assert (parsed.producer, parsed.kind, parsed.version) == ("hpx", "intent", 1)
+    assert (parsed.producer, parsed.kind, parsed.version) == ("hpx", "intent", 2)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +285,7 @@ def test_the_intent_hash_is_a_semantic_hash(session):
     [
         lambda good: good.rsplit(":", 1)[1],
         lambda good: good.replace("hpx.intent/", "hpx.build/"),
-        lambda good: good.replace("/1:", "/2:"),
+        lambda good: good.replace("/2:", "/1:"),
         lambda good: None,
     ],
 )
@@ -763,33 +783,10 @@ def test_rtt_module_override_replays_and_requires_its_directory(session, tmp_pat
 
 
 @pytest.mark.parametrize("mode", ["default", "ref", "path", "version"])
-def test_pre_retirement_module_plans_keep_stored_identity(mode, tmp_path, monkeypatch):
-    import helia_profiler.deps.compatibility as compatibility
-    from helia_profiler.runs.plan import freeze_config
-
+def test_pre_retirement_module_plans_require_the_originating_reader(mode):
     fixtures = Path(__file__).parents[1] / "fixtures" / "module_override_plans"
     source = fixtures / f"{mode}.json"
-    # Replay against the baseline they froze with.
-    historical = json.loads((fixtures / "baseline.json").read_text())
-    parse = compatibility._parse_baseline
-    monkeypatch.setattr(compatibility, "_parse_baseline", lambda raw: parse(historical))
     original = source.read_bytes()
-    stored = json.loads(original)
-    plan = FrozenRun.load(source)
-    assert plan.to_dict() == stored
-    assert FrozenRun.load(plan.save(tmp_path / "copy.json")).intent_hash == stored["intent_hash"]
-    model = tmp_path / "model.tflite"
-    model.write_bytes(b"TFL3" + bytes(64))
-    monkeypatch.setattr(
-        "helia_profiler.hostenv._proc.tool_output", lambda *a, **k: "historical-test-compiler\n"
-    )
-    # The historical paths are host-independent fixture names, not live directories.
-    monkeypatch.setattr("helia_profiler.runs.plan._check_local_input", lambda item: None)
-    monkeypatch.setattr("helia_profiler.runs.plan._local_inputs", lambda config: plan.local_inputs)
-    if mode == "version":
-        with pytest.raises(ConfigError, match="version is no longer supported"):
-            plan.config(model=model)
-    else:
-        replayed = plan.config(model=model)
-        assert freeze_config(replayed).intent_hash == stored["intent_hash"]
+    with pytest.raises(ConfigError, match="Unsupported frozen run plan version"):
+        FrozenRun.load(source)
     assert source.read_bytes() == original

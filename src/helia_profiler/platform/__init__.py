@@ -42,6 +42,13 @@ from .memory_map import (
     link_family_for_toolchain,
     linked_memory_map,
 )
+from .provenance import (
+    CatalogProvenance,
+    CatalogSource,
+    PlatformSnapshot,
+    RegionExtent,
+    TargetSelection,
+)
 from .registry import (
     PlatformRegistry,
     build_platform_registry,
@@ -69,6 +76,11 @@ from .soc import (
 )
 
 __all__ = [
+    "PlatformSnapshot",
+    "CatalogProvenance",
+    "CatalogSource",
+    "TargetSelection",
+    "RegionExtent",
     "DEFAULT_GO_GPIO_PIN",
     "DEFAULT_STATE_GPIO_PIN",
     "DEFAULT_SYNC_GPIO_PIN",

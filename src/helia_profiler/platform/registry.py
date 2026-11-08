@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
 from .board import (
-    _BOARDS,
     DEFAULT_GO_GPIO_PIN,
     DEFAULT_STATE_GPIO_PIN,
     DEFAULT_SYNC_GPIO_PIN,
     BoardDef,
 )
-from .soc import _SOCS, SocDef
+from .provenance import CatalogProvenance, TargetSelection
+from .soc import SocDef
 
 
 @dataclass(frozen=True)
@@ -22,10 +22,17 @@ class PlatformRegistry:
 
     socs: Mapping[str, SocDef]
     boards: Mapping[str, BoardDef]
+    selections: Mapping[str, TargetSelection] = field(default_factory=lambda: MappingProxyType({}))
+    catalog: CatalogProvenance | None = None
+    board_socs: Mapping[str, SocDef] = field(default_factory=lambda: MappingProxyType({}))
 
 
 def _freeze_registry(
-    socs: Mapping[str, SocDef], boards: Mapping[str, BoardDef]
+    socs: Mapping[str, SocDef],
+    boards: Mapping[str, BoardDef],
+    selections: Mapping[str, TargetSelection],
+    catalog: CatalogProvenance | None,
+    board_socs: Mapping[str, SocDef],
 ) -> PlatformRegistry:
     soc_map = dict(socs)
     board_map = dict(boards)
@@ -40,6 +47,9 @@ def _freeze_registry(
     return PlatformRegistry(
         socs=MappingProxyType(soc_map),
         boards=MappingProxyType(board_map),
+        selections=MappingProxyType(dict(selections)),
+        catalog=catalog,
+        board_socs=MappingProxyType(dict(board_socs)),
     )
 
 
@@ -51,16 +61,30 @@ def build_platform_registry(
 ) -> PlatformRegistry:
     """Return a frozen platform registry for one config/run."""
     if base is None:
-        merged_socs = dict(_SOCS)
-        merged_boards = dict(_BOARDS)
+        from .catalog import catalog_views
+
+        builtin_socs, builtin_boards, builtin_board_socs, builtin_selections, catalog = (
+            catalog_views()
+        )
+        merged_socs = dict(builtin_socs)
+        merged_boards = dict(builtin_boards)
+        board_socs = dict(builtin_board_socs)
+        selections = dict(builtin_selections)
     else:
         merged_socs = dict(base.socs)
         merged_boards = dict(base.boards)
+        selections = dict(base.selections)
+        catalog = base.catalog
+        board_socs = dict(base.board_socs)
     if socs:
         merged_socs.update(socs)
     if boards:
         merged_boards.update(boards)
-    return _freeze_registry(merged_socs, merged_boards)
+    for name, board in merged_boards.items():
+        if (socs and board.soc in socs) or (boards and name in boards):
+            selections[name] = TargetSelection("hpx-custom", catalog)
+            board_socs.pop(name, None)
+    return _freeze_registry(merged_socs, merged_boards, selections, catalog, board_socs)
 
 
 def get_soc(name: str, *, registry: PlatformRegistry | None = None) -> SocDef:
@@ -82,8 +106,9 @@ def get_board(name: str, *, registry: PlatformRegistry | None = None) -> BoardDe
 
 def get_soc_for_board(board_name: str, *, registry: PlatformRegistry | None = None) -> SocDef:
     """Resolve the SoC definition for a given board."""
+    registry = registry or build_platform_registry()
     board = get_board(board_name, registry=registry)
-    soc = get_soc(board.soc, registry=registry)
+    soc = registry.board_socs.get(board_name) or get_soc(board.soc, registry=registry)
     if board.psram_kb is None:
         return soc
     return replace(

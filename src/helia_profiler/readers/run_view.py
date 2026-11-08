@@ -10,7 +10,7 @@ from ..fixtures.power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
 from ..identity import Unknown
 from ..runs.record import RunResultRecord
 
-MAPPING_VERSION = "hpx-run-2"
+MAPPING_VERSION = "hpx-run-3"
 _RESULT = "native-result"
 #: What ``engine.version`` means for each engine.
 _VERSION_BASIS = {
@@ -22,12 +22,13 @@ _VERSION_BASIS = {
 }
 _CLOCK_DOMAINS = {"stimer": "timer", "cpu": "cpu"}
 _FILE_KEYS = {"root", "path", "sha256", "size_bytes"}
-_VERIFIER = "helia-profiler.run_record/run-1"
+_VERIFIER = "helia-profiler.run_record/run-2"
 _CHECKS = (
     "run-result-schema-version",
     "compiled-build-path-size-sha256-and-verify",
     "evidence-path-size-sha256",
     "identity-recomputed",
+    "recorded-platform-provenance-bound-to-plan",
     "power-request-fits-build",
 )
 _COMPARED = "output-comparison-recomputed"
@@ -283,6 +284,9 @@ def _extension(record: RunResultRecord) -> dict[str, Any]:
         else None,
         "build_producer": _plain(identity.producer),
         "target_config": _target_config(record),
+        "platform_provenance": result.compiled.plan.platform.to_dict()
+        if result.compiled.plan.platform is not None
+        else None,
         "cpu_clocks": _cpu_clocks(record),
         "semantic_hashes": {
             "intent_hash": identity.intent_hash,

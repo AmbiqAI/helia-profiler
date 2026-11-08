@@ -32,7 +32,8 @@ probe steps.
 | Apollo3 Plus EVB | `apollo3p_evb` | Cortex-M4 | DWT cycle count only | stable |
 | Apollo3 Plus Cygnus EVB | `apollo3p_evb_cygnus` | Cortex-M4 | DWT cycle count only | preview |
 
-The rows are the registry in `src/helia_profiler/platform/board.py`; the
+The accepted rows are HPX policy in `platform/policy.py`, projected with
+helia-platforms facts by `platform/catalog.py`; the
 channel is each board's `BoardDef.channel` and records how much hardware
 validation backs it, not whether hpx will drive it. `hpx boards` is the
 live list for your installed version and wins over this table.
@@ -48,6 +49,10 @@ profiling and the Ethos-U NPU through the `ethos_u` engine backend with the
 `ethos_npu` counter group; see the
 [NPU profiling example](../../examples/atomiq110-npu-profiling/).
 :::
+
+`apollo5b_evb` is retained as an SDK-descriptor compatibility spelling, not
+a sourced catalog hardware target. See [Platform facts and policy](../concepts/platforms/)
+for provenance, exceptions and saved-format compatibility.
 
 ## Steps
 
@@ -70,10 +75,9 @@ preflight with the groups that board does expose
 capture cycles only. The counter groups themselves are on
 [PMU counters](../pmu-counters/).
 
-Two more facts the registry fixes per board: whether PSRAM is fitted
-(`BoardDef.psram_kb`; the Apollo3 Plus and Apollo4 EVBs register it, the
-Apollo5-family EVBs take the SoC's value, and `apollo510dL_evb` registers
-none because the chip is not fitted on that EVB), and whether the
+Fitted PSRAM comes from the catalog (`BoardDef.psram_kb`): the plain
+Apollo3 Plus, Apollo330P, Apollo510 Lite and Apollo4 EVBs have none; Cygnus
+has 8 MiB, and Apollo510/510B have 64 MiB. HPX separately decides whether the
 `usb_cdc` transport is available (`SocDef.has_usb`; Apollo3P and Atomiq110
 have no compatible `nsx-ambiq-usb` module, so `usb_cdc` is rejected at
 preflight there).
@@ -88,7 +92,7 @@ from `target.board` and needs no configuration.
 `target.clock.cpu` selects the core frequency by the SoC's named tier
 (`lp` or `hp` on the Apollo parts; `atomiq110_fpga_turbo` exposes `lp`
 only, a single fixed FPGA clock). The tiers and their frequencies are
-registered per SoC in `src/helia_profiler/platform/soc.py`; hpx validates
+projected from catalog operating points by `platform/catalog.py`; hpx validates
 the name against them and maps it onto the matching neuralSPOT-X
 performance mode in the generated firmware. Unset, the board runs at its
 lowest-power tier. `run_metadata.json` records the resolved tier and

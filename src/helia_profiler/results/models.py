@@ -23,6 +23,7 @@ from ..deps.compatibility import CompatibilityResolution
 from ..engines import EngineType
 from ..modelcost.layer_attribution import source_index_from_op
 from ..placement import MemoryRegion
+from ..platform.provenance import PlatformSnapshot
 from ..power.base import PowerResult
 
 if TYPE_CHECKING:
@@ -397,6 +398,7 @@ class RunMetadata:
     timestamp: str = ""
     config_snapshot: dict[str, Any] = field(default_factory=dict)
     platform: PlatformInfo | None = None
+    platform_provenance: PlatformSnapshot | None = None
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
     #: One entry per built target ("profile", "power"). Appended as each
