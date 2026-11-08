@@ -1,0 +1,60 @@
+{
+  "main": {
+    "results": {
+      "0": {
+        "value": 357.0
+      },
+      "1": {
+        "value": 124.0
+      },
+      "2": {
+        "value": 49.0
+      },
+      "3": {
+        "value": 124.0
+      },
+      "4": {
+        "value": 49.0
+      },
+      "5": {
+        "value": 124.0
+      },
+      "6": {
+        "value": 49.0
+      },
+      "7": {
+        "value": 124.0
+      },
+      "8": {
+        "value": 49.0
+      },
+      "9": {
+        "value": 97.0
+      },
+      "10": {
+        "value": 2.0
+      },
+      "11": {
+        "value": 1.0
+      },
+      "12": {
+        "value": 8.0
+      }
+    },
+    "gradient": [
+      {
+        "stop": 0,
+        "bgColor": "#22c55e"
+      },
+      {
+        "stop": 0.5,
+        "bgColor": "#eab308"
+      },
+      {
+        "stop": 1,
+        "bgColor": "#ef4444"
+      }
+    ],
+    "name": "ARM_PMU_STALL_FRONTEND"
+  }
+}

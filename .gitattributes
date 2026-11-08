@@ -6,6 +6,7 @@ src/helia_profiler/** text=auto eol=lf
 
 # Manifest digests cover the captured bytes, including line endings.
 examples/results/** -text
+tests/fixtures/calibration/pairs/** -text
 
 # ORIGIN.json pins BENCH's contract files by sha256 of their exact bytes.
 tests/fixtures/result_contract_v1/** -text

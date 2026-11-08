@@ -1,0 +1,208 @@
+{
+  "schema_version": 2,
+  "model": {
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "subgraph": 0
+  },
+  "conditions": {
+    "target": "apollo510_evb",
+    "cpu_hz": 250000000,
+    "weights_memory": "dtcm",
+    "weights_cache": "on",
+    "application_load": "none"
+  },
+  "operator_cycles": {
+    "0:conv": [
+      {
+        "knobs": {
+          "accumulation": "fast"
+        },
+        "cycles": 9000.0,
+        "facts": {
+          "kernel:entry": "conv_2d_accumulation_fast"
+        }
+      },
+      {
+        "knobs": {
+          "accumulation": "precise"
+        },
+        "cycles": 12000.0,
+        "facts": {
+          "kernel:entry": "conv_2d_accumulation_precise"
+        }
+      }
+    ],
+    "0:fc": [
+      {
+        "knobs": {
+          "accumulation": "fast",
+          "kernel": "specialized"
+        },
+        "cycles": 2400.0,
+        "facts": {
+          "fixed:weight_layout": "packed",
+          "kernel:entry": "fully_connected_accumulation_fast_kernel_specialized"
+        }
+      },
+      {
+        "knobs": {
+          "accumulation": "precise",
+          "kernel": "generic"
+        },
+        "cycles": 3600.0,
+        "facts": {
+          "fixed:weight_layout": "packed",
+          "kernel:entry": "fully_connected_accumulation_precise_kernel_generic"
+        }
+      },
+      {
+        "knobs": {
+          "accumulation": "precise",
+          "kernel": "specialized"
+        },
+        "cycles": 3000.0,
+        "facts": {
+          "fixed:weight_layout": "packed",
+          "kernel:entry": "fully_connected_accumulation_precise_kernel_specialized"
+        }
+      }
+    ],
+    "0:softmax": [
+      {
+        "knobs": {},
+        "cycles": 400.0,
+        "facts": {
+          "kernel:entry": "softmax"
+        }
+      }
+    ]
+  },
+  "capture": {
+    "setup": {
+      "digest": "10b1668b3aaed517f5994b44c1146c426208aff7d7d8da7486d4f6b13c270ac8",
+      "fields": [
+        "build.architecture_flags",
+        "config.build.nsx_modules",
+        "config.engine.backend",
+        "config.engine.config.aot_args.documentation.html",
+        "config.engine.config.aot_args.force",
+        "config.engine.config.aot_args.memory.allocate_arenas",
+        "config.engine.config.aot_args.memory.constraints",
+        "config.engine.config.aot_args.memory.dump_residency_json",
+        "config.engine.config.aot_args.memory.planner",
+        "config.engine.config.aot_args.memory.planner_options",
+        "config.engine.config.aot_args.memory.tensors",
+        "config.engine.config.aot_args.model.description",
+        "config.engine.config.aot_args.model.name",
+        "config.engine.config.aot_args.model.subgraph",
+        "config.engine.config.aot_args.model.type",
+        "config.engine.config.aot_args.model.version",
+        "config.engine.config.aot_args.module.name",
+        "config.engine.config.aot_args.module.prefix",
+        "config.engine.config.aot_args.module.schedule",
+        "config.engine.config.aot_args.module.type",
+        "config.engine.config.aot_args.optimization.allow_approximate",
+        "config.engine.config.aot_args.optimization.budget",
+        "config.engine.config.aot_args.optimization.goal",
+        "config.engine.config.aot_args.optimization.plan",
+        "config.engine.config.aot_args.platform.capabilities",
+        "config.engine.config.aot_args.platform.cpu",
+        "config.engine.config.aot_args.platform.memories",
+        "config.engine.config.aot_args.platform.min_alignment",
+        "config.engine.config.aot_args.platform.name",
+        "config.engine.config.aot_args.platform.preferred_memory_order",
+        "config.engine.config.aot_args.result_views",
+        "config.engine.config.aot_args.test.enabled",
+        "config.engine.config.aot_args.test.golden_data",
+        "config.engine.config.aot_args.test.num_iterations",
+        "config.engine.config.aot_args.test.skip_verification",
+        "config.engine.config.aot_args.test.state_feedback",
+        "config.engine.config.aot_args.test.tolerance",
+        "config.engine.config.aot_args.transforms",
+        "config.engine.type",
+        "config.model.arena_location",
+        "config.model.arena_size",
+        "config.model.weights_location",
+        "config.profiling.iterations",
+        "config.profiling.pmu_counters.0",
+        "config.target.board",
+        "config.target.clock.cpu",
+        "config.target.toolchain",
+        "config.target.transport",
+        "engine.backend",
+        "engine.effective_config_keys.0",
+        "engine.effective_config_keys.1",
+        "engine.effective_config_keys.2",
+        "engine.effective_config_keys.3",
+        "engine.effective_config_sha256",
+        "engine.type",
+        "engine.version",
+        "kernel.build",
+        "toolchain.compiler",
+        "toolchain.compiler_version"
+      ],
+      "pairing_digest": "cc4f46dcf3f67f7cda0caf74ec233af536dd2ea24737d2eebcd6a768c84b11c6",
+      "pairing_fields": [
+        "build.architecture_flags",
+        "config.build.nsx_modules",
+        "config.engine.backend",
+        "config.engine.config.aot_args.documentation.html",
+        "config.engine.config.aot_args.force",
+        "config.engine.config.aot_args.memory.allocate_arenas",
+        "config.engine.config.aot_args.memory.constraints",
+        "config.engine.config.aot_args.memory.dump_residency_json",
+        "config.engine.config.aot_args.memory.planner",
+        "config.engine.config.aot_args.memory.planner_options",
+        "config.engine.config.aot_args.memory.tensors",
+        "config.engine.config.aot_args.model.description",
+        "config.engine.config.aot_args.model.name",
+        "config.engine.config.aot_args.model.subgraph",
+        "config.engine.config.aot_args.model.type",
+        "config.engine.config.aot_args.model.version",
+        "config.engine.config.aot_args.module.name",
+        "config.engine.config.aot_args.module.prefix",
+        "config.engine.config.aot_args.module.schedule",
+        "config.engine.config.aot_args.module.type",
+        "config.engine.config.aot_args.optimization.allow_approximate",
+        "config.engine.config.aot_args.optimization.budget",
+        "config.engine.config.aot_args.optimization.goal",
+        "config.engine.config.aot_args.optimization.plan",
+        "config.engine.config.aot_args.platform.capabilities",
+        "config.engine.config.aot_args.platform.cpu",
+        "config.engine.config.aot_args.platform.memories",
+        "config.engine.config.aot_args.platform.min_alignment",
+        "config.engine.config.aot_args.platform.name",
+        "config.engine.config.aot_args.platform.preferred_memory_order",
+        "config.engine.config.aot_args.result_views",
+        "config.engine.config.aot_args.test.enabled",
+        "config.engine.config.aot_args.test.golden_data",
+        "config.engine.config.aot_args.test.num_iterations",
+        "config.engine.config.aot_args.test.skip_verification",
+        "config.engine.config.aot_args.test.state_feedback",
+        "config.engine.config.aot_args.test.tolerance",
+        "config.engine.config.aot_args.transforms",
+        "config.engine.type",
+        "config.model.arena_location",
+        "config.model.arena_size",
+        "config.profiling.iterations",
+        "config.profiling.pmu_counters.0",
+        "config.target.board",
+        "config.target.clock.cpu",
+        "config.target.toolchain",
+        "config.target.transport",
+        "engine.backend",
+        "engine.effective_config_keys.0",
+        "engine.effective_config_keys.1",
+        "engine.effective_config_keys.2",
+        "engine.effective_config_keys.3",
+        "engine.effective_config_pairing_sha256",
+        "engine.type",
+        "engine.version",
+        "kernel.build",
+        "toolchain.compiler",
+        "toolchain.compiler_version"
+      ],
+      "helia_aot_version": "0.33.0"
+    }
+  }
+}

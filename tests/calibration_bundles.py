@@ -2,6 +2,10 @@
 
 Needs no heliaAOT: the tests that read these bundles skip without the aot
 extra, the ones that only need a bundle on disk run everywhere.
+
+``python -m tests.calibration_bundles <out>`` writes the calibration file of
+:func:`golden_bundles` to *out*, which needs the aot extra; the committed
+``tests/fixtures/calibration/hpx_calibration.v2.json`` is written this way.
 """
 
 from __future__ import annotations
@@ -10,8 +14,15 @@ import csv
 import dataclasses
 import hashlib
 import json
+import sys
+import tempfile
+from collections.abc import Iterator
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
+
+import pytest
+from click import unstyle
 
 from helia_profiler.results import ResultValidity
 from helia_profiler.results.manifest import ResultIssue, load_result_manifest
@@ -46,9 +57,13 @@ PLAN_OPERATORS = [
 ]
 
 PLANS = Path(__file__).parent / "fixtures" / "calibration"
+#: The calibration file hpx's writer produces for :func:`golden_bundles`.
+GOLDEN = PLANS / "hpx_calibration.v2.json"
 
 
-def _aot_args(knob_values: dict[str, str] | None) -> dict[str, Any]:
+def _aot_args(
+    knob_values: dict[str, str] | None, memory: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """heliaAOT arguments in the shape its ConvertArgs accepts, knob values included.
 
     Validated by ConvertArgs wherever the aot extra is installed; a test
@@ -58,6 +73,8 @@ def _aot_args(knob_values: dict[str, str] | None) -> dict[str, Any]:
         "optimization": {"goal": "balanced", **(knob_values or {})},
         "operators": [{"type": "conv_2d", "optimization": dict(knob_values or {})}],
     }
+    if memory is not None:
+        args["memory"] = dict(memory)
     try:
         from helia_aot.cli.defines import ConvertArgs
     except ImportError:
@@ -94,6 +111,7 @@ def bundle(
     link_family: str = "gnu",
     arena_location: str | None = None,
     knob_values: dict[str, str] | None = None,
+    aot_memory: dict[str, Any] | None = None,
     jlink_serial: str = "1160002204",
     flags: str = "-mcpu=cortex-m55",
     kernel_commit: str | None = "c" * 40,
@@ -102,6 +120,8 @@ def bundle(
     power_config: dict[str, Any] | None = None,
     with_toolchain: bool = True,
     effective_config: str = "e" * 64,
+    effective_config_pairing: str | None = "9" * 64,
+    weights_location: str | None = "tcm",
     layer_cycles_text: str | None = None,
 ) -> Path:
     """Write a result bundle as ``hpx profile --engine helia-aot`` would."""
@@ -132,13 +152,13 @@ def bundle(
                 "path": str(path / "kws.tflite"),
                 "arena_size": 262144,
                 "arena_location": arena_location,
-                "weights_location": "tcm",
+                "weights_location": weights_location,
             },
             "engine": {
                 "type": "helia-aot",
                 "backend": backend,
                 "config_path": None,
-                "config": {"aot_args": _aot_args(knob_values)},
+                "config": {"aot_args": _aot_args(knob_values, aot_memory)},
             },
             "target": {
                 "board": "apollo510_evb",
@@ -173,6 +193,8 @@ def bundle(
             ]
         },
     }
+    if effective_config_pairing is not None:
+        metadata["engine"]["effective_config_pairing_sha256"] = effective_config_pairing
     if with_toolchain:
         metadata["toolchain"] = {"compiler": toolchain, "compiler_version": compiler_version}
     (path / "run_metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -197,6 +219,15 @@ def bundle(
         (path / name).write_text(json.dumps(plan), encoding="utf-8")
     publish_manifest(path)
     return path
+
+
+def flat(output: str) -> str:
+    """CLI output as one line, however the terminal wrapped it.
+
+    Escape codes are dropped, panel borders become spaces and whitespace is
+    collapsed, so a phrase reads the same wherever a line breaks.
+    """
+    return " ".join(unstyle(output).replace("│", " ").split())
 
 
 def _republish(path: Path, **changes: Any) -> None:
@@ -227,14 +258,15 @@ def _mark(path: Path, validity: ResultValidity, *codes: str, severity: str = "er
     _republish(path, validity=validity, issues=issues)
 
 
-def _hand_written(path: Path, operators: dict[str, Any], sha256: str = SHA) -> Path:
+def _hand_written(path: Path, operator_cycles: dict[str, Any], sha256: str = SHA) -> Path:
+    """A schema 2 table as a person writes it for heliaOptimus: no ``capture`` block."""
     path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "model": {"sha256": sha256, "subgraph": 0},
                 "conditions": CONDITIONS,
-                "operators": operators,
+                "operator_cycles": operator_cycles,
             }
         ),
         encoding="utf-8",
@@ -247,8 +279,122 @@ def two_bundles(tmp_path: Path) -> tuple[Path, Path]:
     auto = bundle(tmp_path / "auto", cycles={0: 12000.0, 1: 3000.0, 2: 400.0})
     wide = bundle(
         tmp_path / "wide",
-        cycles={0: 9000.0, 1: 3030.0, 2: 410.0},
+        cycles={0: 9000.0, 1: 3030.0, 2: 405.0},
         plan_ops=_knob(PLAN_OPERATORS, "0:conv", "accumulation", "fast"),
         knob_values={"accumulation": "fast"},
     )
     return auto, wide
+
+
+#: The heliaAOT memory arguments of every capture of a pair: hpx accepts
+#: PSRAM weights only in external-arena mode, and the setting is held.
+PAIR_AOT_MEMORY: dict[str, Any] = {"allocate_arenas": False}
+
+
+def pair(tmp_path: Path, slow_memory: str) -> tuple[Path, Path]:
+    """A capture with the weights in *slow_memory* (``mram`` or ``psram``) and one in TCM.
+
+    Everything else is held, as one operator session records it: both run
+    with :data:`PAIR_AOT_MEMORY`, the compiler's configuration differs only
+    in the constants' placement rule hpx derives from ``weights_location``,
+    so its pairing digest is shared, and the PSRAM clock is recorded only by
+    the run that used PSRAM.
+    """
+    slow_conditions: dict[str, Any] = {**CONDITIONS, "weights_memory": slow_memory}
+    if slow_memory == "psram":
+        slow_conditions["external_memory_clock"] = 48
+    slow = bundle(
+        tmp_path / f"{slow_memory}-pair" / slow_memory,
+        cycles={0: 15000.0, 1: 3600.0, 2: 400.0},
+        conditions=slow_conditions,
+        weights_location=slow_memory,
+        aot_memory=PAIR_AOT_MEMORY,
+        effective_config=hashlib.sha256(f"constants in {slow_memory}".encode()).hexdigest(),
+    )
+    fast = bundle(
+        tmp_path / f"{slow_memory}-pair" / "tcm",
+        cycles={0: 12000.0, 1: 3000.0, 2: 400.0},
+        weights_location="tcm",
+        aot_memory=PAIR_AOT_MEMORY,
+        effective_config=hashlib.sha256(b"constants staged in dtcm").hexdigest(),
+    )
+    return slow, fast
+
+
+def _golden_plan(changes: dict[str, dict[str, str]]) -> list[dict[str, Any]]:
+    """:data:`PLAN_OPERATORS` with *changes* applied to the knobs, each operator's
+    kernel entry named after its vector, and the fc's fixed weight layout."""
+    ops = json.loads(json.dumps(PLAN_OPERATORS))
+    for op in ops:
+        for knob, value in changes.get(op["id"], {}).items():
+            op["knobs"][knob] = {"value": value, "approximate": value == "fast"}
+        vector = sorted((knob, choice["value"]) for knob, choice in op["knobs"].items())
+        op["kernel"] = {"entry": "_".join([op["op_type"], *(f"{k}_{v}" for k, v in vector)])}
+        if op["id"] == "0:fc":
+            op["fixed"] = {"weight_layout": {"value": "packed", "set_by": "heuristic"}}
+    return ops
+
+
+def golden_bundles(path: Path) -> tuple[Path, Path, Path, Path]:
+    """Four bundles of :data:`PLAN_OPERATORS`: a base and one knob moved in each other.
+
+    ``0:fc``'s two knobs are swept one at a time from the base's
+    ``(precise, specialized)``; together they write 3 operators and 6 samples.
+    """
+    base = {0: 12000.0, 1: 3000.0, 2: 400.0}
+    sweeps = (
+        ("base", {}, {}, {}),
+        ("conv_fast", {"0:conv": {"accumulation": "fast"}}, {0: 9000.0}, {"accumulation": "fast"}),
+        ("fc_generic", {"0:fc": {"kernel": "generic"}}, {1: 3600.0}, {"kernel": "generic"}),
+        ("fc_fast", {"0:fc": {"accumulation": "fast"}}, {1: 2400.0}, {"accumulation": "fast"}),
+    )
+    first, second, third, fourth = (
+        bundle(
+            path / name,
+            cycles={**base, **cycles},
+            plan_ops=_golden_plan(changes),
+            knob_values=knob_values or None,
+        )
+        for name, changes, cycles, knob_values in sweeps
+    )
+    return first, second, third, fourth
+
+
+def _calibration_schema() -> dict[str, Any]:
+    text = files("helia_profiler").joinpath("data/calibration.schema.v2.json").read_text("utf-8")
+    return json.loads(text)
+
+
+@pytest.fixture
+def schema_checked_writes(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Hold every file ``calibrate`` writes to the exported schema and to hpx's own reader."""
+    from jsonschema import Draft202012Validator
+
+    from helia_profiler.calibration import table
+
+    validator = Draft202012Validator(_calibration_schema())
+    original = table.write_calibration
+
+    def checked(written: Any, path: Path) -> Path:
+        result = original(written, path)
+        validator.validate(json.loads(path.read_text(encoding="utf-8")))
+        assert table.read_calibration(path) == written
+        return result
+
+    monkeypatch.setattr(table, "write_calibration", checked)
+    yield
+
+
+def write_golden(output: Path) -> Path:
+    """Calibrate :func:`golden_bundles` into *output* with hpx's own writer."""
+    from helia_profiler.calibration import calibrate
+
+    with tempfile.TemporaryDirectory() as directory:
+        calibrate(golden_bundles(Path(directory)), output=output)
+    return output
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        raise SystemExit("usage: python -m tests.calibration_bundles <out>")
+    write_golden(Path(sys.argv[1]))

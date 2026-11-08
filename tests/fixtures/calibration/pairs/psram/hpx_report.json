@@ -1,0 +1,266 @@
+{
+  "constant_placement": {
+    "cold_source": "PSRAM",
+    "constant_bytes_in_tcm": 0,
+    "constant_bytes_outside_tcm": {
+      "PSRAM": 29088
+    },
+    "dtcm_budget_bytes": 507904,
+    "dtcm_free_bytes": 488560,
+    "id_specific_constant_rules": 0
+  },
+  "hints": [
+    {
+      "alternative": "DTCM",
+      "current": "PSRAM",
+      "facts": {
+        "constant_bytes_outside_tcm": 29088,
+        "dtcm_budget_bytes": 507904,
+        "dtcm_free_bytes": 488560
+      },
+      "mac_share": null,
+      "message": "constants are read from outside TCM (29088 B in PSRAM); 488560 B of DTCM is not used by this module's arenas, so they fit (your application's stack and data share DTCM)",
+      "operators": [],
+      "setting": "constant_placement",
+      "yaml": "memory:\n  tensors:\n    - type: constant\n      attributes: {memory: PSRAM, constant_destination_memory: DTCM}"
+    }
+  ],
+  "kernel_calls": {
+    "calls": [
+      {
+        "operator_ids": [
+          "0:functional_1/average_pooling2d/AvgPool"
+        ],
+        "symbol": "arm_avgpool_s8"
+      },
+      {
+        "operator_ids": [
+          "0:functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1",
+          "0:functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1",
+          "0:functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1",
+          "0:functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1"
+        ],
+        "symbol": "arm_convolve_1x1_s8_fast"
+      },
+      {
+        "operator_ids": [
+          "0:functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1"
+        ],
+        "symbol": "arm_convolve_s8_small_cin"
+      },
+      {
+        "operator_ids": [
+          "0:functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1",
+          "0:functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1",
+          "0:functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1",
+          "0:functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1"
+        ],
+        "symbol": "arm_depthwise_conv_s8_opt_3x3_c64_s1"
+      },
+      {
+        "operator_ids": [
+          "0:functional_1/dense/BiasAdd"
+        ],
+        "symbol": "arm_fully_connected_per_channel_packed_s8"
+      },
+      {
+        "operator_ids": [
+          "0:functional_1/flatten/Reshape"
+        ],
+        "symbol": "arm_memcpy_s8"
+      },
+      {
+        "operator_ids": [
+          "0:Identity"
+        ],
+        "symbol": "arm_softmax_s8"
+      }
+    ],
+    "unrecorded_operator_ids": []
+  },
+  "measurements": {
+    "accumulation": [],
+    "allow_approximate": [],
+    "constant_placement": [
+      {
+        "accuracy": "exact",
+        "cmsis_nn": "7.36.0",
+        "conditions": "Apollo510 EVB at 96 MHz",
+        "cpu": "cortex-m55",
+        "gain": "AD 2.70x, sleep FP16 1.28x, sleep FP32 1.22x; KWS, VWW, IC and TCN within 1%",
+        "generated_by": "recorded by hand from the helia-profiler placement A/B",
+        "helia_aot": "0.23.0",
+        "setting": "constant_placement",
+        "source": "helia-aot #513",
+        "subject": "whole model, weights staged into DTCM instead of SRAM",
+        "target": "apollo510_evb",
+        "value": "DTCM"
+      }
+    ],
+    "goal": [],
+    "kernel": []
+  },
+  "operators": [
+    {
+      "entry": "arm_convolve_s8_small_cin",
+      "id": "0:functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 320000
+    },
+    {
+      "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+      "id": "0:functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 72000
+    },
+    {
+      "entry": "arm_convolve_1x1_s8_fast",
+      "id": "0:functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": false,
+          "reason": "no specialized entry applies to this shape on this target"
+        }
+      },
+      "macs": 512000
+    },
+    {
+      "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+      "id": "0:functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 72000
+    },
+    {
+      "entry": "arm_convolve_1x1_s8_fast",
+      "id": "0:functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": false,
+          "reason": "no specialized entry applies to this shape on this target"
+        }
+      },
+      "macs": 512000
+    },
+    {
+      "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+      "id": "0:functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 72000
+    },
+    {
+      "entry": "arm_convolve_1x1_s8_fast",
+      "id": "0:functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": false,
+          "reason": "no specialized entry applies to this shape on this target"
+        }
+      },
+      "macs": 512000
+    },
+    {
+      "entry": "arm_depthwise_conv_s8_opt_3x3_c64_s1",
+      "id": "0:functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 72000
+    },
+    {
+      "entry": "arm_convolve_1x1_s8_fast",
+      "id": "0:functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": false,
+          "reason": "no specialized entry applies to this shape on this target"
+        }
+      },
+      "macs": 512000
+    },
+    {
+      "entry": "arm_avgpool_s8",
+      "id": "0:functional_1/average_pooling2d/AvgPool",
+      "knobs": {},
+      "macs": 0
+    },
+    {
+      "entry": null,
+      "id": "0:functional_1/flatten/Reshape",
+      "knobs": {},
+      "macs": 0
+    },
+    {
+      "entry": "arm_fully_connected_per_channel_packed_s8",
+      "id": "0:functional_1/dense/BiasAdd",
+      "knobs": {
+        "kernel": {
+          "alternatives": [
+            "generic"
+          ],
+          "applicable": true,
+          "reason": null
+        }
+      },
+      "macs": 768
+    },
+    {
+      "entry": null,
+      "id": "0:Identity",
+      "knobs": {},
+      "macs": 0
+    }
+  ],
+  "plan_file": "hpx_plan.json",
+  "schema_version": 1,
+  "total_macs": 2656768
+}

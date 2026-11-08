@@ -18,7 +18,7 @@ import json
 import logging
 import math
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -542,21 +542,67 @@ def without_knob_values(
     return data
 
 
+#: A key a path names as written; any other key is shown JSON-quoted.
+_PLAIN_KEY = re.compile(r"[A-Za-z0-9_-]+")
+
+#: A node's place in the document: the parent's link and the node's key.
+_Link = tuple[Any, Any] | None
+
+
+def _nodes(value: Any) -> Iterator[tuple[Any, _Link, int]]:
+    """Every node of a JSON value in document order, with its link and depth.
+
+    Walks with an explicit stack, so no nesting exhausts Python's recursion
+    limit; a node's path is built only from its link, when it is reported.
+    A scalar is at depth 0 and the members of a container one deeper than it.
+    """
+    stack: list[tuple[Any, _Link, int]] = [(value, None, 0)]
+    while stack:
+        node, link, depth = stack.pop()
+        yield node, link, depth
+        if isinstance(node, dict):
+            children = list(node.items())
+        elif isinstance(node, list):
+            children = list(enumerate(node))
+        else:
+            continue
+        stack.extend((item, (link, key), depth + 1) for key, item in reversed(children))
+
+
+def _path(link: _Link, prefix: str) -> str:
+    """The dotted path of a link: plain keys as written, any other JSON-quoted in brackets."""
+    keys: list[Any] = []
+    while link is not None:
+        link, key = link
+        keys.append(key)
+    path = prefix
+    for key in reversed(keys):
+        if isinstance(key, int) or _PLAIN_KEY.fullmatch(key):
+            path = f"{path}.{key}" if path else str(key)
+        else:
+            path = f"{path}[{json.dumps(key)}]"
+    return path or "<root>"
+
+
 def non_finite_field(value: Any, prefix: str = "") -> str | None:
-    """The dotted name of the first NaN or infinity in *value*, else ``None``."""
-    if isinstance(value, float) and not math.isfinite(value):
-        return prefix or "<root>"
-    if isinstance(value, dict):
-        for key, item in value.items():
-            found = non_finite_field(item, f"{prefix}.{key}" if prefix else str(key))
-            if found is not None:
-                return found
-    elif isinstance(value, list):
-        for index, item in enumerate(value):
-            found = non_finite_field(item, f"{prefix}.{index}" if prefix else str(index))
-            if found is not None:
-                return found
+    """The path of the first NaN or infinity in *value*, after *prefix*, else ``None``.
+
+    A key other than letters, digits, ``_`` and ``-`` is shown JSON-quoted,
+    so a dot, a newline or an escape sequence in it cannot change how the
+    path reads.
+    """
+    for node, link, _ in _nodes(value):
+        if isinstance(node, float) and not math.isfinite(node):
+            return _path(link, prefix)
     return None
+
+
+def nesting_depth(value: Any) -> int:
+    """How deeply *value* nests containers: 0 for a scalar, 1 for a flat object or list."""
+    return max(
+        (depth + 1 for node, _, depth in _nodes(value) if isinstance(node, (dict, list))),
+        default=0,
+    )
 
 
 def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
@@ -590,6 +636,69 @@ def effective_config_digest(
         data, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False
     )
     return hashlib.sha256(canonical.encode()).hexdigest(), tuple(sorted(data))
+
+
+#: The attributes of a ``memory.tensors[]`` rule that say where constants live.
+_CONSTANT_PLACEMENT_ATTRIBUTES = frozenset({"memory", "constant_destination_memory", "residency"})
+_CONSTANT_KIND = "constant"
+
+
+def without_constant_placement(aot_args: Mapping[str, Any]) -> dict[str, Any]:
+    """heliaAOT arguments less every placement of the constants, as a fresh dict.
+
+    In ``memory.tensors[]``, a rule whose ``type`` is ``constant`` (compared
+    ignoring case, as heliaAOT and :func:`user_wildcard_kinds` compare it)
+    and whose ``attributes`` hold nothing but ``memory``,
+    ``constant_destination_memory`` and ``residency`` is removed; a constant
+    rule that sets other attributes keeps them and loses only those three.
+    ``scratch`` and ``persistent`` rules are untouched, as is a rule whose
+    ``attributes`` is not a mapping, so heliaAOT's ``ConvertArgs`` refuses it
+    as it does for the ordinary digest. Two runs that differ only in where
+    the weights sit therefore give the same arguments.
+    """
+    data = copy.deepcopy(dict(aot_args))
+    memory = data.get("memory")
+    rules = memory.get("tensors") if isinstance(memory, dict) else None
+    if not isinstance(memory, dict) or not isinstance(rules, list):
+        return data
+    kept: list[Any] = []
+    for rule in rules:
+        kind = rule.get("type") if isinstance(rule, dict) else None
+        if not (isinstance(kind, str) and kind.casefold() == _CONSTANT_KIND):
+            kept.append(rule)
+            continue
+        attributes = rule.get("attributes", {})
+        if not isinstance(attributes, dict):
+            kept.append(rule)
+            continue
+        rest = {
+            key: value
+            for key, value in attributes.items()
+            if key not in _CONSTANT_PLACEMENT_ATTRIBUTES
+        }
+        if rest:
+            kept.append({**rule, "attributes": rest})
+    memory["tensors"] = kept
+    return data
+
+
+def effective_config_pairing_digest(
+    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+) -> tuple[str, tuple[str, ...]]:
+    """:func:`effective_config_digest` of the arguments less the constants' placement.
+
+    The arguments go through :func:`without_constant_placement` first, so two
+    conversions that differ only in where the weights sit digest the same.
+
+    Raises:
+        EngineError: as :func:`without_knob_values` raises it.
+    """
+    return effective_config_digest(
+        without_constant_placement(aot_args),
+        module_name=module_name,
+        prefix=prefix,
+        aot_platform=aot_platform,
+    )
 
 
 def _merge_aot_tensor_rulesets(

@@ -181,6 +181,11 @@ class EngineArtifacts:
         return ()
 
     @property
+    def effective_config_pairing_sha256(self) -> str | None:
+        """:attr:`effective_config_sha256` less every placement rule of the constants."""
+        return None
+
+    @property
     def resolved_version(self) -> str | None:
         return None
 
@@ -284,6 +289,9 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: ``operators[].optimization.<knob>`` for every registered knob.
     aot_effective_config_sha256: str | None = None
     aot_effective_config_keys: tuple[str, ...] = ()
+    #: The same digest less every placement rule of the constants
+    #: (``compile.effective_config_pairing_digest``).
+    aot_effective_config_pairing_sha256: str | None = None
 
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = EngineType.HELIA_AOT
 
@@ -294,6 +302,10 @@ class HeliaAotArtifacts(EngineArtifacts):
     @property
     def effective_config_keys(self) -> tuple[str, ...]:
         return self.aot_effective_config_keys
+
+    @property
+    def effective_config_pairing_sha256(self) -> str | None:
+        return self.aot_effective_config_pairing_sha256
 
     @property
     def resolved_version(self) -> str | None:

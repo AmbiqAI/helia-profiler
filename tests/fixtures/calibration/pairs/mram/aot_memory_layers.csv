@@ -1,0 +1,70 @@
+layer_idx,layer_id,op_type,op_name,tensor_role,tensor_id,tensor_name,tensor_kind,memory,source_memory,staged,arena_role,arena_region_id,offset,size,shape
+0,0,CONV_2D,conv_2d_0,input,0,input_1,input,dtcm,dtcm,False,scratch,0,8000,490,"[1, 49, 10, 1]"
+0,0,CONV_2D,conv_2d_0,output,22,functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+0,0,CONV_2D,conv_2d_0,local,17,functional_1/conv2d/Conv2D,constant,mram,mram,False,constant,1,0,2560,"[64, 10, 4, 1]"
+0,0,CONV_2D,conv_2d_0,local,conv_2d_0_scratch,,scratch,dtcm,dtcm,False,scratch,0,8496,192,[192]
+0,0,CONV_2D,conv_2d_0,local,conv_2d_0_weight_sum,,constant,mram,mram,False,constant,1,2560,256,[64]
+0,0,CONV_2D,conv_2d_0,local,conv_2d_0_multiplier,,constant,mram,mram,False,constant,1,2816,256,[64]
+0,0,CONV_2D,conv_2d_0,local,conv_2d_0_shift,,constant,mram,mram,False,constant,1,3072,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,input,22,functional_1/activation/Relu;functional_1/batch_normalization/FusedBatchNormV3;functional_1/conv2d/BiasAdd/ReadVariableOp/resource;functional_1/conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,output,23,functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,5,functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource,constant,mram,mram,False,constant,1,3328,576,"[1, 3, 3, 64]"
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,depthwise_conv_2d_1_scratch,,scratch,dtcm,dtcm,False,scratch,0,16000,3344,[3344]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,depthwise_conv_2d_1_weight_sum,,constant,mram,mram,False,constant,1,3904,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,depthwise_conv_2d_1_multiplier,,constant,mram,mram,False,constant,1,4160,256,[64]
+1,1,DEPTHWISE_CONV_2D,depthwise_conv_2d_1,local,depthwise_conv_2d_1_shift,,constant,mram,mram,False,constant,1,4416,256,[64]
+2,2,CONV_2D,conv_2d_2,input,23,functional_1/activation_1/Relu;functional_1/batch_normalization_1/FusedBatchNormV3;functional_1/depthwise_conv2d/depthwise;functional_1/depthwise_conv2d/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+2,2,CONV_2D,conv_2d_2,output,24,functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+2,2,CONV_2D,conv_2d_2,local,18,functional_1/conv2d_1/Conv2D,constant,mram,mram,False,constant,1,4672,4096,"[64, 1, 1, 64]"
+2,2,CONV_2D,conv_2d_2,local,conv_2d_2_weight_sum,,constant,mram,mram,False,constant,1,8768,256,[64]
+2,2,CONV_2D,conv_2d_2,local,conv_2d_2_multiplier,,constant,mram,mram,False,constant,1,9024,256,[64]
+2,2,CONV_2D,conv_2d_2,local,conv_2d_2_shift,,constant,mram,mram,False,constant,1,9280,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,input,24,functional_1/activation_2/Relu;functional_1/batch_normalization_2/FusedBatchNormV3;functional_1/conv2d_1/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_1/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,output,25,functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,8,functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource,constant,mram,mram,False,constant,1,9536,576,"[1, 3, 3, 64]"
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,depthwise_conv_2d_3_scratch,,scratch,dtcm,dtcm,False,scratch,0,16000,3344,[3344]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,depthwise_conv_2d_3_weight_sum,,constant,mram,mram,False,constant,1,10112,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,depthwise_conv_2d_3_multiplier,,constant,mram,mram,False,constant,1,10368,256,[64]
+3,3,DEPTHWISE_CONV_2D,depthwise_conv_2d_3,local,depthwise_conv_2d_3_shift,,constant,mram,mram,False,constant,1,10624,256,[64]
+4,4,CONV_2D,conv_2d_4,input,25,functional_1/activation_3/Relu;functional_1/batch_normalization_3/FusedBatchNormV3;functional_1/depthwise_conv2d_1/depthwise;functional_1/depthwise_conv2d_1/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_1/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+4,4,CONV_2D,conv_2d_4,output,26,functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+4,4,CONV_2D,conv_2d_4,local,19,functional_1/conv2d_2/Conv2D,constant,mram,mram,False,constant,1,10880,4096,"[64, 1, 1, 64]"
+4,4,CONV_2D,conv_2d_4,local,conv_2d_4_weight_sum,,constant,mram,mram,False,constant,1,14976,256,[64]
+4,4,CONV_2D,conv_2d_4,local,conv_2d_4_multiplier,,constant,mram,mram,False,constant,1,15232,256,[64]
+4,4,CONV_2D,conv_2d_4,local,conv_2d_4_shift,,constant,mram,mram,False,constant,1,15488,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,input,26,functional_1/activation_4/Relu;functional_1/batch_normalization_4/FusedBatchNormV3;functional_1/conv2d_2/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_2/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,output,27,functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,11,functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource,constant,mram,mram,False,constant,1,15744,576,"[1, 3, 3, 64]"
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,depthwise_conv_2d_5_scratch,,scratch,dtcm,dtcm,False,scratch,0,16000,3344,[3344]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,depthwise_conv_2d_5_weight_sum,,constant,mram,mram,False,constant,1,16320,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,depthwise_conv_2d_5_multiplier,,constant,mram,mram,False,constant,1,16576,256,[64]
+5,5,DEPTHWISE_CONV_2D,depthwise_conv_2d_5,local,depthwise_conv_2d_5_shift,,constant,mram,mram,False,constant,1,16832,256,[64]
+6,6,CONV_2D,conv_2d_6,input,27,functional_1/activation_5/Relu;functional_1/batch_normalization_5/FusedBatchNormV3;functional_1/depthwise_conv2d_2/depthwise;functional_1/depthwise_conv2d_2/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_2/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+6,6,CONV_2D,conv_2d_6,output,28,functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+6,6,CONV_2D,conv_2d_6,local,20,functional_1/conv2d_3/Conv2D,constant,mram,mram,False,constant,1,17088,4096,"[64, 1, 1, 64]"
+6,6,CONV_2D,conv_2d_6,local,conv_2d_6_weight_sum,,constant,mram,mram,False,constant,1,21184,256,[64]
+6,6,CONV_2D,conv_2d_6,local,conv_2d_6_multiplier,,constant,mram,mram,False,constant,1,21440,256,[64]
+6,6,CONV_2D,conv_2d_6,local,conv_2d_6_shift,,constant,mram,mram,False,constant,1,21696,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,input,28,functional_1/activation_6/Relu;functional_1/batch_normalization_6/FusedBatchNormV3;functional_1/conv2d_3/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/conv2d_3/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,output,29,functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,14,functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource,constant,mram,mram,False,constant,1,21952,576,"[1, 3, 3, 64]"
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,depthwise_conv_2d_7_scratch,,scratch,dtcm,dtcm,False,scratch,0,16000,3344,[3344]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,depthwise_conv_2d_7_weight_sum,,constant,mram,mram,False,constant,1,22528,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,depthwise_conv_2d_7_multiplier,,constant,mram,mram,False,constant,1,22784,256,[64]
+7,7,DEPTHWISE_CONV_2D,depthwise_conv_2d_7,local,depthwise_conv_2d_7_shift,,constant,mram,mram,False,constant,1,23040,256,[64]
+8,8,CONV_2D,conv_2d_8,input,29,functional_1/activation_7/Relu;functional_1/batch_normalization_7/FusedBatchNormV3;functional_1/depthwise_conv2d_3/depthwise;functional_1/depthwise_conv2d_3/BiasAdd;functional_1/conv2d_4/Conv2D;functional_1/depthwise_conv2d_3/BiasAdd/ReadVariableOp/resource1,scratch,dtcm,dtcm,False,scratch,0,8000,8000,"[1, 25, 5, 64]"
+8,8,CONV_2D,conv_2d_8,output,30,functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+8,8,CONV_2D,conv_2d_8,local,21,functional_1/conv2d_4/Conv2D,constant,mram,mram,False,constant,1,23296,4096,"[64, 1, 1, 64]"
+8,8,CONV_2D,conv_2d_8,local,conv_2d_8_weight_sum,,constant,mram,mram,False,constant,1,27392,256,[64]
+8,8,CONV_2D,conv_2d_8,local,conv_2d_8_multiplier,,constant,mram,mram,False,constant,1,27648,256,[64]
+8,8,CONV_2D,conv_2d_8,local,conv_2d_8_shift,,constant,mram,mram,False,constant,1,27904,256,[64]
+9,9,AVERAGE_POOL_2D,average_pool_2d_9,input,30,functional_1/activation_8/Relu;functional_1/batch_normalization_8/FusedBatchNormV3;functional_1/conv2d_4/BiasAdd/ReadVariableOp/resource;functional_1/conv2d_4/BiasAdd;functional_1/conv2d_4/Conv2D1,scratch,dtcm,dtcm,False,scratch,0,0,8000,"[1, 25, 5, 64]"
+9,9,AVERAGE_POOL_2D,average_pool_2d_9,output,31,functional_1/average_pooling2d/AvgPool,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 1, 1, 64]"
+10,10,RESHAPE,reshape_10,input,31,functional_1/average_pooling2d/AvgPool,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 1, 1, 64]"
+10,10,RESHAPE,reshape_10,output,32,functional_1/flatten/Reshape,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 64]"
+10,10,RESHAPE,reshape_10,local,2,functional_1/flatten/Const,constant,mram,mram,False,constant,1,28160,8,[2]
+11,11,FULLY_CONNECTED,fully_connected_11,input,32,functional_1/flatten/Reshape,scratch,dtcm,dtcm,False,scratch,0,8000,64,"[1, 64]"
+11,11,FULLY_CONNECTED,fully_connected_11,output,33,functional_1/dense/BiasAdd,scratch,dtcm,dtcm,False,scratch,0,0,12,"[1, 12]"
+11,11,FULLY_CONNECTED,fully_connected_11,local,fully_connected_11_packed,,constant,mram,mram,False,constant,1,28176,912,[912]
+12,12,SOFTMAX,softmax_12,input,33,functional_1/dense/BiasAdd,scratch,dtcm,dtcm,False,scratch,0,0,12,"[1, 12]"
+12,12,SOFTMAX,softmax_12,output,34,Identity,output,dtcm,dtcm,False,scratch,0,16,12,"[1, 12]"

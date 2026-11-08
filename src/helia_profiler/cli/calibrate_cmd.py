@@ -33,5 +33,5 @@ def _cmd_calibrate(
         sys.exit(1)
     print(
         f"Wrote calibration: {output} "
-        f"({len(table.operators)} operators, {table.price_count} prices)"
+        f"({table.operator_count} operators, {len(table.samples)} samples)"
     )

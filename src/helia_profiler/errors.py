@@ -131,7 +131,7 @@ class PowerError(HpxError):
 
 
 class CalibrationError(HpxError):
-    """``hpx calibrate`` refused a bundle, a price or an existing file."""
+    """``hpx calibrate`` refused a bundle, a sample or an existing file."""
 
 
 class ReportError(HpxError):

@@ -23,7 +23,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
 | `aot_operator_manifest.json` | engine extension | the operators the AOT compiler emitted with tensor placement | `helia-aot` runs |
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
-| `<prefix>_plan.json`, `<prefix>_report.json` | heliaAOT's plan and report schemas | the compiler's own record of every operator's knob values, and its report; `hpx calibrate` (which needs the `aot` extra installed) reads the plan | `helia-aot` runs, when the installed heliaAOT writes them |
+| `<prefix>_plan.json`, `<prefix>_report.json` | heliaAOT's plan and report schemas | the compiler's own record of every operator's knob values, and its report; `hpx calibrate` (which needs the `aot` extra installed) reads the plan and writes calibration schema 2 (`helia_profiler/data/calibration.schema.v2.json`): `operator_cycles` (every operator the plan lists, with knobs or without, one entry of `knobs`, `cycles` and `facts` per knob vector) and `capture.setup.pairing_digest` (the setup less where the constants sit, from `effective_config_pairing_sha256`; `null` for a bundle without it; `memory.allocate_arenas` stays held, so a pair that includes PSRAM weights needs `memory.allocate_arenas: false` on every capture of the pair); see [`hpx calibrate`](../../reference/cli/calibrate/) | `helia-aot` runs, when the installed heliaAOT writes them |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
 | `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v1 (`runs/record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
@@ -41,7 +41,11 @@ omits it reads the manifest without checking the files. The packaged JSON Schema
 `run_summary.schema.v1.json`, `run_metadata.schema.v1.json`,
 `profile_results.schema.v1.json`); they fix the stable root fields and stay
 open to additive extension, and the typed models in
-`helia_profiler.results` are the authoritative shape.
+`helia_profiler.results` are the authoritative shape. Beside them,
+`calibration.schema.v2.json` is the schema of the file `hpx calibrate`
+writes. Unlike the result schemas it is closed: within version 2 only
+`conditions`, the names and values in `knobs`, the operator ids and the fact
+values are open, and any other change to the file's shape is a new version.
 
 ## Steps
 
@@ -315,7 +319,7 @@ The provenance of the run, from `report/contracts.py`:
 | `platform` | `board`, `soc`, `core`, `link_family` (`gnu` for GCC and ATfE, `armlink` for armclang), the resolved clock tier |
 | `model` | `name`, `size` in bytes, `sha256` |
 | `toolchain` | `compiler`, `compiler_version`, `cmake_version` as found on the host |
-| `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT); for heliaAOT also `effective_config_sha256`, the digest of the configuration the compiler received (the merged arguments with hpx's forced fields and placement rulesets, validated and dumped in full by heliaAOT's `ConvertArgs`, less `optimization.<knob>` and `operators[].optimization.<knob>` for every knob heliaAOT registers, the paths of the run, `verbose` and `keep_work_dir`) and `effective_config_keys`, the top-level keys it covers |
+| `engine` | type and the measured runtime version where one resolves (heliaRT, heliaAOT); for heliaAOT also `effective_config_sha256`, the digest of the configuration the compiler received (the merged arguments with hpx's forced fields and placement rulesets, validated and dumped in full by heliaAOT's `ConvertArgs`, less `optimization.<knob>` and `operators[].optimization.<knob>` for every knob heliaAOT registers, the paths of the run, `verbose` and `keep_work_dir`) and `effective_config_keys`, the top-level keys it covers, and `effective_config_pairing_sha256`, the same digest of the arguments less every `memory.tensors[]` rule of the `constant` kind that sets only `memory`, `constant_destination_memory` or `residency` (and those three attributes of a constant rule that sets more), so runs that differ only in `model.weights_location` record the same value |
 | `build_images[]` | one entry per built target (`profile`, and `power` on a power run): `target_name`, `binary_name`, `sha256` of the linked ELF, `flash_sha256` of the flat `.bin` image the probe writes (no host paths; `null` when the build left none), `size_bytes`, `architecture_flags` counted from the configured build tree's `compile_commands.json`, `translation_units` |
 | `firmware` | `arena_size`, `allocated_arena`, `model_size` as the firmware reported them |
 | `conditions` | the same block `summary.json` carries: the board conditions the measurements refer to |
