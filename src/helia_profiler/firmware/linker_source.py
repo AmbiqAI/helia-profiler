@@ -56,8 +56,13 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
             value = value[1:-1]
         if _RESPONSE_FLAG.search(value):
             raise ValueError("Opaque linker response inputs have no characterized source closure")
+        script_input = _SCRIPT_FLAG.search(value) or Path(value).suffix.lower() in {
+            ".ld",
+            ".lds",
+            ".sct",
+        }
         if entry.get("role") != "flags":
-            if _SCRIPT_FLAG.search(value) or Path(value).suffix.lower() in {".ld", ".sct"}:
+            if script_input:
                 raise ValueError("Additional linker script input outside supported flags")
             continue
         prefix = next((flag for flag in _SCRIPT_OPTIONS if value.startswith(flag)), None)
@@ -66,7 +71,7 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
             if prefix.startswith("-Wl,") and "," in argument:
                 raise ValueError("Ambiguous forwarded linker script arguments")
             scripts.append((build_dir / argument).resolve())
-        elif _SCRIPT_FLAG.search(value):
+        elif script_input:
             raise ValueError("Unsupported combined linker script options")
     if len(scripts) != 1:
         raise ValueError(f"Expected one configured linker script, found {len(scripts)}")
