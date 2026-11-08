@@ -92,11 +92,11 @@ How it works, and the rules it must keep:
   cache (`HPX_CACHE_DIR`); it must never write under it. Scratch TUs go to
   pytest's `tmp_path`. `-fsyntax-only` means no objects and no
   launcher/ccache interplay.
-- **Vendored headers are `-isystem`.** Workspace `modules/` include dirs
-  are demoted so diagnostics located *inside* vendor headers (e.g. the
-  `AM_SHARED_RW` redefinition between `nsx_mem.h` and `am_hal_global.h`,
-  present in every production build) don't gate our rendered code, which
-  compiles at full `-Werror`.
+- **Include classifications match production.** The gate retains the
+  workspace's explicit `-I` and `-isystem` classifications. It does not
+  promote module directories to system headers. Rendered code compiles at
+  full `-Werror`; an SDK header regression visible under the production
+  include policy therefore fails the gate.
 - **Legs skip with a named reason** when their workspace is absent, has no
   fingerprinted (post-#212) layout, records no baseline fingerprint, was
   built against a different compatibility baseline than the checkout

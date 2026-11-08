@@ -41,7 +41,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
         == "c3816103ad8f55c44701d2a498bbc8c1e9869ae3e8eec1ab09eb8d79c602df79"
     )
     assert baseline.project("neuralspotx").ref == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
-    assert baseline.project("nsx-ambiq-sdk").ref == "993b7901a82008ac4cd523ffe0b125a016a8f6a8"
+    assert baseline.project("nsx-ambiq-sdk").ref == "acc97030b7158f81dc11f8df68fc43b8346f6dfe"
     assert baseline.project("nsx-pmu-armv8m").ref == "5725c065a0c3603132f1064ee2684d1fa8587c88"
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
@@ -56,7 +56,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
 
     assert {project.name: project.ref for project in baseline.projects} == {
         "neuralspotx": "62ca121a73b906f6ca8a82d4146b3c69d9587c5d",
-        "nsx-ambiq-sdk": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+        "nsx-ambiq-sdk": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
         # Vendored Arm Ethos-U core driver pulled transitively by nsx-npu;
         # the baseline records the resolved commit, not the registry's
         # mutable tag, so _verify_baseline_resolution covers the NPU
@@ -75,8 +75,8 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-segger-rtt": "9b5fe942de1607365a19bab1b6ed549541ff71c6",
     }
     assert {module.name: module.ref for module in baseline.modules} == {
-        "nsx-ambiq-bsp": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
-        "nsx-npu": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+        "nsx-ambiq-bsp": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
+        "nsx-npu": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
