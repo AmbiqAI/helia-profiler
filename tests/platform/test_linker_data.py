@@ -56,12 +56,25 @@ def test_uncharacterized_profiles_and_names_remain_unavailable():
     assert characterized_input("custom", LinkFamily.GNU) is None
 
 
-def test_public_window_order_retains_mram_tcm_sram_for_apollo3():
-    assert tuple(value.region for value in linked_memory_map(get_soc("apollo3p"))) == (
-        MemoryRegion.MRAM,
-        MemoryRegion.DTCM,
-        MemoryRegion.SRAM,
-    )
+@pytest.mark.parametrize(
+    ("soc", "order"),
+    [
+        ("apollo3p", (MemoryRegion.MRAM, MemoryRegion.DTCM, MemoryRegion.SRAM)),
+        (
+            "apollo510",
+            (
+                MemoryRegion.ITCM,
+                MemoryRegion.MRAM,
+                MemoryRegion.DTCM,
+                MemoryRegion.SRAM,
+                MemoryRegion.PSRAM,
+            ),
+        ),
+        ("atomiq110", (MemoryRegion.ITCM, MemoryRegion.MRAM, MemoryRegion.DTCM, MemoryRegion.SRAM)),
+    ],
+)
+def test_public_window_order_retains_the_existing_contract(soc, order):
+    assert tuple(value.region for value in linked_memory_map(get_soc(soc))) == order
 
 
 def test_source_identity_is_portable_across_checkout_line_endings(tmp_path):
