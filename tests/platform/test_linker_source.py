@@ -353,6 +353,10 @@ def test_actual_source_admission_refuses_before_link(linked_pipeline):
         ("flags", "-Wl,--start-group,alternate.sct,libhelper.a,--end-group"),
         ("flags", "-Wl,--default-script=alternate.txt"),
         ("flags", "-Wl,-dTalternate.txt"),
+        ("flags", "-Wl,-script=alternate.txt"),
+        ("flags", "-Wl,--scr=alternate.txt"),
+        ("flags", "-Wl,-default-script=alternate.txt"),
+        ("flags", "-Wl,--default-scr=alternate.txt"),
     ],
 )
 def test_opaque_or_additional_script_inputs_never_qualify(
@@ -448,7 +452,17 @@ def test_only_pending_declared_binary_products_can_qualify_before_build(configur
 @pytest.mark.parametrize("role", ["profile", "power"])
 @pytest.mark.parametrize(
     "search",
-    ["-L{path}", "-Wl,-L,{path}", "-L {path}", "--library-path={path}", "--userlibpath={path}"],
+    [
+        "-L{path}",
+        "-Wl,-L,{path}",
+        "-L {path}",
+        "--library-path={path}",
+        "--userlibpath={path}",
+        "-Wl,-library-path={path}",
+        "-Wl,--library-pa={path}",
+        "-library-path {path}",
+        "--userlibpa={path}",
+    ],
 )
 def test_explicit_library_search_cannot_hide_implicit_scripts(configured, role, search):
     _, build, _, _, _ = configured

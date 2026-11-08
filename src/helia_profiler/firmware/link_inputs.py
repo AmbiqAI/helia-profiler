@@ -26,6 +26,8 @@ _OPERAND_OPTIONS = frozenset(
     }
 )
 _BINARY_HEADERS = (b"\x7fELF", b"!<arch>\n", b"!<thin>\n", b"BC\xc0\xde", b"\xde\xc0\x17\x0b")
+_SEARCH_OPTIONS = ("library-path", "userlibpath")
+_SCRIPT_OPTIONS = ("script", "default-script", "scatter", "via")
 
 
 def _tokens(fragment: str) -> list[str]:
@@ -71,10 +73,17 @@ def validate_link_inputs(
     operand = None
     for fragment in fragments:
         for token in _tokens(fragment):
-            if token.startswith(("-L", "--library-path", "--userlibpath")):
+            name = token.lstrip("-").partition("=")[0] if token.startswith("-") else ""
+            # https://sourceware.org/binutils/docs/ld/Options.html: aliases and abbreviations.
+            long_option = bool(name) and (token.startswith("--") or len(name) > 1)
+            if token.startswith("-L") or (
+                long_option
+                and name != "library"
+                and any(o.startswith(name) for o in _SEARCH_OPTIONS)
+            ):
                 raise ValueError("Explicit linker library search paths are not characterized")
-            if token.startswith(
-                ("@", "--via", "-T", "-dT", "--script", "--default-script", "--scatter")
+            if token.startswith(("@", "-T", "-dT")) or (
+                long_option and any(o.startswith(name) for o in _SCRIPT_OPTIONS)
             ):
                 raise ValueError("Additional or opaque linker script input")
             if operand is not None:
