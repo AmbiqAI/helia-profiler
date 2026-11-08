@@ -202,3 +202,25 @@ def test_custom_board_with_another_soc_does_not_inherit_the_base_probe():
         }
     )
     assert get_soc_for_board("different", registry=registry).jlink_device == "AP510NFA-CBR"
+
+
+@pytest.mark.parametrize(
+    "base,parent_capacity,default_capacity",
+    [
+        ("apollo510_evb", 1024, 65536),
+        ("apollo3p_evb_cygnus", 8192, 0),
+    ],
+)
+def test_null_child_psram_restores_the_soc_default(base, parent_capacity, default_capacity):
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    registry = build_custom_platform_registry(
+        {
+            "custom_boards": {
+                "parent": {"based_on": base, "psram_kb": parent_capacity},
+                "child": {"based_on": "parent", "psram_kb": None},
+            }
+        }
+    )
+    assert get_soc_for_board("parent", registry=registry).memory.psram_kb == parent_capacity
+    assert get_soc_for_board("child", registry=registry).memory.psram_kb == default_capacity

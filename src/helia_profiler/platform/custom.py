@@ -30,7 +30,6 @@ from .registry import (
     build_platform_registry,
     get_board,
     get_soc,
-    get_soc_for_board,
 )
 from .soc import (
     ClockDomain,
@@ -528,7 +527,7 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> PlatformRegist
             description=str(spec.get("description", base_board.description if base_board else "")),
         )
         inherited = (
-            get_soc_for_board(base_board.name, registry=registry)
+            registry.board_socs.get(base_board.name) or get_soc(base_board.soc, registry=registry)
             if base_board is not None and board.soc == base_board.soc
             else None
         )
