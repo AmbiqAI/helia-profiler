@@ -1528,18 +1528,9 @@ class TestBuildAppFrozen:
         assert out_build_dir == build_dir
         assert out_binary == binary
 
-    def test_existing_build_still_verifies_dependencies_but_skips_configure(
+    def test_existing_build_refreshes_configuration_after_dependency_verification(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
     ):
-        """Offline incremental rebuild: frozen + an already-configured build
-
-        directory (build.ninja present) skips nsx lock, nsx sync, AND the
-        nsx configure() round-trip entirely -- CMake's own
-        --regenerate-during-build ninja rule picks up any regenerated
-        template changes on its own, with zero module-tree verification.
-        This is the fast path for iterating on a hand-patched vendored NSX
-        module without every rebuild silently reverting it.
-        """
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
         app_dir = tmp_path / "app"
@@ -1579,7 +1570,8 @@ class TestBuildAppFrozen:
         assert lock_calls == []
         assert sync_calls == []
         assert prepared == [app_dir]
-        assert configure_calls == []
+        assert len(configure_calls) == 1
+        assert configure_calls[0]["frozen"] is True
         assert len(build_calls) == 1
         assert out_build_dir == build_dir
         assert out_binary == binary

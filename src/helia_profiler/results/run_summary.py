@@ -27,7 +27,7 @@ from .serde import to_float, to_int
 
 RUN_SUMMARY_SCHEMA = "hpx.run-summary"
 #: Current summary format; historical changes are in the schema reference above.
-RUN_SUMMARY_SCHEMA_VERSION = 21
+RUN_SUMMARY_SCHEMA_VERSION = 22
 
 
 def _require_current_summary(data: Mapping[str, Any]) -> None:

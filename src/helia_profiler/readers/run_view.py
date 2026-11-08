@@ -10,7 +10,7 @@ from ..fixtures.power import GROSS_RAIL_SCOPE, FixtureBoardPowerRequest
 from ..identity import Unknown
 from ..runs.record import RunResultRecord
 
-MAPPING_VERSION = "hpx-run-3"
+MAPPING_VERSION = "hpx-run-4"
 _RESULT = "native-result"
 #: What ``engine.version`` means for each engine.
 _VERSION_BASIS = {
@@ -286,6 +286,9 @@ def _extension(record: RunResultRecord) -> dict[str, Any]:
         "target_config": _target_config(record),
         "platform_provenance": result.compiled.plan.platform.to_dict()
         if result.compiled.plan.platform is not None
+        else None,
+        "linker_verification": result.compiled.build.linker_verification.to_dict()
+        if result.compiled.build.linker_verification is not None
         else None,
         "cpu_clocks": _cpu_clocks(record),
         "semantic_hashes": {

@@ -298,23 +298,36 @@ class TestPlanMemorySynthesise:
         assert any(c.kind == "weights" for c in mram.consumers)
         assert any(c.kind == "arena" and c.size == 65536 for c in dtcm.consumers)
 
-    def test_mram_capacity_is_the_linker_application_window(self, tmp_path: Path):
+    def test_planning_keeps_declared_capacity_until_actual_source_admission(self, tmp_path: Path):
+        from helia_profiler.placement import admit_memory_plan
+
         overrides = {"model": {"path": str(tmp_path / "model.tflite"), "weights_location": "mram"}}
         ctx = _make_ctx(tmp_path, overrides)
         PlanMemoryStage().run(ctx)
         assert ctx.memory_plan is not None
         mram = ctx.memory_plan.region("MRAM")
-        assert mram is not None and mram.capacity == 4_128_768  # not the whole 4 MiB part
+        assert mram is not None and mram.capacity == 4_194_304
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None and platform.expected_linker is not None
+        admitted = admit_memory_plan(ctx.memory_plan, platform.expected_linker)
+        mram = admitted.region("MRAM")
+        assert mram is not None and mram.capacity == 4_128_768
 
     def test_weights_beyond_the_mram_application_window_are_refused_before_build(
         self, tmp_path: Path
     ):
+        from helia_profiler.placement import admit_memory_plan
+
         # Fits the 4,194,304 B part but not the 4,128,768 B the linker can use (#466).
         overrides = {"model": {"path": str(tmp_path / "model.tflite"), "weights_location": "mram"}}
         ctx = _make_ctx(tmp_path, overrides)
         (tmp_path / "model.tflite").write_bytes(b"\x00" * 4_130_000)
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None and platform.expected_linker is not None
         with pytest.raises(PlatformError, match="MRAM"):
-            PlanMemoryStage().run(ctx)
+            admit_memory_plan(ctx.memory_plan, platform.expected_linker)
 
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(self, tmp_path: Path):
         ctx = _make_ctx(

@@ -143,6 +143,7 @@ if TYPE_CHECKING:
     from .placement import Placement
     from .platform import BoardDef, SocDef, build_platform_registry, get_soc
     from .platform.counters import PmuCounter
+    from .platform.linker.model import LinkerFile, LinkerInput, LinkerRegion, LinkerVerification
     from .platform.provenance import (
         CatalogProvenance,
         CatalogSource,
@@ -308,6 +309,10 @@ _EXPORTS = {
     "ProgressUpdate": (".pipeline", "ProgressUpdate", "stable"),
     "Placement": (".placement", "Placement", "stable"),
     "BoardDef": (".platform", "BoardDef", "implementation"),
+    "LinkerFile": (".platform.linker.model", "LinkerFile", "experimental"),
+    "LinkerInput": (".platform.linker.model", "LinkerInput", "experimental"),
+    "LinkerRegion": (".platform.linker.model", "LinkerRegion", "experimental"),
+    "LinkerVerification": (".platform.linker.model", "LinkerVerification", "experimental"),
     "PlatformSnapshot": (".platform.provenance", "PlatformSnapshot", "experimental"),
     "CatalogProvenance": (".platform.provenance", "CatalogProvenance", "experimental"),
     "CatalogSource": (".platform.provenance", "CatalogSource", "experimental"),
@@ -633,6 +638,10 @@ __all__ = [
     "DoctorResult",
     "DoctorVersionCheck",
     "BoardDef",
+    "LinkerFile",
+    "LinkerInput",
+    "LinkerRegion",
+    "LinkerVerification",
     "PlatformSnapshot",
     "CatalogProvenance",
     "CatalogSource",

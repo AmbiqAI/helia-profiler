@@ -11,6 +11,7 @@ import pytest
 
 from helia_profiler.api import inspect_result, load_result
 from helia_profiler.readers.native import ProfileResultRecord, ResultReadError
+from helia_profiler.report.contracts import RUN_METADATA_SCHEMA_VERSION
 from helia_profiler.results.run_summary import RUN_SUMMARY_SCHEMA_VERSION
 
 
@@ -68,7 +69,7 @@ def bundle(root: Path, *, status="complete") -> Path:
             "hpx.run-metadata",
             {
                 "schema": "hpx.run-metadata",
-                "schema_version": 2,
+                "schema_version": RUN_METADATA_SCHEMA_VERSION,
                 "run_id": "synthetic-run",
                 "hpx_version": "synthetic",
                 "engine": {"type": "litert"},
@@ -694,10 +695,13 @@ def test_windows_native_path_rejection_precedes_portable_checks(tmp_path, monkey
     assert "non-empty relative path" in checked.message
 
 
-def test_earlier_metadata_contract_is_refused_without_relabelling(tmp_path):
+@pytest.mark.parametrize("version", [1, 2])
+def test_earlier_metadata_contract_is_refused_without_relabelling(tmp_path, version):
     path = bundle(tmp_path)
-    edit_document(path, "run_metadata.json", lambda value: value.update(schema_version=1))
-    with pytest.raises(ResultReadError, match="Expected hpx.run-metadata version 2"):
+    edit_document(path, "run_metadata.json", lambda value: value.update(schema_version=version))
+    with pytest.raises(
+        ResultReadError, match=f"Expected hpx.run-metadata version {RUN_METADATA_SCHEMA_VERSION}"
+    ):
         load_result(path)
 
 

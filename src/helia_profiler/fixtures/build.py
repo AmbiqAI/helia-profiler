@@ -404,6 +404,18 @@ def build_fixed_fixture(
         kernel_source=kernel_source,
         runtime_source=runtime_source,
         platform=config_platform(config),
+        linker_verification=(
+            next(
+                (
+                    value
+                    for value in ctx.run_metadata.linker_verifications
+                    if value.role == "profile"
+                ),
+                None,
+            )
+            if compile
+            else None
+        ),
         dependency_state=dependency_state,
         psram_weights=_psram_weights(ctx, flat_binary),
         arena_location=config.model.arena_location,

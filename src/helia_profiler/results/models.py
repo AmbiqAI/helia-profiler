@@ -23,11 +23,12 @@ from ..deps.compatibility import CompatibilityResolution
 from ..engines import EngineType
 from ..modelcost.layer_attribution import source_index_from_op
 from ..placement import MemoryRegion
+from ..platform.linker.model import LinkerVerification
 from ..platform.provenance import PlatformSnapshot
 from ..power.base import PowerResult
 
 RUN_METADATA_SCHEMA = "hpx.run-metadata"
-RUN_METADATA_SCHEMA_VERSION = 2
+RUN_METADATA_SCHEMA_VERSION = 3
 
 if TYPE_CHECKING:
     from ..evaluation import RunEvaluation
@@ -402,6 +403,7 @@ class RunMetadata:
     config_snapshot: dict[str, Any] = field(default_factory=dict)
     platform: PlatformInfo | None = None
     platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)
+    linker_verifications: tuple[LinkerVerification, ...] = field(default=(), kw_only=True)
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
     #: One entry per built target ("profile", "power"). Appended as each

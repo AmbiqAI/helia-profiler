@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ambiqai.github.io/helia-profiler/schemas/run-metadata/v3.json",
+  "title": "heliaPROFILER run metadata",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "hpx_version",
+    "run_id",
+    "timestamp"
+  ],
+  "properties": {
+    "schema": {
+      "const": "hpx.run-metadata"
+    },
+    "schema_version": {
+      "const": 3
+    },
+    "hpx_version": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "string"
+    },
+    "config": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "firmware": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "platform_provenance": {
+      "type": "object",
+      "required": [
+        "board",
+        "soc",
+        "selection",
+        "link_family",
+        "linker_profile",
+        "app_regions",
+        "load_address",
+        "expected_linker"
+      ],
+      "additionalProperties": true
+    },
+    "linker_verifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "role",
+          "target",
+          "layout",
+          "reason"
+        ],
+        "properties": {
+          "role": {
+            "enum": [
+              "profile",
+              "power"
+            ]
+          },
+          "target": {
+            "enum": [
+              "hpx_profiler",
+              "hpx_profiler_power"
+            ]
+          },
+          "layout": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

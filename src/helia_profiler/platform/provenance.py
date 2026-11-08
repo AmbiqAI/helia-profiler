@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import TypeAdapter
 
 from .board import BoardDef
-from .memory_map import LinkFamily, MemoryRegion, linked_memory_map
+from .linker.model import LinkerInput
+from .memory_map import LinkFamily, MemoryRegion
 from .soc import MemoryRange, SocDef
 
 if TYPE_CHECKING:
@@ -69,6 +70,18 @@ class PlatformSnapshot:
     linker_profile: str
     app_regions: tuple[RegionExtent, ...]
     load_address: int | None
+    expected_linker: LinkerInput | None = None
+
+    def __post_init__(self) -> None:
+        layout = self.expected_linker
+        if layout is not None and (
+            layout.soc_name != self.soc.name
+            or layout.link_family is not self.link_family
+            or layout.linker_profile != self.linker_profile
+            or tuple((r.region, r.app_window) for r in layout.regions)
+            != tuple((r.region, r.extent) for r in self.app_regions)
+        ):
+            raise ValueError("Expected linker input differs from its recorded platform view")
 
     def to_dict(self) -> dict[str, Any]:
         return TypeAdapter(PlatformSnapshot).dump_python(self, mode="json")
@@ -101,6 +114,7 @@ def platform_snapshot(
     linker_profile: str = "default",
 ) -> PlatformSnapshot:
     from .capabilities import resolve_app_flash_load_addr
+    from .linker.selection import expected_linker_input
     from .registry import build_platform_registry, get_board, get_soc_for_board
 
     registry = registry or build_platform_registry()
@@ -109,15 +123,16 @@ def platform_snapshot(
     selection = registry.selections.get(board)
     if selection is None:
         selection = TargetSelection("hpx-custom", registry.catalog)
+    layout = expected_linker_input(soc, selection, link_family, linker_profile)
     return PlatformSnapshot(
         board_def,
         soc,
         selection,
         link_family,
         linker_profile,
-        tuple(
-            RegionExtent(window.region, window.app_window[link_family])
-            for window in linked_memory_map(soc, linker_profile=linker_profile)
-        ),
+        tuple(RegionExtent(r.region, r.app_window) for r in layout.regions)
+        if layout is not None
+        else (),
         resolve_app_flash_load_addr(soc),
+        layout,
     )

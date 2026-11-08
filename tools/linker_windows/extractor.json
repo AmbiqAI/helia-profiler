@@ -1,0 +1,5 @@
+{
+  "repository": "AmbiqAI/helia-platforms",
+  "commit": "0d36057ec5b412d8bac07139c66ccb5ec63916e9",
+  "files": ["__init__.py", "cdefines.py", "cexpr.py", "cmake.py", "linker.py", "sdk.py", "git.py"]
+}

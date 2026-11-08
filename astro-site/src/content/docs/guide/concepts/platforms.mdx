@@ -15,7 +15,7 @@ its firmware, transport, timing or energy measurements.
 |---|---|---|
 | Core, ISA, PMU presence, clock operating points, memory regions, fitted PSRAM, SDK symbols, boot origin and known probe device | helia-platforms | `platform/catalog.py` projects catalog facts into `SocDef` and `BoardDef` |
 | Accepted board spellings, stable/preview channel, exposed clock labels and default, firmware performance tier, GPIO measurement wiring, transport support and PMU storage limits | HPX | `platform/policy.py` |
-| Characterized default SDK linker windows and fit rules | HPX | `platform/memory_map.py`; these windows remain separate from physical catalog capacities |
+| Generated default SDK linker windows, source verification and fit rules | HPX | `platform/linker/`; `platform/memory_map.py` retains the classification view |
 | Per-run custom board/SoC declarations | Caller, resolved by HPX | `platform/custom.py` and `platform/registry.py` |
 
 The adapter loads only the packaged built-in catalog, with plugins disabled.
@@ -42,22 +42,52 @@ and the Blue board's radio-reset BSP wiring are also retained separately.
 `TargetSelection.compatibility` names these exceptions; they are not catalog
 hardware facts or new hardware qualification.
 
-`MemoryLayout` is HPX's placement-capacity view, not an inventory of all
-physical banks. It keeps the existing selected-bank and linker-reservation
-conventions. The catalog corrects fitted PSRAM to zero on the plain Apollo3
-Plus and Apollo330P EVBs; Cygnus has 8 MiB. Apollo4's MRAM view is 1952 KiB,
-matching its existing application window. Apollo3's RTT scan now covers its
-contiguous 64 KiB TCM and 704 KiB SRAM from `0x10000000`. Blue Apollo4 boards use their concrete catalog
-J-Link device names. These corrections do not enlarge a pre-build fit budget.
+`MemoryLayout` records physical capacities for HPX's selected logical banks,
+including fitted board PSRAM. It does not subtract linker reservations. The
+catalog records zero fitted PSRAM on the plain Apollo3 Plus and Apollo330P
+EVBs; Cygnus has 8 MiB. Apollo3's RTT scan covers its contiguous 64 KiB TCM
+and 704 KiB SRAM from `0x10000000`.
+
+## Linker layout and admission
+
+HPX generates default GNU and armlink layouts from the pinned SDK's scripts
+and headers. Generation uses the shared catalog extractor as a maintainer tool;
+normal installation and profiling use packaged data, with no runtime parser or
+source checkout. A layout records classification apertures, script application
+extents, fixed stack reservations, and the source paths and hashes that supplied
+them. `linked_memory_map()` remains a characterization view; calling it does not
+verify a build.
+
+Planning starts with declared capacities. Before each profile or dedicated-power
+link, HPX refreshes CMake configuration under its workspace lock, reads that
+executable's selected script, and checks current SDK module revisions and source
+content. Each executable has its own decision, including incremental power
+rebuilds. Matching the profile executable does not qualify the power executable.
+
+For verified sources, HPX intersects script extents with the catalog's application
+ranges in the selected core's address space. Known empty space refuses an
+allocation; unknown space makes no catalog-backed fit claim. Separated intervals
+cannot be summed into a contiguous arena. Admission uses the largest contiguous
+interval as a conservative scalar budget. Fixed stack reservations outside the
+script's application extent are charged once; floating stacks remain app usage.
+This models requested occupancy, not complete allocator or linker success.
+
+Explicit SDK/script overrides and uncharacterized profiles can still build for
+development, but report unavailable linker fit/accounting instead of borrowing
+default windows. Strict compiled fixture/run receipts require verified source
+provenance and refuse unsupported publication. ELF placement checks use the
+verified intervals. Measured free-space accounting is unavailable when its
+single-extent representation cannot describe the effective allowed intervals.
 
 ## Retained platform input
 
 `PlatformSnapshot` records the requested board, effective HPX board/SoC views,
 catalog package/schema version and digest, source identities, resolved target,
 core, boot configuration, implementation and add-ons. It also records the
-selected linker family/profile, characterized application windows and boot load
-address. These windows are HPX inputs, not measured ELF extents or validation
-of a custom SDK. Uncharacterized profiles record no windows. Unknown
+selected linker family/profile, expected source-bound layout, characterized
+application windows and boot load address. These are build inputs, not measured
+ELF extents. Actual per-executable verification is recorded separately in
+metadata and compiled receipts. Uncharacterized profiles record no windows. Unknown
 facts stay absent; an application boot origin is never inferred from a linker
 window for a catalog-backed target.
 
@@ -65,7 +95,7 @@ Ordinary profiling writes the snapshot as `platform_provenance` in metadata,
 summary and manifest provenance. A frozen run includes it as `platform`, and
 the plan's `hpx.intent/2` hash binds it. The compiled build and standalone
 fixture receipt retain the same snapshot. Portable run observations expose it
-in their producer extension under mapping `hpx-run-3`.
+in their producer extension under mapping `hpx-run-4`.
 
 Loading a current-format receipt validates its retained facts and files without
 resolving a replacement platform. The ordinary reader parses every supplied
@@ -84,12 +114,12 @@ measured frequency; catalog adoption supplies no new measurement evidence.
 
 | Contract | Current version |
 |---|---|
-| `hpx.frozen-run` | 3 |
-| `hpx.compiled-build` (run API) | 4 |
-| Standalone fixture receipt `fixture_api` | `[8, 0]` (outer envelope remains 1) |
-| `hpx.run-result` | 2 |
-| `hpx.run-metadata` | 2 |
-| `hpx.run-summary` | 21 |
+| `hpx.frozen-run` | 4 |
+| `hpx.compiled-build` (run API) | 5 |
+| Standalone fixture receipt `fixture_api` | `[9, 0]` (outer envelope remains 1) |
+| `hpx.run-result` | 3 |
+| `hpx.run-metadata` | 3 |
+| `hpx.run-summary` | 22 |
 
 Create a complete plan with `Session.freeze()`. A manually constructed
 `FrozenRun` must include its recorded `platform` before `to_dict()` or `save()`;

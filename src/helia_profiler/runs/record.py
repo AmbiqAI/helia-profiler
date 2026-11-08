@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from .expect import ReferenceOutputs, Verification
 
 RUN_RESULT_SCHEMA = "hpx.run-result"
-RUN_RESULT_SCHEMA_VERSION = 2
+RUN_RESULT_SCHEMA_VERSION = 3
 
 _KEYS = frozenset(
     {

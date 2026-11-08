@@ -15,7 +15,9 @@ from typing import Any
 
 from .._semantic_hash import Kind, require
 from ..errors import ConfigError, ReportError
+from ..platform.linker.model import LinkerVerification
 from ..platform.provenance import PlatformSnapshot
+from ..results.dependencies import recorded_dependency_modules, validate_sdk_modules
 from ..results.dimensions import DIMENSION_REGISTRY, ComparisonDimension
 from ..results.manifest import (
     RESULT_PUBLICATION_INCOMPLETE,
@@ -214,7 +216,7 @@ def _reconcile_identities(
 
 def _reconcile_platform(
     manifest: ResultManifest, summary: dict[str, Any] | None, metadata: dict[str, Any] | None
-) -> None:
+) -> PlatformSnapshot | None:
     snapshots: list[PlatformSnapshot] = []
     for label, document, key in (
         ("summary", summary, "platform_provenance"),
@@ -229,7 +231,7 @@ def _reconcile_platform(
                     "invalid_evidence", f"Invalid {label} platform: {exc}"
                 ) from exc
     if not snapshots:
-        return
+        return None
     platform = snapshots[0]
     if any(other != platform for other in snapshots[1:]):
         raise ResultReadError("identity_mismatch", "Native platform snapshots differ")
@@ -244,6 +246,52 @@ def _reconcile_platform(
         raise ResultReadError(
             "identity_mismatch", "Recorded platform board differs from native identity"
         )
+    return platform
+
+
+def _reconcile_linker(metadata: dict[str, Any] | None, platform: PlatformSnapshot | None) -> None:
+    if metadata is None or "linker_verifications" not in metadata:
+        return
+    values = metadata["linker_verifications"]
+    if not isinstance(values, list):
+        raise ResultReadError("invalid_evidence", "Linker verifications must be an array")
+    roles = set()
+    for value in values:
+        try:
+            verification = LinkerVerification.from_dict(value)
+        except (TypeError, ValueError) as exc:
+            raise ResultReadError(
+                "invalid_evidence", f"Invalid linker verification: {exc}"
+            ) from exc
+        if verification.role in roles:
+            raise ResultReadError("identity_mismatch", "Repeated current linker verification role")
+        roles.add(verification.role)
+        layout = verification.layout
+        if layout is not None:
+            try:
+                dependencies = metadata.get("dependencies")
+                if not isinstance(dependencies, dict):
+                    raise ValueError("Verified linker input has no retained SDK dependency facts")
+                validate_sdk_modules(
+                    recorded_dependency_modules(dependencies.get("modules")), layout.sdk_commit
+                )
+            except (TypeError, ValueError) as exc:
+                raise ResultReadError(
+                    "identity_mismatch", f"SDK/linker source facts differ: {exc}"
+                ) from exc
+        if (
+            platform is not None
+            and layout is not None
+            and (
+                layout.soc_name != platform.soc.name
+                or layout.link_family is not platform.link_family
+                or layout.linker_profile != platform.linker_profile
+                or (platform.expected_linker is not None and layout != platform.expected_linker)
+            )
+        ):
+            raise ResultReadError(
+                "identity_mismatch", "Actual linker input differs from native platform"
+            )
 
 
 def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
@@ -368,7 +416,8 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
                         "identity_mismatch", f"Metadata differs from manifest model {field}"
                     )
     _reconcile_identities(manifest, summary, metadata)
-    _reconcile_platform(manifest, summary_data, metadata)
+    platform = _reconcile_platform(manifest, summary_data, metadata)
+    _reconcile_linker(metadata, platform)
     if manifest.status is RunStatus.COMPLETE and (summary is None or metadata is None):
         raise ResultReadError(
             "incomplete_result", "Completed profile lacks native summary/metadata"

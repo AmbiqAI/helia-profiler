@@ -216,7 +216,7 @@ def test_every_artifact_records_the_same_conditions(tmp_path: Path) -> None:
     }
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     metadata = json.loads((out / "run_metadata.json").read_text(encoding="utf-8"))
-    assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION == 21
+    assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION == 22
     assert summary["conditions"] == expected
     assert list(summary["conditions"]) == list(expected)
     assert metadata["conditions"] == expected

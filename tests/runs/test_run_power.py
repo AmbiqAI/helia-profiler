@@ -615,10 +615,15 @@ def test_the_settle_limits_are_the_capture_s_own():
 
 
 def test_supply_only_timing_runs_on_ap510b(tmp_path, build, device):
+    from helia_profiler.platform.linker.model import LinkerVerification
+
+    platform = platform_snapshot("apollo510b_evb")
+    assert platform.expected_linker is not None
     ap510b = reseal(
         build,
         target=fixture_target_for_board("apollo510b_evb"),
-        platform=platform_snapshot("apollo510b_evb"),
+        platform=platform,
+        linker_verification=LinkerVerification("profile", "hpx_profiler", platform.expected_linker),
     )
     record = compiled(plan_for(ap510b, tmp_path / "model.tflite"), ap510b, Lifecycle.CARRY)
     device.reply = _invoke_only(tmp_path / "raw")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ..errors import BuildError, ImageTooLargeError
+from ..errors import BuildError, ImageTooLargeError, PlatformError
 from ..firmware.image import record_build_image
 from ..hostenv.memory_measurement import measure_memory_regions, reconcile_memory
 from ..hostenv.toolchain_probe import (
@@ -38,7 +38,7 @@ class BuildFirmwareStage:
 
         try:
             build_dir, binary_path = build_app(ctx)
-        except BuildError:
+        except (BuildError, PlatformError):
             raise
         except Exception as exc:
             raise BuildError(
@@ -54,20 +54,31 @@ class BuildFirmwareStage:
             toolchain,
             timeout_s=ctx.config.timeouts.binary_probe_s,
         )
-        # Measured memory regions (#133): the ELF classified into the verified
-        # per-SoC windows, using the linker profile the binary actually linked
-        # with. Best-effort like binary_sections; the soc gate also covers test
-        # contexts that never ran ResolvePlatformStage.
-        if ctx.soc is not None:
-            linker_profile = str(ctx.config.engine.config.get("linker_profile") or "default")
+        decision = next(
+            (v for v in ctx.run_metadata.linker_verifications if v.role == "profile"), None
+        )
+        layout = decision.layout if decision is not None else None
+        if (
+            ctx.soc is not None
+            and layout is not None
+            and all(
+                not region.section_attributable or region.allowed == (region.app_window,)
+                for region in layout.regions
+            )
+        ):
             ctx.memory_regions = measure_memory_regions(
                 binary_path,
                 toolchain,
                 ctx.soc,
-                linker_profile=linker_profile,
+                linker_profile=layout.linker_profile,
                 timeout_s=ctx.config.timeouts.binary_probe_s,
             )
             check_image_fits(ctx.memory_regions, has_psram=ctx.soc.memory.psram_kb > 0)
+        else:
+            ctx.memory_regions = None
+            log.info(
+                "Linked memory accounting unavailable for this source/application interval layout"
+            )
         # Symbol inventory + plan-vs-measured reconciliation (#133). A
         # partial nm listing is refused like a partial section inventory —
         # never understate.

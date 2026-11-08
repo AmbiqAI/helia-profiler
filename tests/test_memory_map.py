@@ -108,46 +108,29 @@ def test_apollo510_windows_are_the_linker_script_values():
     assert by_region[MemoryRegion.MRAM].window_provenance == "linker-app-origin"
 
 
-# Every known divergence between capabilities._FAMILY_MEMORY_BASES (via
-# soc_placement_ranges) and the verified windows, pinned EXACTLY per SoC
-# (#176): real MRAM start plus (legacy length, verified length) for
-# MRAM / TCM / SRAM. Every legacy MRAM base is 0x0 except atomiq110's
-# (asserted in the test body); an edit that turns any known
-# divergence into agreement — or vice versa — must consciously edit this
-# table.
-_EXPECTED_LEGACY_VS_VERIFIED = {
+# Declared placement ranges and script classification apertures are distinct views.
+_EXPECTED_DECLARED_VS_CLASSIFICATION = {
     #  name         real MRAM    (legacy, verified) lengths for MRAM / TCM / SRAM
-    "apollo3p": (0x0000C000, (2_048_000, 2_048_000), (65_536, 65_536), (716_800, 720_896)),
-    "apollo4p": (0x00018000, (1_998_848, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
-    "apollo4l": (0x00018000, (1_998_848, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
+    "apollo3p": (0x0000C000, (2_097_152, 2_048_000), (65_536, 65_536), (720_896, 720_896)),
+    "apollo4p": (0x00018000, (2_097_152, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
+    "apollo4l": (0x00018000, (2_097_152, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
     "apollo510": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo510b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
     "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
-    # apollo330P: legacy = linker MCU_MRAM; verified window = to NVM top.
-    "apollo330P": (0x00410000, (1_589_248, 2_031_616), (245_760, 262_144), (1_835_008, 1_835_008)),
-    # atomiq110's legacy table already carries the real (FPGA-emulated)
-    # bases, so its only divergence is the TCM length: legacy = the 496 KB
-    # gcc script region, verified window = the 512 KB hardware aperture.
-    "atomiq110": (0x22000000, (4_194_304, 4_194_304), (507_904, 524_288), (3_145_728, 3_145_728)),
+    "apollo330P": (0x00410000, (2_097_152, 2_031_616), (262_144, 262_144), (1_835_008, 1_835_008)),
+    "atomiq110": (0x22000000, (4_194_304, 4_194_304), (524_288, 524_288), (3_145_728, 3_145_728)),
 }
-_EXPECTED_LEGACY_VS_VERIFIED["apollo510L"] = _EXPECTED_LEGACY_VS_VERIFIED["apollo330P"]
+_EXPECTED_DECLARED_VS_CLASSIFICATION["apollo510L"] = _EXPECTED_DECLARED_VS_CLASSIFICATION[
+    "apollo330P"
+]
 
 
-def test_known_divergences_from_the_legacy_placement_table_are_pinned():
-    """capabilities._FAMILY_MEMORY_BASES stays as is (verify-placement
-    depends on it); this test pins EVERY known divergence — bases
-    AND lengths — so migrating it is a reviewed edit, not silent
-    drift. Notable pinned facts: every legacy MRAM base is 0x0, entirely
-    disjoint from the real windows on the AP5 family (0x0 is ITCM there);
-    apollo330P's legacy 240 KB TCM is the gcc linker region while the
-    verified window is the 256 KB hardware aperture; apollo3p's verified
-    SRAM window includes the 4 KB STACKMEM slot the legacy table starts
-    above."""
+def test_declared_and_generated_classification_ranges_are_pinned():
     for name in CHARACTERIZED_SOCS:
         soc = get_soc(name)
         legacy = soc_placement_ranges(soc)
         verified = {w.region: w for w in linked_memory_map(soc)}
-        mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_LEGACY_VS_VERIFIED[name]
+        mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_DECLARED_VS_CLASSIFICATION[name]
         legacy_mram = legacy[Placement.MRAM]
         real_mram = verified[MemoryRegion.MRAM].window
         # atomiq110 is the one part whose legacy table already carries the
@@ -163,7 +146,7 @@ def test_known_divergences_from_the_legacy_placement_table_are_pinned():
         legacy_sram = legacy[Placement.SRAM]
         real_sram = verified[MemoryRegion.SRAM].window
         if name == "apollo3p":
-            assert legacy_sram.start == 0x10011000 and real_sram.start == 0x10010000
+            assert legacy_sram.start == real_sram.start == 0x10010000
         else:
             assert legacy_sram.start == real_sram.start, name
         assert (legacy_sram.length, real_sram.length) == sram_lens, name
@@ -329,7 +312,7 @@ def test_real_gcc_fixture_inventory_classifies_correctly():
 
 
 # Every app extent pinned exactly, per (soc, region, family): (start, length).
-# Window starts/lengths are pinned by _EXPECTED_LEGACY_VS_VERIFIED, but a
+# Window starts/lengths are pinned by _EXPECTED_DECLARED_VS_CLASSIFICATION, but a
 # transposed digit in an extent would otherwise ship silently (#176). GNU DTCM
 # extents are the FULL script MCU_TCM regions (the floating .stack counts
 # as occupancy — its position is script-order-dependent); armlink DTCM

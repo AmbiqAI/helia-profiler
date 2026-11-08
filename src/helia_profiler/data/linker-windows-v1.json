@@ -1,0 +1,1034 @@
+{
+  "extractor": {
+    "commit": "0d36057ec5b412d8bac07139c66ccb5ec63916e9",
+    "files": [
+      "__init__.py",
+      "cdefines.py",
+      "cexpr.py",
+      "cmake.py",
+      "linker.py",
+      "sdk.py",
+      "git.py"
+    ],
+    "repository": "AmbiqAI/helia-platforms",
+    "sha256": {
+      "__init__.py": "29eb47a99319ef0dfe9e1a544f6d3ca941318f817a17e93d561ff18a736e3ab0",
+      "cdefines.py": "4d36307fbc1ed51f61bce7e46b922f0a6f4a730486d58cb7fb84c3c06accbf76",
+      "cexpr.py": "f2c72bb043770b0f43d515a6031e41813c957ea987bbaa0ca90912fa34fc4d09",
+      "cmake.py": "1eb1d63e168bb61accc6b63914b7f7cac013672998648ae30b7c386f717d2de5",
+      "git.py": "5f84080a4765b1bbea453981ff541f02b685dcd2146e3759f250a2f534c3de70",
+      "linker.py": "f70ddd9a4e698731476dcae458d5ef981b6efaa91c9d5e007513b925a86f5701",
+      "sdk.py": "2d61b3831e547512bf5343d5e3205d75f6e5ff2c74cd36526714437955e7e054"
+    }
+  },
+  "schema": "hpx.linker-windows",
+  "schema_version": 1,
+  "sdk_commit": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+  "socs": {
+    "apollo330P": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                1589248
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                2031616
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                241664
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                1835008
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                1835008
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo330P/armclang/linker_script_sbl.sct",
+          "sha256": "a1911133baf8e1c06a7b063deea192665730bde7924bf767b64832c3992e2c86"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                1589248
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                2031616
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                245760
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                1835008
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                1835008
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo330P/gcc/linker_script_sbl.ld",
+          "sha256": "82bee4f3f619a89420279531f163dd2292f9f3b03e80097edbc4a0e324378303"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo330P.cmake": "2a80374bfb737016e474ddcdeafbb45a9bf3503e2fb014b9304545901fd11751",
+        "cmake/socs/facts/apollo330P.cmake": "240bb12dca93b750df6aecbfd687f853e18ec12c73f062bd99b67f707bccddce",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo330P/regs/am_reg_base_addresses.h": "5f8ba897d212424404ebcaa4f37dacfb1a1a62423ca5808b7a179687d0c017f5"
+      }
+    },
+    "apollo3p": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                49152,
+                2048000
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                49152,
+                2048000
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268505088,
+                716800
+              ],
+              "fixed_stack_bytes": 4096,
+              "region": "SRAM",
+              "window": [
+                268500992,
+                720896
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268435456,
+                65536
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                65536
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo3p/armclang/linker_script.sct",
+          "sha256": "f0d59d038c76bdc817802b3d07cbf4aef571205313b90b2c0708fb700cec9d9e"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                49152,
+                2048000
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                49152,
+                2048000
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268505088,
+                716800
+              ],
+              "fixed_stack_bytes": 4096,
+              "region": "SRAM",
+              "window": [
+                268500992,
+                720896
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268435456,
+                65536
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                65536
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo3p/gcc/linker_script.ld",
+          "sha256": "7f2161a5c2564924a1bfc478a0a54fa6f2168db1438639e4b2a467c55670d619"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo3p.cmake": "e54facf7542c83574819b492ec1abb6fdcd4678b2548e7a31bb2c4707b00bbd2",
+        "cmake/socs/facts/apollo3p.cmake": "e657529768dd41181e8e4da081b49c510099f5c779f460c8c420bfa9932ba170",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo3p/hal/am_hal_flash.h": "241e12d39d0218eb7635e6b2776ba9be8029e6d3079e9b52bece07e2c7cedcd9",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo3p/regs/am_reg_base_addresses.h": "c47fa6a15d5d266638572e304c1240ed627d5d3e96e36db3c784c3b58ff907d3"
+      }
+    },
+    "apollo4l": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                98304,
+                1998848
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                98304,
+                1998848
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268435456,
+                372736
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                393216
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268828672,
+                1048576
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                268828672,
+                1048576
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo4l/armclang/linker_script.sct",
+          "sha256": "fb056b750e1df2f27718a96c30a91fb2b114458030043efc012cbd92d9001518"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                98304,
+                1998848
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                98304,
+                1998848
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268435456,
+                393216
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                393216
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268828672,
+                1048576
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                268828672,
+                1048576
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo4l/gcc/linker_script.ld",
+          "sha256": "c757a91b4c79891683ae1cc8ca389e33e187a8f0aca397516763f50c21cd54a3"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo4l.cmake": "ad26a208449a238bceedac4e1c0cc7606b1164f7b894027c9cae91a476eefc24",
+        "cmake/socs/facts/apollo4l.cmake": "223c748173445f266dd1a7b5c0fd1a0902c1de5d46a00f9c42cfaaf21e0a5b24",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo4l/regs/am_reg_base_addresses.h": "71f77cff36a88009a4cfa76f5683f32ee49190b2d767f8f381442a63cb8a274f"
+      }
+    },
+    "apollo4p": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                98304,
+                1998848
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                98304,
+                1998848
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268435456,
+                372736
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                393216
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268828672,
+                1048576
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                268828672,
+                1048576
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo4p/armclang/linker_script.sct",
+          "sha256": "5eef5120d529b0c5fd8e643205919061d87d32f7555268cd15dbf6cc1fe9384d"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                98304,
+                1998848
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                98304,
+                1998848
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                268435456,
+                393216
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                268435456,
+                393216
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                268828672,
+                1048576
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                268828672,
+                1048576
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo4p/gcc/linker_script.ld",
+          "sha256": "6816934addd4fa9bfd94b0338fdaaa0f9c44d6de26fc1dd63d96a6f39fdd4fa6"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo4p.cmake": "3170dfa14bd5059101ba540272a99a3a47ffc9aca6687d2ad18a3b7f29846f59",
+        "cmake/socs/facts/apollo4p.cmake": "784c07b33b47e4980c847c0289b5bd6625a10cb3d51478dbc41648aa71041e45",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo4p/regs/am_reg_base_addresses.h": "aa0cb9d73a58e2d7aeab3bd300354db2d0781bae668a63225e8c1b0dbcc9721f"
+      }
+    },
+    "apollo510": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                536870912,
+                503808
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510/armclang/linker_script_sbl.sct",
+          "sha256": "9024203cf48bb3f898f23a7b7e707a55538bfbd87ee3e62f72f666a79371fabc"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                507904
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+          "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo510.cmake": "472607b0878fbaff2c9c26c2343da5391b31e37d4a3639146aa00bae12f82051",
+        "cmake/socs/facts/apollo510.cmake": "accedd25d81bb76799b311771d45e30371304cde9ff3b0701bcfc39a1dea806e",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+      }
+    },
+    "apollo510L": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                1589248
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                2031616
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                241664
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                1835008
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                1835008
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510L/armclang/linker_script_sbl.sct",
+          "sha256": "a1911133baf8e1c06a7b063deea192665730bde7924bf767b64832c3992e2c86"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                1589248
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                2031616
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                245760
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                1835008
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                1835008
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510L/gcc/linker_script_sbl.ld",
+          "sha256": "d39c40844c6823fef1340fe7ac7df77e897ce751c19f892e6a190482276aa518"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo510L.cmake": "df0bcf6fc1b2c9808daa7421905db6f85802f900ca2731fe5a4612d90b206eee",
+        "cmake/socs/facts/apollo510L.cmake": "02969cafa50f49585db9cf5b90f6ebb30bd3ec21dada99924698b9c95f00c0f9",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo510L/regs/am_reg_base_addresses.h": "e88b65f4223a9daded3ddad91595e350007f3320f87a69eccbc551ee44977339"
+      }
+    },
+    "apollo510b": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                536870912,
+                503808
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510b/armclang/linker_script_sbl.sct",
+          "sha256": "9024203cf48bb3f898f23a7b7e707a55538bfbd87ee3e62f72f666a79371fabc"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                507904
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo510b/gcc/linker_script_sbl.ld",
+          "sha256": "b0d779507b8466030fea12688701f5ca2075dbc1923054091ae988c8c5170ad5"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo510b.cmake": "db94ee126a08e9545ef6755797e4e2e357f112b15ae167c393c06a816c887e12",
+        "cmake/socs/facts/apollo510b.cmake": "c47035a8fb4b4e613e849fd38e3a9f4b3240d5c16ebb75a98eac76f83ec681c3",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+      }
+    },
+    "apollo5b": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                536870912,
+                503808
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo5b/armclang/linker_script_sbl.sct",
+          "sha256": "1e8fe66001051758677ee2dfcf47787c83194cb120076eb8e9adaab77273095e"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                4259840,
+                4128768
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                4259840,
+                4128768
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                507904
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                537395200,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                537395200,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/apollo5b/gcc/linker_script_sbl.ld",
+          "sha256": "d86cbd960961845c06945d100bccd7bc6e9992427742771ca184ca6d2fdfea61"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/apollo5b.cmake": "141d7dacd4383ae7c5e42deaedd704c35e633bc66f0808d83dc850d1f59153c0",
+        "cmake/socs/facts/apollo5b.cmake": "fb3b179d5a1585aeff39ead2f7d36fe3a083c47b0ee458a9961d7be829709042",
+        "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+      }
+    },
+    "atomiq110": {
+      "families": {
+        "armlink": {
+          "regions": [
+            {
+              "app_window": [
+                570425344,
+                4194304
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                570425344,
+                4194304
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "linker-script"
+            },
+            {
+              "app_window": [
+                536870912,
+                503808
+              ],
+              "fixed_stack_bytes": 16384,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                553648128,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                553648128,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/atomiq110/armclang/linker_script_nbl.sct",
+          "sha256": "c742f2137f908430cd269a09e4eee78218e9cfd844cb18ec7ee0b24d1af9559a"
+        },
+        "gnu": {
+          "regions": [
+            {
+              "app_window": [
+                0,
+                262144
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "window": [
+                0,
+                262144
+              ],
+              "window_provenance": "linker-script"
+            },
+            {
+              "app_window": [
+                570425344,
+                4194304
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "window": [
+                570425344,
+                4194304
+              ],
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "app_window": [
+                536870912,
+                507904
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "window": [
+                536870912,
+                524288
+              ],
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "app_window": [
+                553648128,
+                3145728
+              ],
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "window": [
+                553648128,
+                3145728
+              ],
+              "window_provenance": "hardware-aperture"
+            }
+          ],
+          "script": "modules/nsx-core/src/atomiq110/gcc/linker_script_nbl.ld",
+          "sha256": "1728c4bdc5b9006a1686fcb28b75f2c8ad6deacd78d4c2dcb2ea0fc8822664c6"
+        }
+      },
+      "inputs": {
+        "cmake/nsx_toolchain_flags.cmake": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25",
+        "cmake/socs/atomiq110.cmake": "86fda8f508cb82e0e3307c56383e3764366020cdb583e2d2d2a03b92e24c57d3",
+        "cmake/socs/facts/atomiq110.cmake": "ea8c9dd4af7de72c915336a7668f79ee9a3c5c07c09b2da1463830d60c719637",
+        "modules/nsx-ambiqsuite/sdk/mcu/atomiq110/regs/am_reg_base_addresses.h": "0ad23c6023c1a02f601b14c3dbeb83c0511cb2a96d0473a04a8712362f5b4851"
+      }
+    }
+  }
+}

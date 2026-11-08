@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from .compiled import CompiledBuild
 
 FROZEN_RUN_SCHEMA = "hpx.frozen-run"
-FROZEN_RUN_SCHEMA_VERSION = 3
+FROZEN_RUN_SCHEMA_VERSION = 4
 
 _T = TypeVar("_T")
 

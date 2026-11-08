@@ -69,7 +69,6 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
 
     nsx_tc = nsx_toolchain(toolchain)
     build_dir = app_dir / "build" / board
-    ninja_already_configured = (build_dir / "build.ninja").exists()
 
     from ..deps.dependencies import (
         prepare_locked_dependencies,
@@ -78,20 +77,11 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
     from ..deps.sync import invalidate_sync_stamp
 
     with workspace_mutex(ctx.resolved_workspace):
-        dependency_state = prepare_locked_dependencies(ctx)
+        prepare_locked_dependencies(ctx)
         try:
-            if not ninja_already_configured or dependency_state.lock.mode.value != "reused":
-                nsx_cli.configure(
-                    app_dir,
-                    toolchain=nsx_tc,
-                    frozen=True,
-                    timeout_s=timeouts.configure_s,
-                    verbose=verbose,
-                )
-            else:
-                # CMake's regeneration rule handles deterministic source/template
-                # changes; dependency verification already ran via sync --frozen.
-                log.info("Reusing configured deterministic workspace: %s", build_dir)
+            from .linker import configure_linker
+
+            configure_linker(ctx, build_dir=build_dir, role="profile", target="hpx_profiler")
             try:
                 nsx_cli.build(
                     app_dir, toolchain=nsx_tc, timeout_s=timeouts.build_s, verbose=verbose
@@ -111,11 +101,8 @@ def build_app(ctx: PipelineContext) -> tuple[Path, Path]:
                     hint=f"Searched in {build_dir}",
                 )
         except BuildError:
-            # Any build-stage failure — configure, compile, or the artifact
-            # lookup — may mean the workspace is corrupted in a way the
-            # stamped skip above no longer checks for; drop the stamp so the
-            # next run pays full frozen verification (and repair) again
-            # instead of skipping straight back into the same failure.
+            # A failed build may have damaged the materialization, so the next
+            # run must verify dependencies instead of trusting its sync stamp.
             invalidate_sync_stamp(app_dir)
             raise
 

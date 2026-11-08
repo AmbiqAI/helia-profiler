@@ -30,7 +30,9 @@ from helia_profiler.fixtures.record import (
     verify_fixture_build,
 )
 from helia_profiler.fixtures.target import supported_fixture_target
+from helia_profiler.platform.linker.model import LinkerVerification
 from helia_profiler.platform.provenance import platform_snapshot
+from helia_profiler.results.dependencies import ContentDigest, DependencyModule
 
 
 def _pin(path, data):
@@ -71,11 +73,36 @@ def test_recapture_refuses_changed_platform_before_returning_a_request(tmp_path,
     assert not (tmp_path / "raw").exists()
 
 
+def _sdk_modules(platform):
+    assert platform.expected_linker is not None
+    commit = platform.expected_linker.sdk_commit
+    return tuple(
+        DependencyModule(
+            name=name,
+            project="nsx-ambiq-sdk",
+            kind="git",
+            requested_ref=commit,
+            requested_tag=None,
+            peeled_commit=commit,
+            content_hash=ContentDigest("sha256", "c" * 64),
+            url="https://github.com/AmbiqAI/nsx-ambiq-sdk.git",
+            vendored_at="modules/nsx-ambiq-sdk",
+        )
+        for name in ("nsx-core", "nsx-soc-hal", "nsx-ambiqsuite")
+    )
+
+
 def _build(root):
+    platform = platform_snapshot("apollo510_evb")
     lock = _pin(root / "evidence" / "nsx.lock", b"lock")
     state = _pin(
         root / "evidence" / "state.json",
-        json.dumps({"lock": {"sha256": {"value": lock.sha256}}}).encode(),
+        json.dumps(
+            {
+                "lock": {"sha256": {"value": lock.sha256}},
+                "modules": [asdict(m) for m in _sdk_modules(platform)],
+            }
+        ).encode(),
     )
     tensor = FixtureTensor("signal", 0, "int8", (1, 4), PerTensorQuantization(0.5, 0))
     output = replace(tensor, name="score", index=3, shape=(1, 2))
@@ -97,7 +124,8 @@ def _build(root):
         warmups=5,
         intent_identity="b" * 64,
         target=supported_fixture_target(),
-        platform=platform_snapshot("apollo510_evb"),
+        platform=platform,
+        linker_verification=LinkerVerification("profile", "hpx_profiler", platform.expected_linker),
         toolchain=ToolchainInfo("clang", "22.1.0", "3.31"),
         dependency_state=state,
         state_policy=FixtureStatePolicy.CARRY,
@@ -133,7 +161,7 @@ def test_power_record_states_its_protocol(tmp_path):
     build = replace(build, build_identity=compiled_fixture_identity(build))
     record = dump_fixture_build(build, roots={"run": tmp_path})
     encoded = json.loads(record)
-    assert encoded["fixture_api"] == list(_RECORD_VERSION) == [8, 0]
+    assert encoded["fixture_api"] == list(_RECORD_VERSION) == [9, 0]
     assert encoded["build"]["power_sync"]["protocol_version"] == 2
     assert load_fixture_build(record, roots={"run": tmp_path}) == build
     with pytest.raises(ValueError, match="Unsupported fixture power protocol"):
@@ -148,7 +176,7 @@ def test_power_record_states_its_protocol(tmp_path):
             load_fixture_build(json.dumps(altered), roots={"run": tmp_path})
 
 
-@pytest.mark.parametrize("version", [[5, 1], [5, 8], [6, 1], [7, 1], [8, 1], "7.0"])
+@pytest.mark.parametrize("version", [[5, 1], [5, 8], [6, 1], [7, 1], [8, 0], [8, 1], [9, 1], "7.0"])
 def test_a_record_of_another_version_names_the_release_that_reads_it(tmp_path, version):
     record = json.loads(dump_fixture_build(_build(tmp_path), roots={"run": tmp_path}))
     record["fixture_api"] = version
@@ -371,7 +399,10 @@ def _sourced(root, build=None):
 
     build = build or _build(root)
     assert build.dependency_lock is not None
-    data = {"lock": {"sha256": {"value": build.dependency_lock.sha256}}, "modules": [asdict(NS)]}
+    data = {
+        "lock": {"sha256": {"value": build.dependency_lock.sha256}},
+        "modules": [asdict(m) for m in _sdk_modules(build.platform)] + [asdict(NS)],
+    }
     build = replace(
         build,
         dependency_state=_pin(root / "evidence" / "sourced-state.json", json.dumps(data).encode()),

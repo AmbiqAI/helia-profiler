@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypedDict
+
+from pydantic import TypeAdapter
 
 from ..deps.compatibility import QualificationState
 
@@ -77,6 +80,41 @@ class DependencyModule:
     content_hash: ContentDigest
     url: str | None
     vendored_at: str
+
+
+def recorded_dependency_modules(value: object) -> tuple[DependencyModule, ...]:
+    """Decode retained producer module facts without resolving any dependency."""
+    if not isinstance(value, list):
+        raise ValueError("Recorded dependency modules must be an array")
+    modules = TypeAdapter(tuple[DependencyModule, ...]).validate_json(
+        json.dumps(value, allow_nan=False), strict=True
+    )
+    if [asdict(module) for module in modules] != value:
+        raise ValueError("Recorded dependency modules have missing or unexpected fields")
+    return modules
+
+
+def validate_sdk_modules(
+    modules: tuple[DependencyModule, ...], sdk_commit: str
+) -> tuple[DependencyModule, ...]:
+    """Reconcile retained module facts with the SDK definition used by a verified layout."""
+    sdk_modules = tuple(
+        module
+        for module in modules
+        if module.project == "nsx-ambiq-sdk"
+        or module.name in {"nsx-core", "nsx-soc-hal", "nsx-ambiqsuite"}
+    )
+    required = {"nsx-core", "nsx-soc-hal", "nsx-ambiqsuite"}
+    if not required <= {module.name for module in sdk_modules}:
+        raise ValueError("Resolved SDK core/HAL module provenance is unavailable")
+    for module in sdk_modules:
+        if module.peeled_commit != sdk_commit and not (
+            module.peeled_commit is None and module.kind == "local"
+        ):
+            raise ValueError(
+                f"Resolved {module.name} does not match the characterized SDK revision"
+            )
+    return sdk_modules
 
 
 @dataclass(frozen=True)
