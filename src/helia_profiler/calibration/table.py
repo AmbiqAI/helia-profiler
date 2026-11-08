@@ -327,6 +327,10 @@ def read_calibration(path: Path) -> CalibrationTable:
     """
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+    except RecursionError as exc:
+        raise CalibrationError(
+            f"Could not read calibration file {path}: JSON nesting exceeds the decoder limit."
+        ) from exc
     except (OSError, ValueError) as exc:
         raise CalibrationError(f"Could not read calibration file {path}: {exc}") from exc
     if not isinstance(data, dict):
@@ -780,6 +784,10 @@ def _plan(run: RunArtifacts, source: str) -> dict[str, Any]:
     path = run.path / candidates[0]
     try:
         plan = json.loads(path.read_text(encoding="utf-8"))
+    except RecursionError as exc:
+        raise CalibrationError(
+            f"Bundle {source}: could not read {path.name}: JSON nesting exceeds the decoder limit."
+        ) from exc
     except (OSError, ValueError) as exc:
         raise CalibrationError(f"Bundle {source}: could not read {path.name}: {exc}") from exc
     if not isinstance(plan, dict):
