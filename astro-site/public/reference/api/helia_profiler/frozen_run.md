@@ -832,6 +832,8 @@ Source: `src/helia_profiler/runs/plan.py:207`
 to_dict() -> dict[str, Any]
 ```
 
+Serialize a complete plan, refusing missing recorded platform input.
+
 Source: `src/helia_profiler/runs/plan.py:221`
 
 ### helia_profiler.FrozenRun.from_dict
@@ -844,7 +846,7 @@ from_dict(data: Mapping[str, Any]) -> FrozenRun
 
 `classmethod`
 
-Source: `src/helia_profiler/runs/plan.py:239`
+Source: `src/helia_profiler/runs/plan.py:245`
 
 ### helia_profiler.FrozenRun.save
 
@@ -856,7 +858,7 @@ save(path: str | Path) -> Path
 
 Write the plan as JSON, refusing its source model path or aliases.
 
-Source: `src/helia_profiler/runs/plan.py:300`
+Source: `src/helia_profiler/runs/plan.py:306`
 
 ### helia_profiler.FrozenRun.load
 
@@ -870,7 +872,7 @@ load(path: str | Path) -> FrozenRun
 
 Read a plan written by :meth:`save`, verifying its intent hash.
 
-Source: `src/helia_profiler/runs/plan.py:318`
+Source: `src/helia_profiler/runs/plan.py:324`
 
 ### helia_profiler.FrozenRun.config
 
@@ -892,7 +894,7 @@ variable set, unset or changed, another compiler version, or another
 engine runtime. Only the model can move; other local files must be
 at their recorded paths.
 
-Source: `src/helia_profiler/runs/plan.py:332`
+Source: `src/helia_profiler/runs/plan.py:338`
 
 ### helia_profiler.FrozenRun.build
 
@@ -904,4 +906,4 @@ build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild
 
 Compile this plan for *fixture*'s pinned inputs; see :func:`~helia_profiler.build`.
 
-Source: `src/helia_profiler/runs/plan.py:381`
+Source: `src/helia_profiler/runs/plan.py:387`
