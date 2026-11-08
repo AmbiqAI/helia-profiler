@@ -91,6 +91,10 @@ measured frequency; catalog adoption supplies no new measurement evidence.
 | `hpx.run-metadata` | 2 |
 | `hpx.run-summary` | 21 |
 
+Create a complete plan with `Session.freeze()`. A manually constructed
+`FrozenRun` must include its recorded `platform` before `to_dict()` or `save()`;
+HPX refuses publication when it is missing, without resolving replacement facts.
+
 These strict readers refuse earlier versions. Read historical evidence with
 the HPX release that wrote it; do not edit version fields or substitute current
 catalog facts into an old receipt. Existing Python calls and CLI commands keep

@@ -59,6 +59,56 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+@pytest.mark.parametrize("output", ["mapping", "new-file", "existing-file"])
+def test_missing_platform_is_refused_before_a_plan_is_published(session, tmp_path, output):
+    plan = session.freeze()
+    incomplete = FrozenRun(
+        plan.settings,
+        plan.model,
+        plan.baseline_id,
+        plan.baseline_fingerprint,
+        plan.qualification,
+        plan.overrides,
+        plan.local_inputs,
+        plan.environment,
+        plan.toolchain,
+        plan.runtime,
+        plan.hpx_version,
+    )
+    target = tmp_path / "plan.json"
+    if output == "existing-file":
+        target.write_text("previous record", encoding="utf-8")
+    with pytest.raises(ConfigError, match="recorded platform provenance") as caught:
+        if output == "mapping":
+            incomplete.to_dict()
+        else:
+            incomplete.save(target)
+    assert "Session.freeze" in str(caught.value)
+    if output == "existing-file":
+        assert target.read_text(encoding="utf-8") == "previous record"
+    else:
+        assert not target.exists()
+    assert not list(tmp_path.glob("*.partial"))
+
+
+@pytest.mark.parametrize("missing", [False, True])
+def test_loading_requires_the_recorded_platform_without_resolving_a_replacement(
+    session, monkeypatch, missing
+):
+    data = session.freeze().to_dict()
+    if missing:
+        del data["platform"]
+    else:
+        data["platform"] = None
+
+    def unexpected_resolution(*args, **kwargs):
+        raise AssertionError("A saved plan must not invent its missing provenance")
+
+    monkeypatch.setattr("helia_profiler.runs.plan.config_platform", unexpected_resolution)
+    with pytest.raises(ConfigError, match="Malformed frozen run plan"):
+        FrozenRun.from_dict(data)
+
+
 def test_platform_input_is_bound_and_catalog_drift_refuses_replay(session, tmp_path, monkeypatch):
     plan = session.freeze()
     assert plan.platform is not None and plan.platform.selection.catalog is not None

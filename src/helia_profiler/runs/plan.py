@@ -219,6 +219,12 @@ class FrozenRun:
         )
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize a complete plan, refusing missing recorded platform input."""
+        if self.platform is None:
+            raise ConfigError(
+                "Cannot serialize a frozen run without recorded platform provenance",
+                hint="Use Session.freeze() to capture a complete plan, or supply its recorded platform.",
+            )
         return {
             "schema": FROZEN_RUN_SCHEMA,
             "schema_version": FROZEN_RUN_SCHEMA_VERSION,
@@ -233,7 +239,7 @@ class FrozenRun:
             "toolchain": asdict(self.toolchain),
             "runtime": asdict(self.runtime) if self.runtime is not None else None,
             "hpx_version": self.hpx_version,
-            "platform": self.platform.to_dict() if self.platform is not None else None,
+            "platform": self.platform.to_dict(),
         }
 
     @classmethod
