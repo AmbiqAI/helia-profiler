@@ -53,10 +53,12 @@ data/armv8m_pmu_events.json
 data/calibration.schema.v2.json
 data/comparison_profile.schema.v1.json
 data/compatibility-baseline-v1.json
+data/linker-windows-v1.json
 data/profile_results.schema.v1.json
 data/result_manifest.schema.v1.json
 data/run_metadata.schema.v1.json
 data/run_metadata.schema.v2.json
+data/run_metadata.schema.v3.json
 data/run_summary.schema.v1.json
 data/runtimes/executorch/0.1.0.json
 data/runtimes/helia-aot/0.33.0.json
@@ -109,6 +111,9 @@ firmware/fixture.py
 firmware/headers.py
 firmware/image.py
 firmware/launcher.py
+firmware/link_inputs.py
+firmware/linker.py
+firmware/linker_source.py
 firmware/op_resolver.py
 firmware/project.py
 firmware/render.py
@@ -193,6 +198,12 @@ platform/capabilities.py
 platform/catalog.py
 platform/counters.py
 platform/custom.py
+platform/linker/__init__.py
+platform/linker/budget.py
+platform/linker/data.py
+platform/linker/files.py
+platform/linker/model.py
+platform/linker/selection.py
 platform/memory_map.py
 platform/placement.py
 platform/policy.py

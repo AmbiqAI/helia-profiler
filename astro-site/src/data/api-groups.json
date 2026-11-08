@@ -46,6 +46,17 @@
       ]
     },
     {
+      "path": "helia_profiler.provenance",
+      "summary": "Recorded run metadata and linker provenance: expected source-bound layouts and per-executable verification, separate from measured results.",
+      "members": [
+        "RunMetadata",
+        "LinkerFile",
+        "LinkerInput",
+        "LinkerRegion",
+        "LinkerVerification"
+      ]
+    },
+    {
       "path": "helia_profiler.compiled_build",
       "summary": "Build once, run later: a frozen plan's compiled firmware, bound to its plan and saved so any host can verify, relocate and capture from it, each run saved as a verifiable result that loads back on any host, how model state carries across a run's invocations, and the build and capture records a compiled build and a run result carry. The hpx freeze, hpx build, hpx validate build and hpx run commands drive the same flow from the command line.",
       "members": [
@@ -215,8 +226,7 @@
         "PresetResult",
         "LayerResult",
         "FirmwareMeta",
-        "Conditions",
-        "RunMetadata"
+        "Conditions"
       ]
     },
     {

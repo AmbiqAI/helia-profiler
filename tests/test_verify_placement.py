@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,9 @@ from helia_profiler.platform import (
     get_soc_for_board,
     soc_placement_ranges,
 )
+from helia_profiler.platform.linker.model import LinkerVerification
+from helia_profiler.platform.memory_map import link_family_for_toolchain
+from helia_profiler.platform.provenance import platform_snapshot
 from helia_profiler.stages import verify_placement
 from helia_profiler.stages.verify_placement import VerifyPlacementStage
 from tests.pipeline_context_helpers import clear_profile_run, set_profile_firmware
@@ -46,12 +50,8 @@ class TestSocPlacementRanges:
 
     def test_ap3_ranges(self):
         ranges = soc_placement_ranges(get_soc_for_board("apollo3p_evb"))
-        # apollo3p has a real 64 KB low-latency TCM at 0x10000000 (arena-
-        # eligible via NSX_MEM_FAST_BSS's dedicated .tcm_bss section,
-        # nsx-ambiq-sdk#29), distinct from the 700 KB main SRAM "RWMEM" at
-        # 0x10011000. "MRAM" is read-only NOR flash.
         assert ranges[Placement.TCM] == MemoryRange(0x10000000, 64 * 1024)
-        assert ranges[Placement.SRAM] == MemoryRange(0x10011000, 700 * 1024)
+        assert ranges[Placement.SRAM] == MemoryRange(0x10010000, 704 * 1024)
         assert ranges[Placement.SRAM].contains(0x10011000)
         # A small KWS-sized arena lands near the base of RWMEM.
         assert ranges[Placement.SRAM].contains(0x10011010)
@@ -80,6 +80,11 @@ def _ctx(
     work_dir.mkdir(parents=True, exist_ok=True)
     ctx = PipelineContext(config=config, work_dir=work_dir)
     ctx.soc = get_soc_for_board(board)
+    layout = platform_snapshot(
+        board, link_family=link_family_for_toolchain(toolchain)
+    ).expected_linker
+    assert layout is not None
+    ctx.run_metadata.linker_verifications = (LinkerVerification("profile", "hpx_profiler", layout),)
     binary = tmp_path / "hpx_profiler.elf"
     binary.write_bytes(b"\x7fELF")
     set_profile_firmware(ctx, binary_path=binary)
@@ -108,6 +113,31 @@ class TestShouldSkip:
 
 
 class TestRun:
+    def test_sized_arena_cannot_cross_a_reserved_gap(self, tmp_path, monkeypatch):
+        from helia_profiler.hostenv.elf_inventory import SymbolEntry
+        from helia_profiler.placement import MemoryRegion
+
+        ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
+        decision = ctx.run_metadata.linker_verifications[0]
+        assert decision.layout is not None
+        start = 0x10060000
+        layout = replace(
+            decision.layout,
+            regions=tuple(
+                replace(r, allowed=(MemoryRange(start, 32), MemoryRange(start + 64, 32)))
+                if r.region is MemoryRegion.SRAM
+                else r
+                for r in decision.layout.regions
+            ),
+        )
+        ctx.run_metadata.linker_verifications = (replace(decision, layout=layout),)
+        monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (start, "b"))
+        ctx.memory_symbols = (SymbolEntry("_ZL15g_arena_storage", start, 48, "b"),)
+        with pytest.raises(BuildError, match="48 B checked"):
+            VerifyPlacementStage().run(ctx)
+        ctx.memory_symbols = (SymbolEntry("_ZL15g_arena_storage", start, 32, "b"),)
+        VerifyPlacementStage().run(ctx)
+
     def test_correct_placement_passes(self, tmp_path, monkeypatch):
         ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
         # Arena correctly in SRAM (0x10060000-0x10160000).
@@ -121,20 +151,24 @@ class TestRun:
         with pytest.raises(BuildError) as exc:
             VerifyPlacementStage().run(ctx)
         msg = str(exc.value)
-        assert "TCM" in msg
         assert "SRAM" in msg
+        assert "0x10025270" in msg
 
     def test_unresolved_symbol_is_best_effort(self, tmp_path, monkeypatch):
         ctx = _ctx(tmp_path, arena_region=Placement.SRAM)
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: None)
         VerifyPlacementStage().run(ctx)  # no raise
 
-    def test_unmodelled_soc_without_declared_ranges_is_best_effort(self, tmp_path, monkeypatch):
+    def test_unverified_builtin_does_not_use_declared_ranges(self, tmp_path, monkeypatch):
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
-        # No verified map AND no declared ranges: nothing to hold the
-        # linker to — even a wildly wrong address must not raise.
-        monkeypatch.setattr(verify_placement, "linked_memory_map", lambda soc: ())
-        monkeypatch.setattr(verify_placement, "soc_placement_ranges", lambda soc: {})
+        ctx.run_metadata.linker_verifications = ()
+        monkeypatch.setattr(
+            verify_placement,
+            "soc_placement_ranges",
+            lambda soc: (_ for _ in ()).throw(
+                AssertionError("Builtin mismatch must not borrow declared/default ranges")
+            ),
+        )
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b"))
         VerifyPlacementStage().run(ctx)  # no raise
 
@@ -143,7 +177,8 @@ class TestRun:
         DECLARED placement bases are still worth holding the linker to —
         the legacy check applies and a mislocated arena still raises."""
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
-        monkeypatch.setattr(verify_placement, "linked_memory_map", lambda soc: ())
+        assert ctx.soc is not None
+        ctx.soc = replace(ctx.soc, name="custom-test")
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (0x00001234, "b"))
         with pytest.raises(BuildError, match="declared SRAM range"):
             VerifyPlacementStage().run(ctx)
@@ -159,7 +194,7 @@ class TestMigrationBehaviorPins:
         outside every app extent; the extent yardstick rejects it (#133)."""
         ctx = _ctx(tmp_path, board="apollo330mP_evb", arena_region=Placement.TCM)
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (0x2003C000, "b"))
-        with pytest.raises(BuildError, match="app window"):
+        with pytest.raises(BuildError, match="application intervals"):
             VerifyPlacementStage().run(ctx)
 
     def test_apollo3p_stackmem_slot_fails_sram_verification(self, tmp_path, monkeypatch):
@@ -167,7 +202,7 @@ class TestMigrationBehaviorPins:
         SRAM window, below the RWMEM app extent."""
         ctx = _ctx(tmp_path, board="apollo3p_evb", arena_region=Placement.SRAM)
         monkeypatch.setattr(verify_placement, "symbol_address", lambda *a, **k: (0x10010000, "b"))
-        with pytest.raises(BuildError, match="app window"):
+        with pytest.raises(BuildError, match="application intervals"):
             VerifyPlacementStage().run(ctx)
 
     def test_legitimate_extent_addresses_pass(self, tmp_path, monkeypatch):

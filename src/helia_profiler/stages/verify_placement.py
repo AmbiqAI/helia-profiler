@@ -1,19 +1,8 @@
-"""Verify memory placement.
+"""Check the linked interpreter arena against verified application intervals.
 
-A static, build-time guard that the tensor arena actually landed in the
-memory region the planner resolved.  It reads the arena symbol's link
-address from the freshly built ELF and asserts it falls inside the
-resolved placement region's physical address range.
-
-This catches the class of silent linker mislocations — e.g. the armclang
-``SHARED_SRAM`` scatter gap that left the arena in TCM while the planner
-believed it was in SRAM — at build time, *before* flashing, instead of as
-a confusing runtime failure several layers downstream.
-
-Best-effort and non-destructive: any case we cannot verify (PSRAM runtime
-pointer, heliaAOT's multi-region arenas, an uncharacterised SoC memory
-model, or an unreadable symbol) is skipped with a debug log rather than
-failing the build.
+Custom targets retain their declared-range check. Unsupported layouts and
+unreadable symbols produce no placement claim; a resolved out-of-range symbol
+fails before deployment.
 """
 
 from __future__ import annotations
@@ -25,8 +14,7 @@ from ..errors import BuildError
 from ..hostenv.toolchain_probe import symbol_address
 from ..pipeline import PipelineContext
 from ..placement import Placement
-from ..platform import classify_address, linked_memory_map, soc_placement_ranges
-from ..platform.memory_map import link_family_for_toolchain
+from ..platform import soc_placement_ranges
 
 log = logging.getLogger("hpx")
 
@@ -50,7 +38,7 @@ class VerifyPlacementStage:
         if ctx.arena_region == Placement.PSRAM:
             return True
         # heliaAOT emits per-region arena buffers with different symbols; the
-        # interpreter arena guard does not apply.  Scope to TFLM / heliaRT.
+        # interpreter arena guard does not apply.
         if ctx.config.engine.type == EngineType.HELIA_AOT:
             return True
         return False
@@ -61,32 +49,22 @@ class VerifyPlacementStage:
         arena_region = ctx.planned_arena_region
 
         toolchain = ctx.config.target.toolchain
-        # Verify against the characterized linked-memory map (#133), not the
-        # legacy family table. The yardstick is the link family's APP EXTENT,
-        # not the classification window: an arena inside a stack reservation
-        # is exactly the mislocation this stage catches (#177). Interpreter
-        # builds always link the DEFAULT profile; the linker_profile knob is
-        # AOT-only, and AOT skips.
-        windows = linked_memory_map(soc)
-        if not windows:
-            # Custom SoCs have no characterized map but declare their own
-            # placement bases; the legacy table is built from that declaration
-            # and remains the right thing to verify against (#177).
+        if not soc.is_builtin:
             self._run_legacy(ctx, soc, arena_region)
             return
-        family = link_family_for_toolchain(toolchain)
-        expected = next(
-            (w.app_window[family] for w in windows if w.region is arena_region.region),
-            None,
+        decision = next(
+            (v for v in ctx.run_metadata.linker_verifications if v.role == "profile"), None
         )
-        if expected is None:
-            log.debug(
-                "No verified window for %s on %s; skipping placement verify.",
-                arena_region,
-                soc.name,
-            )
+        layout = decision.layout if decision is not None else None
+        if layout is None:
+            log.info("Placement interval verification unavailable without a verified linker source")
             return
-
+        if layout.soc_name != soc.name:
+            raise BuildError("Verified linker source differs from the resolved SoC")
+        entry = next((r for r in layout.regions if r.region is arena_region.region), None)
+        if entry is None or entry.allowed is None:
+            log.info("No verified application intervals for %s", arena_region)
+            return
         resolved = symbol_address(
             binary_path,
             toolchain,
@@ -95,37 +73,41 @@ class VerifyPlacementStage:
         )
         if resolved is None:
             log.debug(
-                "Could not resolve %s address; skipping placement verify.",
-                _ARENA_SYMBOL,
+                "Could not resolve %s address; placement verification unavailable", _ARENA_SYMBOL
             )
             return
-
         address, _nm_type = resolved
-        if expected.contains(address):
-            log.info(
-                "Placement verified: arena in %s at 0x%08X (0x%08X-0x%08X).",
-                str(arena_region).upper(),
-                address,
-                expected.start,
-                expected.end,
-            )
-            return
-
-        actual = classify_address(address, windows)
-        actual_label = str(actual) if actual else "an unmapped region"
-        raise BuildError(
-            f"Arena landed in {actual_label} (0x{address:08X}) but the memory "
-            f"plan placed it in {str(arena_region).upper()} "
-            f"(app window 0x{expected.start:08X}-0x{expected.end:08X}).",
-            hint=(
-                f"The {toolchain} linker script for {soc.name} is not "
-                f"relocating the arena section to {str(arena_region).upper()}. "
-                "Check that the scatter/linker script collects the arena's "
-                "section (e.g. '.sram_bss' for SRAM) into the intended region — "
-                "this is the armclang SHARED_SRAM scatter-gap class of bug. "
-                "An address inside the region but inside its stack/heap "
-                "reservation fails for the same reason."
+        sized = next(
+            (
+                value
+                for value in (ctx.memory_symbols or ())
+                if value.address == address
+                and value.name.endswith(_ARENA_SYMBOL)
+                and value.size > 0
             ),
+            None,
+        )
+        size = sized.size if sized is not None else 1
+        if any(r.start <= address and address + size <= r.end for r in entry.allowed):
+            if sized is not None:
+                log.info(
+                    "Placement verified: arena in %s at 0x%08X (%d B)", arena_region, address, size
+                )
+            else:
+                log.info(
+                    "Arena start matches %s; full extent unavailable without a sized symbol",
+                    arena_region,
+                )
+            return
+        bounds = (
+            ", ".join(f"[0x{r.start:08X},0x{r.end:08X})" for r in entry.allowed)
+            or "no permitted intervals"
+        )
+        raise BuildError(
+            f"Arena at 0x{address:08X} ({size} B checked) lies outside verified "
+            f"{str(arena_region).upper()} application intervals: {bounds}.",
+            hint=f"Check {layout.script.path} and the requested arena placement; "
+            "an allocation cannot cross a reserved gap or fixed stack/heap region.",
         )
 
     def _run_legacy(self, ctx: PipelineContext, soc, arena_region) -> None:

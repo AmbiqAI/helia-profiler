@@ -39,7 +39,13 @@ from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import PlatformError
 from ..pipeline import PipelineContext
-from ..placement import ArenaRole, MemoryRegion, Placement, resolve_fastest_fit_placement
+from ..placement import (
+    ArenaRole,
+    MemoryRegion,
+    Placement,
+    placement_capacities,
+    resolve_fastest_fit_placement,
+)
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
@@ -54,30 +60,6 @@ _REGION_FIELDS: dict[MemoryRegion, str] = {
     MemoryRegion.ITCM: "itcm_kb",
     MemoryRegion.PSRAM: "psram_kb",
 }
-
-
-def _mram_app_window(ctx: PipelineContext) -> int | None:
-    """Bytes of MRAM the selected toolchain's linker can place the image in."""
-    from ..platform.memory_map import link_family_for_toolchain, linked_memory_map
-
-    if ctx.soc is None:
-        return None
-    linker_profile = str(ctx.config.engine.config.get("linker_profile") or "default")
-    window = next(
-        (
-            w
-            for w in linked_memory_map(ctx.soc, linker_profile=linker_profile)
-            if w.region is MemoryRegion.MRAM
-        ),
-        None,
-    )
-    if window is None:
-        return None
-    try:
-        extent = window.app_window[link_family_for_toolchain(ctx.config.target.toolchain)]
-    except ValueError:
-        return None
-    return extent.end - extent.start
 
 
 class PlanMemoryStage:
@@ -109,6 +91,7 @@ class PlanMemoryStage:
         self._validate(plan)
 
         ctx.memory_plan = plan
+        ctx.declared_memory_plan = plan
         ctx.run_metadata.memory_plan = plan
 
         log.info("Memory plan (%s):", plan.engine)
@@ -258,7 +241,6 @@ class PlanMemoryStage:
             return plan
 
         layout: MemoryLayout = ctx.soc.memory
-        mram_app = _mram_app_window(ctx)
 
         by_region = {r.region.upper(): r for r in plan.regions}
 
@@ -266,10 +248,6 @@ class PlanMemoryStage:
         for region_name, field in _REGION_FIELDS.items():
             cap_kb = int(getattr(layout, field, 0))
             cap_bytes = cap_kb * 1024
-            if region_name is MemoryRegion.MRAM and mram_app is not None:
-                # The linker places the image in the application window, not
-                # the whole part; the bootloader keeps the rest (#466).
-                cap_bytes = mram_app
             existing = by_region.pop(region_name, None)
             if existing is not None:
                 if existing.capacity not in (0, cap_bytes):
@@ -690,12 +668,9 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     cfg = ctx.config
     soc = ctx.soc
 
-    # Capacity probe (in bytes).  If soc is None (very early call), we
-    # treat all regions as unbounded; the validate pass will catch real
-    # overflow later.
-    tcm_cap = (soc.memory.dtcm_kb * 1024) if soc else (1 << 31)
-    sram_cap = (soc.memory.sram_kb * 1024) if soc else (1 << 31)
-    psram_cap = (soc.memory.psram_kb * 1024) if soc else 0
+    platform = ctx.run_metadata.platform_provenance
+    expected = platform.expected_linker if platform is not None else None
+    capacities = placement_capacities(soc, expected)
 
     arena_size = int(cfg.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
     try:
@@ -706,16 +681,16 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     arena_region, weights_region = resolve_fastest_fit_placement(
         arena_size=arena_size,
         weights_size=model_size,
-        tcm_cap=tcm_cap,
-        sram_cap=sram_cap,
+        tcm_cap=capacities.tcm,
+        sram_cap=capacities.sram,
     )
 
     arena_region, weights_region = _apply_explicit_overrides(
         cfg,
         arena_region,
         weights_region,
-        tcm_cap=tcm_cap,
-        psram_cap=psram_cap,
+        tcm_cap=capacities.tcm,
+        psram_cap=capacities.psram,
     )
 
     return (arena_region, weights_region)

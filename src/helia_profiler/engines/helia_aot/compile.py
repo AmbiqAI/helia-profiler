@@ -25,9 +25,10 @@ from typing import Any
 import jinja2
 
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
+from ...config.platform import config_platform
 from ...engines import EngineType
 from ...errors import ConfigError, EngineError, EngineMissingError
-from ...placement import Placement, resolve_fastest_fit_placement
+from ...placement import Placement, placement_capacities, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
 from ..semver import parse_semver
@@ -200,11 +201,14 @@ def _resolve_aot_placement_intent(
         weights_size = config.model.path.stat().st_size
     except OSError:
         weights_size = 0
+    capacities = placement_capacities(
+        soc, config_platform(config).expected_linker if soc is not None else None
+    )
     arena, weights = resolve_fastest_fit_placement(
         arena_size=config.model.arena_size or DEFAULT_ARENA_SIZE_BYTES,
         weights_size=weights_size,
-        tcm_cap=soc.memory.dtcm_kb * 1024 if soc else 1 << 31,
-        sram_cap=soc.memory.sram_kb * 1024 if soc else 1 << 31,
+        tcm_cap=capacities.tcm,
+        sram_cap=capacities.sram,
     )
     arena = config.model.arena_location or arena
     weights = config.model.weights_location or weights

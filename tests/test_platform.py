@@ -122,14 +122,11 @@ def test_apollo330_hardware_facts_not_copied_from_apollo510():
     soc = get_soc_for_board("apollo330mP_evb")
     # Fixed 48 MHz XTAL_HS trace clock (like AP3), NOT core-clocked.
     assert soc.swo_trace_clock_mhz == 48
-    # Linked memories: 240 KB gcc MCU_TCM (the capacity-check ceiling;
-    # the hardware DTCM aperture is 256 KB, see memory_map.py), 1792 KB
-    # SSRAM, 1552 KB linker MCU_MRAM (radio firmware sits above), no
-    # separate ITCM region.
-    assert soc.memory.dtcm_kb == 240
+    # Physical bank capacities; verified application extents exclude reservations.
+    assert soc.memory.dtcm_kb == 256
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
-    assert soc.memory.mram_kb == 1552
+    assert soc.memory.mram_kb == 2048
     # RTT scan window bounded to the 240 KB gcc-linked TCM region.
     assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
     # HAL defines SRAM_1P75M only (no SRAM_3M on this part).
@@ -149,10 +146,10 @@ def test_apollo510_lite_hardware_facts_match_apollo330P_not_apollo510():
     assert soc.has_full_pmu
     assert soc.has_mve
     assert soc.swo_trace_clock_mhz == 48
-    assert soc.memory.dtcm_kb == 240
+    assert soc.memory.dtcm_kb == 256
     assert soc.memory.itcm_kb == 0
     assert soc.memory.sram_kb == 1792
-    assert soc.memory.mram_kb == 1552
+    assert soc.memory.mram_kb == 2048
     assert soc.memory.psram_kb == 0
     assert soc.rtt_scan_ranges == ((0x20000000, 0x3C000),)
     assert soc.ssram_full_power_enum == "AM_HAL_PWRCTRL_SRAM_1P75M"
@@ -190,9 +187,9 @@ def test_atomiq110_hardware_facts_not_copied_from_apollo510():
     lp_speed = soc.cpu_clock.speed("lp")
     assert lp_speed is not None
     assert lp_speed.mhz == 25
-    # Real FPGA memory map: 496 KB DTCM/TCM, 256 KB ITCM, 3072 KB SSRAM,
+    # Physical FPGA memory map: 512 KB DTCM/TCM, 256 KB ITCM, 3072 KB SSRAM,
     # 4096 KB MRAM, and no PSRAM/MSPI populated on this board.
-    assert soc.memory.dtcm_kb == 496
+    assert soc.memory.dtcm_kb == 512
     assert soc.memory.itcm_kb == 256
     assert soc.memory.sram_kb == 3072
     assert soc.memory.mram_kb == 4096

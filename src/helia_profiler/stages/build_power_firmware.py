@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from ..config import PowerFirmware
-from ..errors import BuildError, FirmwareError
+from ..errors import BuildError, FirmwareError, PlatformError
 from ..firmware.image import record_build_image
 from ..pipeline import PipelineContext
 from ..power.diagnostics import count_noun
@@ -69,6 +69,11 @@ class BuildPowerFirmwareStage:
             with workspace_mutex(ctx.dependency_workspace):
                 render_power_source(ctx, inference_count=inference_count)
                 _remove_stale_power_outputs(ctx.build_dir)
+                from ..firmware.linker import configure_linker
+
+                configure_linker(
+                    ctx, build_dir=ctx.build_dir, role="power", target="hpx_profiler_power"
+                )
                 nsx_cli.build(
                     ctx.firmware_dir,
                     toolchain=nsx_toolchain(ctx.config.target.toolchain),
@@ -76,7 +81,7 @@ class BuildPowerFirmwareStage:
                     timeout_s=ctx.config.timeouts.build_s,
                     verbose=ctx.config.verbose,
                 )
-        except (BuildError, FirmwareError):
+        except (BuildError, FirmwareError, PlatformError):
             raise
         except Exception as exc:
             raise BuildError(

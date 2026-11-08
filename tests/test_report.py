@@ -98,7 +98,7 @@ def test_metadata_to_dict_includes_timing():
     data = _metadata_to_dict(meta)
 
     assert data["schema"] == "hpx.run-metadata"
-    assert data["schema_version"] == 2
+    assert data["schema_version"] == 3
     assert data["timing"] == {
         "capture_duration_s": 1.5,
         "hpx_start_latency_s": 0.25,

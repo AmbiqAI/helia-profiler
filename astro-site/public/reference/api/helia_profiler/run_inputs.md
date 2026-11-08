@@ -134,7 +134,7 @@ inside the span.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:25`
+Source: `src/helia_profiler/fixtures/types.py:26`
 
 ### helia_profiler.FixtureTimingScope.INVOKE_ONLY
 
@@ -144,7 +144,7 @@ Source: `src/helia_profiler/fixtures/types.py:25`
 INVOKE_ONLY = 'invoke_only'
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:33`
+Source: `src/helia_profiler/fixtures/types.py:34`
 
 ### helia_profiler.FixtureTimingScope.RESTORE_AND_INVOKE
 
@@ -154,7 +154,7 @@ Source: `src/helia_profiler/fixtures/types.py:33`
 RESTORE_AND_INVOKE = 'restore_and_invoke'
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:34`
+Source: `src/helia_profiler/fixtures/types.py:35`
 
 ## helia_profiler.analyze_run_model
 
@@ -201,7 +201,7 @@ Internal state behavior; input restoration is independent of this policy.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:37`
+Source: `src/helia_profiler/fixtures/types.py:38`
 
 ### helia_profiler.FixtureStatePolicy.CARRY
 
@@ -211,7 +211,7 @@ Source: `src/helia_profiler/fixtures/types.py:37`
 CARRY = 'carry'
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:40`
+Source: `src/helia_profiler/fixtures/types.py:41`
 
 ## helia_profiler.FixtureRole
 
@@ -225,7 +225,7 @@ Role of one fixture tensor; outputs are always ``SIGNAL``.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:43`
+Source: `src/helia_profiler/fixtures/types.py:44`
 
 ### helia_profiler.FixtureRole.SIGNAL
 
@@ -235,7 +235,7 @@ Source: `src/helia_profiler/fixtures/types.py:43`
 SIGNAL = 'signal'
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:46`
+Source: `src/helia_profiler/fixtures/types.py:47`
 
 ### helia_profiler.FixtureRole.AUX
 
@@ -245,7 +245,7 @@ Source: `src/helia_profiler/fixtures/types.py:46`
 AUX = 'aux'
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:47`
+Source: `src/helia_profiler/fixtures/types.py:48`
 
 ## helia_profiler.PerTensorQuantization
 
@@ -349,7 +349,7 @@ source-initializer equivalence is implied.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:50`
+Source: `src/helia_profiler/fixtures/types.py:51`
 
 ### helia_profiler.FixtureMethod.timing_scope
 
@@ -359,7 +359,7 @@ Source: `src/helia_profiler/fixtures/types.py:50`
 timing_scope: FixtureTimingScope
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:61`
+Source: `src/helia_profiler/fixtures/types.py:62`
 
 ### helia_profiler.FixtureMethod.state_policy
 
@@ -369,7 +369,7 @@ Source: `src/helia_profiler/fixtures/types.py:61`
 state_policy: FixtureStatePolicy | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:62`
+Source: `src/helia_profiler/fixtures/types.py:63`
 
 ### helia_profiler.FixtureMethod.power_sync
 
@@ -379,7 +379,7 @@ Source: `src/helia_profiler/fixtures/types.py:62`
 power_sync: FixturePowerSync | None = None
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:63`
+Source: `src/helia_profiler/fixtures/types.py:64`
 
 ## helia_profiler.analyze_run_model_for_engine
 
@@ -511,7 +511,7 @@ One model input with its fixed bytes, or one output with its expected bytes.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:116`
+Source: `src/helia_profiler/fixtures/types.py:117`
 
 ### helia_profiler.FixtureIO.tensor
 
@@ -521,7 +521,7 @@ Source: `src/helia_profiler/fixtures/types.py:116`
 tensor: FixtureTensor
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:120`
+Source: `src/helia_profiler/fixtures/types.py:121`
 
 ### helia_profiler.FixtureIO.data
 
@@ -531,7 +531,7 @@ Source: `src/helia_profiler/fixtures/types.py:120`
 data: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:121`
+Source: `src/helia_profiler/fixtures/types.py:122`
 
 ### helia_profiler.FixtureIO.role
 
@@ -541,7 +541,7 @@ Source: `src/helia_profiler/fixtures/types.py:121`
 role: FixtureRole = FixtureRole.SIGNAL
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:122`
+Source: `src/helia_profiler/fixtures/types.py:123`
 
 ## helia_profiler.TypedFixtureModelAnalysis
 
@@ -693,7 +693,7 @@ One complete output declaration, without a reference answer.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:125`
+Source: `src/helia_profiler/fixtures/types.py:126`
 
 ### helia_profiler.FixtureOutput.tensor
 
@@ -703,7 +703,7 @@ Source: `src/helia_profiler/fixtures/types.py:125`
 tensor: FixtureTensor
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:129`
+Source: `src/helia_profiler/fixtures/types.py:130`
 
 ## helia_profiler.TypedFixture
 
@@ -726,7 +726,7 @@ bytes are not needed for measurement; legacy identities remain unchanged.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/fixtures/types.py:132`
+Source: `src/helia_profiler/fixtures/types.py:133`
 
 ### helia_profiler.TypedFixture.model
 
@@ -736,7 +736,7 @@ Source: `src/helia_profiler/fixtures/types.py:132`
 model: FixtureFile
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:140`
+Source: `src/helia_profiler/fixtures/types.py:141`
 
 ### helia_profiler.TypedFixture.inputs
 
@@ -746,7 +746,7 @@ Source: `src/helia_profiler/fixtures/types.py:140`
 inputs: tuple[FixtureIO, ...]
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:141`
+Source: `src/helia_profiler/fixtures/types.py:142`
 
 ### helia_profiler.TypedFixture.outputs
 
@@ -756,7 +756,7 @@ Source: `src/helia_profiler/fixtures/types.py:141`
 outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:142`
+Source: `src/helia_profiler/fixtures/types.py:143`
 
 ### helia_profiler.TypedFixture.expected
 
@@ -766,7 +766,7 @@ Source: `src/helia_profiler/fixtures/types.py:142`
 expected: FixtureFile | None
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:162`
+Source: `src/helia_profiler/fixtures/types.py:163`
 
 ### helia_profiler.TypedFixture.identity
 
@@ -776,7 +776,7 @@ Source: `src/helia_profiler/fixtures/types.py:162`
 identity: str
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:167`
+Source: `src/helia_profiler/fixtures/types.py:168`
 
 ### helia_profiler.TypedFixture.verify
 
@@ -786,4 +786,4 @@ Source: `src/helia_profiler/fixtures/types.py:167`
 verify() -> None
 ```
 
-Source: `src/helia_profiler/fixtures/types.py:144`
+Source: `src/helia_profiler/fixtures/types.py:145`

@@ -399,10 +399,11 @@ def _hpx_target_head(target: str, package: str) -> str:
     From a file in ``helia_profiler.<package>``: ``".sibling"`` is the
     package itself, ``"..other.name"`` is ``other``, and an absolute target
     contributes its second segment."""
-    if target.startswith(".."):
-        return target.lstrip(".").split(".")[0]
     if target.startswith("."):
-        return package
+        level = len(target) - len(target.lstrip("."))
+        parents = package.split(".")
+        relative = parents[: len(parents) - level + 1] + target.lstrip(".").split(".")
+        return relative[0]
     return target.split(".")[1] if "." in target else target
 
 
@@ -414,11 +415,24 @@ def _closure_offenders(package: str, allowed: set[str]) -> dict[str, list[str]]:
         hits = [
             target
             for target in _hpx_import_targets(path, module_level_only=False)
-            if _hpx_target_head(target, package) not in allowed
+            if _hpx_target_head(target, ".".join(path.relative_to(_SRC).parts[:-1])) not in allowed
         ]
         if hits:
             offenders[path.name] = hits
     return offenders
+
+
+@pytest.mark.parametrize(
+    ("package", "target", "expected"),
+    [
+        ("platform", ".soc.SocDef", "platform"),
+        ("platform.linker", "..soc.SocDef", "platform"),
+        ("platform.linker", "...results.MemoryPlan", "results"),
+        ("platform.linker", "helia_profiler.results.MemoryPlan", "results"),
+    ],
+)
+def test_extraction_gate_resolves_nested_relative_imports(package, target, expected):
+    assert _hpx_target_head(target, package) == expected
 
 
 def test_platform_closure_stays_extractable() -> None:

@@ -14,24 +14,77 @@
     "issues"
   ],
   "properties": {
-    "schema": {"const": "hpx.run-summary"},
-    "schema_version": {"const": 21},
-    "engine": {"type": "string", "minLength": 1},
-    "layers": {"type": "integer", "minimum": 0},
-    "total_cycles": {"type": ["number", "null"]},
-    "overflow_detected": {"type": "boolean"},
-    "validity": {"enum": ["valid", "degraded", "invalid"]},
-    "issues": {"type": "array", "items": {"type": "object"}},
+    "schema": {
+      "const": "hpx.run-summary"
+    },
+    "schema_version": {
+      "const": 22
+    },
+    "engine": {
+      "type": "string",
+      "minLength": 1
+    },
+    "layers": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "total_cycles": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "overflow_detected": {
+      "type": "boolean"
+    },
+    "validity": {
+      "enum": [
+        "valid",
+        "degraded",
+        "invalid"
+      ]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
     "conditions": {
       "type": "object",
-      "required": ["target", "cpu_hz", "weights_memory", "weights_cache", "application_load"],
+      "required": [
+        "target",
+        "cpu_hz",
+        "weights_memory",
+        "weights_cache",
+        "application_load"
+      ],
       "properties": {
-        "target": {"type": "string", "minLength": 1},
-        "cpu_hz": {"type": ["integer", "null"]},
-        "weights_memory": {"type": ["string", "null"]},
-        "weights_cache": {"type": "string"},
-        "external_memory_clock": {"type": "integer"},
-        "application_load": {"type": "string"}
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_hz": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "weights_memory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "weights_cache": {
+          "type": "string"
+        },
+        "external_memory_clock": {
+          "type": "integer"
+        },
+        "application_load": {
+          "type": "string"
+        }
       }
     },
     "identity": {
@@ -54,26 +107,72 @@
       "properties": {
         "build_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$", "minLength": 83, "maxLength": 83},
-            {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
+            {
+              "type": "string",
+              "pattern": "^hpx\\.build/1:sha256:[0-9a-f]{64}$",
+              "minLength": 83,
+              "maxLength": 83
+            },
+            {
+              "type": "object",
+              "required": [
+                "unknown"
+              ],
+              "properties": {
+                "unknown": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
           ]
         },
         "inputs_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
-            {"type": "object", "required": ["unknown"], "properties": {"unknown": {"type": "string"}}, "additionalProperties": false}
+            {
+              "type": "string",
+              "pattern": "^hpx\\.inputs/1:sha256:[0-9a-f]{64}$",
+              "minLength": 84,
+              "maxLength": 84
+            },
+            {
+              "type": "object",
+              "required": [
+                "unknown"
+              ],
+              "properties": {
+                "unknown": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
           ]
         },
         "observation_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.observation/1:sha256:[0-9a-f]{64}$", "minLength": 89, "maxLength": 89},
-            {"type": "null"}
+            {
+              "type": "string",
+              "pattern": "^hpx\\.observation/1:sha256:[0-9a-f]{64}$",
+              "minLength": 89,
+              "maxLength": 89
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "intent_hash": {
           "oneOf": [
-            {"type": "string", "pattern": "^hpx\\.intent/2:sha256:[0-9a-f]{64}$", "minLength": 84, "maxLength": 84},
-            {"type": "null"}
+            {
+              "type": "string",
+              "pattern": "^hpx\\.intent/2:sha256:[0-9a-f]{64}$",
+              "minLength": 84,
+              "maxLength": 84
+            },
+            {
+              "type": "null"
+            }
           ]
         }
       }

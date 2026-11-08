@@ -17,16 +17,16 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 | File | Schema | Role | When present |
 |---|---|---|---|
 | `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
-| `summary.json` | `hpx.run-summary` v21 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
+| `summary.json` | `hpx.run-summary` v22 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
 | `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | always; one of the two per `output.format` |
-| `run_metadata.json` | `hpx.run-metadata` v2 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
+| `run_metadata.json` | `hpx.run-metadata` v3 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
 | `aot_operator_manifest.json` | engine extension | the operators the AOT compiler emitted with tensor placement | `helia-aot` runs |
 | `aot_memory_layers.csv` | engine extension | the same placement data flattened for a spreadsheet | `helia-aot` runs |
 | `<prefix>_plan.json`, `<prefix>_report.json` | heliaAOT's plan and report schemas | the compiler's own record of every operator's knob values, and its report; `hpx calibrate` (which needs the `aot` extra installed) reads the plan and writes calibration schema 2 (`helia_profiler/data/calibration.schema.v2.json`): `operator_cycles` (every operator the plan lists, with knobs or without, one entry of `knobs`, `cycles` and `facts` per knob vector) and `capture.setup.pairing_digest` (the setup less where the constants sit, from `effective_config_pairing_sha256`; `null` for a bundle without it; `memory.allocate_arenas` stays held, so a pair that includes PSRAM weights needs `memory.allocate_arenas: false` on every capture of the pair); see [`hpx calibrate`](../../reference/cli/calibrate/) | `helia-aot` runs, when the installed heliaAOT writes them |
 | `model_explorer/me_overlay_<COUNTER>.json` | Model Explorer overlay format | one overlay per counter | unless `output.model_explorer: false` |
 | `detailed/memory.json`, `detailed/profile_<group>.csv`, `detailed/profile_<preset>.csv`, `detailed/power_summary.csv` | projections and diagnostics | counters merged per compute-unit group and per PMU preset, memory breakdown, per-window power | `output.detailed: true` |
-| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v2 (`runs/record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
+| `result.json` in a run directory's `evidence-<N>/` | `hpx.run-result` v3 (`runs/record.py`) | one run-API capture, saved and verifiable; see [A saved run result](#7-a-saved-run-result) | `hpx run`, `RunResult.save` |
 
 The manifest's artifact entries carry `role` (`core`, `projection`,
 `extension`, `export`, `diagnostic`), `name`, `producer`, `optional`, and
@@ -76,13 +76,13 @@ nested memory and analysis tables described below:
 
 (the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-which retains schema version 5. New runs use schema version 21; use the
+which retains schema version 5. New runs use schema version 22; use the
 producing HPX release to read historical bundles without rewriting them). Top-level
 fields in new runs:
 
 | Field | Type | Unit | What it measures |
 |---|---|---|---|
-| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 21 |
+| `schema`, `schema_version` | string, int | none | `hpx.run-summary`, version 22 |
 | `engine` | string | none | the engine that ran |
 | `layers` | int | count | operators in the profiled graph |
 | `total_cycles` | number | CPU cycles | the sum of the per-layer instrumented cycle counts (`report/summary.py`), so it includes the per-layer counter reads; the clean window is `latency.device_clean_infer_avg_cycles` |
@@ -444,7 +444,7 @@ it records itself under and this host's HPX cache, raising a
 result that changed while it was read, and `ambiguous_location` for a
 directory holding both `result.json` and `result_manifest.json`; name the
 file instead. `observations(record)`
-maps it to the portable result view (`1.0-draft`, mapping `hpx-run-3`);
+maps it to the portable result view (`1.0-draft`, mapping `hpx-run-4`);
 `hpx results show` and `hpx results export` print and write it.
 
 | Metric | Unit | Scope | Statistic | Basis |
@@ -516,7 +516,7 @@ Schema v11 renames the firmware gate interval in the `power.window_observer_mism
 
 ### Retained target configuration and CPU clocks
 
-Saved-run mapping `hpx-run-3` exposes `target.identity` as
+Saved-run mapping `hpx-run-4` exposes `target.identity` as
 `hpx.target-config/1:sha256:<hex>` when all seven retained facts are known:
 `board`, `device`, `load_address`, `clock_profile`, `cpu_hz`, `arena_location`
 and `weights_location`. The producer extension `target_config` exposes that flat
@@ -540,5 +540,6 @@ measured or calibrated frequency. If the timing source is CPU, its existing
 CPU-domain clock entries are kept without duplicates. Failed captures do not gain
 successful latency observations from these configuration facts.
 
-The native saved-result and compiled-build formats are unchanged. This mapping
-version applies to saved run results; the separate profile mapping is unchanged.
+Saved-run mapping `hpx-run-4` adds source-bound linker inputs and build
+verification to retained producer facts. It accompanies the version changes in
+the [platform guide](../concepts/platforms/). The separate profile mapping is unchanged.

@@ -128,6 +128,8 @@ class PipelineContext:
 
     # Memory plan (stage: plan_memory)
     memory_plan: MemoryPlan | None = None
+    #: Original declared-capacity plan, reused for each target admission decision.
+    declared_memory_plan: MemoryPlan | None = None
     #: Measured per-region occupancy from the built ELF;
     #: None whenever it cannot be true (uncharacterized map, tool failure,
     #: partial inventory).

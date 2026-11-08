@@ -1,5 +1,5 @@
 {
-  "binding": "hpx.binding/1:sha256:3afd2ad0a1aa0d2a443e8343710ceffcaa6e188305731b4550607c8665959922",
+  "binding": "hpx.binding/1:sha256:9320f0eaeb2b12e29ca5f0563d334f6409c378e822997550cd1ffcd983219eff",
   "build": {
     "build": {
       "aot_arena_scan": [],
@@ -15,7 +15,7 @@
         "root": "run",
         "sha256": "780d84b20d7ae7e6292919399348bdbf96025270136198083fc8a4da398b5ca9"
       },
-      "build_identity": "33528cf6706218ffa6497e8d20472b38b47d584618adac9c6842cbcabe4af192",
+      "build_identity": "b4e2b193fc4eb7e08b5f612253730f556fd0f2ba583afd4beaff332147ac6bd4",
       "built": true,
       "capabilities": [
         [
@@ -33,7 +33,7 @@
       "dependency_state": {
         "path": "build/evidence/state.json",
         "root": "run",
-        "sha256": "829e1bfe741e76c53761793cd883330ac5d93ce477a47598c4ae964a4266c4dc"
+        "sha256": "34541eced6f42873b967a0f388f5152cf46a998174f5af7e3fdb721a9200ff06"
       },
       "engine": "helia-aot",
       "engine_source": null,
@@ -82,6 +82,147 @@
         "path": "build/app/main.map",
         "root": "run",
         "sha256": "60be9861750facbfad8758254a2f76c0cfe78d54459a3bc187d49b1401fcd8e8"
+      },
+      "linker_verification": {
+        "layout": {
+          "admission_source": "catalog-and-linker",
+          "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
+          "files": [
+            {
+              "path": "cmake/nsx_toolchain_flags.cmake",
+              "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
+            },
+            {
+              "path": "cmake/socs/apollo510.cmake",
+              "sha256": "472607b0878fbaff2c9c26c2343da5391b31e37d4a3639146aa00bae12f82051"
+            },
+            {
+              "path": "cmake/socs/facts/apollo510.cmake",
+              "sha256": "accedd25d81bb76799b311771d45e30371304cde9ff3b0701bcfc39a1dea806e"
+            },
+            {
+              "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
+              "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
+            },
+            {
+              "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+              "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+            }
+          ],
+          "link_family": "gnu",
+          "linker_profile": "default",
+          "regions": [
+            {
+              "allowed": [
+                {
+                  "length": 262144,
+                  "start": 0
+                }
+              ],
+              "app_window": {
+                "length": 262144,
+                "start": 0
+              },
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "section_attributable": true,
+              "window": {
+                "length": 262144,
+                "start": 0
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 4128768,
+                  "start": 4259840
+                }
+              ],
+              "app_window": {
+                "length": 4128768,
+                "start": 4259840
+              },
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "section_attributable": true,
+              "window": {
+                "length": 4128768,
+                "start": 4259840
+              },
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 507904,
+                  "start": 536870912
+                }
+              ],
+              "app_window": {
+                "length": 507904,
+                "start": 536870912
+              },
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "section_attributable": true,
+              "window": {
+                "length": 524288,
+                "start": 536870912
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 3145728,
+                  "start": 537395200
+                }
+              ],
+              "app_window": {
+                "length": 3145728,
+                "start": 537395200
+              },
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "section_attributable": true,
+              "window": {
+                "length": 3145728,
+                "start": 537395200
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 67108864,
+                  "start": 1610612736
+                }
+              ],
+              "app_window": {
+                "length": 67108864,
+                "start": 1610612736
+              },
+              "fixed_stack_bytes": 0,
+              "region": "PSRAM",
+              "section_attributable": false,
+              "window": {
+                "length": 67108864,
+                "start": 1610612736
+              },
+              "window_provenance": "board-knowledge"
+            }
+          ],
+          "script": {
+            "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+            "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+          },
+          "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
+          "soc_name": "apollo510"
+        },
+        "reason": null,
+        "role": "profile",
+        "target": "hpx_profiler"
       },
       "model": {
         "path": "inputs/tiny_cnn.tflite",
@@ -156,6 +297,142 @@
           "psram_kb": null,
           "soc": "apollo510",
           "starter_profile_board": null
+        },
+        "expected_linker": {
+          "admission_source": "catalog-and-linker",
+          "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
+          "files": [
+            {
+              "path": "cmake/nsx_toolchain_flags.cmake",
+              "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
+            },
+            {
+              "path": "cmake/socs/apollo510.cmake",
+              "sha256": "472607b0878fbaff2c9c26c2343da5391b31e37d4a3639146aa00bae12f82051"
+            },
+            {
+              "path": "cmake/socs/facts/apollo510.cmake",
+              "sha256": "accedd25d81bb76799b311771d45e30371304cde9ff3b0701bcfc39a1dea806e"
+            },
+            {
+              "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
+              "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
+            },
+            {
+              "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+              "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+            }
+          ],
+          "link_family": "gnu",
+          "linker_profile": "default",
+          "regions": [
+            {
+              "allowed": [
+                {
+                  "length": 262144,
+                  "start": 0
+                }
+              ],
+              "app_window": {
+                "length": 262144,
+                "start": 0
+              },
+              "fixed_stack_bytes": 0,
+              "region": "ITCM",
+              "section_attributable": true,
+              "window": {
+                "length": 262144,
+                "start": 0
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 4128768,
+                  "start": 4259840
+                }
+              ],
+              "app_window": {
+                "length": 4128768,
+                "start": 4259840
+              },
+              "fixed_stack_bytes": 0,
+              "region": "MRAM",
+              "section_attributable": true,
+              "window": {
+                "length": 4128768,
+                "start": 4259840
+              },
+              "window_provenance": "linker-app-origin"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 507904,
+                  "start": 536870912
+                }
+              ],
+              "app_window": {
+                "length": 507904,
+                "start": 536870912
+              },
+              "fixed_stack_bytes": 0,
+              "region": "DTCM",
+              "section_attributable": true,
+              "window": {
+                "length": 524288,
+                "start": 536870912
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 3145728,
+                  "start": 537395200
+                }
+              ],
+              "app_window": {
+                "length": 3145728,
+                "start": 537395200
+              },
+              "fixed_stack_bytes": 0,
+              "region": "SRAM",
+              "section_attributable": true,
+              "window": {
+                "length": 3145728,
+                "start": 537395200
+              },
+              "window_provenance": "hardware-aperture"
+            },
+            {
+              "allowed": [
+                {
+                  "length": 67108864,
+                  "start": 1610612736
+                }
+              ],
+              "app_window": {
+                "length": 67108864,
+                "start": 1610612736
+              },
+              "fixed_stack_bytes": 0,
+              "region": "PSRAM",
+              "section_attributable": false,
+              "window": {
+                "length": 67108864,
+                "start": 1610612736
+              },
+              "window_provenance": "board-knowledge"
+            }
+          ],
+          "script": {
+            "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+            "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+          },
+          "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
+          "soc_name": "apollo510"
         },
         "link_family": "gnu",
         "linker_profile": "default",
@@ -255,7 +532,7 @@
       "weights_location": "mram"
     },
     "fixture_api": [
-      8,
+      9,
       0
     ],
     "schema_version": 1
@@ -263,12 +540,12 @@
   "lifecycle": "carry",
   "plan": {
     "baseline": {
-      "fingerprint": "c6be3d29b88bf909164958347e046636ca3cf684a3d2892007014830c20db928",
-      "id": "hpx-neuralspotx-0.9.2-2026-11-07.1"
+      "fingerprint": "d82450eec03f894fa208aa2ddaaad08c33cd6143b5069cdf25159a82057ab3ee",
+      "id": "hpx-neuralspotx-0.9.2-2026-11-08.2"
     },
     "environment": {},
     "hpx_version": "0.5.0",
-    "intent_hash": "hpx.intent/2:sha256:36825c2c280ffb6b64a733603e22061fa5ecd2d97d6f577e85ac0b30a6cc91d8",
+    "intent_hash": "hpx.intent/2:sha256:9b10361d8abe83a5787285692294bfbcdf9b2cb59766e8bbbec4aca7323b8f8f",
     "local_inputs": [],
     "model": {
       "path": "inputs/tiny_cnn.tflite",
@@ -326,6 +603,142 @@
         "psram_kb": null,
         "soc": "apollo510",
         "starter_profile_board": null
+      },
+      "expected_linker": {
+        "admission_source": "catalog-and-linker",
+        "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
+        "files": [
+          {
+            "path": "cmake/nsx_toolchain_flags.cmake",
+            "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
+          },
+          {
+            "path": "cmake/socs/apollo510.cmake",
+            "sha256": "472607b0878fbaff2c9c26c2343da5391b31e37d4a3639146aa00bae12f82051"
+          },
+          {
+            "path": "cmake/socs/facts/apollo510.cmake",
+            "sha256": "accedd25d81bb76799b311771d45e30371304cde9ff3b0701bcfc39a1dea806e"
+          },
+          {
+            "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
+            "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
+          },
+          {
+            "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+            "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+          }
+        ],
+        "link_family": "gnu",
+        "linker_profile": "default",
+        "regions": [
+          {
+            "allowed": [
+              {
+                "length": 262144,
+                "start": 0
+              }
+            ],
+            "app_window": {
+              "length": 262144,
+              "start": 0
+            },
+            "fixed_stack_bytes": 0,
+            "region": "ITCM",
+            "section_attributable": true,
+            "window": {
+              "length": 262144,
+              "start": 0
+            },
+            "window_provenance": "hardware-aperture"
+          },
+          {
+            "allowed": [
+              {
+                "length": 4128768,
+                "start": 4259840
+              }
+            ],
+            "app_window": {
+              "length": 4128768,
+              "start": 4259840
+            },
+            "fixed_stack_bytes": 0,
+            "region": "MRAM",
+            "section_attributable": true,
+            "window": {
+              "length": 4128768,
+              "start": 4259840
+            },
+            "window_provenance": "linker-app-origin"
+          },
+          {
+            "allowed": [
+              {
+                "length": 507904,
+                "start": 536870912
+              }
+            ],
+            "app_window": {
+              "length": 507904,
+              "start": 536870912
+            },
+            "fixed_stack_bytes": 0,
+            "region": "DTCM",
+            "section_attributable": true,
+            "window": {
+              "length": 524288,
+              "start": 536870912
+            },
+            "window_provenance": "hardware-aperture"
+          },
+          {
+            "allowed": [
+              {
+                "length": 3145728,
+                "start": 537395200
+              }
+            ],
+            "app_window": {
+              "length": 3145728,
+              "start": 537395200
+            },
+            "fixed_stack_bytes": 0,
+            "region": "SRAM",
+            "section_attributable": true,
+            "window": {
+              "length": 3145728,
+              "start": 537395200
+            },
+            "window_provenance": "hardware-aperture"
+          },
+          {
+            "allowed": [
+              {
+                "length": 67108864,
+                "start": 1610612736
+              }
+            ],
+            "app_window": {
+              "length": 67108864,
+              "start": 1610612736
+            },
+            "fixed_stack_bytes": 0,
+            "region": "PSRAM",
+            "section_attributable": false,
+            "window": {
+              "length": 67108864,
+              "start": 1610612736
+            },
+            "window_provenance": "board-knowledge"
+          }
+        ],
+        "script": {
+          "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
+          "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
+        },
+        "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
+        "soc_name": "apollo510"
       },
       "link_family": "gnu",
       "linker_profile": "default",
@@ -414,7 +827,7 @@
       "version": "0.33.0"
     },
     "schema": "hpx.frozen-run",
-    "schema_version": 3,
+    "schema_version": 4,
     "settings": {
       "build": {
         "channel": null,
@@ -499,5 +912,5 @@
     }
   },
   "schema": "hpx.compiled-build",
-  "schema_version": 4
+  "schema_version": 5
 }

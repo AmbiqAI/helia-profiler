@@ -12,6 +12,7 @@ from .._files import FixtureFile
 from ..engines import EngineType
 from ..engines.base import EngineSource
 from ..placement import Placement
+from ..platform.linker.model import LinkerVerification
 from ..platform.provenance import PlatformSnapshot
 from ..results.models import MemoryPlan, ToolchainInfo
 from .analysis import FixtureModelAnalysis, FixtureTensor, Int8Tensor, TypedFixtureModelAnalysis
@@ -236,3 +237,4 @@ class FixtureBuild:
     #: Compiled heliaRT and LiteRT builds only: the prepared runtime archive linked.
     runtime_source: FixtureRuntimeSource | None = None
     platform: PlatformSnapshot | None = None
+    linker_verification: LinkerVerification | None = None

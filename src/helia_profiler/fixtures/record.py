@@ -13,6 +13,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..platform.linker.model import LinkerVerification
 from ..platform.provenance import PlatformSnapshot
 
 if TYPE_CHECKING:
@@ -76,12 +77,13 @@ _FIELDS = frozenset(
         "cpu_hz",
         "timer_hz",
         "platform",
+        "linker_verification",
     )
 )
 
 
 #: The record's ``fixture_api`` version, inside a versioned ``hpx.compiled-build``.
-_RECORD_VERSION = (8, 0)
+_RECORD_VERSION = (9, 0)
 
 #: Absent from a record when unknown.
 _SOURCE_FIELDS = ("kernel_source", "runtime_source")
@@ -105,6 +107,9 @@ def _payload(build: FixtureBuild, *, file, path) -> dict:
     """The single build schema, with different path encodings for identity/storage."""
     result = asdict(build)
     result["platform"] = build.platform.to_dict() if build.platform is not None else None
+    result["linker_verification"] = (
+        build.linker_verification.to_dict() if build.linker_verification is not None else None
+    )
     if not build.observe_ram:
         del result["observe_ram"]
     for name in _SOURCE_FIELDS:
@@ -177,6 +182,24 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         raise ValueError("Explicit fixture target required")
     if build.platform is None:
         raise ValueError("Compiled fixture requires recorded platform provenance; build again")
+    verification = build.linker_verification
+    if verification is None or not verification.verified or verification.role != "profile":
+        raise ValueError("Compiled fixture requires verified profile linker input; build again")
+    if verification.layout != build.platform.expected_linker:
+        raise ValueError("Compiled fixture linker input differs from its platform expectation")
+    from ..results.dependencies import recorded_dependency_modules, validate_sdk_modules
+
+    try:
+        state = _read_json(build.dependency_state.read())
+        if not isinstance(state, dict) or verification.layout is None:
+            raise ValueError("Compiled fixture SDK dependency facts are unavailable")
+        assert verification.layout is not None
+        validate_sdk_modules(
+            recorded_dependency_modules(state.get("modules")), verification.layout.sdk_commit
+        )
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise ValueError(f"SDK source facts cannot be re-derived: {exc}") from exc
+
     if build.platform.board.name != build.target.board:
         raise ValueError("Fixture target differs from its recorded platform")
     build.target.verify(platform=build.platform)
@@ -457,6 +480,7 @@ def load_fixture_build(record: str | bytes, *, roots: Mapping[str, Path]) -> Fix
     value = dict(_object(outer["build"], _FIELDS | optional))
     try:
         value["platform"] = PlatformSnapshot.from_dict(value["platform"])
+        value["linker_verification"] = LinkerVerification.from_dict(value["linker_verification"])
         value["app_dir"] = mapping.decode(value["app_dir"])
         for name in _FILE_FIELDS:
             value[name] = mapping.read_file(value[name])

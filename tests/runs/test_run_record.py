@@ -412,7 +412,7 @@ def test_a_timing_only_run_maps_latency_memory_and_states_no_energy(root, record
     view = observations(loaded)
 
     _validate(view)
-    assert view["producer"]["mapping_version"] == "hpx-run-3"
+    assert view["producer"]["mapping_version"] == "hpx-run-4"
     assert view["native_result"]["identity"] == loaded.sha256
     latency = _items(view)["latency.invoke.v1"]
     assert latency["value"] == pytest.approx(65536 / 32768 / 100 * 1000)

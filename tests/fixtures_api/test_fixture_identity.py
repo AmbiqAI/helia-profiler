@@ -25,7 +25,7 @@ from helia_profiler.fixtures.record import (
     load_fixture_build,
 )
 from helia_profiler.runtime.archive import _manifest_facts
-from tests.fixtures_api.test_fixture_record import _build, _pin, _sourced
+from tests.fixtures_api.test_fixture_record import _build, _pin, _sdk_modules, _sourced
 from tests.fixtures_api.test_fixture_sources import NS
 
 AOT_COMMIT = "7b92ec8a3ced8459eb68940a42d405536144368e"
@@ -72,7 +72,7 @@ def _state(root, build, *, hpx_version="0.2.3", name="state.json"):
     assert build.dependency_lock is not None
     data = {
         "lock": {"sha256": {"value": build.dependency_lock.sha256}},
-        "modules": [asdict(NS)],
+        "modules": [asdict(m) for m in _sdk_modules(build.platform)] + [asdict(NS)],
         "workspace": {
             "baseline_id": "hpx-neuralspotx-0.9.0-2026-10-27.1",
             "inputs": {"hpx_version": hpx_version},

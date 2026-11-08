@@ -88,10 +88,14 @@ def fixture_app_region(
     if platform is not None:
         if platform.board.name != board:
             raise ValueError("Fixture board differs from recorded platform")
-        recorded = next((r.extent for r in platform.app_regions if r.region is region), None)
-        if recorded is None:
-            raise ValueError(f"{board} recorded no linked {region} region")
-        return recorded.start, recorded.end
+        layout = platform.expected_linker
+        recorded = next((r for r in layout.regions if r.region is region), None) if layout else None
+        if recorded is None or recorded.allowed is None or len(recorded.allowed) != 1:
+            raise ValueError(
+                f"{board} recorded no supported contiguous {region} application interval"
+            )
+        extent = recorded.allowed[0]
+        return extent.start, extent.end
     windows = linked_memory_map(_fixture_soc(board))
     window = next((w for w in windows if w.region is region), None)
     if window is None:

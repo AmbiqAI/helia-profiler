@@ -6,8 +6,9 @@ from collections.abc import Mapping
 from dataclasses import replace
 from functools import cache
 from types import MappingProxyType
+from typing import TYPE_CHECKING
 
-from helia_platforms import Target, builtin
+from helia_platforms import Catalog, Target, builtin
 from helia_platforms.model import DomainPoint
 
 from .board import BoardDef
@@ -16,6 +17,14 @@ from .policy import BOARD_POLICIES, CORE_CLOCKED_PROBES, PROBE_CLOCK_COMPAT, SOC
 from .provenance import CatalogProvenance, CatalogSource, TargetSelection
 from .sdk_descriptor import apollo5b_descriptor
 from .soc import ClockDomain, ClockSpeed, CoreArch, MemoryLayout, PmuTier, SocDef, SocOrigin
+
+if TYPE_CHECKING:
+    from .linker.model import ApplicationRegion
+
+
+@cache
+def _builtin_catalog() -> Catalog:
+    return builtin(include_plugins=False)
 
 
 @cache
@@ -26,7 +35,7 @@ def catalog_views() -> tuple[
     Mapping[str, TargetSelection],
     CatalogProvenance,
 ]:
-    catalog = builtin(include_plugins=False)
+    catalog = _builtin_catalog()
     identity = catalog.identity()
     provenance = CatalogProvenance(
         identity.package_version,
@@ -183,17 +192,51 @@ def _soc(target: Target, name: str, policy: SocPolicy) -> SocDef:
         origin=SocOrigin.BUILTIN,
         registered_name=name,
     )
-    windows = {w.region: w for w in linked_memory_map(soc)}
-    limits = {}
-    # These views already expose linker-sized capacities. Keep that convention
-    # until all admission callers migrate together (helia-profiler#657).
-    for region, field in ((MemoryRegion.MRAM, "mram_kb"),):
-        if name in {"apollo3p", "apollo4p", "apollo4l", "apollo330P", "apollo510L"}:
-            limits[field] = windows[region].app_window[LinkFamily.GNU].length // 1024
-    if name == "apollo3p":
-        limits["sram_kb"] = windows[MemoryRegion.SRAM].app_window[LinkFamily.GNU].length // 1024
     if policy.scan_app_only:
+        windows = {w.region: w for w in linked_memory_map(soc)}
         extent = windows[MemoryRegion.DTCM].app_window[LinkFamily.GNU]
-        limits["dtcm_kb"] = extent.length // 1024
         soc = replace(soc, rtt_scan_ranges=((extent.start, extent.length),))
-    return replace(soc, memory=replace(memory, **limits))
+    return soc
+
+
+def application_regions(selection: TargetSelection) -> tuple[ApplicationRegion, ...] | None:
+    """Sourced application intervals for a catalog selection, in its core's address space."""
+    from .linker.model import ApplicationRegion
+    from .soc import MemoryRange
+
+    if selection.origin != "catalog" or selection.target_id is None:
+        return None
+    target = _builtin_catalog().resolve(
+        selection.target_id, addons=selection.addons, boot=selection.boot
+    )
+    core = selection.core or target.cores()[0].id
+    ranges = target.application_ranges(core, include_discouraged=True)
+    names = {
+        "mram": MemoryRegion.MRAM,
+        "flash": MemoryRegion.MRAM,
+        "rram": MemoryRegion.MRAM,
+        "dtcm": MemoryRegion.DTCM,
+        "tcm": MemoryRegion.DTCM,
+        "itcm": MemoryRegion.ITCM,
+        "sram": MemoryRegion.SRAM,
+        "ssram": MemoryRegion.SRAM,
+        "ssram0": MemoryRegion.SRAM,
+    }
+    result = []
+    for region in target.memories(core, include_discouraged=True):
+        logical = MemoryRegion.PSRAM if region.technology == "psram" else names.get(region.name)
+        if logical is None:
+            continue
+        access = target.reachable(core, region.name)
+        offset = (
+            access.address - region.base
+            if access is not None and access.address is not None and region.base is not None
+            else 0
+        )
+        intervals = (
+            tuple(MemoryRange(r.start + offset, r.size) for r in ranges[region.name])
+            if region.name in ranges and selection.boot is not None
+            else None
+        )
+        result.append(ApplicationRegion(region.name, logical, intervals))
+    return tuple(result)

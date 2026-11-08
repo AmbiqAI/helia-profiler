@@ -16,6 +16,64 @@ permissions:
   contents: read
 
 jobs:
+  linker-windows:
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read source pins
+        id: linker-sources
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          baseline = json.loads(Path("src/helia_profiler/data/compatibility-baseline-v1.json").read_text())
+          extractor = json.loads(Path("tools/linker_windows/extractor.json").read_text())
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              print(f"sdk={baseline['projects']['nsx-ambiq-sdk']['ref']}", file=output)
+              print(f"extractor={extractor['commit']}", file=output)
+          PY
+
+      - name: Checkout SDK linker and header inputs
+        uses: actions/checkout@v4
+        with:
+          repository: AmbiqAI/nsx-ambiq-sdk
+          ref: ${{ steps.linker-sources.outputs.sdk }}
+          path: .linker-sources/sdk
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /cmake/socs/
+            /cmake/nsx_toolchain_flags.cmake
+            /modules/nsx-core/src/*/gcc/*.ld
+            /modules/nsx-core/src/*/armclang/*.sct
+            /modules/nsx-ambiqsuite/sdk/mcu/*/regs/am_reg_base_addresses.h
+            /modules/nsx-ambiqsuite/sdk/mcu/*/hal/am_hal_flash.h
+
+      - name: Checkout extractor
+        uses: actions/checkout@v4
+        with:
+          repository: AmbiqAI/helia-platforms
+          ref: ${{ steps.linker-sources.outputs.extractor }}
+          path: .linker-sources/extractor
+          sparse-checkout: scripts/snapshot_extractor
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.13.5"
+          enable-cache: true
+
+      - name: Check generated linker layouts
+        run: >-
+          uv run --python 3.11 python tools/gen_linker_windows.py
+          --sdk-root .linker-sources/sdk
+          --extractor-root .linker-sources/extractor
+          --check
+
   nix-evaluation:
     if: github.event_name != 'pull_request' || !github.event.pull_request.draft
     runs-on: ubuntu-latest

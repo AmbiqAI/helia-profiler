@@ -8,6 +8,11 @@ spelling and keeps the fastest-fit *policy*, which is hpx's concern.
 
 from __future__ import annotations
 
+from dataclasses import dataclass, replace
+from typing import TYPE_CHECKING
+
+from .errors import PlatformError
+from .platform.linker.model import LinkerInput
 from .platform.placement import (
     SRAM_PLACEMENT_SLACK_BYTES,
     TCM_PLACEMENT_SLACK_BYTES,
@@ -15,6 +20,81 @@ from .platform.placement import (
     MemoryRegion,
     Placement,
 )
+
+if TYPE_CHECKING:
+    from .platform import SocDef
+    from .results import MemoryPlan
+
+
+def region_capacity(region: MemoryRegion, declared: int, layout: LinkerInput | None) -> int:
+    """Constrain a declared byte capacity when a corresponding interval budget is known."""
+    if layout is None:
+        return declared
+    entry = next((value for value in layout.regions if value.region is region), None)
+    if entry is None:
+        return 0
+    if entry.capacity is None:
+        return declared
+    return min(declared, entry.capacity)
+
+
+@dataclass(frozen=True)
+class PlacementCapacities:
+    tcm: int
+    sram: int
+    psram: int
+
+
+def placement_capacities(soc: SocDef | None, layout: LinkerInput | None) -> PlacementCapacities:
+    """The same usable byte budgets for conversion and downstream placement."""
+    return PlacementCapacities(
+        region_capacity(MemoryRegion.DTCM, soc.memory.dtcm_kb * 1024 if soc else 1 << 31, layout),
+        region_capacity(MemoryRegion.SRAM, soc.memory.sram_kb * 1024 if soc else 1 << 31, layout),
+        region_capacity(MemoryRegion.PSRAM, soc.memory.psram_kb * 1024 if soc else 0, layout),
+    )
+
+
+def admit_memory_plan(plan: MemoryPlan, layout: LinkerInput) -> MemoryPlan:
+    """Account fixed reservations once, and refuse known-empty or fragmented overflow."""
+    from .results import ConsumerKind
+
+    regions = []
+    for usage in plan.regions:
+        entry = next((value for value in layout.regions if value.region is usage.region), None)
+        if entry is not None and entry.capacity is None:
+            if usage.overflow:
+                raise PlatformError(f"{usage.region}: modelled usage exceeds its declared capacity")
+            regions.append(usage)
+            continue
+        excluded = 0
+        consumers = []
+        for consumer in usage.consumers:
+            if (
+                entry is not None
+                and entry.fixed_stack_bytes
+                and consumer.kind is ConsumerKind.STACK
+                and consumer.name == "boot_stack"
+            ):
+                if consumer.size != entry.fixed_stack_bytes:
+                    raise PlatformError(
+                        "Modelled boot stack differs from the SDK's fixed reservation"
+                    )
+                excluded += consumer.size
+            else:
+                consumers.append(consumer)
+        used = usage.used - excluded
+        if used < 0:
+            raise PlatformError("Fixed stack reservation exceeds modelled region usage")
+        capacity = region_capacity(usage.region, usage.capacity, layout)
+        if used > capacity:
+            raise PlatformError(
+                f"{usage.region}: {used} B modelled usage exceeds the contiguous application "
+                f"budget of {capacity} B ({layout.script.path})",
+                hint="Reduce the requested arena/weights or select another explicit placement. "
+                "Separated allowed intervals cannot form one contiguous allocation.",
+            )
+        regions.append(replace(usage, capacity=capacity, used=used, consumers=tuple(consumers)))
+    return replace(plan, regions=tuple(regions), has_overflow=any(r.overflow for r in regions))
 
 
 def resolve_fastest_fit_placement(

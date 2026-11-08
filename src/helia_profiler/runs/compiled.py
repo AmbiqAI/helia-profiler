@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     _PowerRequest: TypeAlias = FixtureRailPowerRequest | FixtureBoardPowerRequest | None
 
 COMPILED_BUILD_SCHEMA = "hpx.compiled-build"
-COMPILED_BUILD_SCHEMA_VERSION = 4
+COMPILED_BUILD_SCHEMA_VERSION = 5
 
 _DOCUMENT_KEYS = frozenset({"schema", "schema_version", "plan", "lifecycle", "binding", "build"})
 

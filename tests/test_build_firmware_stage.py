@@ -58,11 +58,13 @@ def test_missing_binary_sections_does_not_fail_successful_build(
     assert progress[-1].message == "Profile firmware ready"
 
 
-def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, monkeypatch) -> None:
-    """#177: the stage->measure_memory_regions wiring — the ctx.soc gate,
-    ctx.soc gate, the engine-config linker_profile extraction, and the
-    argument order."""
+@pytest.mark.parametrize("linker_profile", ["default", "itcm"])
+def test_measured_regions_require_source_verification(
+    tmp_path: Path, monkeypatch, linker_profile: str
+) -> None:
     from helia_profiler.platform import get_soc
+    from helia_profiler.platform.linker.model import LinkerVerification
+    from helia_profiler.platform.provenance import platform_snapshot
 
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -70,12 +72,18 @@ def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, m
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "helia-aot", "config": {"linker_profile": "itcm"}},
+            "engine": {"type": "helia-aot", "config": {"linker_profile": linker_profile}},
             "work_dir": str(tmp_path / "work"),
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ctx.soc = get_soc("apollo510")
+    layout = platform_snapshot("apollo510_evb", linker_profile=linker_profile).expected_linker
+    ctx.run_metadata.linker_verifications = (
+        LinkerVerification(
+            "profile", "hpx_profiler", layout, None if layout else "Uncharacterized"
+        ),
+    )
     ctx.firmware_dir = tmp_path / "app"
     ctx.firmware_dir.mkdir(parents=True)
     build_dir = tmp_path / "build"
@@ -86,7 +94,7 @@ def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, m
 
     def _measure(bp, toolchain, soc, *, linker_profile, timeout_s):
         calls.append((bp, toolchain, soc.name, linker_profile))
-        return None  # itcm profile degrades inside the real function
+        return None
 
     monkeypatch.setattr("helia_profiler.firmware.build_app", lambda _ctx: (build_dir, binary_path))
     monkeypatch.setattr(
@@ -102,7 +110,11 @@ def test_measured_regions_wiring_passes_soc_and_linker_profile(tmp_path: Path, m
 
     BuildFirmwareStage().run(ctx)
 
-    assert calls == [(binary_path, config.target.toolchain, "apollo510", "itcm")]
+    assert calls == (
+        [(binary_path, config.target.toolchain, "apollo510", "default")]
+        if linker_profile == "default"
+        else []
+    )
     assert ctx.memory_regions is None
 
 
@@ -322,6 +334,8 @@ def test_unmeasured_image_is_not_guessed() -> None:
 def test_oversized_image_stops_before_publish(tmp_path: Path, monkeypatch) -> None:
     from helia_profiler.errors import ImageTooLargeError
     from helia_profiler.platform import get_soc
+    from helia_profiler.platform.linker.model import LinkerVerification
+    from helia_profiler.platform.provenance import platform_snapshot
 
     model = tmp_path / "model.tflite"
     model.write_bytes(b"\x00")
@@ -335,6 +349,9 @@ def test_oversized_image_stops_before_publish(tmp_path: Path, monkeypatch) -> No
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
     ctx.soc = get_soc("apollo330P")
+    layout = platform_snapshot("apollo330mP_evb").expected_linker
+    assert layout is not None
+    ctx.run_metadata.linker_verifications = (LinkerVerification("profile", "hpx_profiler", layout),)
     ctx.firmware_dir = tmp_path / "app"
     ctx.firmware_dir.mkdir(parents=True)
     ctx.progress_sink = lambda *_a, **_k: None

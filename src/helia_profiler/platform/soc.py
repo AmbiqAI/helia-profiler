@@ -45,7 +45,7 @@ class SocOrigin(Enum):
 
 @dataclass(frozen=True)
 class MemoryLayout:
-    """Profiler placement capacities in KiB; zero means unavailable to the profiler."""
+    """Declared hardware/board capacities in KiB; linker admission is a separate view."""
 
     mram_kb: int = 0
     sram_kb: int = 0

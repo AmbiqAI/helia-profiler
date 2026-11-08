@@ -628,11 +628,10 @@ def test_a_custom_soc_cannot_forge_a_builtin_address() -> None:
 def test_catalog_boot_origin_is_independent_of_linker_windows(monkeypatch) -> None:
     from helia_profiler.platform import get_soc, memory_map
 
-    trimmed = dict(memory_map._MAPS)
-    assert trimmed.pop("apollo510")
-    monkeypatch.setattr(memory_map, "_MAPS", trimmed)
-
-    assert get_soc("apollo510").capabilities.memory.app_flash_load_addr == 0x410000
+    soc = get_soc("apollo510")
+    monkeypatch.setattr("helia_profiler.platform.linker.data.characterized_windows", lambda _: ())
+    assert memory_map.linked_memory_map(soc) == ()
+    assert soc.capabilities.memory.app_flash_load_addr == 0x410000
 
 
 def test_unknown_catalog_boot_origin_does_not_fall_back_to_windows() -> None:

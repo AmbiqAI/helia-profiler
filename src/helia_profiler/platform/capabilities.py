@@ -252,24 +252,12 @@ class SocCapabilities:
         )
 
 
-# Base addresses of the arena/weights-eligible memory regions, per SoC family.
-# Sizes come from each SoC's ``MemoryLayout``; only the bases are family-wide.
-# DTCM and SRAM are contiguous on AP4/AP5 (SRAM begins right after DTCM), but
-# the bases are listed explicitly rather than derived so the mapping stays
-# obvious and robust to layout changes.
-#
-# AP3 does not share a single family base map the way AP4/AP5 do. apollo3p
-# (Blue Plus) has a real 64 KB low-latency TCM at 0x10000000 (arena-eligible
-# via NSX_MEM_FAST_BSS's dedicated `.tcm_bss` section, nsx-ambiq-sdk#29), a
-# separate 700 KB main SRAM "RWMEM" at 0x10011000 (default .bss/.data home),
-# and "MRAM" is read-only NOR flash (XIP) at 0x0000C000 used for weights.
-# apollo3 (Blue) instead has a flat 384 KB SRAM at 0x10000000 and no separate
-# TCM — it is not currently a registered target, so the AP3 entry below
-# encodes apollo3p only.
+# Declared placement bases for custom targets. Builtin fit and placement checks
+# use the separately verified linker/application intervals.
 _FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
     SocFamily.AP3: {
         Placement.TCM: 0x10000000,  # real 64 KB low-latency TCM (NSX_MEM_FAST_BSS, nsx-ambiq-sdk#29)
-        Placement.SRAM: 0x10011000,  # RWMEM main SRAM (default .bss/.data home)
+        Placement.SRAM: 0x10010000,
         Placement.MRAM: 0x00000000,  # NOR flash XIP (ROMEM @ 0x0000C000), weights
     },
     SocFamily.AP4: {

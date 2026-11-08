@@ -84,7 +84,7 @@ def linking(
     from helia_profiler.fixtures.build import FIXTURE_CAPABILITIES
     from helia_profiler.fixtures.sources import pinned_sources
     from helia_profiler.results.dependencies import ContentDigest, DependencyModule
-    from tests.fixtures_api.test_fixture_record import _pin
+    from tests.fixtures_api.test_fixture_record import _pin, _sdk_modules
     from tests.fixtures_api.test_heliart_fixture import runtime as prepared
 
     selected = EngineType(engine)
@@ -97,6 +97,7 @@ def linking(
         state = {
             "lock": {"sha256": {"value": build.dependency_lock.sha256}},
             "modules": [
+                *(asdict(m) for m in _sdk_modules(build.platform)),
                 asdict(
                     DependencyModule(
                         name="nsx-cmsis-nn",
@@ -109,7 +110,7 @@ def linking(
                         url="https://github.com/AmbiqAI/ns-cmsis-nn.git",
                         vendored_at="modules/ns-cmsis-nn",
                     )
-                )
+                ),
             ],
         }
         pinned = _pin(root / "evidence" / "linked-state.json", json.dumps(state).encode())
