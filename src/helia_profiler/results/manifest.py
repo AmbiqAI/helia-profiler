@@ -191,6 +191,10 @@ class ResultManifest:
         manifest_path = Path(path)
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except RecursionError as exc:
+            raise ReportError(
+                f"Could not read result manifest {manifest_path}: JSON nesting exceeds the decoder limit."
+            ) from exc
         except (OSError, json.JSONDecodeError) as exc:
             raise ReportError(f"Cannot load result manifest {manifest_path}: {exc}") from exc
         if not isinstance(data, dict):

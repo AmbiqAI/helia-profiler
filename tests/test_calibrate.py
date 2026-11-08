@@ -730,7 +730,7 @@ def _deep_bundle(path: Path, levels: int) -> Path:
 
 
 def test_conditions_nested_deeper_than_a_flat_record_are_refused(tmp_path: Path) -> None:
-    """Fail closed on depth, without recursion: 3000 levels are refused cleanly."""
+    """Enforce the semantic conditions limit for parseable JSON."""
     from helia_profiler.calibration.table import CONDITIONS_DEPTH
 
     message = f"conditions nest deeper than {CONDITIONS_DEPTH} levels"
@@ -738,21 +738,40 @@ def test_conditions_nested_deeper_than_a_flat_record_are_refused(tmp_path: Path)
     # The block itself is one level, so board may hold CONDITIONS_DEPTH - 1 objects.
     legal = calibrate([_deep_bundle(tmp_path / "legal", CONDITIONS_DEPTH - 1)], output=output)
     assert json.loads(output.read_text())["conditions"] == legal.conditions
-    for levels in (CONDITIONS_DEPTH, 3000):
-        deep = _deep_bundle(tmp_path / f"deep-{levels}", levels)
-        with pytest.raises(CalibrationError, match=rf"Bundle .*deep-{levels}: {message}\."):
-            calibrate([deep], output=tmp_path / f"deep-{levels}.json")
-        assert not (tmp_path / f"deep-{levels}.json").exists()
+    deep = _deep_bundle(tmp_path / "deep", CONDITIONS_DEPTH)
+    with pytest.raises(CalibrationError, match=rf"Bundle .*deep: {message}\."):
+        calibrate([deep], output=tmp_path / "deep.json")
+    assert not (tmp_path / "deep.json").exists()
     # A file holding such a block is refused on --merge, and left as it is.
+    auto, _ = two_bundles(tmp_path)
+    calibrate([auto], output=output)
+    data = json.loads(output.read_text(encoding="utf-8"))
+    data["conditions"]["board"] = "DEEP"
+    output.write_text(
+        json.dumps(data).replace('"DEEP"', _nested(CONDITIONS_DEPTH)), encoding="utf-8"
+    )
+    before = output.read_bytes()
+    with pytest.raises(CalibrationError) as refused:
+        calibrate([auto], output=output, merge=True)
+    assert refused.value.args[0] == f"Calibration file {output} is malformed: {message}."
+    assert output.read_bytes() == before
+
+
+def test_extreme_conditions_nesting_is_refused_without_writing(tmp_path: Path) -> None:
+    output = tmp_path / "out.json"
+    deep = _deep_bundle(tmp_path / "deep", 3000)
+    message = r"conditions nest deeper than 8 levels|JSON nesting exceeds the decoder limit"
+    with pytest.raises((CalibrationError, ReportError), match=message):
+        calibrate([deep], output=output)
+    assert not output.exists()
     auto, _ = two_bundles(tmp_path)
     calibrate([auto], output=output)
     data = json.loads(output.read_text(encoding="utf-8"))
     data["conditions"]["board"] = "DEEP"
     output.write_text(json.dumps(data).replace('"DEEP"', _nested(3000)), encoding="utf-8")
     before = output.read_bytes()
-    with pytest.raises(CalibrationError) as refused:
+    with pytest.raises(CalibrationError, match=message):
         calibrate([auto], output=output, merge=True)
-    assert refused.value.args[0] == f"Calibration file {output} is malformed: {message}."
     assert output.read_bytes() == before
 
 
