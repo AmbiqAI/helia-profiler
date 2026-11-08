@@ -7,7 +7,7 @@
  * counts come from the package source, and check-output.mjs asserts the built
  * page carries every one of them.
  *
- * Extraction is `scripts/dump-catalog.py`, which parses rather than imports.
+ * Extraction is `scripts/dump-catalog.py`, run in the locked Python environment.
  * The artifact records the source path it was read from and no hash of it,
  * for the same reasons as the Python reference; see `sourceTree`. The stale
  * check compares it byte for byte with a fresh extraction.
@@ -28,19 +28,6 @@ const site = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repo = path.resolve(site, '..');
 
 export const CATALOG_FILE = 'src/data/catalog.json';
-
-/** The interpreter the documentation job sets up. `python` on a bare Windows. */
-function pythonCommand({ exec = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' }) } = {}) {
-  for (const command of ['python3', 'python']) {
-    try {
-      exec(command, ['--version']);
-      return command;
-    } catch {
-      /* Try the next spelling. */
-    }
-  }
-  throw new Error('No python3 or python on PATH. The catalog is read from the package source.');
-}
 
 /**
  * The committed artifact, from the extractor's output.
@@ -79,9 +66,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? path.resolve(process.argv[process.argv.indexOf('--out') + 1])
     : site;
 
-  const python = pythonCommand();
   const dump = JSON.parse(
-    execFileSync(python, [path.join(site, 'scripts/dump-catalog.py'), '--source', path.join(repo, SOURCE_PATH)], {
+    execFileSync('uv', ['run', '--isolated', '--no-dev', 'python', path.join(site, 'scripts/dump-catalog.py'), '--source', path.join(repo, SOURCE_PATH)], {
       cwd: repo,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'inherit'],
