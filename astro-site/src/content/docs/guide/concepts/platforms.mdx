@@ -20,7 +20,11 @@ its firmware, transport, timing or energy measurements.
 
 The adapter loads only the packaged built-in catalog, with plugins disabled.
 It does not discover overlays from environment variables or change per-run
-configuration. Each `ProfileConfig` gets its own frozen registry mappings;
+configuration. `BoardDef.psram_kb` stores only a board-specific difference
+from the SoC default, such as the Cygnus add-on. An explicit custom-SoC
+capacity therefore remains effective on boards that inherit that default;
+an explicit custom-board capacity takes precedence, and `null` restores the
+SoC default. Each `ProfileConfig` gets its own frozen registry mappings;
 only the immutable built-in projections are cached. Explicit custom declarations
 continue to override those views and are labelled `hpx-custom`, rather than
 claimed as catalog targets.

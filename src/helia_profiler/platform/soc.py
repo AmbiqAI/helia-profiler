@@ -2,8 +2,7 @@
 
 The platform model is a two-level hierarchy: Board -> SoC.  SoC determines the
 core architecture, PMU capabilities, memory layout, and supported clock modes.
-Board selects a concrete EVB (or, in the future, a custom target) that maps to
-exactly one SoC.
+Board selects a concrete target that references exactly one SoC.
 
 Architecture note: AP330 (apollo330P) is Cortex-M55 and belongs to the AP5
 family despite the "3" in its name.

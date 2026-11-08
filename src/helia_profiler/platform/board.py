@@ -1,4 +1,4 @@
-"""Board definitions and the built-in board registry."""
+"""Frozen board views and profiler GPIO defaults."""
 
 from __future__ import annotations
 

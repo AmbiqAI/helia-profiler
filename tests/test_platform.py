@@ -688,10 +688,10 @@ def test_overriding_memory_does_not_drop_an_inherited_address():
 def test_a_board_psram_override_does_not_cost_a_builtin_soc_its_address():
     """Provenance must survive ``get_soc_for_board``'s ``replace`` copy.
 
-    Seven built-in boards override ``psram_kb``, and for those the SoC handed
-    to the pipeline is a copy, not the registered object.  Gating the address
+    A board-specific ``psram_kb`` override makes the resolved SoC
+    a copy rather than the registered object.  Gating the address
     lookup on object identity silently reclassified those copies as unknown
-    parts -- so the map-derived address would vanish on exactly the boards
+    parts -- so the registered boot address would vanish on exactly the boards
     that populate PSRAM, which is why this is a typed field.
     """
     soc = get_soc_for_board("apollo3p_evb_cygnus")
@@ -789,7 +789,7 @@ def test_a_builtin_copy_that_keeps_its_name_still_resolves_through_the_map():
 
     Stated on its own rather than only through ``get_soc_for_board`` so that
     tightening ``is_builtin`` into an identity check -- the bug ``origin``
-    replaced -- fails here even if the seven ``psram_kb`` boards ever stop
+    replaced -- fails here even if board-specific PSRAM overrides stop
     being the way a built-in copy is made.
     """
     from dataclasses import replace

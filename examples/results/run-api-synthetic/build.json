@@ -1,5 +1,5 @@
 {
-  "binding": "hpx.binding/1:sha256:84726db884c37e8919ab675a1d6345326cd55477cd2af25fd084d6bcb6309ab5",
+  "binding": "hpx.binding/1:sha256:3afd2ad0a1aa0d2a443e8343710ceffcaa6e188305731b4550607c8665959922",
   "build": {
     "build": {
       "aot_arena_scan": [],
@@ -15,7 +15,7 @@
         "root": "run",
         "sha256": "780d84b20d7ae7e6292919399348bdbf96025270136198083fc8a4da398b5ca9"
       },
-      "build_identity": "1a0b8cac989dc9524a52641607acf9c06535f274252ab3509260a1cfda6dc182",
+      "build_identity": "33528cf6706218ffa6497e8d20472b38b47d584618adac9c6842cbcabe4af192",
       "built": true,
       "capabilities": [
         [
@@ -153,7 +153,7 @@
           "description": "",
           "is_fpga": false,
           "name": "apollo510_evb",
-          "psram_kb": 65536,
+          "psram_kb": null,
           "soc": "apollo510",
           "starter_profile_board": null
         },
@@ -268,7 +268,7 @@
     },
     "environment": {},
     "hpx_version": "0.5.0",
-    "intent_hash": "hpx.intent/2:sha256:614ceb75b5e01f23200181ac9ea618fb79efe5435852e0557b16ffec4d78d931",
+    "intent_hash": "hpx.intent/2:sha256:36825c2c280ffb6b64a733603e22061fa5ecd2d97d6f577e85ac0b30a6cc91d8",
     "local_inputs": [],
     "model": {
       "path": "inputs/tiny_cnn.tflite",
@@ -323,7 +323,7 @@
         "description": "",
         "is_fpga": false,
         "name": "apollo510_evb",
-        "psram_kb": 65536,
+        "psram_kb": null,
         "soc": "apollo510",
         "starter_profile_board": null
       },

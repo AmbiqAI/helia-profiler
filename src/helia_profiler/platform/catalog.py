@@ -54,10 +54,14 @@ def catalog_views() -> tuple[
             selections[policy.name] = TargetSelection("sdk-descriptor", None)
             continue
         target = catalog.resolve(policy.name)
+        fitted_psram = _external_kib(target)
+        soc_default_psram = socs[target.soc.id].memory.psram_kb
+        # A board records differences, so defaults cannot replace a caller's SoC capacity.
+        board_psram = fitted_psram if fitted_psram != soc_default_psram else None
         boards[policy.name] = replace(
             policy,
             soc=target.soc.id,
-            psram_kb=_external_kib(target),
+            psram_kb=board_psram,
             is_fpga=target.category == "fpga",
         )
         board_socs[policy.name] = replace(

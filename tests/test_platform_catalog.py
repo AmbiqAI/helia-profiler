@@ -241,3 +241,32 @@ def test_direct_board_soc_switch_discards_the_old_concrete_probe():
     board = replace(base.boards["apollo4l_blue_evb"], soc="apollo510")
     changed = build_platform_registry(base=base, boards={board.name: board})
     assert get_soc_for_board(board.name, registry=changed).jlink_device == "AP510NFA-CBR"
+
+
+@pytest.mark.parametrize("board", ["apollo510_evb", "apollo510b_evb"])
+def test_explicit_soc_psram_capacity_is_not_replaced_by_a_catalog_default(board):
+    base = build_platform_registry()
+    soc = base.socs[base.boards[board].soc]
+    smaller = replace(soc, memory=replace(soc.memory, psram_kb=1024))
+    registry = build_platform_registry(base=base, socs={soc.name: smaller})
+    assert get_soc_for_board(board, registry=registry).memory.psram_kb == 1024
+    assert get_soc_for_board(board, registry=base).memory.psram_kb == 65536
+    assert platform_snapshot(board, registry=registry).selection.origin == "hpx-custom"
+
+
+@pytest.mark.parametrize(
+    "board,soc",
+    [
+        ("apollo510_evb", "apollo510"),
+        ("apollo510b_evb", "apollo510b"),
+    ],
+)
+@pytest.mark.parametrize("board_override,expected", [("absent", 1024), (None, 1024), (2048, 2048)])
+def test_yaml_psram_precedence_keeps_explicit_board_choices(board, soc, board_override, expected):
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    target = {"custom_socs": {soc: {"based_on": soc, "memory": {"psram_kb": 1024}}}}
+    if board_override != "absent":
+        target["custom_boards"] = {board: {"based_on": board, "psram_kb": board_override}}
+    registry = build_custom_platform_registry(target)
+    assert get_soc_for_board(board, registry=registry).memory.psram_kb == expected
