@@ -151,3 +151,57 @@ def test_the_exported_schema_rejects_what_hpx_refuses(tmp_path: Path) -> None:
             if seen != expected:
                 disagreements.append(f"{name}: schema, reader = {seen}, expected {expected}")
     assert not disagreements, disagreements
+
+
+@pytest.mark.parametrize(
+    "artifact",
+    ["summary.json", "run_metadata.json", "result_manifest.json", "hpx_plan.json", "merge.json"],
+)
+def test_decoder_exhaustion_has_a_domain_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, artifact: str
+) -> None:
+    from helia_profiler.calibration.table import _plan
+    from helia_profiler.errors import ReportError
+    from helia_profiler.evaluation.compare import load_run_artifacts
+    from tests.calibration_bundles import _republish
+
+    auto, _ = two_bundles(tmp_path)
+    output = tmp_path / "out.json"
+    output.write_bytes(GOLDEN.read_bytes())
+    target = output if artifact == "merge.json" else auto / artifact
+    data = json.loads(target.read_text(encoding="utf-8"))
+    data["decoder_probe"] = "exhaust-decoder-here"
+    target.write_text(json.dumps(data), encoding="utf-8")
+    if artifact not in ("merge.json", "result_manifest.json"):
+        _republish(auto)
+    # Load the surrounding bundle before injecting a failure in the plan decoder.
+    run = load_run_artifacts(auto) if artifact == "hpx_plan.json" else None
+    before = output.read_bytes()
+    original_loads = json.loads
+
+    def exhausted(text: str, *args: Any, **kwargs: Any) -> Any:
+        if "exhaust-decoder-here" in text:
+            raise RecursionError("decoder exhausted")
+        return original_loads(text, *args, **kwargs)
+
+    monkeypatch.setattr(json, "loads", exhausted)
+    error = CalibrationError if artifact in ("merge.json", "hpx_plan.json") else ReportError
+    with pytest.raises(error, match="JSON nesting exceeds the decoder limit") as caught:
+        if artifact == "hpx_plan.json":
+            assert run is not None
+            _plan(run, str(auto))
+        else:
+            calibrate([auto], output=output, merge=artifact == "merge.json")
+    assert isinstance(caught.value.__cause__, RecursionError)
+    assert target.name in str(caught.value)
+    assert output.read_bytes() == before
+
+    if artifact != "hpx_plan.json":
+        args = ["calibrate", str(auto), "--output", str(output)]
+        if artifact == "merge.json":
+            args.append("--merge")
+        result = CliRunner().invoke(app, args)
+        assert result.exit_code == 1
+        assert "JSON nesting exceeds the decoder limit" in flat(result.output)
+        assert "Traceback" not in result.output
+        assert output.read_bytes() == before

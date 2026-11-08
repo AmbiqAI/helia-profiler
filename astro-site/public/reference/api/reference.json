@@ -17902,9 +17902,9 @@
                       "returns": [],
                       "signature": "to_dict() -> dict[str, Any]",
                       "source": {
-                        "line": 200,
+                        "line": 204,
                         "path": "src/helia_profiler/results/manifest.py",
-                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L200"
+                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L204"
                       },
                       "summary": ""
                     },
@@ -17921,9 +17921,9 @@
                       "returns": [],
                       "signature": "write(path: str | Path) -> Path",
                       "source": {
-                        "line": 203,
+                        "line": 207,
                         "path": "src/helia_profiler/results/manifest.py",
-                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L203"
+                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L207"
                       },
                       "summary": "Write the manifest without discarding unknown fields."
                     },
@@ -17940,9 +17940,9 @@
                       "returns": [],
                       "signature": "verify(bundle_dir: str | Path) -> None",
                       "source": {
-                        "line": 215,
+                        "line": 219,
                         "path": "src/helia_profiler/results/manifest.py",
-                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L215"
+                        "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L219"
                       },
                       "summary": "Verify all declared artifact paths, sizes, and SHA-256 digests."
                     }
@@ -17972,9 +17972,9 @@
                   "returns": [],
                   "signature": "load_result_manifest(path: str | Path, *, verify: bool = False) -> ResultManifest",
                   "source": {
-                    "line": 247,
+                    "line": 251,
                     "path": "src/helia_profiler/results/manifest.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L247"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/manifest.py#L251"
                   },
                   "summary": "Load a result manifest and optionally verify its sibling artifacts."
                 }

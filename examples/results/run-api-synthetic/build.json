@@ -1,5 +1,5 @@
 {
-  "binding": "hpx.binding/1:sha256:39924a9e81eb1299590a67df28bd5f54ac0022d6ff72a54bf0edaeb0737a24aa",
+  "binding": "hpx.binding/1:sha256:9320f0eaeb2b12e29ca5f0563d334f6409c378e822997550cd1ffcd983219eff",
   "build": {
     "build": {
       "aot_arena_scan": [],
@@ -15,7 +15,7 @@
         "root": "run",
         "sha256": "780d84b20d7ae7e6292919399348bdbf96025270136198083fc8a4da398b5ca9"
       },
-      "build_identity": "1bf546c2677ca9c0ce92a8577d300f20b40279806c151809725aabcf935e20bc",
+      "build_identity": "b4e2b193fc4eb7e08b5f612253730f556fd0f2ba583afd4beaff332147ac6bd4",
       "built": true,
       "capabilities": [
         [
@@ -33,7 +33,7 @@
       "dependency_state": {
         "path": "build/evidence/state.json",
         "root": "run",
-        "sha256": "caa05ac5af157b7eb3f4bfafc8223c8c042883b615c94ace2718d1e19f1e645d"
+        "sha256": "34541eced6f42873b967a0f388f5152cf46a998174f5af7e3fdb721a9200ff06"
       },
       "engine": "helia-aot",
       "engine_source": null,
@@ -86,11 +86,11 @@
       "linker_verification": {
         "layout": {
           "admission_source": "catalog-and-linker",
-          "definition_sha256": "ed7e7141cb4557df4743e42e5d2c979f950978ceaecc3d5a86e468b081532519",
+          "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
           "files": [
             {
               "path": "cmake/nsx_toolchain_flags.cmake",
-              "sha256": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25"
+              "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
             },
             {
               "path": "cmake/socs/apollo510.cmake",
@@ -102,7 +102,7 @@
             },
             {
               "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
-              "sha256": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+              "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
             },
             {
               "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
@@ -217,7 +217,7 @@
             "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
             "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
           },
-          "sdk_commit": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+          "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
           "soc_name": "apollo510"
         },
         "reason": null,
@@ -300,11 +300,11 @@
         },
         "expected_linker": {
           "admission_source": "catalog-and-linker",
-          "definition_sha256": "ed7e7141cb4557df4743e42e5d2c979f950978ceaecc3d5a86e468b081532519",
+          "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
           "files": [
             {
               "path": "cmake/nsx_toolchain_flags.cmake",
-              "sha256": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25"
+              "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
             },
             {
               "path": "cmake/socs/apollo510.cmake",
@@ -316,7 +316,7 @@
             },
             {
               "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
-              "sha256": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+              "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
             },
             {
               "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
@@ -431,7 +431,7 @@
             "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
             "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
           },
-          "sdk_commit": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+          "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
           "soc_name": "apollo510"
         },
         "link_family": "gnu",
@@ -540,12 +540,12 @@
   "lifecycle": "carry",
   "plan": {
     "baseline": {
-      "fingerprint": "c6be3d29b88bf909164958347e046636ca3cf684a3d2892007014830c20db928",
-      "id": "hpx-neuralspotx-0.9.2-2026-11-07.1"
+      "fingerprint": "d82450eec03f894fa208aa2ddaaad08c33cd6143b5069cdf25159a82057ab3ee",
+      "id": "hpx-neuralspotx-0.9.2-2026-11-08.2"
     },
     "environment": {},
     "hpx_version": "0.5.0",
-    "intent_hash": "hpx.intent/2:sha256:2ec84510b6296fe2dae105ff5bab4559fda21d448d502e1fa82247ad8cde5047",
+    "intent_hash": "hpx.intent/2:sha256:9b10361d8abe83a5787285692294bfbcdf9b2cb59766e8bbbec4aca7323b8f8f",
     "local_inputs": [],
     "model": {
       "path": "inputs/tiny_cnn.tflite",
@@ -606,11 +606,11 @@
       },
       "expected_linker": {
         "admission_source": "catalog-and-linker",
-        "definition_sha256": "ed7e7141cb4557df4743e42e5d2c979f950978ceaecc3d5a86e468b081532519",
+        "definition_sha256": "9a236c859cdc7f7fee7d19361812c91c64ca50418b5fe6a719a2ea8da2eca2f8",
         "files": [
           {
             "path": "cmake/nsx_toolchain_flags.cmake",
-            "sha256": "fd2b92fd1f4154fc5221c73bf7df2e122c648dfe1b930ae0101a23b29eb4df25"
+            "sha256": "9b40139f36af4128573bcd5b997e1b6fbe4a2a532ee857b6bf23182ca99275a6"
           },
           {
             "path": "cmake/socs/apollo510.cmake",
@@ -622,7 +622,7 @@
           },
           {
             "path": "modules/nsx-ambiqsuite/sdk/mcu/apollo510/regs/am_reg_base_addresses.h",
-            "sha256": "cccf017cef706b4cf4da7f80f39998ff9350cfffc718ca7e14e29d54dad627fa"
+            "sha256": "579efd2e88e460cf883d341617655f305435620cdfc4a2104888ff9e72d3a879"
           },
           {
             "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
@@ -737,7 +737,7 @@
           "path": "modules/nsx-core/src/apollo510/gcc/linker_script_sbl.ld",
           "sha256": "43434045a1a3765d59190999ae12d965a085417a14152d780f9e4d89622dc17c"
         },
-        "sdk_commit": "993b7901a82008ac4cd523ffe0b125a016a8f6a8",
+        "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
         "soc_name": "apollo510"
       },
       "link_family": "gnu",

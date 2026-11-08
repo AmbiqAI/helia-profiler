@@ -555,7 +555,7 @@ Source: `src/helia_profiler/results/manifest.py:188`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/results/manifest.py:200`
+Source: `src/helia_profiler/results/manifest.py:204`
 
 ### helia_profiler.ResultManifest.write
 
@@ -567,7 +567,7 @@ write(path: str | Path) -> Path
 
 Write the manifest without discarding unknown fields.
 
-Source: `src/helia_profiler/results/manifest.py:203`
+Source: `src/helia_profiler/results/manifest.py:207`
 
 ### helia_profiler.ResultManifest.verify
 
@@ -579,7 +579,7 @@ verify(bundle_dir: str | Path) -> None
 
 Verify all declared artifact paths, sizes, and SHA-256 digests.
 
-Source: `src/helia_profiler/results/manifest.py:215`
+Source: `src/helia_profiler/results/manifest.py:219`
 
 ## helia_profiler.load_result_manifest
 
@@ -593,4 +593,4 @@ Load a result manifest and optionally verify its sibling artifacts.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:247`
+Source: `src/helia_profiler/results/manifest.py:251`

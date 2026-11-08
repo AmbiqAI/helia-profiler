@@ -397,6 +397,10 @@ def _read_json(path: Path) -> dict[str, Any]:
         raise ReportError(f"Missing required compare artifact: {path}")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
+    except RecursionError as exc:
+        raise ReportError(
+            f"Could not read JSON artifact {path}: JSON nesting exceeds the decoder limit."
+        ) from exc
     except json.JSONDecodeError as exc:
         raise ReportError(f"Could not parse JSON artifact: {path}", hint=str(exc)) from exc
     if not isinstance(data, dict):
