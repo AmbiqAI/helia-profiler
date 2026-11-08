@@ -15,7 +15,7 @@ from typer.testing import CliRunner
 from helia_profiler.calibration import calibrate, read_calibration
 from helia_profiler.cli.app import app
 from helia_profiler.errors import CalibrationError, EngineMissingError
-from tests.calibration_bundles import GOLDEN, _calibration_schema, two_bundles
+from tests.calibration_bundles import GOLDEN, _calibration_schema, flat, two_bundles
 
 
 def test_a_host_without_heliaaot_gets_the_install_hint(tmp_path: Path, monkeypatch) -> None:
@@ -32,8 +32,8 @@ def test_a_host_without_heliaaot_gets_the_install_hint(tmp_path: Path, monkeypat
         app, ["calibrate", str(auto), str(wide), "--output", str(tmp_path / "cli.json")]
     )
     assert result.exit_code == 1, result.output
-    assert "heliaAOT package not installed" in result.output
-    assert "pip install 'helia-profiler[aot]'" in result.output
+    assert "heliaAOT package not installed" in flat(result.output)
+    assert "pip install 'helia-profiler[aot]'" in flat(result.output)
 
 
 def test_a_bad_tolerance_is_refused_before_any_bundle_is_read(tmp_path: Path) -> None:
@@ -43,7 +43,7 @@ def test_a_bad_tolerance_is_refused_before_any_bundle_is_read(tmp_path: Path) ->
     result = CliRunner().invoke(
         app, ["calibrate", str(auto), "-o", str(tmp_path / "o.json"), "--tolerance", "nan"]
     )
-    assert result.exit_code == 1 and "--tolerance must be a fraction" in result.output
+    assert result.exit_code == 1 and "--tolerance must be a fraction" in flat(result.output)
 
 
 def _entry(document: dict[str, Any]) -> dict[str, Any]:

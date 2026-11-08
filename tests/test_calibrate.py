@@ -48,6 +48,7 @@ from tests.calibration_bundles import (
     _mark,
     _republish,
     bundle,
+    flat,
     golden_bundles,
     pair,
     schema_checked_writes,  # noqa: F401
@@ -1123,14 +1124,10 @@ def test_a_malformed_existing_file_is_refused(
 
 
 def _plain_help(runner: CliRunner) -> str:
-    """The command's help as plain text: no colour, no escape codes, no wrapping."""
-    result = runner.invoke(
-        app,
-        ["calibrate", "--help"],
-        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "200"},
-    )
+    """The command's help as one line, at whatever width the terminal wraps it."""
+    result = runner.invoke(app, ["calibrate", "--help"])
     assert result.exit_code == 0, result.output
-    return " ".join(re.sub(r"\x1b\[[0-9;?]*[A-Za-z]", "", result.output).split())
+    return flat(result.output)
 
 
 def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
@@ -1148,15 +1145,15 @@ def test_the_command_writes_the_file_and_reports_errors(tmp_path: Path) -> None:
         app, ["calibrate", str(auto), str(wide), "-o", str(output), "--tolerance", "0.005"]
     )
     assert strict.exit_code == 1
-    assert "takes 3000 cycles" in strict.output
-    assert "tolerance 0.5% or 8 cycles" in strict.output
+    assert "takes 3000 cycles" in flat(strict.output)
+    assert "tolerance 0.5% or 8 cycles" in flat(strict.output)
 
     lax = runner.invoke(app, ["calibrate", str(auto), "-o", str(output), "--tolerance", "nan"])
-    assert lax.exit_code == 1 and "--tolerance must be a fraction" in lax.output
+    assert lax.exit_code == 1 and "--tolerance must be a fraction" in flat(lax.output)
 
     directory = runner.invoke(app, ["calibrate", str(auto), "-o", str(tmp_path)])
     assert directory.exit_code == 1, directory.output
-    assert "Could not write" in directory.output
+    assert "Could not write" in flat(directory.output)
     assert not any(tmp_path.glob(f".{tmp_path.name}.*"))
 
     help_text = _plain_help(runner)
@@ -1401,7 +1398,7 @@ def test_a_non_finite_value_in_a_held_field_is_refused_naming_it(tmp_path: Path)
         read_bundle(held)
     # The CLI reports it as an error, never as a traceback.
     result = CliRunner().invoke(app, ["calibrate", str(held), "--output", str(tmp_path / "o.json")])
-    assert result.exit_code == 1 and "window_target_ms" in result.output
+    assert result.exit_code == 1 and "window_target_ms" in flat(result.output)
 
 
 def test_heliaaot_rejecting_the_arguments_surfaces_its_own_error(tmp_path: Path) -> None:
@@ -1565,17 +1562,13 @@ def test_a_schema_1_file_is_refused_with_the_recalibrate_hint(tmp_path: Path) ->
     before = output.read_bytes()
 
     result = CliRunner().invoke(
-        app,
-        ["calibrate", str(auto), str(wide), "-o", str(output), "--merge"],
-        env={"NO_COLOR": "1", "TERM": "dumb", "COLUMNS": "400"},
+        app, ["calibrate", str(auto), str(wide), "-o", str(output), "--merge"]
     )
 
+    # The CLI wraps the message at the terminal's width, path included, so it
+    # is checked whole through the API below.
     assert result.exit_code == 1, result.output
-    flat = " ".join(result.output.split())
-    assert (
-        f"Calibration file {output} is calibration schema 1, which this release does not "
-        "read: schema 2 stores only operator_cycles." in flat
-    )
+    assert "is calibration schema 1, which this release does not read" in flat(result.output)
     with pytest.raises(CalibrationError) as refused:
         calibrate([auto, wide], output=output, merge=True)
     assert refused.value.hint == (

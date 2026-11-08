@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from click import unstyle
 
 from helia_profiler.results import ResultValidity
 from helia_profiler.results.manifest import ResultIssue, load_result_manifest
@@ -218,6 +219,15 @@ def bundle(
         (path / name).write_text(json.dumps(plan), encoding="utf-8")
     publish_manifest(path)
     return path
+
+
+def flat(output: str) -> str:
+    """CLI output as one line, however the terminal wrapped it.
+
+    Escape codes are dropped, panel borders become spaces and whitespace is
+    collapsed, so a phrase reads the same wherever a line breaks.
+    """
+    return " ".join(unstyle(output).replace("│", " ").split())
 
 
 def _republish(path: Path, **changes: Any) -> None:
