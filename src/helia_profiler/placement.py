@@ -8,7 +8,7 @@ spelling and keeps the fastest-fit *policy*, which is hpx's concern.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from .errors import PlatformError
@@ -22,6 +22,7 @@ from .platform.placement import (
 )
 
 if TYPE_CHECKING:
+    from .platform import SocDef
     from .results import MemoryPlan
 
 
@@ -35,6 +36,22 @@ def region_capacity(region: MemoryRegion, declared: int, layout: LinkerInput | N
     if entry.capacity is None:
         return declared
     return min(declared, entry.capacity)
+
+
+@dataclass(frozen=True)
+class PlacementCapacities:
+    tcm: int
+    sram: int
+    psram: int
+
+
+def placement_capacities(soc: SocDef | None, layout: LinkerInput | None) -> PlacementCapacities:
+    """The same usable byte budgets for conversion and downstream placement."""
+    return PlacementCapacities(
+        region_capacity(MemoryRegion.DTCM, soc.memory.dtcm_kb * 1024 if soc else 1 << 31, layout),
+        region_capacity(MemoryRegion.SRAM, soc.memory.sram_kb * 1024 if soc else 1 << 31, layout),
+        region_capacity(MemoryRegion.PSRAM, soc.memory.psram_kb * 1024 if soc else 0, layout),
+    )
 
 
 def admit_memory_plan(plan: MemoryPlan, layout: LinkerInput) -> MemoryPlan:

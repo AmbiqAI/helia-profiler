@@ -39,7 +39,13 @@ from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import PlatformError
 from ..pipeline import PipelineContext
-from ..placement import ArenaRole, MemoryRegion, Placement, resolve_fastest_fit_placement
+from ..placement import (
+    ArenaRole,
+    MemoryRegion,
+    Placement,
+    placement_capacities,
+    resolve_fastest_fit_placement,
+)
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
 
@@ -662,20 +668,9 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     cfg = ctx.config
     soc = ctx.soc
 
-    # Capacity probe (in bytes).  If soc is None (very early call), we
-    # treat all regions as unbounded; the validate pass will catch real
-    # overflow later.
-    tcm_cap = (soc.memory.dtcm_kb * 1024) if soc else (1 << 31)
-    sram_cap = (soc.memory.sram_kb * 1024) if soc else (1 << 31)
-    psram_cap = (soc.memory.psram_kb * 1024) if soc else 0
-
-    from ..placement import region_capacity
-
     platform = ctx.run_metadata.platform_provenance
     expected = platform.expected_linker if platform is not None else None
-    tcm_cap = region_capacity(MemoryRegion.DTCM, tcm_cap, expected)
-    sram_cap = region_capacity(MemoryRegion.SRAM, sram_cap, expected)
-    psram_cap = region_capacity(MemoryRegion.PSRAM, psram_cap, expected)
+    capacities = placement_capacities(soc, expected)
 
     arena_size = int(cfg.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
     try:
@@ -686,16 +681,16 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     arena_region, weights_region = resolve_fastest_fit_placement(
         arena_size=arena_size,
         weights_size=model_size,
-        tcm_cap=tcm_cap,
-        sram_cap=sram_cap,
+        tcm_cap=capacities.tcm,
+        sram_cap=capacities.sram,
     )
 
     arena_region, weights_region = _apply_explicit_overrides(
         cfg,
         arena_region,
         weights_region,
-        tcm_cap=tcm_cap,
-        psram_cap=psram_cap,
+        tcm_cap=capacities.tcm,
+        psram_cap=capacities.psram,
     )
 
     return (arena_region, weights_region)

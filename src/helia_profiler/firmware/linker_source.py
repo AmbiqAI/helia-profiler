@@ -10,12 +10,12 @@ from typing import Any, Literal
 from ..platform.linker.files import source_sha256
 from ..platform.linker.model import LinkerInput, LinkerVerification
 from ..results.dependencies import DependencyModule, validate_sdk_modules
+from .link_inputs import validate_link_inputs
 
 _CLIENT = "client-hpx-linker"
 _SCRIPT_OPTIONS = ("-T", "--scatter=", "-Wl,-T,", "-Wl,--script=", "--script=")
 _SCRIPT_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:-T|--script|--scatter)")
 _RESPONSE_FLAG = re.compile(r"(?:^|[\s,])[\"']?(?:@|--via(?:[=,\s]|$))")
-_SCRIPT_FILE = re.compile(r"\.(?:lds?|sct)(?=$|[\s,\"'])", re.IGNORECASE)
 
 
 def request_linker_information(build_dir: Path) -> None:
@@ -45,8 +45,11 @@ def _argument(value: str, *, quoted: bool = False) -> str:
     return value
 
 
-def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
+def _selected_script(
+    fragments: list[dict[str, Any]], build_dir: Path, products: frozenset[Path]
+) -> Path:
     scripts = []
+    other_inputs = []
     for entry in fragments:
         value = entry["fragment"]
         if not isinstance(value, str):
@@ -57,10 +60,11 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
             value = value[1:-1]
         if _RESPONSE_FLAG.search(value):
             raise ValueError("Opaque linker response inputs have no characterized source closure")
-        script_input = _SCRIPT_FLAG.search(value) or _SCRIPT_FILE.search(value)
+        script_input = _SCRIPT_FLAG.search(value)
         if entry.get("role") != "flags":
             if script_input:
                 raise ValueError("Additional linker script input outside supported flags")
+            other_inputs.append(entry["fragment"])
             continue
         prefix = next((flag for flag in _SCRIPT_OPTIONS if value.startswith(flag)), None)
         if prefix is not None:
@@ -70,8 +74,11 @@ def _selected_script(fragments: list[dict[str, Any]], build_dir: Path) -> Path:
             scripts.append((build_dir / argument).resolve())
         elif script_input:
             raise ValueError("Unsupported combined linker script options")
+        else:
+            other_inputs.append(entry["fragment"])
     if len(scripts) != 1:
         raise ValueError(f"Expected one configured linker script, found {len(scripts)}")
+    validate_link_inputs(tuple(other_inputs), build_dir, products)
     return scripts[0]
 
 
@@ -91,11 +98,20 @@ def configured_script(app_dir: Path, build_dir: Path, target: str) -> Path:
     configurations = model["configurations"]
     if len(configurations) != 1:
         raise ValueError("Configured linker information has ambiguous build configurations")
-    matches = [entry for entry in configurations[0]["targets"] if entry["name"] == target]
+    targets = configurations[0]["targets"]
+    matches = [entry for entry in targets if entry["name"] == target]
     if len(matches) != 1:
         raise ValueError(f"Configured executable {target!r} is unavailable or ambiguous")
     record = _object(reply / matches[0]["jsonFile"])
-    return _selected_script(record["link"]["commandFragments"], build_dir)
+    products = frozenset(
+        (build_dir / artifact["path"]).resolve()
+        for entry in targets
+        for product in (_object(reply / entry["jsonFile"]),)
+        if product.get("type")
+        in {"STATIC_LIBRARY", "SHARED_LIBRARY", "MODULE_LIBRARY", "OBJECT_LIBRARY"}
+        for artifact in product.get("artifacts", ())
+    )
+    return _selected_script(record["link"]["commandFragments"], build_dir, products)
 
 
 def verify_configured_linker(

@@ -9,6 +9,7 @@ each kind to a concrete memory. User-provided
 
 from __future__ import annotations
 
+from dataclasses import replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -408,3 +409,107 @@ class TestEthosUPlacement:
         soc = get_soc_for_board("atomiq110_fpga_turbo")
         cfg = self._npu_cfg({"arena_location": "sram", "weights_location": "mram"})
         assert _resolve_aot_placement_intent(cfg, soc) == (Placement.SRAM, Placement.MRAM)
+
+
+@pytest.mark.parametrize(
+    ("arena_kib", "weights_kib", "expected"),
+    [
+        (368, 1, (Placement.TCM, Placement.SRAM)),
+        (376, 1, (Placement.SRAM, Placement.MRAM)),
+        (128, 120, (Placement.TCM, Placement.SRAM)),
+    ],
+)
+@pytest.mark.parametrize("allocate_arenas", [False, True])
+def test_aot_application_budgets_agree_through_conversion_plan_and_render(
+    tmp_path, arena_kib, weights_kib, expected, allocate_arenas
+):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+    from helia_profiler.engines.helia_aot.manifest import (
+        _extract_arena_regions,
+        _extract_memory_plan,
+    )
+    from helia_profiler.firmware import _resolved_aot_arena_regions
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.plan_memory import PlanMemoryStage
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+    from tests.aot_views import RegionView, Result
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"x" * (weights_kib * 1024))
+    cfg = load_config(
+        None,
+        {
+            "model": {"path": str(model), "arena_size": arena_kib * 1024},
+            "engine": {"type": "helia-aot"},
+            "target": {"board": "apollo510_evb"},
+        },
+    )
+    ctx = PipelineContext(config=cfg, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    assert _resolve_aot_placement_intent(cfg, ctx.soc) == expected
+    kinds = _by_kind(_resolve_aot_tensor_rulesets(cfg, ctx.soc))
+    arena_memory = "dtcm" if expected[0] is Placement.TCM else "sram"
+    assert kinds["scratch"] == kinds["persistent"] == {"memory": arena_memory}
+    if expected[1] is Placement.SRAM:
+        assert kinds["constant"] == {"memory": "mram", "constant_destination_memory": "sram"}
+    else:
+        assert kinds["constant"] == {"memory": "mram"}
+
+    # Model a converter view responding to the requested memory rules.
+    result = Result(
+        regions=(
+            RegionView(
+                0,
+                arena_memory.upper(),
+                arena_memory.upper(),
+                "scratch",
+                size=arena_kib * 1024,
+                symbol="scratch",
+            ),
+            RegionView(
+                1,
+                arena_memory.upper(),
+                arena_memory.upper(),
+                "persistent",
+                size=2048,
+                symbol="persistent",
+            ),
+        )
+    )
+    ctx.engine_adapter = HeliaAOTAdapter()
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        helia_aot_version="test",
+        aot_allocate_arenas=allocate_arenas,
+        memory_plan=_extract_memory_plan(result, allocate_arenas=allocate_arenas),
+        aot_arena_regions=_extract_arena_regions(result, "hpx"),
+    )
+    PlanMemoryStage().run(ctx)
+    assert (ctx.arena_region, ctx.weights_region) == expected
+    assert {r.placement for r in _resolved_aot_arena_regions(ctx)} == {expected[0]}
+    assert ctx.memory_plan is not None
+    for usage in ctx.memory_plan.regions:
+        for consumer in usage.consumers:
+            if consumer.name.endswith("_arena_0") or consumer.name.endswith("_arena_1"):
+                assert usage.region.value.lower() == arena_memory
+
+
+def test_aot_unknown_profile_keeps_declared_capacities(tmp_path):
+    cfg = _cfg("apollo510_evb", "auto", linker_profile="uncharacterized")
+    cfg = replace(cfg, model=replace(cfg.model, arena_size=376 * 1024))
+    assert (
+        _resolve_aot_placement_intent(cfg, get_soc_for_board("apollo510_evb"))[0] is Placement.TCM
+    )
+
+
+def test_aot_uses_the_selected_linker_family_budget():
+    cfg = _cfg("apollo510_evb", "auto")
+    cfg = replace(cfg, model=replace(cfg.model, arena_size=368 * 1024))
+    soc = get_soc_for_board("apollo510_evb")
+    assert _resolve_aot_placement_intent(cfg, soc)[0] is Placement.TCM
+    cfg = replace(cfg, target=replace(cfg.target, toolchain=type(cfg.target.toolchain)("armclang")))
+    assert _resolve_aot_placement_intent(cfg, soc)[0] is Placement.SRAM

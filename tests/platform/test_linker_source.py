@@ -351,6 +351,8 @@ def test_actual_source_admission_refuses_before_link(linked_pipeline):
         ("flags", "-Wl,alternate.ld,-Map,out.map"),
         ("libraries", '"path with spaces/alternate.lds" libhelper.a'),
         ("flags", "-Wl,--start-group,alternate.sct,libhelper.a,--end-group"),
+        ("flags", "-Wl,--default-script=alternate.txt"),
+        ("flags", "-Wl,-dTalternate.txt"),
     ],
 )
 def test_opaque_or_additional_script_inputs_never_qualify(
@@ -371,9 +373,73 @@ def test_opaque_or_additional_script_inputs_never_qualify(
 @pytest.mark.parametrize("role", ["profile", "power"])
 def test_library_names_are_not_mistaken_for_script_inputs(configured, fragment, role):
     _, build, _, _, _ = configured
+    library = build / fragment
+    library.parent.mkdir(parents=True, exist_ok=True)
+    library.write_bytes(b"!<arch>\n")
     target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
     path = build / ".cmake/api/v1/reply" / f"{target}.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     data["link"]["commandFragments"].append({"role": "libraries", "fragment": fragment})
     path.write_text(json.dumps(data), encoding="utf-8")
     assert _verify(configured, role=role).verified
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+@pytest.mark.parametrize("name", ["extra.txt", "extra", "looks_like_archive.a"])
+@pytest.mark.parametrize("forwarding", ["libraries", "flags", "-Wl,", "-Xlinker "])
+def test_implicit_scripts_are_refused_independent_of_filename(configured, role, name, forwarding):
+    _, build, _, _, _ = configured
+    build.mkdir(parents=True, exist_ok=True)
+    (build / name).write_text("SECTIONS { .extra : { *(.extra) } }", encoding="utf-8")
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    fragment = name if forwarding in {"libraries", "flags"} else forwarding + name
+    data["link"]["commandFragments"].append(
+        {
+            "role": forwarding if forwarding in {"libraries", "flags"} else "flags",
+            "fragment": fragment,
+        }
+    )
+    path.write_text(json.dumps(data), encoding="utf-8")
+    result = _verify(configured, role=role)
+    assert not result.verified
+    assert "implicit script" in result.reason
+
+
+@pytest.mark.parametrize("header", [b"\x7fELF", b"!<arch>\n", b"BC\xc0\xde"])
+@pytest.mark.parametrize("role", ["profile", "power"])
+def test_binary_inputs_need_no_recognized_filename_suffix(configured, header, role):
+    _, build, _, _, _ = configured
+    name = "binary input.txt"
+    (build / name).write_bytes(header)
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append({"role": "libraries", "fragment": f'"{name}"'})
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _verify(configured, role=role).verified
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_only_pending_declared_binary_products_can_qualify_before_build(configured, existing):
+    _, build, _, _, _ = configured
+    reply = build / ".cmake/api/v1/reply"
+    product = build / "future library.a"
+    if existing:
+        product.write_text("SECTIONS {}", encoding="utf-8")
+    path = reply / "hpx_profiler.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"].append(
+        {
+            "role": "libraries",
+            "fragment": '"future library.a"',
+        }
+    )
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert not _verify(configured).verified
+    model = json.loads((reply / "model.json").read_text(encoding="utf-8"))
+    model["configurations"][0]["targets"].append({"name": "future", "jsonFile": "future.json"})
+    _json(reply / "model.json", model)
+    _json(reply / "future.json", {"type": "STATIC_LIBRARY", "artifacts": [{"path": product.name}]})
+    assert _verify(configured).verified is (not existing)

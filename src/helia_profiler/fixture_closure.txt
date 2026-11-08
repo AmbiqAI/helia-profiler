@@ -111,6 +111,7 @@ firmware/fixture.py
 firmware/headers.py
 firmware/image.py
 firmware/launcher.py
+firmware/link_inputs.py
 firmware/linker.py
 firmware/linker_source.py
 firmware/op_resolver.py

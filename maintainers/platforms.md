@@ -45,3 +45,15 @@ content. Do not require a generation descriptor to have executed or infer the
 actual script from a requested profile. Unsupported metadata must remain an
 explicit unavailable result. Strict compiled receipts refuse such a build;
 ordinary development builds retain that limitation in their metadata.
+
+Positional link files are checked by binary header, regardless of extension:
+GNU linkers can treat an unknown text input as an implicit script. A missing
+file qualifies only when CMake declares it as a binary library/object product;
+an existing file must pass the format check even if it is a declared product.
+Named toolchain library searches remain toolchain inputs. Opaque response files
+and unsupported script selections leave source verification unavailable.
+
+Automatic placement uses the same interval-constrained capacity before AOT
+conversion and during memory planning. Custom or uncharacterized layouts retain
+their declared capacities; actual-source admission still occurs at the link
+boundary.
