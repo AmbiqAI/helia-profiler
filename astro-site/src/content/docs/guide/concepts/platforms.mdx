@@ -15,7 +15,7 @@ its firmware, transport, timing or energy measurements.
 |---|---|---|
 | Core, ISA, PMU presence, clock operating points, memory regions, fitted PSRAM, SDK symbols, boot origin and known probe device | helia-platforms | `platform/catalog.py` projects catalog facts into `SocDef` and `BoardDef` |
 | Accepted board spellings, stable/preview channel, exposed clock labels and default, firmware performance tier, GPIO measurement wiring, transport support and PMU storage limits | HPX | `platform/policy.py` |
-| Application linker windows and fit rules | HPX, derived from the SDK it builds against | `platform/memory_map.py`; these windows remain separate from physical catalog capacities |
+| Characterized default SDK linker windows and fit rules | HPX | `platform/memory_map.py`; these windows remain separate from physical catalog capacities |
 | Per-run custom board/SoC declarations | Caller, resolved by HPX | `platform/custom.py` and `platform/registry.py` |
 
 The adapter loads only the packaged built-in catalog, with plugins disabled.
@@ -51,7 +51,9 @@ J-Link device names. These corrections do not enlarge a pre-build fit budget.
 `PlatformSnapshot` records the requested board, effective HPX board/SoC views,
 catalog package/schema version and digest, source identities, resolved target,
 core, boot configuration, implementation and add-ons. It also records the
-selected linker family, application windows and boot load address. Unknown
+selected linker family/profile, characterized application windows and boot load
+address. These windows are HPX inputs, not measured ELF extents or validation
+of a custom SDK. Uncharacterized profiles record no windows. Unknown
 facts stay absent; an application boot origin is never inferred from a linker
 window for a catalog-backed target.
 

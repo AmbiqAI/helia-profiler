@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from ..engines import EngineType
 from ..platform.memory_map import link_family_for_toolchain
 from ..platform.provenance import PlatformSnapshot, platform_snapshot
 
@@ -16,4 +17,9 @@ def config_platform(config: ProfileConfig) -> PlatformSnapshot:
         config.target.board,
         registry=config.platform_registry,
         link_family=link_family_for_toolchain(config.target.toolchain.value),
+        linker_profile=(
+            str(config.engine.config.get("linker_profile") or "default")
+            if config.engine.type is EngineType.HELIA_AOT
+            else "default"
+        ),
     )

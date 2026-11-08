@@ -122,3 +122,83 @@ def test_ordinary_artifacts_keep_the_same_resolved_platform(tmp_path):
     assert metadata["platform_provenance"] == expected
     assert summary["platform_provenance"] == expected
     assert manifest["provenance"]["platform"] == expected
+
+    from helia_profiler.api import load_result, observations
+    from helia_profiler.readers.native import ProfileResultRecord
+
+    record = load_result(tmp_path / "results")
+    assert isinstance(record, ProfileResultRecord) and record.metadata is not None
+    assert record.metadata["platform_provenance"] == expected
+    assert observations(record)["producer"]["name"] == "helia-profiler"
+
+
+@pytest.mark.parametrize("profile", ["default", "itcm"])
+def test_retained_windows_use_the_selected_aot_linker_profile(tmp_path, profile):
+    from helia_profiler.config import load_config
+    from helia_profiler.config.platform import config_platform
+
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(tmp_path / "model.tflite")},
+            "engine": {"type": "helia-aot", "config": {"linker_profile": profile}},
+        },
+    )
+    snapshot = config_platform(config)
+    assert snapshot.linker_profile == profile
+    if profile == "itcm":
+        assert snapshot.app_regions == ()
+    else:
+        assert snapshot.app_regions
+
+
+@pytest.mark.parametrize(
+    "board,device",
+    [
+        ("apollo4l_blue_evb", "AMA4B2KL-KXR"),
+        ("apollo4p_blue_kbr_evb", "AMA4B2KP-KBR"),
+        ("apollo4p_blue_kxr_evb", "AMA4B2KP-KXR"),
+    ],
+)
+def test_custom_board_inherits_concrete_probe_facts_through_a_chain(board, device):
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    registry = build_custom_platform_registry(
+        {
+            "custom_boards": {
+                "derived": {"based_on": board, "default_sync_gpio_pin": 12},
+                "child": {"based_on": "derived"},
+            }
+        }
+    )
+    for name in ("derived", "child"):
+        snapshot = platform_snapshot(name, registry=registry)
+        assert snapshot.soc.jlink_device == device
+        assert snapshot.board.default_sync_gpio_pin == 12
+        assert snapshot.selection.origin == "hpx-custom"
+
+
+def test_custom_board_inherits_an_explicit_soc_override():
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    registry = build_custom_platform_registry(
+        {
+            "custom_socs": {"apollo4l": {"based_on": "apollo4l", "jlink_device": "ExplicitProbe"}},
+            "custom_boards": {"derived": {"based_on": "apollo4l_blue_evb"}},
+        }
+    )
+    assert get_soc_for_board("derived", registry=registry).jlink_device == "ExplicitProbe"
+    assert get_soc_for_board("apollo4l_blue_evb").jlink_device == "AMA4B2KL-KXR"
+
+
+def test_custom_board_with_another_soc_does_not_inherit_the_base_probe():
+    from helia_profiler.platform.custom import build_custom_platform_registry
+
+    registry = build_custom_platform_registry(
+        {
+            "custom_boards": {
+                "different": {"based_on": "apollo4l_blue_evb", "soc": "apollo510"},
+            }
+        }
+    )
+    assert get_soc_for_board("different", registry=registry).jlink_device == "AP510NFA-CBR"

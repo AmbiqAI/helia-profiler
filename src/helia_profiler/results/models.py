@@ -26,6 +26,9 @@ from ..placement import MemoryRegion
 from ..platform.provenance import PlatformSnapshot
 from ..power.base import PowerResult
 
+RUN_METADATA_SCHEMA = "hpx.run-metadata"
+RUN_METADATA_SCHEMA_VERSION = 2
+
 if TYPE_CHECKING:
     from ..evaluation import RunEvaluation
     from ..identity import RunIdentity
@@ -398,7 +401,7 @@ class RunMetadata:
     timestamp: str = ""
     config_snapshot: dict[str, Any] = field(default_factory=dict)
     platform: PlatformInfo | None = None
-    platform_provenance: PlatformSnapshot | None = None
+    platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)
     model: ModelInfo | None = None
     toolchain: ToolchainInfo | None = None
     #: One entry per built target ("profile", "power"). Appended as each

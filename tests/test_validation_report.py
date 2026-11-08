@@ -114,7 +114,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         json.dumps(
             {
                 "schema": "hpx.run-metadata",
-                "schema_version": 1,
+                "schema_version": 2,
                 "hpx_version": "0.1.0",
                 "toolchain": {
                     "compiler": "gcc",
@@ -183,7 +183,7 @@ def test_write_validation_reports_includes_manifest_with_relative_paths(
         "engine": {"type": "helia-rt", "version": "1.16.0"},
     }
     assert case["provenance"]["system_clock_hz"] == 96_000_000
-    assert case["provenance"]["run_metadata_schema_version"] == 1
+    assert case["provenance"]["run_metadata_schema_version"] == 2
     assert case["provenance"]["run_summary_schema_version"] == RUN_SUMMARY_SCHEMA_VERSION
     assert case["resources"]["binary_sections"] == {
         "text": 80_000,

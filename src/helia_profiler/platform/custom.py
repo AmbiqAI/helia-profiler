@@ -17,13 +17,21 @@ that fails to load, which is how ``BoardDef.ble_reset_gpio_pin`` surfaced.
 from __future__ import annotations
 
 import difflib
+from dataclasses import replace
 from enum import Enum
+from types import MappingProxyType
 from typing import Any, Mapping, TypeVar
 
 from ..errors import ConfigError
 from .board import DEFAULT_GO_GPIO_PIN, DEFAULT_STATE_GPIO_PIN, DEFAULT_SYNC_GPIO_PIN, BoardDef
 from .capabilities import resolve_app_flash_load_addr
-from .registry import PlatformRegistry, build_platform_registry, get_board, get_soc
+from .registry import (
+    PlatformRegistry,
+    build_platform_registry,
+    get_board,
+    get_soc,
+    get_soc_for_board,
+)
 from .soc import (
     ClockDomain,
     ClockSpeed,
@@ -119,8 +127,7 @@ def build_custom_platform_registry(target: dict[str, Any]) -> PlatformRegistry:
     base = build_platform_registry()
     custom_socs = _build_custom_socs(target.get("custom_socs"), base)
     registry_with_socs = build_platform_registry(base=base, socs=custom_socs)
-    custom_boards = _build_custom_boards(target.get("custom_boards"), registry_with_socs)
-    return build_platform_registry(base=registry_with_socs, boards=custom_boards)
+    return _build_custom_boards(target.get("custom_boards"), registry_with_socs)
 
 
 def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
@@ -442,22 +449,20 @@ def _reject_unknown_keys(
     )
 
 
-def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, BoardDef]:
+def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> PlatformRegistry:
     if raw is None:
-        return {}
+        return registry
     if not isinstance(raw, dict):
         raise ConfigError("target.custom_boards must be a mapping of name -> definition")
 
-    custom: dict[str, BoardDef] = {}
     for name, spec in raw.items():
         if not isinstance(spec, dict):
             raise ConfigError(f"target.custom_boards.{name} must be a mapping")
         _reject_unknown_keys(
             spec, allowed=CustomBoardField, field_name=f"target.custom_boards.{name}"
         )
-        overlay = build_platform_registry(base=registry, boards=custom)
         based_on = spec.get("based_on")
-        base_board = get_board(based_on, registry=overlay) if based_on else None
+        base_board = get_board(based_on, registry=registry) if based_on else None
         soc = spec.get("soc", base_board.soc if base_board else None)
         channel = spec.get("channel", base_board.channel if base_board else None)
         if soc is None:
@@ -468,7 +473,7 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             "starter_profile_board",
             base_board.profile_source_board if base_board else None,
         )
-        custom[name] = BoardDef(
+        board = BoardDef(
             name=name,
             soc=str(soc),
             channel=str(channel),
@@ -522,7 +527,18 @@ def _build_custom_boards(raw: Any, registry: PlatformRegistry) -> dict[str, Boar
             ),
             description=str(spec.get("description", base_board.description if base_board else "")),
         )
-    return custom
+        inherited = (
+            get_soc_for_board(base_board.name, registry=registry)
+            if base_board is not None and board.soc == base_board.soc
+            else None
+        )
+        registry = build_platform_registry(base=registry, boards={name: board})
+        if inherited is not None:
+            registry = replace(
+                registry,
+                board_socs=MappingProxyType({**registry.board_socs, name: inherited}),
+            )
+    return registry
 
 
 _EnumT = TypeVar("_EnumT", bound=Enum)

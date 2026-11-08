@@ -68,7 +68,7 @@ def bundle(root: Path, *, status="complete") -> Path:
             "hpx.run-metadata",
             {
                 "schema": "hpx.run-metadata",
-                "schema_version": 1,
+                "schema_version": 2,
                 "run_id": "synthetic-run",
                 "hpx_version": "synthetic",
                 "engine": {"type": "litert"},
@@ -692,3 +692,10 @@ def test_windows_native_path_rejection_precedes_portable_checks(tmp_path, monkey
     assert checked.code == "invalid_evidence"
     assert checked.message is not None
     assert "non-empty relative path" in checked.message
+
+
+def test_earlier_metadata_contract_is_refused_without_relabelling(tmp_path):
+    path = bundle(tmp_path)
+    edit_document(path, "run_metadata.json", lambda value: value.update(schema_version=1))
+    with pytest.raises(ResultReadError, match="Expected hpx.run-metadata version 2"):
+        load_result(path)

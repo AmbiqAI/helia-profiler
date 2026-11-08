@@ -468,7 +468,7 @@ class RunSummary:
     identity: Mapping[str, Any] | None = None
     #: The run's ``Conditions.to_dict()``; absent before schema v20.
     conditions: Mapping[str, Any] | None = None
-    platform_provenance: PlatformSnapshot | None = None
+    platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)
     top_layers: tuple[Mapping[str, Any], ...] = ()
     memory: MemorySection | None = None
     psram: Mapping[str, Any] | None = None

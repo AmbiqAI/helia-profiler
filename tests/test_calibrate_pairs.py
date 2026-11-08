@@ -8,8 +8,9 @@ weights only in that mode, and the setting is held by the pairing digest, so
 a TCM or MRAM capture left at the default does not pair with the PSRAM one.
 The three bundles are committed under
 ``tests/fixtures/calibration/pairs/<weights_location>/``, and a missing one
-fails the real-data test. Reading a bundle needs heliaAOT, as
-``test_calibrate.py`` does.
+fails the real-data test. The retained bundles keep their original summary contract and are read with
+the producing HPX release. Current-format pairing is exercised by the synthetic
+pair below. Reading a bundle needs heliaAOT, as ``test_calibrate.py`` does.
 """
 
 from __future__ import annotations
@@ -66,10 +67,18 @@ def _check(bundles: dict[str, Path], tmp_path: Path) -> None:
         assert _pairs(files[slow], fast), slow
 
 
-def test_real_captures_pair_across_the_weights_memory(tmp_path: Path) -> None:
+def test_retained_real_captures_keep_their_producing_contract(tmp_path: Path) -> None:
+    from helia_profiler.errors import ReportError
+    from helia_profiler.results import load_result_manifest
+
     for name in WEIGHTS_LOCATIONS:
-        assert (PAIRS / name / "result_manifest.json").is_file(), f"{PAIRS / name} is missing"
-    _check({name: PAIRS / name for name in WEIGHTS_LOCATIONS}, tmp_path)
+        path = PAIRS / name
+        load_result_manifest(path / "result_manifest.json", verify=True)
+        summary = json.loads((path / "summary.json").read_text())
+        assert summary["schema_version"] == 20
+        with pytest.raises(ReportError, match="read the result with the HPX release that wrote it"):
+            calibrate([path], output=tmp_path / f"{name}.json")
+        assert not (tmp_path / f"{name}.json").exists()
 
 
 def test_the_check_holds_for_the_synthetic_pairs(tmp_path: Path) -> None:

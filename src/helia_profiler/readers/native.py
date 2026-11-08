@@ -23,6 +23,7 @@ from ..results.manifest import (
     ResultManifest,
     RunStatus,
 )
+from ..results.models import RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION
 from ..results.run_summary import RunSummary, _require_current_summary
 from ..results.serde import nested_get
 from ..runs.record import RUN_RESULT_SCHEMA, RunResultError, RunResultRecord, read_run
@@ -313,7 +314,7 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
                         )
         summary = RunSummary.from_dict(summary_data)
     if metadata is not None:
-        _schema(metadata, "hpx.run-metadata", 1)
+        _schema(metadata, RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION)
         if (
             metadata.get("run_id") != manifest.run_id
             or metadata.get("hpx_version") != manifest.hpx_version
