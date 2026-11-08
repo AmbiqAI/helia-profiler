@@ -401,7 +401,10 @@ def _compile_command(
     workspace_src = workspace.app_dir / "src"
     # The scratch dir replaces the workspace src include so the CURRENT
     # CHECKOUT's rendered headers win (D6); keep everything else verbatim.
-    includes = [f"-I{scratch}" if inc == f"-I{workspace_src}" else inc for inc in includes]
+    includes = [
+        f"-I{scratch.as_posix()}" if inc == f"-I{workspace_src.as_posix()}" else inc
+        for inc in includes
+    ]
     flags = [
         # -MMD/-MP/-MD write .d depfiles into the CWD even under
         # -fsyntax-only — a filesystem side effect this read-only gate must
