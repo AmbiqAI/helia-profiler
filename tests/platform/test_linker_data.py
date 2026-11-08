@@ -56,6 +56,14 @@ def test_uncharacterized_profiles_and_names_remain_unavailable():
     assert characterized_input("custom", LinkFamily.GNU) is None
 
 
+def test_public_window_order_retains_mram_tcm_sram_for_apollo3():
+    assert tuple(value.region for value in linked_memory_map(get_soc("apollo3p"))) == (
+        MemoryRegion.MRAM,
+        MemoryRegion.DTCM,
+        MemoryRegion.SRAM,
+    )
+
+
 def test_source_identity_is_portable_across_checkout_line_endings(tmp_path):
     path = tmp_path / "source.ld"
     source = b"MEMORY\n{\n A : ORIGIN = 0, LENGTH = 16\n}\n"

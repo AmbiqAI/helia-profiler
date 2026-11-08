@@ -80,7 +80,8 @@ def characterized_windows(soc_name: str) -> tuple[LinkedRegionWindow, ...]:
     if any(set(regions) != set(first) for regions in by_family.values()):
         raise ValueError(f"{soc_name}: generated link families disagree on logical regions")
     result = []
-    for name, primary in first.items():
+    order = (MemoryRegion.MRAM, MemoryRegion.ITCM, MemoryRegion.DTCM, MemoryRegion.SRAM)
+    for name, primary in sorted(first.items(), key=lambda item: order.index(item[0])):
         if any(regions[name].window != primary.window for regions in by_family.values()):
             raise ValueError(f"{soc_name}/{name}: generated classification apertures differ")
         result.append(
