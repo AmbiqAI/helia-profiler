@@ -42,7 +42,11 @@
         "CatalogProvenance",
         "CatalogSource",
         "TargetSelection",
-        "RegionExtent"
+        "RegionExtent",
+        "LinkerFile",
+        "LinkerInput",
+        "LinkerRegion",
+        "LinkerVerification"
       ]
     },
     {

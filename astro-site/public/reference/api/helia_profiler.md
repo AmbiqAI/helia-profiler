@@ -33,6 +33,10 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 | [CatalogSource](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.CatalogSource) | `helia_profiler.CatalogSource` |
 | [TargetSelection](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.TargetSelection) | `helia_profiler.TargetSelection` |
 | [RegionExtent](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.RegionExtent) | `helia_profiler.RegionExtent` |
+| [LinkerFile](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LinkerFile) | `helia_profiler.LinkerFile` |
+| [LinkerInput](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LinkerInput) | `helia_profiler.LinkerInput` |
+| [LinkerRegion](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LinkerRegion) | `helia_profiler.LinkerRegion` |
+| [LinkerVerification](/helia-profiler/reference/api/helia_profiler/frozen_run/#helia_profiler.LinkerVerification) | `helia_profiler.LinkerVerification` |
 | [build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.build) | `helia_profiler.build` |
 | [load_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.load_build) | `helia_profiler.load_build` |
 | [run_build](/helia-profiler/reference/api/helia_profiler/compiled_build/#helia_profiler.run_build) | `helia_profiler.run_build` |

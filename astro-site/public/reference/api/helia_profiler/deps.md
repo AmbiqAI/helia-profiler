@@ -284,6 +284,20 @@ Return structured result provenance without lossy enum conversion.
 
 Source: `src/helia_profiler/deps/compatibility.py:151`
 
+## helia_profiler.load_compatibility_baseline
+
+`function` · `python`
+
+```python
+load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseline
+```
+
+Load and strictly validate an HPX compatibility baseline.
+
+**API tier:** `stable`
+
+Source: `src/helia_profiler/deps/compatibility.py:162`
+
 ## helia_profiler.DependencyLockProvenance
 
 `class` · `python`
@@ -310,7 +324,7 @@ Read-only lock provenance surface for later diagnostics collectors.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/dependencies.py:128`
+Source: `src/helia_profiler/results/dependencies.py:166`
 
 ### helia_profiler.DependencyLockProvenance.lock_path
 
@@ -320,7 +334,7 @@ Source: `src/helia_profiler/results/dependencies.py:128`
 lock_path: Path
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:132`
+Source: `src/helia_profiler/results/dependencies.py:170`
 
 ### helia_profiler.DependencyLockProvenance.lock_sha256
 
@@ -330,7 +344,7 @@ Source: `src/helia_profiler/results/dependencies.py:132`
 lock_sha256: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:133`
+Source: `src/helia_profiler/results/dependencies.py:171`
 
 ### helia_profiler.DependencyLockProvenance.registry_hash
 
@@ -340,7 +354,7 @@ Source: `src/helia_profiler/results/dependencies.py:133`
 registry_hash: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:134`
+Source: `src/helia_profiler/results/dependencies.py:172`
 
 ### helia_profiler.DependencyLockProvenance.requested_refs
 
@@ -350,7 +364,7 @@ Source: `src/helia_profiler/results/dependencies.py:134`
 requested_refs: tuple[DependencyRequest, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:135`
+Source: `src/helia_profiler/results/dependencies.py:173`
 
 ### helia_profiler.DependencyLockProvenance.resolved
 
@@ -360,7 +374,7 @@ Source: `src/helia_profiler/results/dependencies.py:135`
 resolved: tuple[DependencyModule, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:136`
+Source: `src/helia_profiler/results/dependencies.py:174`
 
 ### helia_profiler.DependencyLockProvenance.overrides
 
@@ -370,7 +384,7 @@ Source: `src/helia_profiler/results/dependencies.py:136`
 overrides: tuple[DependencyOverride, ...]
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:137`
+Source: `src/helia_profiler/results/dependencies.py:175`
 
 ### helia_profiler.DependencyLockProvenance.qualification
 
@@ -380,7 +394,7 @@ Source: `src/helia_profiler/results/dependencies.py:137`
 qualification: QualificationState
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:138`
+Source: `src/helia_profiler/results/dependencies.py:176`
 
 ### helia_profiler.DependencyLockProvenance.baseline_fingerprint
 
@@ -390,7 +404,7 @@ Source: `src/helia_profiler/results/dependencies.py:138`
 baseline_fingerprint: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:139`
+Source: `src/helia_profiler/results/dependencies.py:177`
 
 ### helia_profiler.DependencyLockProvenance.workspace_fingerprint
 
@@ -400,7 +414,7 @@ Source: `src/helia_profiler/results/dependencies.py:139`
 workspace_fingerprint: str
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:140`
+Source: `src/helia_profiler/results/dependencies.py:178`
 
 ### helia_profiler.DependencyLockProvenance.lock_mode
 
@@ -410,7 +424,7 @@ Source: `src/helia_profiler/results/dependencies.py:140`
 lock_mode: DependencyLockMode
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:141`
+Source: `src/helia_profiler/results/dependencies.py:179`
 
 ### helia_profiler.DependencyLockProvenance.update_requested
 
@@ -420,21 +434,7 @@ Source: `src/helia_profiler/results/dependencies.py:141`
 update_requested: bool
 ```
 
-Source: `src/helia_profiler/results/dependencies.py:142`
-
-## helia_profiler.load_compatibility_baseline
-
-`function` · `python`
-
-```python
-load_compatibility_baseline(path: Path | None = None) -> CompatibilityBaseline
-```
-
-Load and strictly validate an HPX compatibility baseline.
-
-**API tier:** `stable`
-
-Source: `src/helia_profiler/deps/compatibility.py:162`
+Source: `src/helia_profiler/results/dependencies.py:180`
 
 ## helia_profiler.read_dependency_lock_provenance
 
