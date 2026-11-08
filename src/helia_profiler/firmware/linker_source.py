@@ -49,11 +49,12 @@ def _selected_script(
     fragments: list[dict[str, Any]], build_dir: Path, products: frozenset[Path]
 ) -> Path:
     scripts = []
-    other_inputs = []
-    for entry in fragments:
+    link_fragments = []
+    for position, entry in enumerate(fragments):
         value = entry["fragment"]
         if not isinstance(value, str):
             raise ValueError("Backend link fragment is not text")
+        link_fragments.append(value)
         value = value.strip()
         quoted = value.startswith(('"', "'")) and value.endswith(value[0])
         if quoted:
@@ -64,22 +65,20 @@ def _selected_script(
         if entry.get("role") != "flags":
             if script_input:
                 raise ValueError("Additional linker script input outside supported flags")
-            other_inputs.append(entry["fragment"])
             continue
         prefix = next((flag for flag in _SCRIPT_OPTIONS if value.startswith(flag)), None)
         if prefix is not None:
             argument = _argument(value[len(prefix) :], quoted=quoted)
             if prefix.startswith("-Wl,") and "," in argument:
                 raise ValueError("Ambiguous forwarded linker script arguments")
-            scripts.append((build_dir / argument).resolve())
+            scripts.append(((build_dir / argument).resolve(), position))
         elif script_input:
             raise ValueError("Unsupported combined linker script options")
-        else:
-            other_inputs.append(entry["fragment"])
     if len(scripts) != 1:
         raise ValueError(f"Expected one configured linker script, found {len(scripts)}")
-    validate_link_inputs(tuple(other_inputs), build_dir, products)
-    return scripts[0]
+    script, position = scripts[0]
+    validate_link_inputs(tuple(link_fragments), build_dir, products, script_fragment_index=position)
+    return script
 
 
 def configured_script(app_dir: Path, build_dir: Path, target: str) -> Path:

@@ -538,3 +538,37 @@ def test_supported_option_operands_are_not_positional_inputs(configured, fragmen
     data["link"]["commandFragments"].append({"role": "flags", "fragment": fragment})
     path.write_text(json.dumps(data), encoding="utf-8")
     assert _verify(configured).verified
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+@pytest.mark.parametrize("option", ["--entry", "-u", "-Map", "--library", "-Wl,-e"])
+def test_script_fragment_cannot_complete_a_previous_option(configured, role, option):
+    _, build, root, layout, _ = configured
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if option == "-Wl,-e":
+        data["link"]["commandFragments"][0]["fragment"] = (
+            f'-Wl,--script="{root / layout.script.path}"'
+        )
+    data["link"]["commandFragments"].insert(0, {"role": "flags", "fragment": option})
+    data["link"]["commandFragments"].append({"role": "libraries", "fragment": "extra.ld"})
+    (build / "extra.ld").write_text("SECTIONS {}", encoding="utf-8")
+    path.write_text(json.dumps(data), encoding="utf-8")
+    result = _verify(configured, role=role)
+    assert not result.verified
+    assert "consumed as another option" in result.reason
+
+
+@pytest.mark.parametrize("role", ["profile", "power"])
+def test_completed_split_operand_before_script_keeps_its_position(configured, role):
+    _, build, _, _, _ = configured
+    target = "hpx_profiler" if role == "profile" else "hpx_profiler_power"
+    path = build / ".cmake/api/v1/reply" / f"{target}.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["link"]["commandFragments"][:0] = [
+        {"role": "flags", "fragment": "--entry"},
+        {"role": "flags", "fragment": "entry_symbol.ld"},
+    ]
+    path.write_text(json.dumps(data), encoding="utf-8")
+    assert _verify(configured, role=role).verified

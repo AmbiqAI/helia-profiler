@@ -89,11 +89,19 @@ def _option_value(option: str, value: str) -> None:
 
 
 def validate_link_inputs(
-    fragments: tuple[str, ...], build_dir: Path, products: frozenset[Path]
+    fragments: tuple[str, ...],
+    build_dir: Path,
+    products: frozenset[Path],
+    *,
+    script_fragment_index: int,
 ) -> None:
-    """Recognize supported default options; unknown syntax cannot qualify a layout."""
+    """Recognize supported options without letting an operand consume the selected script."""
     operand = None
-    for fragment in fragments:
+    for position, fragment in enumerate(fragments):
+        if position == script_fragment_index:
+            if operand is not None:
+                raise ValueError("Selected linker script is consumed as another option's operand")
+            continue
         for token in _tokens(fragment):
             if operand is not None:
                 _option_value(operand, token)
