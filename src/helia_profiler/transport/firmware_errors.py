@@ -60,6 +60,24 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "provider's reset, then model_init.  Other codes are the module's own "
         "status codes (see its generated tensors header)."
     ),
+    FirmwareErrorCode.TRANSFER_BIND_FAILED: (
+        "The heliaAOT module's own transfer provider refused to bind, so its "
+        "dma units cannot run.  The code is the provider's: 311 means the "
+        "linked nsx-psram lacks the API version the provider was emitted "
+        "for; 312 PSRAM is not ready or XIP is off; 313 this part has no "
+        "asynchronous PSRAM read; 314 nsx-psram's async depth "
+        "(NSX_PSRAM_ASYNC_DEPTH) is below the module's pieces in flight; 323 "
+        "a drain of an earlier binding timed out.  Pin an nsx-ambiq-sdk whose "
+        "nsx-psram offers the asynchronous read on this board, or convert "
+        "with module.transfer_provider: none."
+    ),
+    FirmwareErrorCode.TRANSFER_POWER_CLAUSE: (
+        "The transfer provider's sleep predicate disagreed with its pieces in "
+        "flight: it allowed deep sleep while a dma unit's wait was starting, or "
+        "refused it after a run returned.  DMA into DTCM is not allowed in deep "
+        "sleep, so this is a provider or nsx-psram defect; report it with the "
+        "capture."
+    ),
     FirmwareErrorCode.NPU_INIT_FAILED: (
         "Ethos-U NPU bring-up failed before any inference ran.  On FPGA "
         "targets this almost always means the loaded bitstream's generation "

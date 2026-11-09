@@ -659,6 +659,7 @@ _PREDICATES = {
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
+    "has_armv8m_pmu and not power_only": lambda v: bool(v["has_armv8m_pmu"]) and not _power(v),
     "has_ethos_u": lambda v: bool(v.get("has_ethos_u", False)),
     "clean_window_trace and transport not in (swo, uart)": (
         lambda v: bool(v.get("clean_window_trace")) and v["transport"] not in ("swo", "uart")
@@ -979,6 +980,8 @@ def test_error_code_catalogue():
         "const_blob_psram_write_failed",
         "model_init_failed",
         "model_run_failed",
+        "transfer_bind_failed",
+        "transfer_power_clause",
         "npu_init_failed",
         "executorch",
         "operator_count_exceeds_capacity",

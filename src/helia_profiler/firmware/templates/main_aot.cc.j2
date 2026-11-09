@@ -37,6 +37,13 @@
 // heliaAOT model API
 #include "{{ aot_prefix }}_model.h"
 #include "{{ aot_prefix }}_common.h"
+#if __has_include("{{ aot_prefix }}_nsx_transfer.h")
+// The module emitted its transfer provider for dma units: hpx binds it
+// before model_init and reports its evidence per run.
+#include "{{ aot_prefix }}_nsx_transfer.h"
+#include "nsx_psram.h"
+#define HPX_AOT_TRANSFER 1
+#endif
 {% if has_armv8m_pmu %}
 {# nsx_pmu_utils.h is the nsx_pmu_* config/counter API the AOT operator
    callback drives directly (heliaRT reaches the same hardware through
@@ -74,6 +81,16 @@ struct HpxLayerRecord {
 {% if has_armv8m_pmu %}
 static nsx_pmu_config_t g_pmu_cfg;
 {% include "_pmu_read.j2" %}
+
+// Restarts the event counters; DWT->CYCCNT, which times the run, keeps counting.
+static inline void hpx_pmu_restart(void) {
+    uint32_t saved_cyccnt = DWT->CYCCNT;
+    nsx_pmu_reset_counters();
+    DWT->CYCCNT = saved_cyccnt;
+#if (__CORTEX_M >= 55U)
+    ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
+#endif
+}
 {% else %}
 static uint32_t g_op_start_cyccnt = 0;
 {% endif %}
@@ -104,6 +121,31 @@ static int32_t hpx_aot_status = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
 static const char* g_counter_names[kMaxEvents] = {};
+{% if not power_only | default(false) %}
+
+#ifdef HPX_AOT_TRANSFER
+// Per instrumented run, beside the layer records: for each transfer unit's
+// issue and each operator's run, whether the MSPI controller's DMA was in
+// progress (bit 0) and nsx-psram had reads pending (bit 1) at both ends; the
+// L1D refills over each unit's issue window; and a latch for the provider's
+// power clause.
+static uint8_t g_transfer_unit_overlap[{{ aot_prefix }}_num_transfer_units];
+NSX_MEM_SRAM_BSS static uint8_t g_transfer_op_overlap[kMaxLayers];
+{% if has_armv8m_pmu %}
+static uint32_t g_transfer_unit_refills[{{ aot_prefix }}_num_transfer_units];
+static int g_transfer_refill_slot = -1;
+{% endif %}
+static bool g_transfer_power_clause = false;
+static {{ aot_prefix }}_nsx_transfer_stats_t g_transfer_stats_before;
+
+// A failed read of the DMA-in-progress bit is no evidence, so it reads as clear.
+static uint8_t hpx_transfer_sample(void) {
+    bool dma = false;
+    const bool sampled = nsx_psram_dma_in_progress(&dma) == 0U;
+    return (uint8_t)(((sampled && dma) ? 1U : 0U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
+}
+#endif
+{% endif %}
 
 // Heartbeat state — cheap counters/timestamps updated on each op finish so
 // the host can detect a hung run without wall-clock timeouts.
@@ -224,16 +266,52 @@ static void model_operator_cb(
     (void)user_data;
 
     if (!g_profiler_enabled) return;
+{% if not power_only | default(false) %}
+
+#ifdef HPX_AOT_TRANSFER
+    // Transfer states arrive outside every operator's run window; for them
+    // op is the unit id.
+    if (state == {{ aot_prefix }}_op_state_transfer_wait_started) {
+        // A dma unit's pieces are in flight until this wait: deep sleep must
+        // be refused.
+        if ({{ aot_prefix }}_nsx_transfer_can_sleep()) {
+            g_transfer_power_clause = true;
+        }
+        return;
+    }
+    if (state == {{ aot_prefix }}_op_state_transfer_issue_started ||
+        state == {{ aot_prefix }}_op_state_transfer_issue_finished) {
+        if (op < 0 || op >= {{ aot_prefix }}_num_transfer_units) {
+            return;
+        }
+        if (state == {{ aot_prefix }}_op_state_transfer_issue_started) {
+            g_transfer_unit_overlap[op] = hpx_transfer_sample();
+{% if has_armv8m_pmu %}
+            if (g_transfer_refill_slot >= 0) {
+                hpx_pmu_restart();
+            }
+{% endif %}
+        } else {
+{% if has_armv8m_pmu %}
+            if (g_transfer_refill_slot >= 0) {
+                (void)hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters);
+                g_transfer_unit_refills[op] = g_pmu_cfg.counter[g_transfer_refill_slot].counterValue;
+            }
+{% endif %}
+            g_transfer_unit_overlap[op] &= hpx_transfer_sample();
+        }
+        return;
+    }
+    if (state == {{ aot_prefix }}_op_state_run_started && g_num_layers < kMaxLayers) {
+        g_transfer_op_overlap[g_num_layers] = hpx_transfer_sample();
+    }
+#endif
+{% endif %}
 
     if (state == {{ aot_prefix }}_op_state_run_started) {
 {% if has_armv8m_pmu %}
         // Reset PMU counters at the start of each operator
-        uint32_t saved_cyccnt = DWT->CYCCNT;
-        nsx_pmu_reset_counters();
-        DWT->CYCCNT = saved_cyccnt;
-#if (__CORTEX_M >= 55U)
-        ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
-#endif
+        hpx_pmu_restart();
 {% else %}
     g_op_start_cyccnt = DWT->CYCCNT;
 {% endif %}
@@ -253,6 +331,11 @@ static void model_operator_cb(
         g_layers[idx].counters[0] = DWT->CYCCNT - g_op_start_cyccnt;
         g_layers[idx].overflow = false;
     {% endif %}
+{% if not power_only | default(false) %}
+#ifdef HPX_AOT_TRANSFER
+        g_transfer_op_overlap[idx] &= hpx_transfer_sample();
+#endif
+{% endif %}
         // Heartbeat emission (inter-op gap, not contaminating a layer)
         ++g_hb_ops_since;
         const bool by_ops = (g_hb_every_ops > 0) &&
@@ -296,22 +379,123 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
     .user_data = nullptr
 };
 
-// Run after every loop of model_run calls, outside timing: a failed run stops
-// the capture instead of reporting the timing of whatever it left behind.
-static void hpx_aot_check_runs(void) {
-    if (hpx_aot_status == 0) {
+#ifdef HPX_AOT_TRANSFER
+// Binds the module's provider. A refusal leaves ctx.transfer unset, so
+// model_init would return 300; the provider's code says why.
+static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *options) {
+    const int32_t status = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, options);
+    if (status == 0) {
         return;
     }
 {% if power_only | default(false) %}
-    hpx_power_terminal_fail("model_run", 9U);
+    hpx_power_terminal_fail("transfer_bind", 8U);
 {% else %}
-{% if transport == "rtt" %}
-    hpx_rtt_set_blocking();
-{% endif %}
-    hpx_printf("HPX_ERROR=model_run_failed:%ld\n", (long)hpx_aot_status);
+    hpx_printf("HPX_ERROR=transfer_bind_failed:%ld\n", (long)status);
     hpx_park();
 {% endif %}
 }
+{% if not power_only | default(false) %}
+
+// Before each instrumented run: clears the run's evidence and notes the
+// provider's counters, which the report after the run turns into deltas.
+static void hpx_transfer_run_start(void) {
+    memset(g_transfer_unit_overlap, 0, sizeof(g_transfer_unit_overlap));
+    memset(g_transfer_op_overlap, 0, sizeof(g_transfer_op_overlap));
+{% if has_armv8m_pmu %}
+    memset(g_transfer_unit_refills, 0, sizeof(g_transfer_unit_refills));
+    g_transfer_refill_slot = -1;
+    for (int i = 0; i < g_num_counters; i++) {
+        if (g_pmu_cfg.events[i].enabled && g_pmu_cfg.events[i].eventId == ARM_PMU_L1D_CACHE_REFILL) {
+            g_transfer_refill_slot = i;
+        }
+    }
+{% endif %}
+    g_transfer_stats_before = *{{ aot_prefix }}_nsx_transfer_stats();
+}
+
+// After each instrumented run: the predicate must allow sleep again once the
+// run returned; then the run's evidence. Refills are printed only in a pass
+// that counts L1D refills: per unit over its issue window, per operator over
+// its run window (that operator's layer record). Overlap entries are
+// <id>:<DMA in progress at both ends>/<reads pending at both ends>. Stats are
+// the run's issues, waits and aborts, and the provider's peak pieces in
+// flight and most checks a wait used since it was bound.
+static void hpx_transfer_report(void) {
+    if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
+        g_transfer_power_clause = true;
+    }
+{% if has_armv8m_pmu %}
+    if (g_transfer_refill_slot >= 0) {
+        hpx_printf("HPX_TRANSFER_REFILLS=");
+        for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
+            hpx_printf("%s%d:%lu", u ? "," : "", u, (unsigned long)g_transfer_unit_refills[u]);
+        }
+        hpx_printf(";");
+        for (int i = 0; i < g_num_layers; i++) {
+            hpx_printf("%s%d:%lu", i ? "," : "", i,
+                       (unsigned long)g_layers[i].counters[g_transfer_refill_slot]);
+        }
+        hpx_printf("\n");
+    }
+{% endif %}
+    hpx_printf("HPX_TRANSFER_OVERLAP=");
+    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
+        hpx_printf("%s%d:%u/%u", u ? "," : "", u, (unsigned)(g_transfer_unit_overlap[u] & 1U),
+                   (unsigned)(g_transfer_unit_overlap[u] >> 1));
+    }
+    hpx_printf(";");
+    for (int i = 0; i < g_num_layers && i < kMaxLayers; i++) {
+        hpx_printf("%s%d:%u/%u", i ? "," : "", i, (unsigned)(g_transfer_op_overlap[i] & 1U),
+                   (unsigned)(g_transfer_op_overlap[i] >> 1));
+    }
+    hpx_printf("\n");
+    const {{ aot_prefix }}_nsx_transfer_stats_t *after = {{ aot_prefix }}_nsx_transfer_stats();
+    hpx_printf("HPX_TRANSFER_STATS=%lu,%lu,%lu,%lu,%lu\n",
+               (unsigned long)(after->issues - g_transfer_stats_before.issues),
+               (unsigned long)(after->waits - g_transfer_stats_before.waits),
+               (unsigned long)(after->aborts - g_transfer_stats_before.aborts),
+               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max);
+}
+{% endif %}
+#endif
+
+// Run after every loop of model_run calls, outside timing: a failed run stops
+// the capture instead of reporting the timing of whatever it left behind.{% if power_only | default(false) %}
+static void hpx_aot_check_runs(void) {
+    if (hpx_aot_status != 0) {
+        hpx_power_terminal_fail("model_run", 9U);
+    }
+}
+{% else %} With
+// a provider, a broken power clause stops it the same way.
+static void hpx_aot_check_runs(void) {
+#ifdef HPX_AOT_TRANSFER
+    if (hpx_aot_status == 0 && !g_transfer_power_clause) {
+        return;
+    }
+#else
+    if (hpx_aot_status == 0) {
+        return;
+    }
+#endif
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+{% endif %}
+#ifdef HPX_AOT_TRANSFER
+    if (hpx_aot_status == 0) {
+        hpx_printf("HPX_ERROR=transfer_power_clause\n");
+    } else {
+        const {{ aot_prefix }}_nsx_transfer_last_t *last = {{ aot_prefix }}_nsx_transfer_last();
+        hpx_printf("HPX_ERROR=model_run_failed:%ld,provider=%ld,driver=%lu,ticket=%lu\n",
+                   (long)hpx_aot_status, (long)last->error, (unsigned long)last->driver_status,
+                   (unsigned long)last->ticket);
+    }
+#else
+    hpx_printf("HPX_ERROR=model_run_failed:%ld\n", (long)hpx_aot_status);
+#endif
+    hpx_park();
+}
+{% endif %}
 {%- endblock %}
 
 {# The base emits HPX_MODEL_SIZE / HPX_ARENA_SIZE only for engines that own a
@@ -462,6 +646,9 @@ static void hpx_aot_check_runs(void) {
 {% endif %}
 {% endfor %}
 {% endif %}
+#ifdef HPX_AOT_TRANSFER
+    hpx_transfer_bind(nullptr);
+#endif
 
     // Initialize AOT model
     int32_t aot_status = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
@@ -575,6 +762,9 @@ hpx_aot_check_runs();{% endblock %}
         g_hb_iter = iter;
         g_hb_last_cyc = DWT->CYCCNT;
         g_hb_ops_since = 0;
+#ifdef HPX_AOT_TRANSFER
+        hpx_transfer_run_start();
+#endif
 {%- endblock %}
 
 {% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
@@ -582,6 +772,9 @@ hpx_aot_check_runs();{% endblock %}
                        kMaxLayers);
             hpx_park();
         }
+#ifdef HPX_AOT_TRANSFER
+        hpx_transfer_report();
+#endif
 {% if pass.group == "ethos_npu" %}
         hpx_npu_print_csv();
 {% else %}

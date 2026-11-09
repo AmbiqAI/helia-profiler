@@ -134,9 +134,38 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         value_shape="model_run_failed:<status>",
         runtime_gate="a run of the loop returned non-zero",
         has_host_hint=True,
-        note="The first failing status of the loop. The dedicated power binary "
-        "reports the same failure as the power terminal's phase model_run, "
-        "error code 9.",
+        note="The first failing status of the loop; with a bound transfer "
+        "provider the line adds `,provider=<code>,driver=<status>,ticket=<unit>` "
+        "from the provider's last failure. The dedicated power binary reports "
+        "the same failure as the power terminal's phase model_run, error code 9.",
+    ),
+    _spec(
+        error_token(FirmwareErrorCode.TRANSFER_BIND_FAILED),
+        WireKind.ERROR,
+        "The module's emitted transfer provider refused to bind before model_init.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=AOT_ENGINES,
+        condition=GATE_NOT_POWER_ONLY,
+        value_shape="transfer_bind_failed:<code>",
+        runtime_gate="the module ships <prefix>_nsx_transfer.h and its bind returned non-zero",
+        has_host_hint=True,
+        note="The dedicated power binary reports it as the power terminal's "
+        "phase transfer_bind, error code 8.",
+    ),
+    _spec(
+        error_token(FirmwareErrorCode.TRANSFER_POWER_CLAUSE),
+        WireKind.ERROR,
+        "The transfer provider's sleep predicate allowed deep sleep at the start "
+        "of a dma unit's wait, or refused it after a run returned.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=AOT_ENGINES,
+        condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h and an instrumented "
+        "run broke the clause",
+        has_host_hint=True,
+        note="Checked during instrumented runs only; reported after the loop.",
     ),
     _spec(
         error_token(FirmwareErrorCode.NPU_INIT_FAILED),

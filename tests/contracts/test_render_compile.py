@@ -103,6 +103,7 @@ from .fixture_compile_cases import (  # noqa: E402
     FIXTURE_KIND_ENGINES,
     FIXTURE_SCOPES,
     aot_model_stub,
+    aot_transfer_headers,
     render_fixture,
 )
 
@@ -333,6 +334,44 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    # A module that emitted its transfer provider: every heliaAOT render above
+    # compiles without the provider header, these with it, so the bind, the
+    # evidence and the provider-aware checks reach the gate (#676).
+    transfer_regions = [
+        {
+            "region_id": 0,
+            "placement": "tcm",
+            "alignment": 64,
+            "size": 4096,
+            "blob_filename": None,
+            "role": "scratch",
+        },
+        {
+            "region_id": 1,
+            "placement": "psram",
+            "alignment": 64,
+            "size": 8192,
+            "blob_filename": "constants.bin",
+            "role": "constant",
+        },
+    ]
+    for transport, power_only in (("rtt", False), ("swo", False), ("rtt", True)):
+        cases.append(
+            _CompileCase(
+                case_id=f"apollo510|{transport}|helia-aot|transfer"
+                + ("|power" if power_only else ""),
+                text=_render(
+                    "apollo510",
+                    transport,
+                    "helia-aot",
+                    power_only=power_only,
+                    overrides={"arena_regions": transfer_regions},
+                ),
+                vars=_common_kwargs("apollo510", transport),
+                headers=aot_transfer_headers(),
+            )
+        )
+
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
     # exactly as firmware/__init__.py renders it.
@@ -367,7 +406,10 @@ def _dedup(cases: list[_CompileCase]) -> list[_CompileCase]:
     failure names every scenario it covers."""
     by_digest: dict[str, _CompileCase] = {}
     for case in cases:
-        digest = hashlib.sha256(case.text.encode("utf-8")).hexdigest()
+        unit = case.text + "".join(
+            f"\0{name}\0{text}" for name, text in sorted(case.headers.items())
+        )
+        digest = hashlib.sha256(unit.encode("utf-8")).hexdigest()
         if digest in by_digest:
             by_digest[digest].aliases.append(case.case_id)
         else:
@@ -462,9 +504,10 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     if '#include "model_data.h"' in case.text:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
-        (case_dir / "fake_model.h").write_text(
-            aot_model_stub(external_arenas="deployment_psram_weights" in case.text)
-        )
+        if "fake_model.h" not in case.headers:
+            (case_dir / "fake_model.h").write_text(
+                aot_model_stub(external_arenas="deployment_psram_weights" in case.text)
+            )
         (case_dir / "fake_common.h").write_text(_AOT_COMMON_STUB)
     for region_id in set(_CONST_BLOB_INCLUDE.findall(case.text)):
         (case_dir / f"hpx_const_blob_{region_id}.h").write_text(_const_blob_stub(region_id))
@@ -627,6 +670,35 @@ def test_gate_fails_on_an_unused_local_variable(tmp_path):
     assert result.returncode != 0, "gate passed a TU with an unused local variable"
     assert "hpx_orphaned_by_injection" in result.stderr
     assert "-Wunused-variable" in result.stderr or "unused" in result.stderr
+
+
+@pytest.mark.parametrize("power_only", [False, True])
+def test_transfer_cases_compile_the_provider_code(tmp_path, power_only):
+    """The transfer cases reach the code under __has_include, so a provider
+    header missing what that code calls fails them (#676)."""
+    (case,) = [
+        case
+        for case in _build_cases()
+        if case.case_id == "apollo510|rtt|helia-aot|transfer" + ("|power" if power_only else "")
+    ]
+    restored = _compile(_prepare_case_dir(case, tmp_path / "ok"), _part_define(case.vars))
+    assert restored.returncode == 0, restored.stderr
+    declaration = (
+        "int32_t fake_nsx_transfer_bind("
+        if power_only
+        else "bool fake_nsx_transfer_can_sleep(void);"
+    )
+    header = case.headers["fake_nsx_transfer.h"]
+    assert declaration in header
+    case.headers = {
+        **case.headers,
+        "fake_nsx_transfer.h": header.replace(declaration, "int32_t hpx_removed_for_test("),
+    }
+    broken = _compile(_prepare_case_dir(case, tmp_path / "broken"), _part_define(case.vars))
+    assert broken.returncode != 0
+    assert ("fake_nsx_transfer_bind" if power_only else "fake_nsx_transfer_can_sleep") in (
+        broken.stderr
+    )
 
 
 @pytest.mark.parametrize("engine", FIXTURE_ENGINES)

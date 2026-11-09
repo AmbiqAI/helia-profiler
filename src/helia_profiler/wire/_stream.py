@@ -19,6 +19,7 @@ from ._model import (
     GATE_HAS_ETHOS_U,
     GATE_NOT_POWER_ONLY,
     GATE_NOT_STIMER_WINDOW,
+    GATE_PMU_PROFILE,
     GATE_POWER_ONLY,
     GATE_PSRAM_METADATA,
     GATE_PSRAM_WEIGHTS_UPLOAD,
@@ -823,6 +824,53 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         value_shape="cycles",
         note="Zero here means a powered-down or frozen PMU, which would "
         "otherwise produce plausible-looking all-zero layer data.",
+    ),
+    _spec(
+        WireKey.TRANSFER_REFILLS.wire,
+        WireKind.KEY_VALUE,
+        "L1D cache refills per transfer unit over its issue window, and per "
+        "operator over its run window, in one instrumented run.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_REFILLS,
+        engines=AOT_ENGINES,
+        condition=GATE_PMU_PROFILE,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h and the pass counts "
+        "ARM_PMU_L1D_CACHE_REFILL",
+        value_shape="<unit>:<refills>,...;<op>:<refills>,...",
+        note="Shows whether the run's reads of PSRAM reached the MSPI controller "
+        "rather than the D-cache.",
+    ),
+    _spec(
+        WireKey.TRANSFER_OVERLAP.wire,
+        WireKind.KEY_VALUE,
+        "Per transfer unit's issue and per operator's run in one instrumented "
+        "run: whether the MSPI controller's DMA was in progress, and whether "
+        "nsx-psram had reads pending, at both ends.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_OVERLAP,
+        engines=AOT_ENGINES,
+        condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h",
+        value_shape="<unit>:<dma>/<pending>,...;<op>:<dma>/<pending>,...",
+        note="Each flag is 1 only when set at both ends; a failed read of the "
+        "DMA-in-progress bit counts as clear.",
+    ),
+    _spec(
+        WireKey.TRANSFER_STATS.wire,
+        WireKind.KEY_VALUE,
+        "The transfer provider's counts for one instrumented run.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_STATS,
+        engines=AOT_ENGINES,
+        condition=GATE_NOT_POWER_ONLY,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h",
+        value_shape="<issues>,<waits>,<aborts>,<peak_in_flight>,<wait_checks_max>",
+        note="Issues, waits and aborts are the run's own; the peak pieces in "
+        "flight and the most checks a wait used are the provider's since it "
+        "was bound.",
     ),
 )
 
