@@ -373,3 +373,38 @@ def test_native_custom_corrected_shutdown_assumption_refuses_saved_replay(tmp_pa
     with pytest.raises(ConfigError, match="different run"):
         restored.config()
     assert FrozenRun.from_dict(plan.to_dict()).config().platform_registry == cfg.platform_registry
+
+
+@pytest.mark.parametrize("restored_soc", ["apollo330P", "apollo510L"])
+def test_supported_descendant_recovers_ancestor_shutdown_eligibility(tmp_path, restored_soc):
+    cfg = native_radio_config(
+        tmp_path,
+        soc="apollo330P",
+        declarations={
+            "child_chip": {
+                "based_on": "native",
+                "c_define": "AM_PART_APOLLO510",
+                "cmsis_header": "apollo510.h",
+            },
+            "leaf": {
+                "based_on": "child_chip",
+                "c_define": "AM_PART_" + restored_soc.upper(),
+                "cmsis_header": restored_soc + ".h",
+            },
+        },
+    )
+    soc = config_platform(cfg).soc
+    assert soc.has_radio_subsystem
+    templates = Path(helia_profiler.__file__).parent / "firmware/templates"
+    rendered = (
+        Environment(loader=FileSystemLoader(templates))
+        .get_template("_crypto_otp_shutdown.j2")
+        .render(
+            power_only=True, crypto_otp_shutdown=True, has_radio_subsystem=soc.has_radio_subsystem
+        )
+    )
+    assert "am_hal_pwrctrl_rss_pwroff();" in rendered
+    plan = freeze_config(cfg)
+    assert (
+        FrozenRun.from_dict(plan.to_dict()).intent_hash == freeze_config(plan.config()).intent_hash
+    )

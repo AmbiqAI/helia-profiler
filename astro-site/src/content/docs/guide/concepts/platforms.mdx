@@ -45,7 +45,9 @@ and the Blue board's radio-reset BSP wiring are also retained separately.
 hardware facts or new hardware qualification. RSS shutdown additionally requires
 both a declared radio subsystem and a known supporting SDK header route;
 physical radio topology alone cannot enable a HAL call. Legacy custom children
-recheck that support after applying SDK part/header overrides.
+recheck that support after applying SDK part/header overrides. An unsupported
+intermediate route does not erase inherited shutdown eligibility: a later
+descendant can select a supported route again.
 
 `MemoryLayout` records physical capacities for HPX's selected logical banks,
 including fitted board PSRAM. It does not subtract linker reservations. The

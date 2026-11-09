@@ -143,6 +143,7 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
         raise ConfigError("target.custom_socs must be a mapping of name -> definition")
 
     custom: dict[str, SocDef] = {}
+    shutdown_eligibility: dict[str, bool] = {}
     for name, spec in raw.items():
         if not isinstance(spec, dict):
             raise ConfigError(f"target.custom_socs.{name} must be a mapping")
@@ -211,6 +212,9 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             ),
         )
         if base_soc is not None and not base_soc.is_builtin:
+            # SDK overrides must not erase the ancestor's shutdown eligibility.
+            eligible = shutdown_eligibility.get(based_on, base_soc.has_radio_subsystem)
+            shutdown_eligibility[name] = eligible
             # Builtin-derived declarations retain their established default policy.
             custom[name] = replace(
                 custom[name],
@@ -218,7 +222,7 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
                 has_usb=base_soc.has_usb,
                 ssram_full_power_enum=base_soc.ssram_full_power_enum,
                 has_radio_subsystem=(
-                    base_soc.has_radio_subsystem
+                    eligible
                     and rss_power_off_available(custom[name].c_define, custom[name].cmsis_header)
                 ),
                 catalog_has_dcache=base_soc.catalog_has_dcache,
