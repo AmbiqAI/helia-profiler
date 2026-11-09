@@ -477,7 +477,7 @@ static void hpx_transfer_report(void) {
                    (unsigned)(g_transfer_unit_overlap[u] >> 1));
     }
     hpx_printf(";");
-    for (int i = 0; i < g_num_layers && i < kMaxLayers; i++) {
+    for (int i = 0; i < g_num_layers; i++) {
         hpx_printf("%s%d:%u/%u", i ? "," : "", i, (unsigned)(g_transfer_op_overlap[i] & 1U),
                    (unsigned)(g_transfer_op_overlap[i] >> 1));
     }
