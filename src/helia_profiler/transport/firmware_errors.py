@@ -47,12 +47,16 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.MODEL_INIT_FAILED: (
         "heliaAOT model init returned a non-zero status.  Check that the "
         "generated module was built against the correct board and that any "
-        "required memories (PSRAM, SHARED_SRAM) are initialised."
+        "required memories (PSRAM, SHARED_SRAM) are initialised.  300 means "
+        "the module has dma transfer units and no transfer provider is bound: "
+        "hpx binds only the provider heliaAOT emits beside a module.type nsx "
+        "module (module.transfer_provider auto); convert that way, or with cpu "
+        "transfer units."
     ),
     FirmwareErrorCode.MODEL_RUN_FAILED: (
         "A heliaAOT model run failed, so no timing from that loop is "
-        "reported.  For a module with dma transfer units: 300 means no "
-        "transfer provider is bound; 301 means a transfer failed, with the "
+        "reported.  For a module with dma transfer units: 301 means a "
+        "transfer failed, with the "
         "provider's own code as provider= and the nsx-psram status as "
         "driver= (provider 319 with driver NSX_PSRAM_STATUS_BUSY means another "
         "nsx-psram client or a blocking call held the queue: retry the run); "
