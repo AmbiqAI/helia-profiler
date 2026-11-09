@@ -7,7 +7,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts, HeliaRtArtifacts
-from helia_profiler.errors import PlatformError
+from helia_profiler.errors import ImageTooLargeError, PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
@@ -326,7 +326,7 @@ class TestPlanMemorySynthesise:
         assert ctx.memory_plan is not None
         platform = ctx.run_metadata.platform_provenance
         assert platform is not None and platform.expected_linker is not None
-        with pytest.raises(PlatformError, match="MRAM"):
+        with pytest.raises(ImageTooLargeError, match="MRAM"):
             admit_memory_plan(ctx.memory_plan, platform.expected_linker)
 
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(self, tmp_path: Path):
@@ -477,6 +477,16 @@ class TestPlanMemoryEngineProvided:
 
 
 class TestPlanMemoryOverflow:
+    def test_weights_over_mram_is_too_large(self, tmp_path: Path):
+        overrides = {"model": {"path": str(tmp_path / "model.tflite"), "weights_location": "mram"}}
+        ctx = _make_ctx(tmp_path, overrides)
+        (tmp_path / "model.tflite").write_bytes(b"\x00" * 8 * 1024 * 1024)
+
+        with pytest.raises(ImageTooLargeError, match="Memory plan does not fit") as exc_info:
+            PlanMemoryStage().run(ctx)
+
+        assert "MRAM" in str(exc_info.value)
+
     def test_oversubscribed_region_raises(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         # Apollo510 DTCM is 508 KB; request far more.

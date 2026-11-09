@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from .errors import PlatformError
+from .errors import ImageTooLargeError, PlatformError
 from .platform.linker.model import LinkerInput
 from .platform.placement import (
     SRAM_PLACEMENT_SLACK_BYTES,
@@ -87,7 +87,9 @@ def admit_memory_plan(plan: MemoryPlan, layout: LinkerInput) -> MemoryPlan:
             raise PlatformError("Fixed stack reservation exceeds modelled region usage")
         capacity = region_capacity(usage.region, usage.capacity, layout)
         if used > capacity:
-            raise PlatformError(
+            # MRAM overflow: the board is too small.
+            too_large = usage.region == MemoryRegion.MRAM
+            raise (ImageTooLargeError if too_large else PlatformError)(
                 f"{usage.region}: {used} B modelled usage exceeds the contiguous application "
                 f"budget of {capacity} B ({layout.script.path})",
                 hint="Reduce the requested arena/weights or select another explicit placement. "

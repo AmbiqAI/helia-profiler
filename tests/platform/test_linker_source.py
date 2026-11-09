@@ -314,7 +314,7 @@ def test_profile_and_each_power_rebuild_refresh_sources_under_the_mutex(linked_p
 
 def test_actual_source_admission_refuses_before_link(linked_pipeline):
     from helia_profiler.engines import EngineType
-    from helia_profiler.errors import PlatformError
+    from helia_profiler.errors import ImageTooLargeError
     from helia_profiler.firmware import build_app
     from helia_profiler.platform.placement import MemoryRegion
     from helia_profiler.results import MemoryConsumer, MemoryPlan, MemoryRegionUsage
@@ -329,7 +329,7 @@ def test_actual_source_admission_refuses_before_link(linked_pipeline):
         ),
     )
     ctx.declared_memory_plan = ctx.memory_plan
-    with pytest.raises(PlatformError, match="application budget of 4128768 B"):
+    with pytest.raises(ImageTooLargeError, match="application budget of 4128768 B"):
         build_app(ctx)
     assert events == ["mutex-enter", "prepare", "configure", "current-lock", "mutex-exit"]
 

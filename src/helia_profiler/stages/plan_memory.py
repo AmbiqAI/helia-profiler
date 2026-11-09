@@ -15,7 +15,8 @@ Two responsibilities:
    synthesise a single-arena plan from arena/model sizes and the
    resolved placement.  Each region is then sized against the SoC's
    ``MemoryLayout`` and any overflow raises ``PlatformError`` with an
-   actionable hint *before* firmware is built.
+   actionable hint *before* firmware is built. An overflow of MRAM alone
+   raises ``ImageTooLargeError`` instead, so ``hpx validate`` skips the case.
 
 Auto policy (greedy fastest-fit, arena prioritized over weights):
 
@@ -37,7 +38,7 @@ import logging
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import PlatformError
+from ..errors import ImageTooLargeError, PlatformError
 from ..pipeline import PipelineContext
 from ..placement import (
     ArenaRole,
@@ -323,7 +324,9 @@ class PlanMemoryStage:
             "  * reduce model size (quantise / prune); or\n"
             "  * pick a larger-memory board."
         )
-        raise PlatformError(
+        # Weights over MRAM: the board is too small.
+        too_large = all(r.region == MemoryRegion.MRAM for r in offenders)
+        raise (ImageTooLargeError if too_large else PlatformError)(
             f"Memory plan does not fit:\n{detail}",
             hint=hint,
         )
