@@ -647,10 +647,12 @@ static void hpx_transfer_probe_recover(uint32_t pending) {
 {% endif %}
         }
 {% include "_psram_metadata.j2" %}
-        // Stack PSRAM-placed arenas at successive 64-byte aligned offsets.
+        // Stack PSRAM-placed arenas at their alignment and on 32-byte D-cache
+        // lines, so cache maintenance of one arena's range never touches
+        // another's bytes.
         uint32_t psram_off = 0;
-{% for region in psram_arena_regions %}
-        psram_off = (psram_off + {{ region.alignment }} - 1u) & ~({{ region.alignment }}u - 1u);
+{% for region in psram_arena_regions %}{% set line_aligned = [region.alignment, 32] | max %}
+        psram_off = (psram_off + {{ line_aligned }} - 1u) & ~({{ line_aligned }}u - 1u);
 {% if region.blob_filename %}
         hpx_arena_psram_offset_{{ region.region_id }} = psram_off;
 {% endif %}
@@ -711,6 +713,11 @@ static void hpx_transfer_probe_recover(uint32_t pending) {
                (unsigned)hpx_const_blob_{{ region.region_id }}_len);
 {% endif %}
 {% endfor %}
+{% if psram_arena_regions | selectattr("blob_filename") | list %}
+    // The constants reached PSRAM by DMA, which leaves any XIP copy of their
+    // range in the D-cache stale: clean and invalidate it before the first run.
+    HPX_CACHE_SYNC_SHARED_DATA();
+{% endif %}
 {% endif %}
 #ifdef HPX_AOT_TRANSFER
     hpx_transfer_bind(nullptr);
