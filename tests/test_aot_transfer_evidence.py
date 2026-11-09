@@ -356,7 +356,7 @@ def test_the_probe_brackets_only_the_first_instrumented_run():
     assert "hpx_transfer_probe_recover" not in _render_aot(transport="rtt")
 
 
-_POOL_REGIONS = [
+_POOL_REGIONS: list[dict[str, object]] = [
     {
         "region_id": 0,
         "placement": "tcm",
