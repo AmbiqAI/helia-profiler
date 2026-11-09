@@ -16,6 +16,7 @@ from .memory_map import LinkFamily, MemoryRegion, linked_memory_map
 from .policy import BOARD_POLICIES, CORE_CLOCKED_PROBES, PROBE_CLOCK_COMPAT, SOC_POLICIES, SocPolicy
 from .provenance import CatalogProvenance, CatalogSource, TargetSelection
 from .sdk_descriptor import apollo5b_descriptor
+from .sdk_facts import rss_power_off_available
 from .soc import ClockDomain, ClockSpeed, CoreArch, MemoryLayout, PmuTier, SocDef, SocOrigin
 
 if TYPE_CHECKING:
@@ -203,7 +204,10 @@ def _soc(
         swo_trace_clock_mhz=int(trace) if trace is not None else None,
         has_usb=policy.usb,
         ssram_full_power_enum=sdk.hal_enums.get("ssram_full_power", "AM_HAL_PWRCTRL_SRAM_3M"),
-        has_radio_subsystem=any(c.role == "radio" for c in target.cores()),
+        has_radio_subsystem=(
+            any(c.role == "radio" for c in target.cores())
+            and rss_power_off_available(sdk.c_define, sdk.cmsis_header)
+        ),
         npu=target.npu.npu.accelerator_config if target.npu else None,
         catalog_target_id=target.id,
         catalog_app_flash_load_addr=target.flash_load_address(),
@@ -259,5 +263,13 @@ def application_regions(selection: TargetSelection) -> tuple[ApplicationRegion, 
             if region.name in ranges and selection.boot is not None
             else None
         )
-        result.append(ApplicationRegion(region.name, logical, intervals))
+        address = (
+            access.address if access is not None and access.address is not None else region.base
+        )
+        aperture = (
+            MemoryRange(address, region.size)
+            if logical is MemoryRegion.PSRAM and address is not None
+            else None
+        )
+        result.append(ApplicationRegion(region.name, logical, intervals, aperture))
     return tuple(result)

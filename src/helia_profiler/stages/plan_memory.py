@@ -672,6 +672,27 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
     expected = platform.expected_linker if platform is not None else None
     capacities = placement_capacities(soc, expected)
 
+    if (
+        soc is not None
+        and soc.memory.psram_kb > 0
+        and capacities.psram == 0
+        and Placement.PSRAM in (cfg.model.arena_location, cfg.model.weights_location)
+    ):
+        entry = (
+            next((r for r in expected.regions if r.region is MemoryRegion.PSRAM), None)
+            if expected is not None
+            else None
+        )
+        if entry is None or entry.allowed is None:
+            raise PlatformError(
+                "PSRAM is declared, but its address/application admission is unavailable.",
+                hint="A supported core-address range is required for this PSRAM placement.",
+            )
+        raise PlatformError(
+            "PSRAM is declared, but no usable application interval remains.",
+            hint="Select another explicit placement; reserved space is not available capacity.",
+        )
+
     arena_size = int(cfg.model.arena_size or DEFAULT_ARENA_SIZE_BYTES)
     try:
         model_size = int(cfg.model.path.stat().st_size)
