@@ -123,6 +123,22 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         has_host_hint=True,
     ),
     _spec(
+        error_token(FirmwareErrorCode.MODEL_RUN_FAILED),
+        WireKind.ERROR,
+        "A heliaAOT model_run() returned a non-zero status; reported after the "
+        "loop of runs it belongs to, outside timing.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=AOT_ENGINES,
+        condition=GATE_NOT_POWER_ONLY,
+        value_shape="model_run_failed:<status>",
+        runtime_gate="a run of the loop returned non-zero",
+        has_host_hint=True,
+        note="The first failing status of the loop. The dedicated power binary "
+        "reports the same failure as the power terminal's phase model_run, "
+        "error code 9.",
+    ),
+    _spec(
         error_token(FirmwareErrorCode.NPU_INIT_FAILED),
         WireKind.ERROR,
         "Ethos-U NPU bring-up (nsx_npu_init) failed before any engine work.",

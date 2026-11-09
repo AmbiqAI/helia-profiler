@@ -99,6 +99,8 @@ static HpxLayerRecord g_layers[kMaxLayers];
 {% endif %}
 static int g_num_layers = 0;
 static bool g_layer_capacity_exceeded = false;
+// The first non-zero model_run status since the last check.
+static int32_t hpx_aot_status = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
 static const char* g_counter_names[kMaxEvents] = {};
@@ -293,6 +295,23 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
     .callback = model_operator_cb,
     .user_data = nullptr
 };
+
+// Run after every loop of model_run calls, outside timing: a failed run stops
+// the capture instead of reporting the timing of whatever it left behind.
+static void hpx_aot_check_runs(void) {
+    if (hpx_aot_status == 0) {
+        return;
+    }
+{% if power_only | default(false) %}
+    hpx_power_terminal_fail("model_run", 9U);
+{% else %}
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+{% endif %}
+    hpx_printf("HPX_ERROR=model_run_failed:%ld\n", (long)hpx_aot_status);
+    hpx_park();
+{% endif %}
+}
 {%- endblock %}
 
 {# The base emits HPX_MODEL_SIZE / HPX_ARENA_SIZE only for engines that own a
@@ -486,7 +505,10 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
         }{% endblock %}
 
-{% block engine_invoke %}{{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);{% endblock %}
+{% block engine_invoke %}{ int32_t s = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx); if (s != 0 && hpx_aot_status == 0) { hpx_aot_status = s; } }{% endblock %}
+
+{% block engine_runs_check %}
+hpx_aot_check_runs();{% endblock %}
 
 {% block engine_window_prologue %}
         // model_operator_cb() is a no-op during this window (guarded by

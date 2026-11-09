@@ -978,6 +978,7 @@ def test_error_code_catalogue():
         "bind_arena_failed",
         "const_blob_psram_write_failed",
         "model_init_failed",
+        "model_run_failed",
         "npu_init_failed",
         "executorch",
         "operator_count_exceeds_capacity",

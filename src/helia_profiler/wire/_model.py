@@ -219,6 +219,7 @@ class FirmwareErrorCode(StrEnum):
     BIND_ARENA_FAILED = "bind_arena_failed"
     CONST_BLOB_PSRAM_WRITE_FAILED = "const_blob_psram_write_failed"
     MODEL_INIT_FAILED = "model_init_failed"
+    MODEL_RUN_FAILED = "model_run_failed"
     NPU_INIT_FAILED = "npu_init_failed"
     EXECUTORCH = "executorch"
     OPERATOR_COUNT_EXCEEDS_CAPACITY = "operator_count_exceeds_capacity"

@@ -420,7 +420,11 @@ int main(void) {
             }
 {%- endif %}
         }
-{%- endif %}
+{%- endif %}{# engine_runs_check -- a region after every loop of inferences (this
+   clean warm-up, the clean window, and each pass's warm-up and profiled
+   iterations), outside timing, where an engine whose invoke returns a status
+   reports the first failure. Its content leads with a newline and
+   carries no indentation of its own: each site indents it. #}{% filter indent(8) %}{% block engine_runs_check %}{% endblock %}{% endfilter %}
 {%- if auto_window %}
         // Adaptive clean-window sizing: run enough gated iterations to fill
         // ~{{ window_target_ms }} ms of wall-time, clamped to
@@ -827,7 +831,7 @@ int main(void) {
                            (unsigned long)clean_avg_us);
             }
 {% endif %}
-        }{% endblock %}
+        }{% endblock %}{{ self.engine_runs_check() | indent(8) }}
 {% if power_only | default(false) %}
 {% include "_power_terminal_success.j2" with context %}
 {% endif %}
@@ -865,7 +869,7 @@ int main(void) {
     for (int w = 0; w < {{ warmup }}; w++) {
 {{ self.engine_reset_inputs() }}
         {{ self.engine_invoke() }}
-    }
+    }{{ self.engine_runs_check() | indent(4) }}
     hpx_printf("HPX_HEARTBEAT phase=warmup_done pass={{ loop.index0 }}\n");
 
     // Profiled iterations — per-layer PMU instrumentation (no GPIO sync; the
@@ -894,7 +898,7 @@ int main(void) {
         // measurements.
         hpx_rtt_set_nonblocking();
 {% endif %}
-    }
+    }{{ self.engine_runs_check() | indent(4) }}
 
 {% if transport == "usb_cdc" %}
     usb_timer_resume();

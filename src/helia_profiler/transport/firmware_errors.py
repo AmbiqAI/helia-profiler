@@ -49,6 +49,17 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "generated module was built against the correct board and that any "
         "required memories (PSRAM, SHARED_SRAM) are initialised."
     ),
+    FirmwareErrorCode.MODEL_RUN_FAILED: (
+        "A heliaAOT model run failed, so no timing from that loop is "
+        "reported.  For a module with dma transfer units: 300 means no "
+        "transfer provider is bound; 301 means a transfer failed, with the "
+        "provider's own code as provider= and the nsx-psram status as "
+        "driver= (provider 319 with driver NSX_PSRAM_STATUS_BUSY means another "
+        "nsx-psram client or a blocking call held the queue: retry the run); "
+        "302 means the provider's abort failed and the module needs the "
+        "provider's reset, then model_init.  Other codes are the module's own "
+        "status codes (see its generated tensors header)."
+    ),
     FirmwareErrorCode.NPU_INIT_FAILED: (
         "Ethos-U NPU bring-up failed before any inference ran.  On FPGA "
         "targets this almost always means the loaded bitstream's generation "

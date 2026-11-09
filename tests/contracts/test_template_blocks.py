@@ -103,6 +103,7 @@ def test_base_blocks_are_the_documented_set():
         "engine_psram_metadata",
         "engine_reset_inputs",
         "engine_reset_inputs_warm",
+        "engine_runs_check",
         "engine_start_metadata",
         "engine_window_prologue",
         "engine_window_restore",
@@ -112,7 +113,7 @@ def test_base_blocks_are_the_documented_set():
 def test_base_block_count_is_pinned():
     """Belt to the set assertion's braces: a rename that swaps one name for
     another keeps the count, but an accidental extra seam does not."""
-    assert len(_blocks(BASE)) == 27
+    assert len(_blocks(BASE)) == 28
 
 
 #: Blocks every engine must supply: the base renders nothing (or nothing
@@ -160,6 +161,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_profiled_summary",
         "engine_profiler_on",
         "engine_psram_metadata",
+        "engine_runs_check",
         "engine_window_prologue",
         "engine_window_restore",
     }
@@ -282,6 +284,7 @@ LEADING_NEWLINE_BLOCKS = {
     "engine_profiled_summary",
     "engine_profiler_on",
     "engine_psram_metadata",
+    "engine_runs_check",
     "engine_start_metadata",
     "engine_window_prologue",
 }
