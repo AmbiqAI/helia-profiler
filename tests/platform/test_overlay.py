@@ -190,11 +190,14 @@ def test_unchanged_overlay_roundtrips_with_same_intent_and_resolved_config(tmp_p
     assert loaded.intent_hash == freeze_config(loaded.config()).intent_hash
 
 
-def test_new_absent_field_does_not_invalidate_retained_builtin_plan(tmp_path):
+def test_new_absent_field_does_not_invalidate_retained_builtin_plan(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[2]
     build = json.loads((root / "examples/results/run-api-synthetic/build.json").read_text())
     old = FrozenRun.from_dict(build["plan"])
     assert "platform_overlay" not in old.settings["target"]
+    assert old.runtime is not None and old.runtime.name == "helia-aot"
+    source = {"version": old.runtime.version, "commit": old.runtime.source_commit}
+    monkeypatch.setattr("helia_profiler.results.dependencies.installed_aot_source", lambda: source)
     model = root / "examples/results/run-api-synthetic/inputs/tiny_cnn.tflite"
     cfg = old.config(model=model)
     assert cfg.target.platform_overlay is None
