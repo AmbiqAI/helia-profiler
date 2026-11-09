@@ -758,3 +758,16 @@ def test_settling_zero_cycles_on_first_iteration_filtered():
     lines.append("--- HPX_END ---")
     layers = parse_firmware_output(lines).layers
     assert [layer.cycles for layer in layers] == [905, 51]
+
+
+def test_digests_bytes_and_transfer_lines_keep_the_printed_strings():
+    from helia_profiler.capture.parser import _meta_value
+
+    assert _meta_value("output_0_fnv1a64", "0012345678901234") == "0012345678901234"
+    assert _meta_value("input_3_fnv1a64", "0000000000000001") == "0000000000000001"
+    assert _meta_value("output_0_hex", "0000") == "0000"
+    assert _meta_value("transfer_recovery", "0") == "0"
+    assert _meta_value("transfer_stats", "3,1,0,2,7,1") == "3,1,0,2,7,1"
+    assert _meta_value("input_0_size", "490") == 490
+    assert _meta_value("output_size", "12") == 12
+    assert _meta_value("num_inputs", "1") == 1
