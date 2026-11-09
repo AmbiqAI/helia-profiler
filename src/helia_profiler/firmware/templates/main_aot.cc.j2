@@ -847,7 +847,21 @@ hpx_aot_check_runs();{% endblock %}
             hpx_transfer_bind(&hpx_probe_options);
         }{% endif %}
         hpx_transfer_run_start();
-#endif
+#endif{% set pool_regions = [] if allocate_arenas else arena_regions | selectattr("role", "equalto", "pool") | list %}{% if pool_regions %}
+#if {{ aot_prefix }}_num_dma_units > 0
+        // With dma units: a piece that lands late shows in the outputs as
+        // 0x5A, and every constant read of the run reaches the MSPI controller
+        // rather than lines an earlier run left in the D-cache.
+{% for region in pool_regions %}
+        memset(hpx_arena_buf_{{ region.region_id }}, 0x5A, {{ region.size }}U);
+{% endfor %}
+{% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
+        {
+            am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
+            (void)am_hal_cachectrl_dcache_invalidate(&hpx_range, true);
+        }
+{% endfor %}
+#endif{% endif %}
 {%- endblock %}
 
 {% block engine_print_csv %}{% if transfer_timeout_probe and loop.index0 == 0 %}#ifdef HPX_AOT_TRANSFER

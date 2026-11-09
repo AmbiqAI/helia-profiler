@@ -27,6 +27,19 @@ static inline uint32_t am_hal_stimer_counter_get(void) { return 0U; }
 #if defined(AM_PART_APOLLO510) || defined(PART_atomiq110)
 static inline uint32_t am_hal_debug_enable(void) { return 0U; }
 static inline uint32_t am_hal_debug_disable(void) { return 0U; }
+
+// --- D-cache range maintenance (am_hal_cachectrl.h) ----------------------
+typedef struct {
+    uint32_t ui32StartAddr;
+    uint32_t ui32Size;
+} am_hal_cachectrl_range_t;
+
+static inline uint32_t am_hal_cachectrl_dcache_invalidate(am_hal_cachectrl_range_t *pRange,
+                                                          bool bClean) {
+    (void)pRange;
+    (void)bClean;
+    return 0U;
+}
 #endif  // AP5 parts
 
 // --- Burst mode (Apollo3 only; mirrors am_hal_burst.h) -------------------

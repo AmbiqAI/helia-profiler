@@ -336,7 +336,8 @@ def _build_cases() -> list[_CompileCase]:
 
     # A module that emitted its transfer provider: every heliaAOT render above
     # compiles without the provider header, these with it, so the bind, the
-    # evidence and the provider-aware checks reach the gate (#676).
+    # evidence, the provider-aware checks and the stream pool's per-run poison
+    # and constant invalidate reach the gate (#676).
     transfer_regions = [
         {
             "region_id": 0,
@@ -353,6 +354,14 @@ def _build_cases() -> list[_CompileCase]:
             "size": 8192,
             "blob_filename": "constants.bin",
             "role": "constant",
+        },
+        {
+            "region_id": 2,
+            "placement": "tcm",
+            "alignment": 4096,
+            "size": 8192,
+            "blob_filename": None,
+            "role": "pool",
         },
     ]
     for transport, power_only, probe in (

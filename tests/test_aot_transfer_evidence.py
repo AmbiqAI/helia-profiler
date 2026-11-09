@@ -354,3 +354,107 @@ def test_the_probe_brackets_only_the_first_instrumented_run():
     # One pass in this render: the probe belongs to its first iteration only.
     assert source.count("hpx_probe_options = {1U, 0U};") == 1
     assert "hpx_transfer_probe_recover" not in _render_aot(transport="rtt")
+
+
+_POOL_REGIONS = [
+    {
+        "region_id": 0,
+        "placement": "tcm",
+        "alignment": 16,
+        "size": 64,
+        "blob_filename": None,
+        "role": "scratch",
+    },
+    {
+        "region_id": 1,
+        "placement": "psram",
+        "alignment": 32,
+        "size": 4100,
+        "blob_filename": "c.bin",
+        "role": "constant",
+    },
+    {
+        "region_id": 2,
+        "placement": "tcm",
+        "alignment": 4096,
+        "size": 48,
+        "blob_filename": None,
+        "role": "pool",
+    },
+    {
+        "region_id": 3,
+        "placement": "psram",
+        "alignment": 32,
+        "size": 256,
+        "blob_filename": None,
+        "role": "scratch",
+    },
+]
+
+
+def _poison_block(source: str) -> str:
+    start = source.index("#if fake_num_dma_units > 0")
+    return source[start : source.index("#endif\n", start) + len("#endif\n")]
+
+
+def test_each_instrumented_run_poisons_the_pool_and_invalidates_psram_constants():
+    source = _render_aot(transport="rtt", arena_region="psram", arena_regions=_POOL_REGIONS)
+    block = _poison_block(source)
+    assert source.count("#if fake_num_dma_units > 0") == 1
+    timed = source.index("uint32_t infer_start_cyc = DWT->CYCCNT;")
+    assert source.rindex("g_hb_ops_since = 0;", 0, timed) < source.index(block) < timed
+    assert "memset(hpx_arena_buf_2, 0x5A, 48U);" in block
+    assert block.count("memset(") == 1
+    assert block.count("am_hal_cachectrl_dcache_invalidate(") == 1
+    assert "hpx_arena_buf_1, 4100U" in block
+    without_pool = _render_aot(
+        transport="rtt", arena_region="psram", arena_regions=_POOL_REGIONS[:2] + _POOL_REGIONS[3:]
+    )
+    assert "fake_num_dma_units" not in without_pool
+    assert "0x5A" not in without_pool
+
+
+@pytest.mark.parametrize("dma_units", [0, 3])
+def test_the_poison_and_invalidate_run_only_with_dma_units(tmp_path: Path, dma_units: int):
+    compiler = shutil.which("c++")
+    if compiler is None:
+        pytest.skip("host C++ compiler required")
+    source = _render_aot(transport="rtt", arena_region="psram", arena_regions=_POOL_REGIONS)
+    program = (
+        r"""
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+"""
+        + f"#define fake_num_dma_units {dma_units}\n"
+        + r"""
+typedef struct { uint32_t ui32StartAddr; uint32_t ui32Size; } am_hal_cachectrl_range_t;
+static am_hal_cachectrl_range_t invalidated[4];
+static int invalidations = 0;
+static uint32_t am_hal_cachectrl_dcache_invalidate(am_hal_cachectrl_range_t *range, bool clean) {
+    if (clean) invalidated[invalidations++] = *range;
+    return 0U;
+}
+static uint8_t pool[48], constants[4100];
+static uint8_t *hpx_arena_buf_1 = constants, *hpx_arena_buf_2 = pool;
+int main() {
+"""
+        + _poison_block(source)
+        + r"""
+    int poisoned = 0;
+    for (uint8_t byte : pool) poisoned += byte == 0x5A;
+    std::printf("%d %d %d %d\n", poisoned, invalidations,
+                invalidations ? (int)(invalidated[0].ui32StartAddr == (uint32_t)(uintptr_t)constants) : 0,
+                invalidations ? (int)invalidated[0].ui32Size : 0);
+    return 0;
+}
+"""
+    )
+    path = tmp_path / "poison.cc"
+    path.write_text(program, encoding="utf-8")
+    executable = tmp_path / "poison.exe"
+    subprocess.run([compiler, "-std=gnu++17", str(path), "-o", str(executable)], check=True)
+    result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    expected = "48 1 1 4100" if dma_units else "0 0 0 0"
+    assert result.stdout.strip() == expected

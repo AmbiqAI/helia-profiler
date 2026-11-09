@@ -514,9 +514,24 @@ _AOT_ARENA_REGIONS: tuple[dict, ...] = (
         "alignment": 16,
         "size": 4097,
         "blob_filename": "c0.bin",
+        "role": "constant",
     },
-    {"region_id": 1, "placement": "tcm", "alignment": 16, "size": 3, "blob_filename": "c1.bin"},
-    {"region_id": 2, "placement": "sram", "alignment": 16, "size": 1024, "blob_filename": None},
+    {
+        "region_id": 1,
+        "placement": "tcm",
+        "alignment": 16,
+        "size": 3,
+        "blob_filename": "c1.bin",
+        "role": "constant",
+    },
+    {
+        "region_id": 2,
+        "placement": "sram",
+        "alignment": 16,
+        "size": 1024,
+        "blob_filename": None,
+        "role": "scratch",
+    },
 )
 
 

@@ -222,21 +222,28 @@ _TCM_REGION = {
     "alignment": 64,
     "size": 4096,
     "blob_filename": None,
+    "role": "scratch",
 }
-_TCM_BLOB_REGION = {**_TCM_REGION, "region_id": 1, "blob_filename": "weights.bin"}
+_TCM_BLOB_REGION = {
+    **_TCM_REGION,
+    "region_id": 1,
+    "blob_filename": "weights.bin",
+    "role": "constant",
+}
 _PSRAM_BLOB_REGION = {
     "region_id": 2,
     "placement": "psram",
     "alignment": 64,
     "size": 8192,
     "blob_filename": "psram_weights.bin",
+    "role": "constant",
 }
 #: A PSRAM arena region with NO sidecar blob. Without it every PSRAM-placed
 #: region in the matrix also carried a blob, which made
 #: ``GATE_AOT_PSRAM_ARENAS`` and ``GATE_AOT_CONST_BLOBS_IN_PSRAM`` true on
 #: exactly the same renders: swapping the two conditions between specs left the
 #: census green.
-_PSRAM_REGION = {**_PSRAM_BLOB_REGION, "region_id": 3, "blob_filename": None}
+_PSRAM_REGION = {**_PSRAM_BLOB_REGION, "region_id": 3, "blob_filename": None, "role": "scratch"}
 
 
 class _Render:

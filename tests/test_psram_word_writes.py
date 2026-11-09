@@ -71,6 +71,7 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
                 "alignment": 1,
                 "size": size,
                 "blob_filename": "w.bin",
+                "role": "constant",
             },
             {
                 "region_id": 1,
@@ -78,6 +79,7 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
                 "alignment": 16,
                 "size": size,
                 "blob_filename": "w.bin",
+                "role": "constant",
             },
         ],
     )
@@ -105,13 +107,21 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
 
 def _psram_regions(alignment: int, *, blob: bool) -> list[dict[str, object]]:
     return [
-        {"region_id": 0, "placement": "tcm", "alignment": 16, "size": 64, "blob_filename": None},
+        {
+            "region_id": 0,
+            "placement": "tcm",
+            "alignment": 16,
+            "size": 64,
+            "blob_filename": None,
+            "role": "scratch",
+        },
         {
             "region_id": 1,
             "placement": "psram",
             "alignment": alignment,
             "size": 100,
             "blob_filename": "c.bin" if blob else None,
+            "role": "constant",
         },
         {
             "region_id": 2,
@@ -119,6 +129,7 @@ def _psram_regions(alignment: int, *, blob: bool) -> list[dict[str, object]]:
             "alignment": alignment,
             "size": 8,
             "blob_filename": None,
+            "role": "scratch",
         },
     ]
 

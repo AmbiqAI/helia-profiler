@@ -578,6 +578,7 @@ class TestMainAotCcRender:
                     "alignment": 64,
                     "size": 4096,
                     "blob_filename": None,
+                    "role": "scratch",
                 }
             ],
         )
@@ -633,6 +634,7 @@ class TestMainAotCcRender:
                     "alignment": 64,
                     "size": 4096,
                     "blob_filename": "weights.bin",
+                    "role": "constant",
                 }
             ],
             psram_clock_hz=125_000_000,
