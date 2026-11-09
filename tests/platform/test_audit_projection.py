@@ -220,7 +220,7 @@ def test_saved_cygnus_window_reads_offline_and_old_assumption_refuses_replay(tmp
     assert restored == current
 
 
-def native_radio_config(tmp_path, soc="apollo510", radio=True):
+def native_radio_config(tmp_path, soc="apollo510", radio=True, declarations=None):
     target = builtin(include_plugins=False).resolve(soc)
     core = target.cores()[0]
     options = core.options
@@ -281,9 +281,13 @@ def native_radio_config(tmp_path, soc="apollo510", radio=True):
         tmp_path,
         board="child",
         platform_overlay=str(path),
-        custom_socs={"child_chip": {"based_on": "native"}},
+        custom_socs=declarations or {"child_chip": {"based_on": "native"}},
         custom_boards={
-            "child": {"soc": "child_chip", "channel": "dev", "starter_profile_board": profile}
+            "child": {
+                "soc": "leaf" if declarations and "leaf" in declarations else "child_chip",
+                "channel": "dev",
+                "starter_profile_board": profile,
+            }
         },
     )
 
@@ -313,3 +317,59 @@ def test_radio_emission_requires_sdk_api_and_declared_subsystem(tmp_path, soc, r
         )
     )
     assert ("am_hal_pwrctrl_rss_pwroff();" in rendered) is expected
+
+
+@pytest.mark.parametrize("at_leaf", [False, True])
+@pytest.mark.parametrize(
+    "route,expected",
+    [
+        ({"c_define": "AM_PART_APOLLO510", "cmsis_header": "apollo510.h"}, False),
+        ({"c_define": "AM_PART_APOLLO510"}, False),
+        ({"cmsis_header": "apollo510.h"}, False),
+        ({"c_define": "AM_PART_APOLLO510L", "cmsis_header": "apollo510L.h"}, True),
+    ],
+)
+def test_native_custom_route_override_rechecks_shutdown_api(tmp_path, route, expected, at_leaf):
+    declarations = {"child_chip": {"based_on": "native"}, "leaf": {"based_on": "child_chip"}}
+    declarations["leaf" if at_leaf else "child_chip"].update(route)
+    cfg = native_radio_config(tmp_path, soc="apollo330P", declarations=declarations)
+    soc = config_platform(cfg).soc
+    assert soc.has_radio_subsystem is expected
+    templates = Path(helia_profiler.__file__).parent / "firmware/templates"
+    rendered = (
+        Environment(loader=FileSystemLoader(templates))
+        .get_template("_crypto_otp_shutdown.j2")
+        .render(
+            power_only=True, crypto_otp_shutdown=True, has_radio_subsystem=soc.has_radio_subsystem
+        )
+    )
+    assert ("am_hal_pwrctrl_rss_pwroff();" in rendered) is expected
+
+
+def test_native_custom_corrected_shutdown_assumption_refuses_saved_replay(tmp_path, monkeypatch):
+    cfg = native_radio_config(
+        tmp_path,
+        soc="apollo330P",
+        declarations={
+            "child_chip": {
+                "based_on": "native",
+                "c_define": "AM_PART_APOLLO510",
+                "cmsis_header": "apollo510.h",
+            }
+        },
+    )
+    plan = freeze_config(cfg)
+    assert plan.platform is not None
+    old = replace(
+        plan,
+        platform=replace(plan.platform, soc=replace(plan.platform.soc, has_radio_subsystem=True)),
+    )
+    with monkeypatch.context() as offline:
+        offline.setattr(
+            "helia_profiler.platform.catalog._builtin_catalog",
+            lambda: pytest.fail("offline reader reopened catalog"),
+        )
+        restored = FrozenRun.from_dict(old.to_dict())
+    with pytest.raises(ConfigError, match="different run"):
+        restored.config()
+    assert FrozenRun.from_dict(plan.to_dict()).config().platform_registry == cfg.platform_registry

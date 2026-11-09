@@ -44,7 +44,8 @@ and the Blue board's radio-reset BSP wiring are also retained separately.
 `TargetSelection.compatibility` names these exceptions; they are not catalog
 hardware facts or new hardware qualification. RSS shutdown additionally requires
 both a declared radio subsystem and a known supporting SDK header route;
-physical radio topology alone cannot enable a HAL call.
+physical radio topology alone cannot enable a HAL call. Legacy custom children
+recheck that support after applying SDK part/header overrides.
 
 `MemoryLayout` records physical capacities for HPX's selected logical banks,
 including fitted board PSRAM. It does not subtract linker reservations. The
@@ -117,6 +118,8 @@ they differ, use the matching producer environment or freeze and build again.
 This catches accidental environment drift; it is not an authentication scheme.
 The Cygnus PSRAM admission correction changes its retained layout: an earlier
 plan still reads offline, but replay requires freezing and building again.
+The same applies to native-derived custom plans whose SDK overrides previously
+retained an unsupported RSS shutdown flag.
 
 The catalog digest does not establish physical equivalence between producers.
 `hpx.target-config/1` still hashes the same retained target/clock/placement

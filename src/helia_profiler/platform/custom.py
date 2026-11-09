@@ -31,6 +31,7 @@ from .registry import (
     get_board,
     get_soc,
 )
+from .sdk_facts import rss_power_off_available
 from .soc import (
     ClockDomain,
     ClockSpeed,
@@ -216,7 +217,10 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
                 swo_trace_clock_mhz=base_soc.swo_trace_clock_mhz,
                 has_usb=base_soc.has_usb,
                 ssram_full_power_enum=base_soc.ssram_full_power_enum,
-                has_radio_subsystem=base_soc.has_radio_subsystem,
+                has_radio_subsystem=(
+                    base_soc.has_radio_subsystem
+                    and rss_power_off_available(custom[name].c_define, custom[name].cmsis_header)
+                ),
                 catalog_has_dcache=base_soc.catalog_has_dcache,
             )
     return custom
