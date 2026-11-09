@@ -174,6 +174,16 @@ transfer_timeout_probe: bool = False
 
 Source: `src/helia_profiler/config/profiling.py:129`
 
+### helia_profiler.ProfilingConfig.stream_evidence
+
+`attribute` · `python`
+
+```python
+stream_evidence: bool = False
+```
+
+Source: `src/helia_profiler/config/profiling.py:136`
+
 ### helia_profiler.ProfilingConfig.extreme_mode
 
 `attribute` · `python`
@@ -182,7 +192,7 @@ Source: `src/helia_profiler/config/profiling.py:129`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:135`
+Source: `src/helia_profiler/config/profiling.py:142`
 
 ## helia_profiler.ClockSelection
 
@@ -1038,4 +1048,4 @@ derived property rather than a helper each caller re-implements,
 because the rule spans two config sections and every caller (firmware
 render, power planner) must agree on the same effective value (#136).
 
-Source: `src/helia_profiler/config/__init__.py:637`
+Source: `src/helia_profiler/config/__init__.py:638`
