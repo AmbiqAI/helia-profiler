@@ -158,6 +158,23 @@ profile while keeping the custom board's own id, channel, pin and SoC facts.
 Unrecognised keys are rejected with the list of supported keys and a
 close-match suggestion.
 
+`custom_socs.<name>.based_on` also inherits controls that cannot be set as
+custom keys: USB availability, the host SWO reference-clock setting, the shared
+SRAM power enum, radio-shutdown eligibility and the known CPU data-cache fact.
+This applies through custom chains, whether their base is builtin or comes
+from a catalog overlay. An SDK part/header override must support the radio
+shutdown API before HPX emits its call; changing the route does not grant an
+ancestor without radio-shutdown eligibility that capability. A supported
+descendant can recover eligibility after an unsupported intermediate route.
+Explicit family, core and MVE settings remain effective, but a known inherited
+cache fact takes precedence over the generic family fallback. An unknown cache
+fact stays unknown and uses the existing fallback.
+
+These inherited inputs do not make a derivative a qualified builtin. It keeps
+custom provenance and does not borrow builtin linker windows, strict compiled
+receipts or fixed-fixture admission. Self-contained definitions without
+`based_on` retain their defaults.
+
 Pins are plain integer pad numbers; booleans are rejected because a pin
 here is driven for the whole measured window. `0` on
 `default_state_gpio_pin` or `default_go_gpio_pin` disables that wire and
@@ -226,8 +243,9 @@ physical equivalence or automatically forward the overlay to the compiler.
 Resolution freezes the facts and file digest. Saved `FrozenRun` readers use
 retained facts even if the file changes or disappears. Fresh execution from the
 saved plan checks the file binding and refuses changed or missing input before
-resolving it again. Omitting `platform_overlay` preserves existing saved-plan
-settings and intent hashes.
+resolving it again. Merely adding support for `platform_overlay` does not change
+the settings or intent of a plan that omits it. Resolved capability corrections
+can still change an intent; see [retained platform input](../concepts/platforms/#retained-platform-input).
 
 #### Application flash load address
 
