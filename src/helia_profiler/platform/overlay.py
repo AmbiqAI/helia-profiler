@@ -121,13 +121,19 @@ def _native_soc(target: Target, key: str, reference: Target) -> SocDef:
                 f"{target.id}: changed CPU clocks need an explicit HPX clock/build policy"
             )
     soc = _soc(target, target.soc.id, policy, custom=True, policy_name=key)
-    for region in target.memories(target.cores()[0].id, include_discouraged=True):
-        if region.technology == "psram":
-            access = target.reachable(target.cores()[0].id, region.name)
-            address = access.address if access and access.address is not None else region.base
-            expected = soc.capabilities.memory.placement_bases.get(Placement.PSRAM)
-            if expected is not None and address != expected:
-                raise ValueError(f"{target.id}: PSRAM address geometry is not supported by HPX")
+    psram = tuple(region for region in target.external_memories() if region.technology == "psram")
+    if len(psram) > 1:
+        raise ValueError(f"{target.id}: HPX supports one populated PSRAM region")
+    for region in psram:
+        if region.size % 1024:
+            raise ValueError(f"{target.id}: HPX memory views require whole KiB capacities")
+        access = target.reachable(target.cores()[0].id, region.name)
+        if access is None or access.access != "direct":
+            raise ValueError(f"{target.id}: populated PSRAM is not directly core-reachable")
+        address = access.address if access.address is not None else region.base
+        expected = soc.capabilities.memory.placement_bases.get(Placement.PSRAM)
+        if expected is not None and address != expected:
+            raise ValueError(f"{target.id}: PSRAM address geometry is not supported by HPX")
     return soc
 
 
@@ -152,7 +158,7 @@ def _project(
             continue
         target = catalog.resolve(name)
         key = _policy_key(target)
-        policy = next(
+        policy = board_policies.get(name) or next(
             (board_policies[n] for n in target.lineage("board") if n in board_policies), None
         )
         if policy is None:

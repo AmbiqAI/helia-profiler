@@ -417,3 +417,55 @@ def test_overlay_composition_keeps_board_capacity_separate_from_soc_default(
     snap = config_platform(cfg)
     assert snap.soc.memory.psram_kb == expected
     assert not snap.soc.is_builtin and snap.expected_linker is None
+
+
+def test_populated_but_unreachable_native_psram_refuses(tmp_path):
+    path = _overlay(
+        tmp_path,
+        socs={
+            "lab_chip": {
+                "based_on": "apollo510",
+                "access": [{"master": "cm55_0", "target": "mspi0", "access": "none"}],
+            }
+        },
+        parts={"lab_part": {"based_on": "AP510NFA-CBR", "soc": "lab_chip"}},
+        boards={"lab": {"based_on": "apollo510_evb", "part": "lab_part"}},
+    )
+    with pytest.raises(ConfigError, match="not directly core-reachable"):
+        _config(path, tmp_path)
+
+
+def test_explicit_supported_composition_retains_exact_hpx_policy(tmp_path):
+    board = "apollo3p_evb_cygnus"
+    native = _config(_overlay(tmp_path), tmp_path, board=board)
+    plain = load_config(
+        None,
+        {"model": {"path": native.model.path}, "target": {"board": board, "toolchain": "atfe"}},
+    )
+    first, second = config_platform(native), config_platform(plain)
+    assert first.board.channel == second.board.channel == "preview"
+    assert first.board.profile_source_board == second.board.profile_source_board == board
+    assert first.soc.memory == second.soc.memory
+    assert not first.soc.is_builtin and first.expected_linker is None
+
+
+def test_multiple_native_psram_banks_do_not_become_one_scalar_budget(tmp_path):
+    path = _overlay(
+        tmp_path,
+        boards={
+            "lab": {
+                "based_on": "apollo510_evb",
+                "interfaces": {
+                    "extra": {
+                        "controller": "mspi1",
+                        "modes": ["hex-ddr"],
+                        "aperture_base": 0x80000000,
+                        "aperture_max": "256M",
+                    }
+                },
+                "population": {"extra": "APS512XX"},
+            }
+        },
+    )
+    with pytest.raises(ConfigError, match="one populated PSRAM region"):
+        _config(path, tmp_path)
