@@ -53,6 +53,9 @@ class ArenaRole(StrEnum):
     SCRATCH = "scratch"
     PERSISTENT = "persistent"
     CONSTANT = "constant"
+    #: The stream pool transfer units copy constants into; the application
+    #: binds it, and no placement override moves it.
+    POOL = "pool"
 
 
 class MemoryRegion(StrEnum):

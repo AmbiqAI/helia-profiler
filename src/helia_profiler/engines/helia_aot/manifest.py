@@ -87,10 +87,11 @@ def _extract_arena_regions(result: Any, prefix: str) -> list[ArenaRegion]:
             raise EngineError(
                 f"AOT arena {region.id} has unsupported role {region.role!r}"
             ) from exc
+        pool = "_pool" if role is ArenaRole.POOL else ""
         regions.append(
             ArenaRegion(
                 region_id=region.id,
-                name=f"{prefix}_arena_{mem_str}",
+                name=f"{prefix}_arena{pool}_{mem_str}",
                 size=region.size,
                 alignment=region.alignment,
                 role=role,
