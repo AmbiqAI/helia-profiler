@@ -396,3 +396,24 @@ def test_unrelated_overlay_preserves_legacy_board_only_base(tmp_path, board):
     )
     assert config_platform(native).soc == config_platform(plain).soc
     assert config_platform(native).board == config_platform(plain).board
+
+
+@pytest.mark.parametrize("override,expected", [(None, 0), (0, 0), (4096, 4096)])
+def test_overlay_composition_keeps_board_capacity_separate_from_soc_default(
+    tmp_path, override, expected
+):
+    path = _overlay(tmp_path, compositions={"lab": {"board": "apollo3p_evb", "addons": ["cygnus"]}})
+    cfg = _config(
+        path,
+        tmp_path,
+        board="child",
+        custom_boards={
+            "inherited": {"based_on": "lab"},
+            "child": {"based_on": "inherited", "psram_kb": override},
+        },
+    )
+    assert get_soc_for_board("lab", registry=cfg.platform_registry).memory.psram_kb == 8192
+    assert get_soc_for_board("inherited", registry=cfg.platform_registry).memory.psram_kb == 8192
+    snap = config_platform(cfg)
+    assert snap.soc.memory.psram_kb == expected
+    assert not snap.soc.is_builtin and snap.expected_linker is None

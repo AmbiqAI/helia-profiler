@@ -164,11 +164,14 @@ def _project(
             socs[target.soc.id] = _native_soc(
                 catalog.resolve(target.soc.id), key, _builtin_catalog().resolve(key)
             )
+        default_psram = socs[target.soc.id].memory.psram_kb
+        fitted_psram = native_soc.memory.psram_kb
+        native_soc = replace(native_soc, memory=replace(native_soc.memory, psram_kb=default_psram))
         boards[name] = replace(
             policy,
             name=name,
             soc=target.soc.id,
-            psram_kb=None,
+            psram_kb=fitted_psram if fitted_psram != default_psram else None,
             starter_profile_board=policy.profile_source_board,
             is_fpga=target.category == "fpga",
         )
