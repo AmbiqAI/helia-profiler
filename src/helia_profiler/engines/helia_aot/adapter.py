@@ -124,6 +124,12 @@ def _report_files(output_dir: Path, prefix: str) -> tuple[Path, ...]:
     return tuple(found)
 
 
+def _transfer_cmake_target(module_dir: Path, prefix: str, cmake_name: str) -> str | None:
+    """The provider target heliaAOT builds beside a module that emitted its header."""
+    header = module_dir / "includes-api" / f"{prefix}_nsx_transfer.h"
+    return f"nsx::{cmake_name}_transfer" if header.is_file() else None
+
+
 def _installed_source() -> EngineSource | None:
     source = installed_aot_source()
     return EngineSource(**source) if source is not None else None
@@ -350,6 +356,7 @@ class HeliaAOTAdapter:
             aot_prefix=prefix,
             aot_module_name=module_name,
             aot_cmake_target=f"nsx::{cmake_name}",
+            aot_transfer_cmake_target=_transfer_cmake_target(aot_module_dir, prefix, cmake_name),
             helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
             aot_user_memory_config=user_memory_config,

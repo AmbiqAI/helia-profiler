@@ -77,6 +77,9 @@ target_link_libraries(hpx_profiler PRIVATE
     nsx::executorch
 {% else %}
     {{ aot_cmake_target }}
+{% if aot_transfer_cmake_target %}
+    {{ aot_transfer_cmake_target }}
+{% endif %}
 {% endif %}
 {% if transport == "usb_cdc" %}
     nsx::usb
@@ -121,6 +124,9 @@ target_link_libraries(hpx_profiler_power PRIVATE
     nsx::executorch
 {% else %}
     {{ aot_cmake_target }}
+{% if aot_transfer_cmake_target %}
+    {{ aot_transfer_cmake_target }}
+{% endif %}
 {% endif %}
 {% if psram_needed %}
     nsx::psram

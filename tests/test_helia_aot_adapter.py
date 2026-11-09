@@ -71,6 +71,24 @@ class TestExtraModules:
         assert npu.project == NSX_NPU_PROJECT
 
 
+class TestTransferCmakeTarget:
+    """A module that emitted its transfer provider header names the provider target."""
+
+    def test_header_names_the_provider_target(self, tmp_path):
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "kws_nsx_transfer.h").write_text("#pragma once\n")
+        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") == "nsx::kws_model_transfer"
+
+    def test_no_header_no_target(self, tmp_path):
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "other_nsx_transfer.h").write_text("#pragma once\n")
+        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") is None
+
+
 class TestEngineBackendPropagation:
     def test_config_backend_reaches_artifacts_field(self):
         # HeliaAotArtifacts.engine_backend drives has_ethos_u in
