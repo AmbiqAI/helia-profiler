@@ -156,6 +156,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_early_globals",
         "engine_io_metadata",
         "engine_model_setup",
+        "engine_pass_preamble",
         "engine_pass_profile_arm",
         "engine_pass_warmup_arm",
         "engine_profiled_summary",
@@ -330,6 +331,11 @@ CONDITIONAL_OVERRIDES = {
         "super() (whose base content opens with one) and the else branch opens "
         "one itself"
     ),
+    ("main_aot.cc.j2", "engine_pass_preamble"): (
+        "the transfer_timeout_probe branch opens with its own newline and then "
+        "super() follows, whose base content opens with one; without the probe "
+        "only super() renders"
+    ),
 }
 
 
@@ -413,7 +419,6 @@ def test_reserved_default_blocks_are_the_documented_set():
     for child in CHILDREN:
         claimed |= _blocks(child)
     assert base_blocks - claimed == {
-        "engine_pass_preamble",
         # No engine keeps its per-layer storage in TCM yet, so the "true"
         # default stands for all three children (#161).
         "engine_pmu_storage_sram_resident",

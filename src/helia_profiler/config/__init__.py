@@ -610,6 +610,7 @@ class ProfileConfig:
             for setting, value in (
                 ("input_fill", self.profiling.input_fill is not InputFill.ZERO),
                 ("transfer_timeout_probe", self.profiling.transfer_timeout_probe),
+                ("stream_evidence", self.profiling.stream_evidence),
             ):
                 if value:
                     raise ConfigError(

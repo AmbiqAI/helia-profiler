@@ -394,6 +394,7 @@ def _render(
             arena_regions=[],
             input_fill="zero",
             transfer_timeout_probe=False,
+            stream_evidence=False,
         )
         return _jinja_env.get_template("main_aot.cc.j2").render(**_resolve(kwargs))
     if engine == "executorch":

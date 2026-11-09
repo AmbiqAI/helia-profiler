@@ -364,25 +364,35 @@ def _build_cases() -> list[_CompileCase]:
             "role": "pool",
         },
     ]
-    for transport, power_only, probe in (
-        ("rtt", False, False),
-        ("swo", False, False),
-        ("rtt", True, False),
-        ("rtt", False, True),
+    # (soc, transport, power_only, probe, stream_evidence). apollo4p: the plain
+    # transfer render compiles on a part without per-range D-cache upkeep;
+    # stream_evidence is refused there at configuration.
+    for soc, transport, power_only, probe, evidence in (
+        ("apollo510", "rtt", False, False, False),
+        ("apollo510", "swo", False, False, False),
+        ("apollo510", "rtt", True, False, False),
+        ("apollo510", "rtt", False, True, False),
+        ("apollo510", "rtt", False, False, True),
+        ("apollo4p", "rtt", False, False, False),
     ):
         cases.append(
             _CompileCase(
-                case_id=f"apollo510|{transport}|helia-aot|transfer"
+                case_id=f"{soc}|{transport}|helia-aot|transfer"
                 + ("|power" if power_only else "")
-                + ("|probe" if probe else ""),
+                + ("|probe" if probe else "")
+                + ("|stream-evidence" if evidence else ""),
                 text=_render(
-                    "apollo510",
+                    soc,
                     transport,
                     "helia-aot",
                     power_only=power_only,
-                    overrides={"arena_regions": transfer_regions, "transfer_timeout_probe": probe},
+                    overrides={
+                        "arena_regions": transfer_regions,
+                        "transfer_timeout_probe": probe,
+                        "stream_evidence": evidence,
+                    },
                 ),
-                vars=_common_kwargs("apollo510", transport),
+                vars=_common_kwargs(soc, transport),
                 headers=aot_transfer_headers(),
             )
         )
@@ -537,8 +547,12 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
         if "fake_model.h" not in case.headers:
+            # A render that requires the stream facts gets a module that has them.
             (case_dir / "fake_model.h").write_text(
-                aot_model_stub(external_arenas="deployment_psram_weights" in case.text)
+                aot_model_stub(
+                    external_arenas="deployment_psram_weights" in case.text,
+                    transfer="#ifndef fake_num_dma_units" in case.text,
+                )
             )
         (case_dir / "fake_common.h").write_text(_AOT_COMMON_STUB)
     for region_id in set(_CONST_BLOB_INCLUDE.findall(case.text)):
@@ -731,6 +745,27 @@ def test_transfer_cases_compile_the_provider_code(tmp_path, power_only):
     assert ("fake_nsx_transfer_bind" if power_only else "fake_nsx_transfer_can_sleep") in (
         broken.stderr
     )
+
+
+def test_stream_evidence_refuses_a_module_without_its_stream_facts(tmp_path):
+    """profiling.stream_evidence fails closed on a context header without
+    <p>_num_dma_units instead of silently skipping the poison and invalidate."""
+    (case,) = [
+        case
+        for case in _build_cases()
+        if case.case_id == "apollo510|rtt|helia-aot|transfer|stream-evidence"
+    ]
+    model = case.headers["fake_model.h"]
+    assert "#define fake_num_dma_units" in model
+    restored = _compile(_prepare_case_dir(case, tmp_path / "ok"), _part_define(case.vars))
+    assert restored.returncode == 0, restored.stderr
+    case.headers = {
+        **case.headers,
+        "fake_model.h": model.replace("#define fake_num_dma_units 3\n", ""),
+    }
+    broken = _compile(_prepare_case_dir(case, tmp_path / "broken"), _part_define(case.vars))
+    assert broken.returncode != 0
+    assert "profiling.stream_evidence needs a module with a stream pool" in broken.stderr
 
 
 @pytest.mark.parametrize("engine", FIXTURE_ENGINES)

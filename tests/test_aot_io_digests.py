@@ -135,6 +135,23 @@ def test_capture_ends_with_the_output_bytes_then_the_inputs_every_run_saw(tmp_pa
     ]
 
 
+@pytest.mark.host_integration
+def test_a_zero_byte_output_prints_a_dash_for_its_bytes(tmp_path: Path):
+    source = _render_aot(transport="rtt", input_fill="lcg")
+    start = source.index("    // The last run's outputs in full")
+    block = source[start : source.index("    if (profiled_infer_count > 0", start)]
+    program = (
+        _PREAMBLE
+        + _function(source, "static void hpx_fill_lcg(")
+        + _function(source, "static uint64_t hpx_fnv1a64(")
+        + "int main() {\n"
+        + "    fake_model_ctx.outputs[0].size = 0;\n"
+        + block
+        + "    return 0;\n}\n"
+    )
+    assert _run(tmp_path, program)[0] == "HPX_OUTPUT_0_HEX=-"
+
+
 def test_every_input_refill_follows_the_fill_setting():
     zero = _render_aot(transport="rtt", input_fill="zero")
     lcg = _render_aot(transport="rtt", input_fill="lcg")

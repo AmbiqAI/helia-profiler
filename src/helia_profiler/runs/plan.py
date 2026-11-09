@@ -64,6 +64,7 @@ _ABSENT_AT_DEFAULT: tuple[tuple[tuple[str, ...], object], ...] = (
     (("target", "platform_overlay"), None),
     (("profiling", "input_fill"), "zero"),
     (("profiling", "transfer_timeout_probe"), False),
+    (("profiling", "stream_evidence"), False),
 )
 
 #: Environment variables that can point a build at local sources.

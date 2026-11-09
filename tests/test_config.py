@@ -693,6 +693,22 @@ def test_transfer_timeout_probe_is_off_by_default_and_helia_aot_only():
             load(engine, True)
 
 
+def test_stream_evidence_is_off_by_default_and_helia_aot_only():
+    def load(engine: str, evidence: bool | None = None) -> ProfileConfig:
+        cli: dict = {"model": {"path": "m.tflite"}, "engine": {"type": engine}}
+        if evidence is not None:
+            cli["profiling"] = {"stream_evidence": evidence}
+        return load_config(None, cli)
+
+    assert load("helia-aot").profiling.stream_evidence is False
+    assert load("helia-aot", True).profiling.stream_evidence is True
+    for engine in ("helia-rt", "litert", "executorch"):
+        with pytest.raises(
+            ConfigError, match="profiling.stream_evidence applies to engine.type helia-aot"
+        ):
+            load(engine, True)
+
+
 def test_model_explorer_rejected_as_primary_output_format():
     cli = {
         "model": {"path": "m.tflite"},

@@ -7,6 +7,7 @@ from ._model import (
     AOT_ENGINES,
     GATE_NOT_POWER_ONLY,
     GATE_PMU_PROFILE,
+    GATE_STREAM_EVIDENCE,
     GATE_TRANSFER_PROBE,
     WireConsumer,
     WireCriticality,
@@ -84,8 +85,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         condition=GATE_NOT_POWER_ONLY,
         runtime_gate="the module ships <prefix>_nsx_transfer.h",
         value_shape="<unit>:<dma>/<pending>,...;<op>:<dma>/<pending>,...",
-        note="Each flag is 1 only when set at both ends; a failed read of the "
-        "DMA-in-progress bit counts as clear.",
+        note="Each flag is 1 only when set at both ends. <dma> is x when the "
+        "DMA-in-progress bit could not be read at an end: no evidence either way.",
     ),
     _spec(
         WireKey.TRANSFER_STATS.wire,
@@ -97,27 +98,72 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         engines=AOT_ENGINES,
         condition=GATE_NOT_POWER_ONLY,
         runtime_gate="the module ships <prefix>_nsx_transfer.h",
-        value_shape="<issues>,<waits>,<aborts>,<peak_in_flight>,<wait_checks_max>",
+        value_shape="<issues>,<waits>,<aborts>,<peak_in_flight>,<wait_checks_max>,<unsampled>",
         note="Issues, waits and aborts are the run's own; the peak pieces in "
         "flight and the most checks a wait used are the provider's since it "
-        "was bound.",
+        "was bound; unsampled counts the run's failed DMA-in-progress reads.",
+    ),
+    _spec(
+        WireKey.TRANSFER_PROBE.wire,
+        WireKind.KEY_VALUE,
+        "profiling.transfer_timeout_probe: what the probe run returned.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_PROBE,
+        engines=AOT_ENGINES,
+        condition=GATE_TRANSFER_PROBE,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h",
+        value_shape="<status>,<provider>",
+        note="Once, before the first pass: an extra run outside the counted "
+        "iterations with a wait budget of one check. 301 with provider 321 is a "
+        "timeout; 0 means nothing was still in flight at its waits. Any other "
+        "status fails the capture as model_run_failed.",
     ),
     _spec(
         WireKey.TRANSFER_RECOVERY.wire,
         WireKind.KEY_VALUE,
-        "profiling.transfer_timeout_probe: what the probe run returned and how "
-        "the module recovered.",
+        "profiling.transfer_timeout_probe: how the module recovered after the probe run.",
         WireConsumer.UNCONSUMED,
         WireCriticality.DIAGNOSTIC,
         key=WireKey.TRANSFER_RECOVERY,
         engines=AOT_ENGINES,
         condition=GATE_TRANSFER_PROBE,
-        runtime_gate="the module ships <prefix>_nsx_transfer.h; once, after the "
-        "first instrumented run",
-        value_shape="<status>,<provider>,<bind>,<init>,<run>,<pending> | no_timeout",
-        note="After a 301: the probe run's status and provider code, then the "
-        "rebind, model_init and recovery run statuses and nsx_psram_pending() "
-        "sampled after the probe run; the recovery run's HPX_OUTPUT_<i>_FNV1A64 "
-        "lines follow. no_timeout: the probe run returned 0.",
+        runtime_gate="the module ships <prefix>_nsx_transfer.h",
+        value_shape="<bind>,<init>,<run>,<pending>",
+        note="The rebind with the default budget, model_init and one more run "
+        "(the pool poisoned again), and nsx_psram_pending() sampled the moment "
+        "the probe run returned. A non-zero bind fails the capture as "
+        "transfer_bind_failed, a non-zero init or run as model_run_failed.",
+    ),
+    _spec(
+        WireKey.STREAM_EVIDENCE.wire,
+        WireKind.KEY_VALUE,
+        "profiling.stream_evidence is on: every instrumented run starts from a "
+        "poisoned stream pool and cold PSRAM constants.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.STREAM_EVIDENCE,
+        engines=AOT_ENGINES,
+        condition=GATE_STREAM_EVIDENCE,
+        value_shape="1",
+        note="The cache regime of the per-layer figures and HPX_PROFILED_INFER_*: "
+        "before each instrumented run the pool is filled with 0x5A and the D-cache "
+        "is cleaned and invalidated over each PSRAM constant arena. The warm-ups "
+        "and the clean window keep a warm cache. Without the setting no capture "
+        "does either.",
+    ),
+    _spec(
+        WireKey.INPUT_FILL.wire,
+        WireKind.KEY_VALUE,
+        "What fills the inputs before every run (profiling.input_fill).",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.INPUT_FILL,
+        engines=AOT_ENGINES,
+        value_shape="zero | lcg",
+        note="The refill runs inside the clean (and power-gated) window, as zero "
+        "always has, so under lcg the clean latency and energy include the LCG "
+        "fill, a few cycles per input byte, and the capture records no clean "
+        "workload.",
     ),
 )

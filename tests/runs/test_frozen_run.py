@@ -850,9 +850,13 @@ def test_profiling_settings_added_later_stay_out_of_a_plan_at_their_default(sess
     aot = session.with_engine("helia-aot")
     plan = aot.freeze()
     stored = plan.to_dict()["settings"]["profiling"]
-    assert "input_fill" not in stored and "transfer_timeout_probe" not in stored
+    assert not {"input_fill", "transfer_timeout_probe", "stream_evidence"} & set(stored)
     assert plan.config().profiling.input_fill == "zero"
-    for change in ({"input_fill": "lcg"}, {"transfer_timeout_probe": True}):
+    for change in (
+        {"input_fill": "lcg"},
+        {"transfer_timeout_probe": True},
+        {"stream_evidence": True},
+    ):
         changed = aot.with_profiling(**change).freeze()
         ((setting, value),) = change.items()
         assert changed.to_dict()["settings"]["profiling"][setting] == value

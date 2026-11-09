@@ -160,6 +160,7 @@ def _render_aot(
     psram_clock_hz: int = 48_000_000,
     input_fill: str = "zero",
     transfer_timeout_probe: bool = False,
+    stream_evidence: bool = False,
     **extra_vars: object,
 ) -> str:
     return _env.get_template(template_name).render(
@@ -171,6 +172,7 @@ def _render_aot(
         ),
         input_fill=input_fill,
         transfer_timeout_probe=transfer_timeout_probe,
+        stream_evidence=stream_evidence,
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],

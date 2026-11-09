@@ -384,6 +384,15 @@ def _matrix() -> list[_Render]:
             power_only=True,
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
         ),
+        # Stream evidence, which only a heliaAOT module with a stream pool on
+        # an Apollo5-family part can run.
+        _Render(
+            "ap510|rtt|helia-aot|stream-evidence",
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"stream_evidence": True},
+        ),
         # The transfer timeout probe, which only a heliaAOT module with its
         # emitted provider can run.
         _Render(
@@ -676,6 +685,7 @@ _PREDICATES = {
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
     "has_armv8m_pmu and not power_only": lambda v: bool(v["has_armv8m_pmu"]) and not _power(v),
+    "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
         lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)
     ),

@@ -323,7 +323,10 @@ class WireKey(StrEnum):
     TRANSFER_REFILLS = "transfer_refills"
     TRANSFER_OVERLAP = "transfer_overlap"
     TRANSFER_STATS = "transfer_stats"
+    TRANSFER_PROBE = "transfer_probe"
     TRANSFER_RECOVERY = "transfer_recovery"
+    STREAM_EVIDENCE = "stream_evidence"
+    INPUT_FILL = "input_fill"
 
     @property
     def wire(self) -> str:
@@ -497,3 +500,4 @@ GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
 GATE_PMU_PROFILE = "has_armv8m_pmu and not power_only"
 GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
+GATE_STREAM_EVIDENCE = "stream_evidence"

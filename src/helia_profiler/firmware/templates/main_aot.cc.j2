@@ -1,5 +1,11 @@
 {% extends "_main_base.cc.j2" %}
 {% set restore_clean_inputs = not busy_loop_probe %}
+{% set pool_regions = [] if allocate_arenas else arena_regions | selectattr("role", "equalto", "pool") | list %}
+{#- The stream pool's bytes set to 0x5A, inline in main() where the arena
+   buffers are declared: a piece that lands late, or a unit never copied,
+   then shows in the run's outputs. #}
+{% macro poison_pool(indent) %}{% for region in pool_regions %}
+{{ indent }}memset(hpx_arena_buf_{{ region.region_id }}, 0x5A, {{ region.size }}U);{% endfor %}{% endmacro %}
 {#- main_aot.cc — heliaPROFILER firmware entry point for the heliaAOT engine.
 
    The firmware skeleton -- boot, transport preamble, PSRAM/clean-window
@@ -44,6 +50,11 @@
 #include "nsx_psram.h"
 #define HPX_AOT_TRANSFER 1
 #endif
+{% if stream_evidence %}
+#ifndef {{ aot_prefix }}_num_dma_units
+#error "profiling.stream_evidence needs a module with a stream pool: {{ aot_prefix }}_num_dma_units is not declared"
+#endif
+{% endif %}
 {% if has_armv8m_pmu %}
 {# nsx_pmu_utils.h is the nsx_pmu_* config/counter API the AOT operator
    callback drives directly (heliaRT reaches the same hardware through
@@ -136,13 +147,25 @@ static uint32_t g_transfer_unit_refills[{{ aot_prefix }}_num_transfer_units];
 static int g_transfer_refill_slot = -1;
 {% endif %}
 static bool g_transfer_power_clause = false;
+static uint32_t g_transfer_sample_failures = 0;
 static {{ aot_prefix }}_nsx_transfer_stats_t g_transfer_stats_before;
 
-// A failed read of the DMA-in-progress bit is no evidence, so it reads as clear.
+// One sample: bit 0 when the DMA-in-progress bit read set, bit 1 when
+// nsx-psram had reads pending, bit 2 when the bit could not be read, which is
+// no evidence either way.
 static uint8_t hpx_transfer_sample(void) {
     bool dma = false;
     const bool sampled = nsx_psram_dma_in_progress(&dma) == 0U;
-    return (uint8_t)(((sampled && dma) ? 1U : 0U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
+    if (!sampled) {
+        ++g_transfer_sample_failures;
+    }
+    return (uint8_t)((sampled ? (dma ? 1U : 0U) : 4U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
+}
+
+// Both ends: a flag holds only when set at both, and an end not sampled
+// leaves the DMA flag unknown.
+static inline uint8_t hpx_transfer_ends(uint8_t first, uint8_t last) {
+    return (uint8_t)((first & last & 3U) | ((first | last) & 4U));
 }
 #endif
 {% endif %}
@@ -298,7 +321,7 @@ static void model_operator_cb(
                 g_transfer_unit_refills[op] = g_pmu_cfg.counter[g_transfer_refill_slot].counterValue;
             }
 {% endif %}
-            g_transfer_unit_overlap[op] &= hpx_transfer_sample();
+            g_transfer_unit_overlap[op] = hpx_transfer_ends(g_transfer_unit_overlap[op], hpx_transfer_sample());
         }
         return;
     }
@@ -333,7 +356,7 @@ static void model_operator_cb(
     {% endif %}
 {% if not power_only | default(false) %}
 #ifdef HPX_AOT_TRANSFER
-        g_transfer_op_overlap[idx] &= hpx_transfer_sample();
+        g_transfer_op_overlap[idx] = hpx_transfer_ends(g_transfer_op_overlap[idx], hpx_transfer_sample());
 #endif
 {% endif %}
         // Heartbeat emission (inter-op gap, not contaminating a layer)
@@ -413,19 +436,23 @@ static void hpx_print_output_digests(void) {
 
 {% endif %}
 #ifdef HPX_AOT_TRANSFER
-// Binds the module's provider. A refusal leaves ctx.transfer unset, so
-// model_init would return 300; the provider's code says why.
-static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *options) {
-    const int32_t status = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, options);
-    if (status == 0) {
-        return;
-    }
+// A refused bind leaves ctx.transfer as it was (unset at boot, so model_init
+// would return 300); the provider's code says why.
+static void hpx_transfer_bind_failed(int32_t status) {
 {% if power_only | default(false) %}
+    (void)status;
     hpx_power_terminal_fail("transfer_bind", 8U);
 {% else %}
     hpx_printf("HPX_ERROR=transfer_bind_failed:%ld\n", (long)status);
     hpx_park();
 {% endif %}
+}
+
+static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *options) {
+    const int32_t status = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, options);
+    if (status != 0) {
+        hpx_transfer_bind_failed(status);
+    }
 }
 {% if not power_only | default(false) %}
 
@@ -434,6 +461,7 @@ static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *opt
 static void hpx_transfer_run_start(void) {
     memset(g_transfer_unit_overlap, 0, sizeof(g_transfer_unit_overlap));
     memset(g_transfer_op_overlap, 0, sizeof(g_transfer_op_overlap));
+    g_transfer_sample_failures = 0;
 {% if has_armv8m_pmu %}
     memset(g_transfer_unit_refills, 0, sizeof(g_transfer_unit_refills));
     g_transfer_refill_slot = -1;
@@ -450,9 +478,15 @@ static void hpx_transfer_run_start(void) {
 // run returned; then the run's evidence. Refills are printed only in a pass
 // that counts L1D refills: per unit over its issue window, per operator over
 // its run window (that operator's layer record). Overlap entries are
-// <id>:<DMA in progress at both ends>/<reads pending at both ends>. Stats are
-// the run's issues, waits and aborts, and the provider's peak pieces in
-// flight and most checks a wait used since it was bound.
+// <id>:<DMA in progress at both ends: 1, 0, or x when an end was not
+// sampled>/<reads pending at both ends>. Stats are the run's issues, waits
+// and aborts, the provider's peak pieces in flight and most checks a wait used
+// since it was bound, and the run's unsampled DMA-in-progress reads.
+static void hpx_transfer_print_ends(const char *separator, int id, uint8_t ends) {
+    hpx_printf("%s%d:%c/%u", separator, id, (ends & 4U) ? 'x' : (char)('0' + (ends & 1U)),
+               (unsigned)((ends >> 1) & 1U));
+}
+
 static void hpx_transfer_report(void) {
     if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
         g_transfer_power_clause = true;
@@ -473,21 +507,20 @@ static void hpx_transfer_report(void) {
 {% endif %}
     hpx_printf("HPX_TRANSFER_OVERLAP=");
     for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
-        hpx_printf("%s%d:%u/%u", u ? "," : "", u, (unsigned)(g_transfer_unit_overlap[u] & 1U),
-                   (unsigned)(g_transfer_unit_overlap[u] >> 1));
+        hpx_transfer_print_ends(u ? "," : "", u, g_transfer_unit_overlap[u]);
     }
     hpx_printf(";");
     for (int i = 0; i < g_num_layers; i++) {
-        hpx_printf("%s%d:%u/%u", i ? "," : "", i, (unsigned)(g_transfer_op_overlap[i] & 1U),
-                   (unsigned)(g_transfer_op_overlap[i] >> 1));
+        hpx_transfer_print_ends(i ? "," : "", i, g_transfer_op_overlap[i]);
     }
     hpx_printf("\n");
     const {{ aot_prefix }}_nsx_transfer_stats_t *after = {{ aot_prefix }}_nsx_transfer_stats();
-    hpx_printf("HPX_TRANSFER_STATS=%lu,%lu,%lu,%lu,%lu\n",
+    hpx_printf("HPX_TRANSFER_STATS=%lu,%lu,%lu,%lu,%lu,%lu\n",
                (unsigned long)(after->issues - g_transfer_stats_before.issues),
                (unsigned long)(after->waits - g_transfer_stats_before.waits),
                (unsigned long)(after->aborts - g_transfer_stats_before.aborts),
-               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max);
+               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max,
+               (unsigned long)g_transfer_sample_failures);
 }
 {% endif %}
 #endif
@@ -527,40 +560,7 @@ static void hpx_aot_check_runs(void) {
     hpx_printf("HPX_ERROR=model_run_failed:%ld\n", (long)hpx_aot_status);
 #endif
     hpx_park();
-}{% if transfer_timeout_probe %}
-
-
-#ifdef HPX_AOT_TRANSFER
-// profiling.transfer_timeout_probe, after the probe run: the default wait
-// budget is bound again whatever the run returned. Its 301 is the probe's
-// timeout, so the recovery runs: rebind, model_init and one run, reported with
-// the probe run's status and provider code, nsx-psram's pending reads sampled
-// right after it returned, and the recovery run's output digests. Any other
-// failure stops the capture as after a loop.
-static void hpx_transfer_probe_recover(uint32_t pending) {
-    const int32_t probe = hpx_aot_status;
-    if (probe != 0 && probe != 301) {
-        hpx_aot_check_runs();
-    }
-    hpx_aot_status = 0;
-    if (probe == 0) {
-        hpx_transfer_bind(nullptr);
-        hpx_printf("HPX_TRANSFER_RECOVERY=no_timeout\n");
-        return;
-    }
-    const int32_t provider = {{ aot_prefix }}_nsx_transfer_last()->error;
-    const int32_t bind = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, nullptr);
-    const int32_t init = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
-    const bool profiling = g_profiler_enabled;
-    g_profiler_enabled = false;
-{{ self.engine_reset_inputs() }}
-    const int32_t run = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
-    g_profiler_enabled = profiling;
-    hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%ld,%ld,%lu\n", (long)probe, (long)provider,
-               (long)bind, (long)init, (long)run, (unsigned long)pending);
-    hpx_print_output_digests();
 }
-#endif{% endif %}
 {% endif %}
 {%- endblock %}
 
@@ -747,6 +747,8 @@ static void hpx_transfer_probe_recover(uint32_t pending) {
         hpx_printf("HPX_OUTPUT_%d_SIZE=%d\n", i,
                   (int){{ aot_prefix }}_model_ctx.outputs[i].size);
     }
+    hpx_printf("HPX_INPUT_FILL={{ input_fill }}\n");{% if stream_evidence %}
+    hpx_printf("HPX_STREAM_EVIDENCE=1\n");{% endif %}
 {%- endblock %}
 
 {% block engine_profiler_off %}        g_profiler_enabled = false;{% endblock %}
@@ -791,6 +793,45 @@ hpx_aot_check_runs();{% endblock %}
 {# heliaAOT re-arms the profiler per pass (engine_pass_profile_arm), so there
    is nothing to re-enable at the end of the clean window. #}
 {% block engine_profiler_on %}{% endblock %}
+
+{# profiling.transfer_timeout_probe: one extra run before the first pass,
+   outside the counted iterations and every timing bracket, with the profiler
+   off. Its waits give up after one check, so a dma unit still in flight times
+   out (301) and the provider's abort drains it; nsx-psram's pending reads are
+   sampled the moment the run returns. The default budget is bound again, and
+   model_init and one more run (the pool poisoned again) show the module
+   recovered. A probe status other than 0 or 301, or a failed recovery step,
+   fails the capture like a failed loop. #}
+{% block engine_pass_preamble %}{% if transfer_timeout_probe %}
+#ifdef HPX_AOT_TRANSFER
+    {
+        static const {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options = {1U, 0U};
+        hpx_transfer_bind(&hpx_probe_options);{{ poison_pool("        ") }}
+{{ self.engine_reset_inputs() }}
+        const int32_t probe = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+        const uint32_t pending = nsx_psram_pending();
+        const int32_t provider = {{ aot_prefix }}_nsx_transfer_last()->error;
+        const int32_t bind = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, nullptr);
+        const int32_t init = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);{{ poison_pool("        ") }}
+{{ self.engine_reset_inputs() }}
+        const int32_t run = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+{% if transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% endif %}
+        hpx_printf("HPX_TRANSFER_PROBE=%ld,%ld\n", (long)probe, (long)provider);
+        hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%lu\n", (long)bind, (long)init, (long)run,
+                   (unsigned long)pending);
+        if (bind != 0) {
+            hpx_transfer_bind_failed(bind);
+        }
+        hpx_aot_status = (probe != 0 && probe != 301) ? probe : (init != 0 ? init : run);
+        hpx_aot_check_runs();
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% endif %}
+    }
+#endif
+{% endif %}{{ super() }}{% endblock %}
 
 {% block engine_pass_init %}
 {% if has_ethos_u | default(false) %}
@@ -839,35 +880,22 @@ hpx_aot_check_runs();{% endblock %}
         g_hb_iter = iter;
         g_hb_last_cyc = DWT->CYCCNT;
         g_hb_ops_since = 0;
-#ifdef HPX_AOT_TRANSFER{% if transfer_timeout_probe and loop.index0 == 0 %}
-        if (iter == 0) {
-            // profiling.transfer_timeout_probe: this run's waits give up after
-            // one check, so a dma unit still in flight times out.
-            static const {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options = {1U, 0U};
-            hpx_transfer_bind(&hpx_probe_options);
-        }{% endif %}
+#ifdef HPX_AOT_TRANSFER
         hpx_transfer_run_start();
-#endif{% set pool_regions = [] if allocate_arenas else arena_regions | selectattr("role", "equalto", "pool") | list %}{% if pool_regions %}
-#if {{ aot_prefix }}_num_dma_units > 0
-        // With dma units: a piece that lands late shows in the outputs as
-        // 0x5A, and every constant read of the run reaches the MSPI controller
-        // rather than lines an earlier run left in the D-cache.
-{% for region in pool_regions %}
-        memset(hpx_arena_buf_{{ region.region_id }}, 0x5A, {{ region.size }}U);
-{% endfor %}
+#endif{% if stream_evidence %}
+        // profiling.stream_evidence: every run starts from a poisoned stream
+        // pool and with each PSRAM constant arena cleaned and invalidated, so
+        // a late or missing copy shows in the outputs and every constant read
+        // reaches the MSPI controller.{{ poison_pool("        ") }}
 {% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
         {
             am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
             (void)am_hal_cachectrl_dcache_invalidate(&hpx_range, true);
         }
-{% endfor %}
-#endif{% endif %}
+{% endfor %}{% endif %}
 {%- endblock %}
 
-{% block engine_print_csv %}{% if transfer_timeout_probe and loop.index0 == 0 %}#ifdef HPX_AOT_TRANSFER
-        const uint32_t hpx_probe_pending = nsx_psram_pending();
-#endif
-{% endif %}        if (g_layer_capacity_exceeded) {
+{% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
             hpx_printf("HPX_ERROR=operator_count_exceeds_capacity capacity=%d\n",
                        kMaxLayers);
             hpx_park();
@@ -880,12 +908,7 @@ hpx_aot_check_runs();{% endblock %}
 #ifdef HPX_AOT_TRANSFER
         hpx_transfer_report();
 #endif
-        hpx_print_output_digests();{% if transfer_timeout_probe and loop.index0 == 0 %}
-#ifdef HPX_AOT_TRANSFER
-        if (iter == 0) {
-            hpx_transfer_probe_recover(hpx_probe_pending);
-        }
-#endif{% endif %}
+        hpx_print_output_digests();
 {%- endblock %}
 
 {% block engine_profiled_summary %}
@@ -900,6 +923,10 @@ hpx_aot_check_runs();{% endblock %}
     // The last run's outputs in full, then the inputs every run received.
     for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
         if ((size_t){{ aot_prefix }}_model_ctx.outputs[i].size > 1024U) {
+            continue;
+        }
+        if ((size_t){{ aot_prefix }}_model_ctx.outputs[i].size == 0U) {
+            hpx_printf("HPX_OUTPUT_%d_HEX=-\n", i);
             continue;
         }
         const uint8_t *bytes = (const uint8_t *){{ aot_prefix }}_model_ctx.outputs[i].data;

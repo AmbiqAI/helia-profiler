@@ -127,6 +127,13 @@ class ProfilingConfig:
     # out and the provider's recovery (rebind, model_init, one run) is
     # reported. Every other run keeps the default budget.
     transfer_timeout_probe: bool = False
+    # heliaAOT module with a stream pool, Apollo5 family: every instrumented
+    # run starts from a poisoned pool and cold PSRAM constants (each constant
+    # arena cleaned and invalidated), so a late or missing copy shows in the
+    # outputs and constant reads reach the MSPI controller. The warm-ups and
+    # the clean window keep their warm cache; the capture says
+    # HPX_STREAM_EVIDENCE=1.
+    stream_evidence: bool = False
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model

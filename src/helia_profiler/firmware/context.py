@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import FirmwareError, PipelineError
-from ..placement import Placement
+from ..errors import ConfigError, FirmwareError, PipelineError
+from ..placement import ArenaRole, Placement
 from ..platform.counters import (
     plan_passes,
     resolve_counters,
@@ -249,6 +249,9 @@ class EngineContext:
     #: ``profiling.transfer_timeout_probe``; only for a heliaAOT module with
     #: its emitted transfer provider.
     transfer_timeout_probe: bool = False
+    #: ``profiling.stream_evidence``; only for a heliaAOT module that binds a
+    #: stream pool, on a part with an explicit D-cache.
+    stream_evidence: bool = False
 
 
 @dataclass(frozen=True)
@@ -319,6 +322,8 @@ class FirmwareRenderContext:
                 )
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
+            if config.profiling.stream_evidence:
+                _check_stream_evidence(soc, aot_arena_regions, allocate_arenas=allocate_arenas)
             aot_manifest = tuple(
                 AotOpContext(
                     id=-1 if op["id"] is None else int(op["id"]),
@@ -449,6 +454,7 @@ class FirmwareRenderContext:
                 npu_tolerate_power_ack=board.is_fpga,
                 input_fill=config.profiling.input_fill.value,
                 transfer_timeout_probe=config.profiling.transfer_timeout_probe,
+                stream_evidence=config.profiling.stream_evidence,
             ),
         )
 
@@ -569,7 +575,27 @@ class FirmwareRenderContext:
             "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
             "input_fill": self.engine.input_fill,
             "transfer_timeout_probe": self.engine.transfer_timeout_probe,
+            "stream_evidence": self.engine.stream_evidence,
         }
+
+
+def _check_stream_evidence(
+    soc: Any, regions: tuple["ArenaRegion", ...], *, allocate_arenas: bool
+) -> None:
+    """profiling.stream_evidence needs a bound stream pool and per-range D-cache maintenance."""
+    if not soc.capabilities.memory.has_dcache:
+        raise ConfigError(
+            f"profiling.stream_evidence needs a part with an explicit D-cache (Apollo5 "
+            f"family); {soc.name} has none.",
+            hint="Turn profiling.stream_evidence off for this target.",
+        )
+    if allocate_arenas or not any(region.role is ArenaRole.POOL for region in regions):
+        raise ConfigError(
+            "profiling.stream_evidence needs a heliaAOT module whose stream pool hpx "
+            "binds, and this module has none.",
+            hint="Convert with transfer units, memory.stream_pool and "
+            "memory.allocate_arenas: false, or turn the setting off.",
+        )
 
 
 def resolve_window_timer(

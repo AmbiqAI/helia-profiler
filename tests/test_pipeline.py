@@ -733,6 +733,66 @@ def test_the_transfer_timeout_probe_needs_the_emitted_provider(tmp_path: Path, p
     assert template_vars["transfer_timeout_probe"] is True
 
 
+_SCRATCH = ("scratch", "tcm")
+_POOL = ("pool", "tcm")
+
+
+@pytest.mark.parametrize(
+    ("soc", "board", "regions", "allocate", "refusal"),
+    [
+        ("apollo510", "apollo510_evb", (_SCRATCH, _POOL), False, None),
+        ("apollo4p", "apollo4p_evb", (_SCRATCH, _POOL), False, "explicit D-cache"),
+        ("apollo510", "apollo510_evb", (_SCRATCH,), False, "stream pool hpx binds"),
+        ("apollo510", "apollo510_evb", (_SCRATCH, _POOL), True, "stream pool hpx binds"),
+    ],
+    ids=["apollo510-pool", "apollo4p", "no-pool", "internal-arenas"],
+)
+def test_stream_evidence_needs_an_explicit_dcache_and_a_bound_pool(
+    tmp_path: Path, soc, board, regions, allocate, refusal
+):
+    from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
+    from helia_profiler.errors import ConfigError
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.placement import ArenaRole, Placement
+    from helia_profiler.platform import get_board, get_soc
+    from helia_profiler.results.models import PlatformInfo
+
+    model_file = tmp_path / "test.tflite"
+    model_file.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model_file)},
+            "engine": {"type": "helia-aot"},
+            "target": {"board": board},
+            "profiling": {"stream_evidence": True},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.soc = get_soc(soc)
+    ctx.board = get_board(board)
+    arena_regions = [
+        ArenaRegion(index, f"hpx_arena_{role}", 64, 16, ArenaRole(role), "dtcm", Placement(place))
+        for index, (role, place) in enumerate(regions)
+    ]
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        helia_aot_version="0.0.0",
+        aot_allocate_arenas=allocate,
+        aot_arena_regions=arena_regions,
+    )
+    ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+    if refusal is not None:
+        with pytest.raises(ConfigError, match=f"profiling.stream_evidence needs .*{refusal}"):
+            FirmwareRenderContext.from_pipeline_context(ctx, arena_regions=arena_regions)
+        return
+    render = FirmwareRenderContext.from_pipeline_context(ctx, arena_regions=arena_regions)
+    assert render.to_template_vars()["stream_evidence"] is True
+
+
 @pytest.mark.parametrize("fill", ["zero", "lcg"])
 def test_render_context_carries_the_input_fill(tmp_path: Path, fill: str):
     from helia_profiler.engines.base import HeliaAotArtifacts
