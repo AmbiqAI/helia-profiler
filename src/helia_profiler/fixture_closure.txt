@@ -211,6 +211,7 @@ platform/policy.py
 platform/provenance.py
 platform/registry.py
 platform/sdk_descriptor.py
+platform/sdk_facts.py
 platform/soc.py
 power/__init__.py
 power/base.py
