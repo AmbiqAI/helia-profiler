@@ -102,6 +102,7 @@ from types import MappingProxyType
 from typing import Mapping
 
 from ..engines import EngineType
+from ._evidence import RUN_EVIDENCE_SPECS
 from ._faults import ERROR_SPECS, WARN_SPECS
 from ._model import (
     ALL_ENGINES,
@@ -164,6 +165,7 @@ _ALL_SPECS: tuple[WireSpec, ...] = (
     + MODEL_MEMORY_SPECS
     + PSRAM_SPECS
     + CLEAN_WINDOW_SPECS
+    + RUN_EVIDENCE_SPECS
     + HEARTBEAT_SPECS
     + ERROR_SPECS
     + WARN_SPECS
