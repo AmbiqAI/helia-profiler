@@ -11,6 +11,7 @@ from typing import Any
 
 from helia_platforms import Catalog, Target, load_overlay
 from helia_platforms import PlatformError as CatalogError
+from helia_platforms.model import DomainPoint
 
 from ..errors import ConfigError
 from .catalog import _builtin_catalog, _soc, catalog_provenance, target_selection
@@ -109,9 +110,12 @@ def _native_soc(target: Target, key: str, reference: Target) -> SocDef:
     domain = target.cores()[0].clock_domain
     reference_domain = reference.cores()[0].clock_domain
     for _, point, _ in policy.cpu_points:
+        actual = target.operating_point(point, domain=domain)
+        expected = reference.operating_point(point, domain=reference_domain)
         if (
-            target.operating_point(point, domain=domain).mhz
-            != reference.operating_point(point, domain=reference_domain).mhz
+            not isinstance(actual, DomainPoint)
+            or not isinstance(expected, DomainPoint)
+            or actual.mhz != expected.mhz
         ):
             raise ValueError(
                 f"{target.id}: changed CPU clocks need an explicit HPX clock/build policy"
