@@ -263,9 +263,9 @@
               "returns": [],
               "signature": "sdk_commit: str",
               "source": {
-                "line": 89,
+                "line": 90,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L89"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L90"
               },
               "summary": ""
             },
@@ -282,9 +282,9 @@
               "returns": [],
               "signature": "soc_name: str",
               "source": {
-                "line": 90,
+                "line": 91,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L90"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L91"
               },
               "summary": ""
             },
@@ -301,9 +301,9 @@
               "returns": [],
               "signature": "link_family: LinkFamily",
               "source": {
-                "line": 91,
+                "line": 92,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L91"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L92"
               },
               "summary": ""
             },
@@ -320,9 +320,9 @@
               "returns": [],
               "signature": "linker_profile: str",
               "source": {
-                "line": 92,
+                "line": 93,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L92"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L93"
               },
               "summary": ""
             },
@@ -339,9 +339,9 @@
               "returns": [],
               "signature": "script: LinkerFile",
               "source": {
-                "line": 93,
+                "line": 94,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L93"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L94"
               },
               "summary": ""
             },
@@ -358,9 +358,9 @@
               "returns": [],
               "signature": "files: tuple[LinkerFile, ...]",
               "source": {
-                "line": 94,
+                "line": 95,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L94"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L95"
               },
               "summary": ""
             },
@@ -377,9 +377,9 @@
               "returns": [],
               "signature": "definition_sha256: str",
               "source": {
-                "line": 95,
+                "line": 96,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L95"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L96"
               },
               "summary": ""
             },
@@ -396,9 +396,9 @@
               "returns": [],
               "signature": "admission_source: Literal['catalog-and-linker', 'sdk-descriptor', 'unavailable']",
               "source": {
-                "line": 96,
+                "line": 97,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L96"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L97"
               },
               "summary": ""
             },
@@ -415,9 +415,9 @@
               "returns": [],
               "signature": "regions: tuple[LinkerRegion, ...]",
               "source": {
-                "line": 97,
+                "line": 98,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L97"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L98"
               },
               "summary": ""
             }
@@ -428,9 +428,9 @@
           "returns": [],
           "signature": "LinkerInput(\n    sdk_commit: str,\n    soc_name: str,\n    link_family: LinkFamily,\n    linker_profile: str,\n    script: LinkerFile,\n    files: tuple[LinkerFile, ...],\n    definition_sha256: str,\n    admission_source: Literal['catalog-and-linker', 'sdk-descriptor', 'unavailable'],\n    regions: tuple[LinkerRegion, ...],\n) -> None",
           "source": {
-            "line": 85,
+            "line": 86,
             "path": "src/helia_profiler/platform/linker/model.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L85"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L86"
           },
           "summary": "Expected SDK/script input and its source-backed effective region data."
         },
@@ -454,9 +454,9 @@
               "returns": [],
               "signature": "role: Literal['profile', 'power']",
               "source": {
-                "line": 111,
+                "line": 112,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L111"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L112"
               },
               "summary": ""
             },
@@ -473,9 +473,9 @@
               "returns": [],
               "signature": "target: str",
               "source": {
-                "line": 112,
+                "line": 113,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L112"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L113"
               },
               "summary": ""
             },
@@ -492,9 +492,9 @@
               "returns": [],
               "signature": "layout: LinkerInput | None",
               "source": {
-                "line": 113,
+                "line": 114,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L113"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L114"
               },
               "summary": ""
             },
@@ -511,9 +511,9 @@
               "returns": [],
               "signature": "reason: str | None = None",
               "source": {
-                "line": 114,
+                "line": 115,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L114"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L115"
               },
               "summary": ""
             },
@@ -530,9 +530,9 @@
               "returns": [],
               "signature": "verified: bool",
               "source": {
-                "line": 126,
+                "line": 127,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L126"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L127"
               },
               "summary": "Whether actual SDK/script applicability was verified, independently of fit."
             },
@@ -549,9 +549,9 @@
               "returns": [],
               "signature": "to_dict() -> dict[str, Any]",
               "source": {
-                "line": 130,
+                "line": 131,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L130"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L131"
               },
               "summary": ""
             },
@@ -568,9 +568,9 @@
               "returns": [],
               "signature": "from_dict(value: object) -> LinkerVerification",
               "source": {
-                "line": 136,
+                "line": 137,
                 "path": "src/helia_profiler/platform/linker/model.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L136"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L137"
               },
               "summary": ""
             }
@@ -581,9 +581,9 @@
           "returns": [],
           "signature": "LinkerVerification(\n    role: Literal['profile', 'power'],\n    target: str,\n    layout: LinkerInput | None,\n    reason: str | None = None,\n) -> None",
           "source": {
-            "line": 107,
+            "line": 108,
             "path": "src/helia_profiler/platform/linker/model.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L107"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/platform/linker/model.py#L108"
           },
           "summary": "Actual applicability decision for one executable at one build boundary."
         },

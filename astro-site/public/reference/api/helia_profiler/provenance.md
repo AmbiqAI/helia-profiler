@@ -178,7 +178,7 @@ Expected SDK/script input and its source-backed effective region data.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/linker/model.py:85`
+Source: `src/helia_profiler/platform/linker/model.py:86`
 
 ### helia_profiler.LinkerInput.sdk_commit
 
@@ -188,7 +188,7 @@ Source: `src/helia_profiler/platform/linker/model.py:85`
 sdk_commit: str
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:89`
+Source: `src/helia_profiler/platform/linker/model.py:90`
 
 ### helia_profiler.LinkerInput.soc_name
 
@@ -198,7 +198,7 @@ Source: `src/helia_profiler/platform/linker/model.py:89`
 soc_name: str
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:90`
+Source: `src/helia_profiler/platform/linker/model.py:91`
 
 ### helia_profiler.LinkerInput.link_family
 
@@ -208,7 +208,7 @@ Source: `src/helia_profiler/platform/linker/model.py:90`
 link_family: LinkFamily
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:91`
+Source: `src/helia_profiler/platform/linker/model.py:92`
 
 ### helia_profiler.LinkerInput.linker_profile
 
@@ -218,7 +218,7 @@ Source: `src/helia_profiler/platform/linker/model.py:91`
 linker_profile: str
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:92`
+Source: `src/helia_profiler/platform/linker/model.py:93`
 
 ### helia_profiler.LinkerInput.script
 
@@ -228,7 +228,7 @@ Source: `src/helia_profiler/platform/linker/model.py:92`
 script: LinkerFile
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:93`
+Source: `src/helia_profiler/platform/linker/model.py:94`
 
 ### helia_profiler.LinkerInput.files
 
@@ -238,7 +238,7 @@ Source: `src/helia_profiler/platform/linker/model.py:93`
 files: tuple[LinkerFile, ...]
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:94`
+Source: `src/helia_profiler/platform/linker/model.py:95`
 
 ### helia_profiler.LinkerInput.definition_sha256
 
@@ -248,7 +248,7 @@ Source: `src/helia_profiler/platform/linker/model.py:94`
 definition_sha256: str
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:95`
+Source: `src/helia_profiler/platform/linker/model.py:96`
 
 ### helia_profiler.LinkerInput.admission_source
 
@@ -258,7 +258,7 @@ Source: `src/helia_profiler/platform/linker/model.py:95`
 admission_source: Literal['catalog-and-linker', 'sdk-descriptor', 'unavailable']
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:96`
+Source: `src/helia_profiler/platform/linker/model.py:97`
 
 ### helia_profiler.LinkerInput.regions
 
@@ -268,7 +268,7 @@ Source: `src/helia_profiler/platform/linker/model.py:96`
 regions: tuple[LinkerRegion, ...]
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:97`
+Source: `src/helia_profiler/platform/linker/model.py:98`
 
 ## helia_profiler.LinkerVerification
 
@@ -289,7 +289,7 @@ Actual applicability decision for one executable at one build boundary.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/linker/model.py:107`
+Source: `src/helia_profiler/platform/linker/model.py:108`
 
 ### helia_profiler.LinkerVerification.role
 
@@ -299,7 +299,7 @@ Source: `src/helia_profiler/platform/linker/model.py:107`
 role: Literal['profile', 'power']
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:111`
+Source: `src/helia_profiler/platform/linker/model.py:112`
 
 ### helia_profiler.LinkerVerification.target
 
@@ -309,7 +309,7 @@ Source: `src/helia_profiler/platform/linker/model.py:111`
 target: str
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:112`
+Source: `src/helia_profiler/platform/linker/model.py:113`
 
 ### helia_profiler.LinkerVerification.layout
 
@@ -319,7 +319,7 @@ Source: `src/helia_profiler/platform/linker/model.py:112`
 layout: LinkerInput | None
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:113`
+Source: `src/helia_profiler/platform/linker/model.py:114`
 
 ### helia_profiler.LinkerVerification.reason
 
@@ -329,7 +329,7 @@ Source: `src/helia_profiler/platform/linker/model.py:113`
 reason: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:114`
+Source: `src/helia_profiler/platform/linker/model.py:115`
 
 ### helia_profiler.LinkerVerification.verified
 
@@ -341,7 +341,7 @@ verified: bool
 
 Whether actual SDK/script applicability was verified, independently of fit.
 
-Source: `src/helia_profiler/platform/linker/model.py:126`
+Source: `src/helia_profiler/platform/linker/model.py:127`
 
 ### helia_profiler.LinkerVerification.to_dict
 
@@ -351,7 +351,7 @@ Source: `src/helia_profiler/platform/linker/model.py:126`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/platform/linker/model.py:130`
+Source: `src/helia_profiler/platform/linker/model.py:131`
 
 ### helia_profiler.LinkerVerification.from_dict
 
@@ -363,7 +363,7 @@ from_dict(value: object) -> LinkerVerification
 
 `classmethod`
 
-Source: `src/helia_profiler/platform/linker/model.py:136`
+Source: `src/helia_profiler/platform/linker/model.py:137`
 
 ## helia_profiler.RunMetadata
 
