@@ -370,6 +370,7 @@ class TargetConfig:
     # Joulescope rail. Always runs when power.enabled is True, since power
     # capture requires the driver regardless.
     ensure_board_powered: bool = False
+    platform_overlay: Path | None = None
 
     @field_validator("rtt_buffer_size_up")
     @classmethod
@@ -698,6 +699,12 @@ class ProfileConfig:
     verbose: int = 0
 
     def __post_init__(self) -> None:
+        overlay = self.platform_registry.overlay_source
+        if (overlay.path if overlay is not None else None) != self.target.platform_overlay:
+            raise ConfigError(
+                "target.platform_overlay must match its resolved platform registry",
+                hint="Use load_config or Session to resolve the overlay before constructing a config.",
+            )
         if self.target.transport is Transport.RTT and os.environ.get("SEGGER_RTT_PATH"):
             raise ConfigError(
                 "SEGGER_RTT_PATH is no longer supported",
@@ -883,8 +890,10 @@ def _prepare_merged_config(merged: dict[str, Any]) -> tuple[dict[str, Any], Plat
     power = dict(raw_power) if isinstance(raw_power, dict) else raw_power
 
     if isinstance(target, dict):
-        platform_registry = build_custom_platform_registry(target)
         board_name = target.get("board", DEFAULT_BOARD)
+        platform_registry = build_custom_platform_registry(target, selected_board=board_name)
+        if platform_registry.overlay_source is not None:
+            target["platform_overlay"] = platform_registry.overlay_source.path
         prepared["target"] = target
     else:
         platform_registry = build_platform_registry()

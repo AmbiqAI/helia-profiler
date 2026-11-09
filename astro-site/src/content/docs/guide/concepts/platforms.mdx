@@ -16,11 +16,12 @@ its firmware, transport, timing or energy measurements.
 | Core, ISA, PMU presence, clock operating points, memory regions, fitted PSRAM, SDK symbols, boot origin and known probe device | helia-platforms | `platform/catalog.py` projects catalog facts into `SocDef` and `BoardDef` |
 | Accepted board spellings, stable/preview channel, exposed clock labels and default, firmware performance tier, GPIO measurement wiring, transport support and PMU storage limits | HPX | `platform/policy.py` |
 | Generated default SDK linker windows, source verification and fit rules | HPX | `platform/linker/`; `platform/memory_map.py` retains the classification view |
-| Per-run custom board/SoC declarations | Caller, resolved by HPX | `platform/custom.py` and `platform/registry.py` |
+| Explicit per-run catalog file and custom board/SoC declarations | Caller, resolved by HPX | `platform/overlay.py`, `platform/custom.py` and `platform/registry.py` |
 
-The adapter loads only the packaged built-in catalog, with plugins disabled.
-It does not discover overlays from environment variables or change per-run
-configuration. `BoardDef.psram_kb` stores only a board-specific difference
+The adapter loads the packaged builtin catalog with plugins disabled. An explicit
+`target.platform_overlay` adds a local file to a per-run catalog; there is no
+environment search. See [catalog overlays](../../boards/#reuse-a-catalog-overlay)
+for supported policy lineage and source-binding behavior. `BoardDef.psram_kb` stores only a board-specific difference
 from the SoC default, such as the Cygnus add-on. An explicit custom-SoC
 capacity therefore remains effective on boards that inherit that default;
 an explicit custom-board capacity takes precedence, and `null` restores the
@@ -37,7 +38,8 @@ See the [catalog owner decision](https://github.com/AmbiqAI/helia-platforms/issu
 
 Some profiler routes still have explicit compatibility policy. The catalog
 has no J-Link device for Apollo330P, Apollo510 Lite or Atomiq110 FPGA, so
-HPX retains its named SDK probe aliases. Existing SWO probe clock controls
+HPX retains its existing probe aliases; they are not necessarily the current
+SDK part spelling. Existing SWO probe clock controls
 and the Blue board's radio-reset BSP wiring are also retained separately.
 `TargetSelection.compatibility` names these exceptions; they are not catalog
 hardware facts or new hardware qualification.

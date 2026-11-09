@@ -139,7 +139,7 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Profile model differs from the pinned fixture")
     if config.engine.type not in FIXTURE_CAPABILITIES:
         raise ConfigError("Fixture supports LiteRT, heliaRT or heliaAOT only")
-    if config.target.custom_socs or config.target.custom_boards:
+    if config.target.custom_socs or config.target.custom_boards or config.target.platform_overlay:
         raise ConfigError("Fixed fixture does not support custom target declarations")
     try:
         fixture_target_for_board(config.target.board)

@@ -36,16 +36,7 @@ def catalog_views() -> tuple[
     CatalogProvenance,
 ]:
     catalog = _builtin_catalog()
-    identity = catalog.identity()
-    provenance = CatalogProvenance(
-        identity.package_version,
-        identity.schema_version,
-        identity.catalog_digest,
-        tuple(
-            CatalogSource(s.label, s.schema_version, s.sha256, s.distribution_version)
-            for s in identity.sources
-        ),
-    )
+    provenance = catalog_provenance(catalog)
     socs = {
         name: _soc(catalog.resolve(policy.board), name, policy)
         for name, policy in SOC_POLICIES.items()
@@ -78,28 +69,7 @@ def catalog_views() -> tuple[
             jlink_device=target.jlink_device or socs[target.soc.id].jlink_device,
             catalog_target_id=target.id,
         )
-        selections[policy.name] = TargetSelection(
-            "catalog",
-            provenance,
-            target.id,
-            target.cores()[0].id,
-            target.boot.name if target.boot else None,
-            target.implementation.id if target.implementation else None,
-            tuple(addon.id for addon in target.addons),
-            tuple(
-                name
-                for name, applies in (
-                    ("probe-device-sdk-alias", target.jlink_device is None),
-                    (
-                        "probe-clock-compatibility",
-                        policy.soc in PROBE_CLOCK_COMPAT or policy.soc in CORE_CLOCKED_PROBES,
-                    ),
-                    ("radio-reset-bsp-wiring", policy.ble_reset_gpio_pin is not None),
-                    ("hpx-linker-capacity-view", True),
-                )
-                if applies
-            ),
-        )
+        selections[policy.name] = target_selection(target, provenance, policy)
     return (
         MappingProxyType(socs),
         MappingProxyType(boards),
@@ -109,11 +79,60 @@ def catalog_views() -> tuple[
     )
 
 
+def target_selection(
+    target: Target, provenance: CatalogProvenance, policy: BoardDef, *, custom: bool = False
+) -> TargetSelection:
+    return TargetSelection(
+        "hpx-custom" if custom else "catalog",
+        provenance,
+        target.id,
+        target.cores()[0].id,
+        target.boot.name if target.boot else None,
+        target.implementation.id if target.implementation else None,
+        tuple(addon.id for addon in target.addons),
+        tuple(
+            name
+            for name, applies in (
+                ("probe-device-sdk-alias", target.jlink_device is None),
+                (
+                    "probe-clock-compatibility",
+                    policy.soc in PROBE_CLOCK_COMPAT or policy.soc in CORE_CLOCKED_PROBES,
+                ),
+                ("radio-reset-bsp-wiring", policy.ble_reset_gpio_pin is not None),
+                ("hpx-linker-capacity-view", not custom),
+                ("catalog-overlay-policy-inheritance", custom),
+            )
+            if applies
+        ),
+    )
+
+
+def catalog_provenance(catalog: Catalog) -> CatalogProvenance:
+    identity = catalog.identity()
+    return CatalogProvenance(
+        identity.package_version,
+        identity.schema_version,
+        identity.catalog_digest,
+        tuple(
+            CatalogSource(s.label, s.schema_version, s.sha256, s.distribution_version)
+            for s in identity.sources
+        ),
+    )
+
+
 def _external_kib(target: Target) -> int:
     return sum(m.size for m in target.external_memories() if m.technology == "psram") // 1024
 
 
-def _soc(target: Target, name: str, policy: SocPolicy) -> SocDef:
+def _soc(
+    target: Target,
+    name: str,
+    policy: SocPolicy,
+    *,
+    custom: bool = False,
+    policy_name: str | None = None,
+) -> SocDef:
+    policy_name = policy_name or name
     sdk = target.sdk
     if sdk is None or sdk.c_define is None or sdk.cmsis_header is None:
         raise ValueError(f"Catalog target {target.id!r} lacks required SDK build facts")
@@ -151,8 +170,8 @@ def _soc(target: Target, name: str, policy: SocPolicy) -> SocDef:
         scan_size += sram.size
     trace = (
         None
-        if name in CORE_CLOCKED_PROBES
-        else PROBE_CLOCK_COMPAT.get(name, target.trace_clock_mhz)
+        if policy_name in CORE_CLOCKED_PROBES
+        else PROBE_CLOCK_COMPAT.get(policy_name, target.trace_clock_mhz)
     )
     if trace is not None and int(trace) != trace:
         raise ValueError(f"{target.id}: profiler probe clocks require whole MHz")
@@ -189,10 +208,12 @@ def _soc(target: Target, name: str, policy: SocPolicy) -> SocDef:
         catalog_target_id=target.id,
         catalog_app_flash_load_addr=target.flash_load_address(),
         catalog_has_dcache=bool(target.core_options.dcache_kb),
-        origin=SocOrigin.BUILTIN,
-        registered_name=name,
+        origin=SocOrigin.CUSTOM if custom else SocOrigin.BUILTIN,
+        registered_name=None if custom else name,
+        memory_bases_like=policy_name if custom else None,
+        app_flash_load_addr=target.flash_load_address() if custom else None,
     )
-    if policy.scan_app_only:
+    if policy.scan_app_only and not custom:
         windows = {w.region: w for w in linked_memory_map(soc)}
         extent = windows[MemoryRegion.DTCM].app_window[LinkFamily.GNU]
         soc = replace(soc, rtt_scan_ranges=((extent.start, extent.length),))

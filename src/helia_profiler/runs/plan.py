@@ -403,6 +403,8 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
+    if settings["target"].get("platform_overlay") is None:
+        _drop(settings, ("target", "platform_overlay"))
     # Preserve symlink spelling: sidecars belong beside the selected model path.
     model_path = Path(config.model.path).expanduser().absolute()
     baseline = config.compatibility_baseline
@@ -451,7 +453,13 @@ def _local_inputs(config: ProfileConfig) -> tuple[LocalInput, ...]:
             candidates.append((f"build.nsx_modules.{name}.path", str(local)))
     for variable, value in _source_environment(config).items():
         candidates.append((f"env.{variable}", value))
-    return tuple(_describe_local(setting, value) for setting, value in candidates)
+    inputs = tuple(_describe_local(setting, value) for setting, value in candidates)
+    overlay = config.platform_registry.overlay_source
+    if overlay is not None:
+        inputs += (
+            LocalInput("target.platform_overlay", str(overlay.path), "file", overlay.sha256),
+        )
+    return inputs
 
 
 def _source_environment(config: ProfileConfig) -> dict[str, str]:

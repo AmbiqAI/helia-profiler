@@ -167,6 +167,68 @@ on a board without an onboard radio). `ble_reset_gpio_pin` names the GPIO
 wired to a Blue board's Cooper BLE controller reset line, held low during
 power captures so an idling radio stays out of the measurement.
 
+#### Reuse a catalog overlay
+
+Use `target.platform_overlay` to read one explicit local
+[helia-platforms overlay](https://github.com/AmbiqAI/helia-platforms).
+For example, save this as `lab-platform.yaml`:
+
+```yaml
+schema_version: 1
+boards:
+  lab:
+    based_on: apollo510_evb
+```
+
+Then select it in the profiling config:
+
+```yaml
+target:
+  board: lab
+  platform_overlay: lab-platform.yaml
+  custom_boards:
+    lab:
+      based_on: lab
+      default_sync_gpio_pin: 27
+```
+
+The overlay supplies catalog facts. The optional `custom_boards` entry above
+sets HPX measurement wiring with the existing custom-declaration syntax.
+HPX retains an exact supported board policy for the requested name; otherwise
+it selects the nearest supported board policy from catalog lineage. The board
+policy supplies the neuralSPOT-X starter profile; SoC policy resolves independently. Catalog entries
+cannot replace builtins; HPX custom declarations retain their existing
+precedence. Self-contained HPX definitions need no catalog overlay.
+
+Relative overlay paths resolve against the working directory when configuration
+is loaded, including `Session.from_yaml`, `Session.from_dict` and `load_config`;
+they are not relative to the config file. `~` expands and the resolved absolute
+locator is retained. Programmatic callers pass the same field through these
+loaders. There is no new CLI flag, plugin discovery or environment search.
+
+Only the selected target and bases referenced by HPX custom declarations are
+projected. A native target needs supported board and SoC policy lineages that
+select the same NSX target. HPX currently requires the inherited core identity,
+non-PSRAM address geometry, trace clock and CPU frequencies exposed by HPX
+policy, and whole-KiB memory capacities;
+PSRAM must retain an address supported by the inherited HPX placement policy
+where one is known. Only one populated, directly core-reachable PSRAM region
+can be represented; an unknown address stays unknown. Unsupported projections
+raise `ConfigError`; use an explicit HPX custom declaration where appropriate.
+
+Every projected overlay target is custom, including compositions of builtin
+leaves and selecting a builtin through an explicit overlay. It does not inherit
+builtin linker-source qualification, strict compiled receipts or fixed-fixture
+admission. heliaAOT still needs an explicit supported
+`engine.config.platform_name` for a new board name; this does not establish
+physical equivalence or automatically forward the overlay to the compiler.
+
+Resolution freezes the facts and file digest. Saved `FrozenRun` readers use
+retained facts even if the file changes or disappears. Fresh execution from the
+saved plan checks the file binding and refuses changed or missing input before
+resolving it again. Omitting `platform_overlay` preserves existing saved-plan
+settings and intent hashes.
+
 #### Application flash load address
 
 `app_flash_load_addr` is the first flash address above the part's

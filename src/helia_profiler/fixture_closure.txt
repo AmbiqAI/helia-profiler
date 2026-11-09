@@ -205,6 +205,7 @@ platform/linker/files.py
 platform/linker/model.py
 platform/linker/selection.py
 platform/memory_map.py
+platform/overlay.py
 platform/placement.py
 platform/policy.py
 platform/provenance.py

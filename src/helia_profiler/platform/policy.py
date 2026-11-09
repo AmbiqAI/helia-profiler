@@ -54,12 +54,12 @@ SOC_POLICIES = {
 }
 
 # Probe control is not the physical trace clock. Preserve these routes pending
-# their bounded migration checks: https://github.com/AmbiqAI/helia-profiler/issues/657
+# their bounded migration checks: https://github.com/AmbiqAI/helia-profiler/issues/665
 PROBE_CLOCK_COMPAT = {"apollo3p": 48, "atomiq110": 48}
 CORE_CLOCKED_PROBES = frozenset({"apollo4p", "apollo4l", "apollo510", "apollo510b"})
 
 # Measurement wiring remains an HPX choice; radio reset wiring is a sourced BSP
-# exception until the catalog models it (helia-profiler#657).
+# exception until the catalog models it; see maintainers/platform-exceptions.md.
 BOARD_POLICIES = (
     BoardDef(
         name="apollo3p_evb",

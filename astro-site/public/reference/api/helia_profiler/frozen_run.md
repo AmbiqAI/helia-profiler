@@ -22,7 +22,7 @@ Identity of an explicit source included in a catalog.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/provenance.py:20`
+Source: `src/helia_profiler/platform/provenance.py:29`
 
 ### helia_profiler.CatalogSource.label
 
@@ -32,7 +32,7 @@ Source: `src/helia_profiler/platform/provenance.py:20`
 label: str
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:24`
+Source: `src/helia_profiler/platform/provenance.py:33`
 
 ### helia_profiler.CatalogSource.schema_version
 
@@ -42,7 +42,7 @@ Source: `src/helia_profiler/platform/provenance.py:24`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:25`
+Source: `src/helia_profiler/platform/provenance.py:34`
 
 ### helia_profiler.CatalogSource.sha256
 
@@ -52,7 +52,7 @@ Source: `src/helia_profiler/platform/provenance.py:25`
 sha256: str
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:26`
+Source: `src/helia_profiler/platform/provenance.py:35`
 
 ### helia_profiler.CatalogSource.distribution_version
 
@@ -62,7 +62,7 @@ Source: `src/helia_profiler/platform/provenance.py:26`
 distribution_version: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:27`
+Source: `src/helia_profiler/platform/provenance.py:36`
 
 ## helia_profiler.CatalogProvenance
 
@@ -83,7 +83,7 @@ Catalog package, schema and data identities recorded at resolution.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/provenance.py:30`
+Source: `src/helia_profiler/platform/provenance.py:39`
 
 ### helia_profiler.CatalogProvenance.package_version
 
@@ -93,7 +93,7 @@ Source: `src/helia_profiler/platform/provenance.py:30`
 package_version: str
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:34`
+Source: `src/helia_profiler/platform/provenance.py:43`
 
 ### helia_profiler.CatalogProvenance.schema_version
 
@@ -103,7 +103,7 @@ Source: `src/helia_profiler/platform/provenance.py:34`
 schema_version: int
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:35`
+Source: `src/helia_profiler/platform/provenance.py:44`
 
 ### helia_profiler.CatalogProvenance.catalog_digest
 
@@ -113,7 +113,7 @@ Source: `src/helia_profiler/platform/provenance.py:35`
 catalog_digest: str
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:36`
+Source: `src/helia_profiler/platform/provenance.py:45`
 
 ### helia_profiler.CatalogProvenance.sources
 
@@ -123,7 +123,7 @@ Source: `src/helia_profiler/platform/provenance.py:36`
 sources: tuple[CatalogSource, ...] = ()
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:37`
+Source: `src/helia_profiler/platform/provenance.py:46`
 
 ## helia_profiler.TargetSelection
 
@@ -148,7 +148,7 @@ Requested target resolution and named HPX compatibility choices.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/provenance.py:40`
+Source: `src/helia_profiler/platform/provenance.py:49`
 
 ### helia_profiler.TargetSelection.origin
 
@@ -158,7 +158,7 @@ Source: `src/helia_profiler/platform/provenance.py:40`
 origin: Literal['catalog', 'hpx-custom', 'sdk-descriptor']
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:44`
+Source: `src/helia_profiler/platform/provenance.py:53`
 
 ### helia_profiler.TargetSelection.catalog
 
@@ -168,7 +168,7 @@ Source: `src/helia_profiler/platform/provenance.py:44`
 catalog: CatalogProvenance | None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:45`
+Source: `src/helia_profiler/platform/provenance.py:54`
 
 ### helia_profiler.TargetSelection.target_id
 
@@ -178,7 +178,7 @@ Source: `src/helia_profiler/platform/provenance.py:45`
 target_id: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:46`
+Source: `src/helia_profiler/platform/provenance.py:55`
 
 ### helia_profiler.TargetSelection.core
 
@@ -188,7 +188,7 @@ Source: `src/helia_profiler/platform/provenance.py:46`
 core: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:47`
+Source: `src/helia_profiler/platform/provenance.py:56`
 
 ### helia_profiler.TargetSelection.boot
 
@@ -198,7 +198,7 @@ Source: `src/helia_profiler/platform/provenance.py:47`
 boot: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:48`
+Source: `src/helia_profiler/platform/provenance.py:57`
 
 ### helia_profiler.TargetSelection.implementation
 
@@ -208,7 +208,7 @@ Source: `src/helia_profiler/platform/provenance.py:48`
 implementation: str | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:49`
+Source: `src/helia_profiler/platform/provenance.py:58`
 
 ### helia_profiler.TargetSelection.addons
 
@@ -218,7 +218,7 @@ Source: `src/helia_profiler/platform/provenance.py:49`
 addons: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:50`
+Source: `src/helia_profiler/platform/provenance.py:59`
 
 ### helia_profiler.TargetSelection.compatibility
 
@@ -228,7 +228,7 @@ Source: `src/helia_profiler/platform/provenance.py:50`
 compatibility: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:51`
+Source: `src/helia_profiler/platform/provenance.py:60`
 
 ## helia_profiler.RegionExtent
 
@@ -244,7 +244,7 @@ A retained application address range for one linker region.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/provenance.py:54`
+Source: `src/helia_profiler/platform/provenance.py:63`
 
 ### helia_profiler.RegionExtent.region
 
@@ -254,7 +254,7 @@ Source: `src/helia_profiler/platform/provenance.py:54`
 region: MemoryRegion
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:58`
+Source: `src/helia_profiler/platform/provenance.py:67`
 
 ### helia_profiler.RegionExtent.extent
 
@@ -264,7 +264,7 @@ Source: `src/helia_profiler/platform/provenance.py:58`
 extent: MemoryRange
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:59`
+Source: `src/helia_profiler/platform/provenance.py:68`
 
 ## helia_profiler.PlatformSnapshot
 
@@ -289,7 +289,7 @@ Effective HPX platform views and the catalog selection that supplied their facts
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/platform/provenance.py:62`
+Source: `src/helia_profiler/platform/provenance.py:71`
 
 ### helia_profiler.PlatformSnapshot.board
 
@@ -299,7 +299,7 @@ Source: `src/helia_profiler/platform/provenance.py:62`
 board: BoardDef
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:66`
+Source: `src/helia_profiler/platform/provenance.py:75`
 
 ### helia_profiler.PlatformSnapshot.soc
 
@@ -309,7 +309,7 @@ Source: `src/helia_profiler/platform/provenance.py:66`
 soc: SocDef
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:67`
+Source: `src/helia_profiler/platform/provenance.py:76`
 
 ### helia_profiler.PlatformSnapshot.selection
 
@@ -319,7 +319,7 @@ Source: `src/helia_profiler/platform/provenance.py:67`
 selection: TargetSelection
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:68`
+Source: `src/helia_profiler/platform/provenance.py:77`
 
 ### helia_profiler.PlatformSnapshot.link_family
 
@@ -329,7 +329,7 @@ Source: `src/helia_profiler/platform/provenance.py:68`
 link_family: LinkFamily
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:69`
+Source: `src/helia_profiler/platform/provenance.py:78`
 
 ### helia_profiler.PlatformSnapshot.linker_profile
 
@@ -339,7 +339,7 @@ Source: `src/helia_profiler/platform/provenance.py:69`
 linker_profile: str
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:70`
+Source: `src/helia_profiler/platform/provenance.py:79`
 
 ### helia_profiler.PlatformSnapshot.app_regions
 
@@ -349,7 +349,7 @@ Source: `src/helia_profiler/platform/provenance.py:70`
 app_regions: tuple[RegionExtent, ...]
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:71`
+Source: `src/helia_profiler/platform/provenance.py:80`
 
 ### helia_profiler.PlatformSnapshot.load_address
 
@@ -359,7 +359,7 @@ Source: `src/helia_profiler/platform/provenance.py:71`
 load_address: int | None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:72`
+Source: `src/helia_profiler/platform/provenance.py:81`
 
 ### helia_profiler.PlatformSnapshot.expected_linker
 
@@ -369,7 +369,7 @@ Source: `src/helia_profiler/platform/provenance.py:72`
 expected_linker: LinkerInput | None = None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:73`
+Source: `src/helia_profiler/platform/provenance.py:82`
 
 ### helia_profiler.PlatformSnapshot.to_dict
 
@@ -379,7 +379,7 @@ Source: `src/helia_profiler/platform/provenance.py:73`
 to_dict() -> dict[str, Any]
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:86`
+Source: `src/helia_profiler/platform/provenance.py:95`
 
 ### helia_profiler.PlatformSnapshot.from_dict
 
@@ -391,7 +391,7 @@ from_dict(value: object) -> PlatformSnapshot
 
 `classmethod`
 
-Source: `src/helia_profiler/platform/provenance.py:92`
+Source: `src/helia_profiler/platform/provenance.py:101`
 
 ### helia_profiler.PlatformSnapshot.verify_current
 
@@ -401,7 +401,7 @@ Source: `src/helia_profiler/platform/provenance.py:92`
 verify_current() -> None
 ```
 
-Source: `src/helia_profiler/platform/provenance.py:101`
+Source: `src/helia_profiler/platform/provenance.py:110`
 
 ## helia_profiler.FrozenModel
 
