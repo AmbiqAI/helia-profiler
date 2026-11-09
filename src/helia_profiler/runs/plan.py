@@ -57,6 +57,15 @@ _HOST_LOCAL_SETTINGS = (
     ("frozen",),  # alias that forces build.offline
 )
 
+#: Settings added after plans were first frozen, with the value that means
+#: absent. At that value a setting is left out of the plan, so a plan frozen
+#: before it existed keeps its intent.
+_ABSENT_AT_DEFAULT: tuple[tuple[tuple[str, ...], object], ...] = (
+    (("target", "platform_overlay"), None),
+    (("profiling", "input_fill"), "zero"),
+    (("profiling", "transfer_timeout_probe"), False),
+)
+
 #: Environment variables that can point a build at local sources.
 _SOURCE_VARIABLES = ("CMSIS_NN_PATH",)
 
@@ -403,8 +412,9 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
-    if settings["target"].get("platform_overlay") is None:
-        _drop(settings, ("target", "platform_overlay"))
+    for (section, key), absent in _ABSENT_AT_DEFAULT:
+        if settings[section].get(key) == absent:
+            _drop(settings, (section, key))
     # Preserve symlink spelling: sidecars belong beside the selected model path.
     model_path = Path(config.model.path).expanduser().absolute()
     baseline = config.compatibility_baseline
