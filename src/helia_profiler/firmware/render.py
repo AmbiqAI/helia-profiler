@@ -8,6 +8,7 @@ from typing import Any, cast
 import jinja2
 
 from ..wire import POWER_TERMINAL_VERSION, STIMER_HZ, STIMER_SETTLE_TICKS
+from .headers import word_padded
 
 _jinja_env = jinja2.Environment(
     loader=jinja2.PackageLoader("helia_profiler.firmware", "templates"),
@@ -21,6 +22,7 @@ cast("dict[str, Any]", _jinja_env.globals).update(
     stimer_hz=STIMER_HZ,
     stimer_settle_ticks=STIMER_SETTLE_TICKS,
 )
+_jinja_env.filters["word_padded"] = word_padded
 
 
 def _write_text(path: Path, text: str) -> None:

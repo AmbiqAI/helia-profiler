@@ -391,7 +391,7 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
                    {{ region.region_id }},
                    (unsigned long)hpx_arena_buf_{{ region.region_id }},
                    (unsigned)({{ region.size }}));
-        psram_off += (uint32_t){{ region.size }};
+        psram_off += (uint32_t){{ region.size | word_padded }};
 {% endfor %}
         HPX_CLEAN_DCACHE();
     }
@@ -435,11 +435,11 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
 {% else %}
     memcpy(hpx_arena_buf_{{ region.region_id }},
            hpx_const_blob_{{ region.region_id }},
-           sizeof(hpx_const_blob_{{ region.region_id }}));
+           hpx_const_blob_{{ region.region_id }}_len);
 {% endif %}
     hpx_printf("HPX_CONST_BLOB_LOADED region=%d size=%u\n",
                {{ region.region_id }},
-               (unsigned)sizeof(hpx_const_blob_{{ region.region_id }}));
+               (unsigned)hpx_const_blob_{{ region.region_id }}_len);
 {% endif %}
 {% endfor %}
 {% endif %}

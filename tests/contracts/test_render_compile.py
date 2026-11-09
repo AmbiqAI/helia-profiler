@@ -377,11 +377,14 @@ def _dedup(cases: list[_CompileCase]) -> list[_CompileCase]:
 
 # The snapshot matrix pins weights_region="mram" (see _common_kwargs), and
 # firmware/__init__.py's _model_to_header emits `static const` for mram —
-# so the generated stand-in matches the const-ness the renders expect.
+# so the generated stand-in matches the const-ness the renders expect. Like
+# the generator, it stores a 1-byte model word-padded with a literal length.
 _MODEL_DATA_STUB = """\
 // hpx compile-check generated model_data.h stand-in (#187)
 #pragma once
-alignas(16) static const unsigned char model_data[] = {0};
+alignas(16) static const unsigned char model_data[] = {
+    0x00, 0x00, 0x00, 0x00,
+};
 static const unsigned int model_data_len = 1;
 """
 
@@ -397,7 +400,8 @@ _AOT_COMMON_STUB = """\
 
 # Constant-arena sidecar blobs: firmware/__init__.py generates one
 # hpx_const_blob_<region_id>.h per blob-carrying arena region (via
-# _blob_to_header); the stand-in mirrors its shape.
+# _blob_to_header); the stand-in mirrors its shape: a 1-byte blob stored
+# word-padded, with a literal logical length.
 _CONST_BLOB_INCLUDE = re.compile(r'#include\s+"hpx_const_blob_(\d+)\.h"')
 
 
@@ -406,9 +410,10 @@ def _const_blob_stub(region_id: str) -> str:
         "// hpx compile-check generated const-blob stand-in (#187)\n"
         "#pragma once\n"
         "#include <stddef.h>\n"
-        f"alignas(16) static const unsigned char hpx_const_blob_{region_id}[] = {{0}};\n"
-        f"static const size_t hpx_const_blob_{region_id}_len = "
-        f"sizeof(hpx_const_blob_{region_id});\n"
+        f"alignas(16) static const unsigned char hpx_const_blob_{region_id}[] = {{\n"
+        "    0x00, 0x00, 0x00, 0x00,\n"
+        "};\n"
+        f"static const size_t hpx_const_blob_{region_id}_len = 1;\n"
     )
 
 

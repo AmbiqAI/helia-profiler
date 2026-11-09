@@ -68,7 +68,7 @@ volatile uint32_t deployment_arena_scan[{{ 2 * (fixture_scan_arenas | length) }}
 {% if payload.region_id == region.region_id %}
     if (!hpx_psram_load({{ loop.index0 }}, {{ region.region_id }},
                          hpx_const_blob_{{ region.region_id }}, {{ payload.size }}U,
-                         {{ payload.checksum }}U, &hpx_arena_buf_{{ region.region_id }})) return {{ fixture_status.psram }};
+                         sizeof(hpx_const_blob_{{ region.region_id }}), {{ payload.checksum }}U, &hpx_arena_buf_{{ region.region_id }})) return {{ fixture_status.psram }};
 {% endif %}
 {% endfor %}
 {% else %}
@@ -119,7 +119,7 @@ volatile uint32_t deployment_arena_scan[{{ 2 * (fixture_scan_arenas | length) }}
 {% if fixture_psram | default(false) %}
     const uint8_t *active_model_data = nullptr;
     if (!hpx_psram_load(0, 0, model_data, {{ fixture_psram_payloads[0].size }}U,
-                         {{ fixture_psram_payloads[0].checksum }}U, &active_model_data)) return {{ fixture_status.psram }};
+                         sizeof(model_data), {{ fixture_psram_payloads[0].checksum }}U, &active_model_data)) return {{ fixture_status.psram }};
     uint32_t model_root_offset = 0;
     std::memcpy(&model_root_offset, active_model_data, sizeof(model_root_offset));
     if (model_root_offset < sizeof(model_root_offset) || model_root_offset > {{ fixture_psram_payloads[0].size }}U - sizeof(model_root_offset)) return {{ fixture_status.psram }};
