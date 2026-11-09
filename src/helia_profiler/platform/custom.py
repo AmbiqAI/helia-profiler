@@ -211,11 +211,10 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
                 base=base_soc,
             ),
         )
-        if base_soc is not None and not base_soc.is_builtin:
+        if base_soc is not None:
             # SDK overrides must not erase the ancestor's shutdown eligibility.
             eligible = shutdown_eligibility.get(based_on, base_soc.has_radio_subsystem)
             shutdown_eligibility[name] = eligible
-            # Builtin-derived declarations retain their established default policy.
             custom[name] = replace(
                 custom[name],
                 swo_trace_clock_mhz=base_soc.swo_trace_clock_mhz,

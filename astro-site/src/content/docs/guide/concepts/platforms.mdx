@@ -123,6 +123,19 @@ plan still reads offline, but replay requires freezing and building again.
 The same applies to native-derived custom plans whose SDK overrides previously
 retained an unsupported RSS shutdown flag.
 
+The builtin-derived custom-SoC inheritance correction also changes selected
+custom targets based on `apollo330P`, `apollo510L`, `apollo3p`, `atomiq110`,
+`apollo4l`, `apollo4p`, `apollo510` or `apollo510b`, including descendants and
+builtin-name shadows. Refreeze and rebuild these plans. The correction retains
+the base's USB, trace, SRAM-power, radio and known cache inputs instead of
+replacing them with custom defaults. Even a cache-provenance-only change alters
+the intent when the effective cache behavior was already the same. Retained
+plans and receipts remain readable without rewriting their facts. Unmodified
+builtin targets, board-only custom definitions, unused custom declarations,
+standalone definitions and SDK-descriptor-derived defaults are unchanged.
+Existing native-derived inheritance is unchanged. There are no new config keys
+or payload/schema versions.
+
 The catalog digest does not establish physical equivalence between producers.
 `hpx.target-config/1` still hashes the same retained target/clock/placement
 facts. Configured CPU frequency remains distinct from firmware-reported or
