@@ -8,9 +8,9 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 107,
-    "schemaProperties": 107,
-    "enums": 4,
+    "declaredFields": 109,
+    "schemaProperties": 109,
+    "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
     ]
@@ -486,7 +486,7 @@
           "name": "profiling",
           "pythonType": "ProfilingConfig",
           "required": false,
-          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, extreme_mode=False)",
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, extreme_mode=False)",
           "defaultFromFactory": true
         },
         {
@@ -652,6 +652,20 @@
           "pythonType": "Aggregation",
           "required": false,
           "default": "median",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "input_fill",
+          "pythonType": "InputFill",
+          "required": false,
+          "default": "zero",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "transfer_timeout_probe",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
           "defaultFromFactory": false
         },
         {
@@ -873,8 +887,8 @@
         "reachableFromRoot": true
       },
       "ProfilingConfig": {
-        "declared": 13,
-        "inSchema": 13,
+        "declared": 15,
+        "inSchema": 15,
         "reachableFromRoot": true
       },
       "PsramConfig": {
@@ -897,6 +911,10 @@
       "CleanWindowProbe": [
         "infer",
         "busy_loop"
+      ],
+      "InputFill": [
+        "zero",
+        "lcg"
       ],
       "OutputFormat": [
         "csv",
@@ -1529,6 +1547,15 @@
       "title": "Ina228Config",
       "type": "object"
     },
+    "InputFill": {
+      "description": "What fills the model's inputs before every run.\n\n``ZERO`` (default) keeps every existing capture unchanged.  ``LCG`` fills\neach input with a fixed-seed 32-bit linear congruential sequence, so an\noutput depends on every weight rather than on biases alone and a missing\nor late weight shows in the output digests (heliaAOT only).",
+      "enum": [
+        "zero",
+        "lcg"
+      ],
+      "title": "InputFill",
+      "type": "string"
+    },
     "MemoryLayout": {
       "description": "Declared hardware/board capacities in KiB; linker admission is a separate view.",
       "properties": {
@@ -2152,6 +2179,15 @@
         "aggregation": {
           "$ref": "#/$defs/Aggregation",
           "default": "median"
+        },
+        "input_fill": {
+          "$ref": "#/$defs/InputFill",
+          "default": "zero"
+        },
+        "transfer_timeout_probe": {
+          "default": false,
+          "title": "Transfer Timeout Probe",
+          "type": "boolean"
         },
         "extreme_mode": {
           "default": false,

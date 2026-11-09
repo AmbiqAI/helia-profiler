@@ -1,6 +1,6 @@
 # Configuration reference
 
-Every hpx.yml key: 107 fields across 15 configuration models, generated from the package.
+Every hpx.yml key: 109 fields across 15 configuration models, generated from the package.
 
 ## ProfileConfig
 
@@ -15,7 +15,7 @@ Top-level immutable configuration for a profiling run.
 | `model` | `ModelConfig` |  | Required. |
 | `engine` | `EngineConfig` | EngineConfig(type=<EngineType.HELIA_RT: 'helia-rt'>, backend=None, config={}, config_path=None, allow_unsupported_version=False) | Default built per instance. |
 | `target` | `TargetConfig` | TargetConfig(board='apollo510_evb', toolchain=<Toolchain.ARM_NONE_EABI_GCC: 'arm-none-eabi-gcc'>, jlink_serial=None, transport=<Transport.RTT: 'rtt'>, usb_port=None, rtt_buffer_size_up=None, clock=ClockSelection(cpu=None), psram=PsramConfig(clock_hz=48000000), heartbeat=HeartbeatConfig(enabled=True, every_n_ops=8, every_ms=2000, host_timeout_s=30, overall_timeout_s=None), custom_socs=None, custom_boards=None, ensure_board_powered=False, platform_overlay=None) | Default built per instance. |
-| `profiling` | `ProfilingConfig` | ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, extreme_mode=False) | Default built per instance. |
+| `profiling` | `ProfilingConfig` | ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, extreme_mode=False) | Default built per instance. |
 | `power` | `PowerConfig` | PowerConfig(enabled=False, driver='joulescope', firmware=<PowerFirmware.DEDICATED: 'dedicated'>, mode=<PowerMode.EXTERNAL: 'external'>, duration_s=None, io_voltage=1.8, sync_gpio_pin=10, sync_input_index=0, lockstep=None, state_gpio_pin=0, go_gpio_pin=0, state_input_index=1, go_output_index=0, stats_rate_hz=1000, reset_strategy=<ResetStrategy.AUTO: 'auto'>, serial=None, ina228=None) | Default built per instance. |
 | `output` | `OutputConfig` | OutputConfig(format=<OutputFormat.CSV: 'csv'>, dir=PosixPath('results'), model_explorer=True, detailed=False, fail_on_invalid=False) | Default built per instance. |
 | `timeouts` | `TimeoutsConfig` | TimeoutsConfig(configure_s=120, build_s=300, flash_s=120, toolchain_probe_s=5, binary_probe_s=10, download_api_s=30, download_asset_s=300) | Default built per instance. |
@@ -196,6 +196,8 @@ plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
 | `clean_window_trace` | `bool` | false | Clean Window Trace |
 | `force_shared_sram` | `bool` | false | Force Shared Sram |
 | `aggregation` | `Aggregation` | median |  |
+| `input_fill` | `InputFill` | zero |  |
+| `transfer_timeout_probe` | `bool` | false | Transfer Timeout Probe |
 | `extreme_mode` | `bool` | false | Extreme Mode |
 
 ## PowerConfig
@@ -393,6 +395,13 @@ Not reachable from `ProfileConfig`; surfaced through a lookup table.
 | --- |
 | `infer` |
 | `busy_loop` |
+
+## InputFill
+
+| Value |
+| --- |
+| `zero` |
+| `lcg` |
 
 ## OutputFormat
 
