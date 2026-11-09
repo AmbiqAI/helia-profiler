@@ -63,8 +63,9 @@ static inline uint32_t nsx_psram_write(uint32_t offset, const void *src, uint32_
     return 0U;
 }
 
-// Asynchronous-read queries (API 1.1.0), used beside an emitted transfer
-// provider. dma_in_progress returns a status; a non-zero one is no sample.
+// Asynchronous-read queries used beside an emitted transfer provider; the
+// DMA-in-progress accessor arrived with nsx-ambiq-sdk#211 (64cf8985), after
+// the API 1.1.0 records. dma_in_progress returns a status; non-zero is no sample.
 static inline uint32_t nsx_psram_pending(void) { return 0U; }
 
 static inline uint32_t nsx_psram_dma_in_progress(bool *in_progress) {
