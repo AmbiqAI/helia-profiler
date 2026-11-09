@@ -192,8 +192,8 @@ def test_psram_production_render_uses_active_consumer(tmp_path, engine, arena):
         **values, psram_clock_hz=96000000, aot_prefix="fake", arena_regions=regions
     )
     assert source.index("if (!hpx_psram_start())") < source.index("if (!hpx_stimer_init())")
-    assert "nsx_psram_write(offset, source, size)" in source
-    assert "size > hpx_psram_size - offset" in source
+    assert "nsx_psram_write(offset, source, stored)" in source
+    assert "stored > hpx_psram_size - offset" in source
     if engine is EngineType.HELIA_AOT:
         assert source.index("fake_bind_arena") < source.index("fake_model_init")
         assert "model_ctx.arena_buffers[1] != hpx_arena_buf_1" in source
@@ -316,7 +316,8 @@ def test_psram_micro_production_generator_stages_only_fixture_model(tmp_path, fi
     assert header.exists() is fixture_enabled
     if fixture_enabled:
         text = header.read_text()
-        assert bytes(int(x, 16) for x in re.findall(r"0x([0-9a-f]{2})", text)) == b"model"
+        assert bytes(int(x, 16) for x in re.findall(r"0x([0-9a-f]{2})", text)) == b"model\0\0\0"
+        assert "model_data_len = 5;" in text
         assert "Placement: mram" in text and "static const unsigned char model_data[]" in text
         assert "tflite::GetModel(active_model_data)" in (app / "src/main.cc").read_text()
 
@@ -583,3 +584,65 @@ def test_psram_compile_preparation_does_not_use_internal_cached_api(tmp_path, ki
     header = (scratch / "fake_model.h").read_text()
     assert "fake_bind_arena" in header
     assert "fake_arena_buffers" not in header
+
+
+def _c_arguments(text: str) -> list[str]:
+    arguments, depth, start = [], 0, 0
+    for i, character in enumerate(text):
+        depth += character == "("
+        depth -= character == ")"
+        if character == "," and depth == 0:
+            arguments.append(text[start:i].strip())
+            start = i + 1
+    return [*arguments, text[start:].strip()]
+
+
+@pytest.mark.parametrize(
+    ("engine", "size"),
+    [(EngineType.HELIA_AOT, 1), (EngineType.HELIA_AOT, 4097), (EngineType.LITERT, 5)],
+)
+def test_psram_fixture_write_is_word_padded(tmp_path, engine, size):
+    import re
+
+    from helia_profiler.firmware.fixture import fixture_psram_payloads, fixture_template_vars
+    from helia_profiler.firmware.headers import _blob_to_header, _model_to_header
+    from helia_profiler.firmware.render import _jinja_env
+    from tests.test_psram_word_writes import _PADDED, c_value
+
+    ctx, regions = render_context(tmp_path, engine)
+    if engine is EngineType.HELIA_AOT:
+        data = bytes(i % 255 + 1 for i in range(size))
+        (tmp_path / "weights.bin").write_bytes(data)
+        regions[1] = replace(regions[1], size=size)
+        header = _blob_to_header(tmp_path / "weights.bin", "hpx_const_blob_1")
+        call = r"hpx_psram_load\(0, 1,\s*(.+?)\)\) return"
+    else:
+        data = ctx.fixture.fixture.model.read()
+        header = _model_to_header(ctx.fixture.fixture.model.path)
+        call = r"hpx_psram_load\(0, 0,\s*(.+?)\)\) return"
+    assert len(data) == size
+    values = fixture_template_vars(ctx, regions)
+    source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
+        **values, psram_clock_hz=96000000, aot_prefix="fake", arena_regions=regions
+    )
+    signature = re.search(r"static bool hpx_psram_load\((.+?)\) \{", source, re.DOTALL)
+    match = re.search(call, source, re.DOTALL)
+    assert signature and match
+    names = [p.split()[-1].lstrip("*") for p in _c_arguments(signature.group(1))]
+    passed = dict(zip(names[2:], _c_arguments(match.group(1)), strict=True))
+
+    def length(pattern: str) -> int:
+        found = re.findall(pattern, source)
+        assert len(found) == 1, pattern
+        return c_value(passed[found[0]], header)
+
+    padded = _PADDED[size]
+    write = length(r"nsx_psram_write\(offset, source, (\w+)\)")
+    assert write == padded and write % 4 == 0
+    assert length(r"(\w+) > hpx_psram_size - offset") == padded
+    assert length(r"hpx_psram_offset = offset \+ (\w+);") == padded
+    assert length(r"hpx_psram_checksum\(destination, (\w+)\)") == size
+    assert length(r"hpx_psram_checksum\(source, (\w+)\)") == size
+    assert length(r"deployment_psram_weights\[10 \+ 4\*slot\] = (\w+);") == size
+    assert c_value(passed["expected"], header) == payload_checksum(data)
+    assert fixture_psram_payloads(ctx, regions)[0].size == size
