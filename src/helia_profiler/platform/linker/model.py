@@ -80,6 +80,7 @@ class ApplicationRegion:
     name: str
     region: MemoryRegion
     intervals: tuple[MemoryRange, ...] | None
+    aperture: MemoryRange | None = None
 
 
 @dataclass(frozen=True)

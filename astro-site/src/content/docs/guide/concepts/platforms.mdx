@@ -42,7 +42,12 @@ HPX retains its existing probe aliases; they are not necessarily the current
 SDK part spelling. Existing SWO probe clock controls
 and the Blue board's radio-reset BSP wiring are also retained separately.
 `TargetSelection.compatibility` names these exceptions; they are not catalog
-hardware facts or new hardware qualification.
+hardware facts or new hardware qualification. RSS shutdown additionally requires
+both a declared radio subsystem and a known supporting SDK header route;
+physical radio topology alone cannot enable a HAL call. Legacy custom children
+recheck that support after applying SDK part/header overrides. An unsupported
+intermediate route does not erase inherited shutdown eligibility: a later
+descendant can select a supported route again.
 
 `MemoryLayout` records physical capacities for HPX's selected logical banks,
 including fitted board PSRAM. It does not subtract linker reservations. The
@@ -73,6 +78,13 @@ cannot be summed into a contiguous arena. Admission uses the largest contiguous
 interval as a conservative scalar budget. Fixed stack reservations outside the
 script's application extent are charged once; floating stacks remain app usage.
 This models requested occupancy, not complete allocator or linker success.
+
+PSRAM uses the selected core’s catalog aperture, bounded by the declared fitted
+capacity and intersected with application intervals. This includes Cygnus’s
+8 MiB add-on. PSRAM is runtime-allocated, so this admission does not establish
+ELF section attribution or measured free space. A missing address and a known
+empty application range produce distinct placement errors; neither means the
+board physically lacks its declared PSRAM.
 
 Explicit SDK/script overrides and uncharacterized profiles can still build for
 development, but report unavailable linker fit/accounting instead of borrowing
@@ -106,6 +118,10 @@ against the retained target/build identity. Replaying a plan or capturing a stan
 fixture checks the current catalog and HPX settings before device access. If
 they differ, use the matching producer environment or freeze and build again.
 This catches accidental environment drift; it is not an authentication scheme.
+The Cygnus PSRAM admission correction changes its retained layout: an earlier
+plan still reads offline, but replay requires freezing and building again.
+The same applies to native-derived custom plans whose SDK overrides previously
+retained an unsupported RSS shutdown flag.
 
 The catalog digest does not establish physical equivalence between producers.
 `hpx.target-config/1` still hashes the same retained target/clock/placement

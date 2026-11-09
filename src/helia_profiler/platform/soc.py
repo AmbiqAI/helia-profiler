@@ -146,7 +146,7 @@ class SocDef:
     #: (apollo330P's am_hal_pwrctrl.h does not define SRAM_3M at all).
     ssram_full_power_enum: str = "AM_HAL_PWRCTRL_SRAM_3M"
 
-    #: Whether this part's HAL exposes am_hal_pwrctrl_rss_pwroff() (the
+    #: Whether the declared radio subsystem can use am_hal_pwrctrl_rss_pwroff() (the
     #: internal radio subsystem / BLE-radio power-down AutoDeploy calls in
     #: ns_power_platform_config() when the app doesn't need Bluetooth).
     #: apollo330P and apollo510L define it; the plain apollo510 (non-L) HAL
