@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import TypeAdapter
@@ -15,6 +16,14 @@ from .soc import MemoryRange, SocDef
 
 if TYPE_CHECKING:
     from .registry import PlatformRegistry
+
+
+@dataclass(frozen=True)
+class OverlaySource:
+    """The local overlay bytes captured when a configuration was resolved."""
+
+    path: Path
+    sha256: str
 
 
 @dataclass(frozen=True)

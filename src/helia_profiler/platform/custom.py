@@ -121,9 +121,15 @@ class CustomBoardField(Enum):
     DESCRIPTION = "description"
 
 
-def build_custom_platform_registry(target: dict[str, Any]) -> PlatformRegistry:
+def build_custom_platform_registry(
+    target: dict[str, Any], *, selected_board: str | None = None
+) -> PlatformRegistry:
     """Build the platform registry after applying target-local overlays."""
     base = build_platform_registry()
+    if target.get("platform_overlay") is not None:
+        from .overlay import overlay_registry
+
+        base = overlay_registry(target, selected_board=selected_board)
     custom_socs = _build_custom_socs(target.get("custom_socs"), base)
     registry_with_socs = build_platform_registry(base=base, socs=custom_socs)
     return _build_custom_boards(target.get("custom_boards"), registry_with_socs)
@@ -188,6 +194,9 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             # Inherited, never user-declared: NPU presence is a silicon fact
             # of the based_on part (see the pinned-subset platform test).
             npu=base_soc.npu if base_soc else None,
+            catalog_has_dcache=(
+                base_soc.catalog_has_dcache if base_soc and not base_soc.is_builtin else None
+            ),
             # Likewise: the based_on part's resolved placement-base map keeps
             # working for the derivative (see SocDef.memory_bases_like).
             memory_bases_like=((base_soc.memory_bases_like or base_soc.name) if base_soc else None),
@@ -212,39 +221,9 @@ def _app_flash_load_addr(
     field_name: str,
     base: SocDef | None,
 ) -> int | None:
-    """Resolve the app-image flash address a custom SoC is declared with.
+    """Prefer an explicit address, then the base's resolved boot address.
 
-    An explicit ``app_flash_load_addr:`` wins.  Otherwise the address is
-    inherited from ``based_on``, using that part's *resolved* address so the
-    inheritance carries whatever the base actually flashes at -- a built-in's
-    map-derived address included -- rather than only the raw field.
-
-    With neither, the result is ``None`` and the part has no address at all.
-    That is deliberate.  The remaining case is a SoC declared from scratch
-    whose only platform statement is a ``family:`` tag, and in this model that
-    tag records a core tier, not a memory map (see
-    :func:`~helia_profiler.platform.capabilities.resolve_app_flash_load_addr`).
-    Handing such a part its family's stock address produces a *plausible*
-    guess -- likely enough to be accepted by the silicon and land the image at
-    the wrong offset -- where ``None`` produces a J-Link fallback that refuses
-    to program and names this field.
-
-    An explicit ``app_flash_load_addr: null`` is NOT the same as leaving the
-    key out, which is why the key's *presence* is tested before its value
-    rather than collapsing both into ``spec.get(...) is None``.  Writing
-    ``null`` is a statement -- the only one the config surface offers for "do
-    not guess an address for this part" -- and it is most plausibly reached for
-    by someone who has a ``based_on`` they want for its memory/clock facts but
-    distrusts its flash window.  Collapsing it into "unstated" hands that user
-    the inherited address, i.e. the exact opposite of what they wrote.
-
-    Note what this deliberately does NOT key on: whether the entry overrides
-    ``memory:``.  :class:`~helia_profiler.platform.soc.MemoryLayout` carries
-    sizes in KB and no addresses, so "resized a region" is not evidence about
-    the bootloader reservation -- bumping ``psram_kb`` for a board with a
-    larger PSRAM part would drop a perfectly good inherited address.  Deriving
-    one memory fact from an unrelated one is the auto-magic this repo avoids;
-    ``based_on`` is a statement the user actually made.
+    A standalone family tag supplies no application origin; leave it unknown.
     """
     key = CustomSocField.APP_FLASH_LOAD_ADDR.value
     if key not in spec:

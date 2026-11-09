@@ -12,7 +12,7 @@ from .board import (
     DEFAULT_SYNC_GPIO_PIN,
     BoardDef,
 )
-from .provenance import CatalogProvenance, TargetSelection
+from .provenance import CatalogProvenance, OverlaySource, TargetSelection
 from .soc import SocDef
 
 
@@ -25,6 +25,7 @@ class PlatformRegistry:
     selections: Mapping[str, TargetSelection] = field(default_factory=lambda: MappingProxyType({}))
     catalog: CatalogProvenance | None = None
     board_socs: Mapping[str, SocDef] = field(default_factory=lambda: MappingProxyType({}))
+    overlay_source: OverlaySource | None = None
 
 
 def _freeze_registry(
@@ -33,6 +34,7 @@ def _freeze_registry(
     selections: Mapping[str, TargetSelection],
     catalog: CatalogProvenance | None,
     board_socs: Mapping[str, SocDef],
+    overlay_source: OverlaySource | None = None,
 ) -> PlatformRegistry:
     soc_map = dict(socs)
     board_map = dict(boards)
@@ -50,6 +52,7 @@ def _freeze_registry(
         selections=MappingProxyType(dict(selections)),
         catalog=catalog,
         board_socs=MappingProxyType(dict(board_socs)),
+        overlay_source=overlay_source,
     )
 
 
@@ -87,7 +90,14 @@ def build_platform_registry(
             previous = previous_boards.get(name)
             if (socs and board.soc in socs) or previous is None or previous.soc != board.soc:
                 board_socs.pop(name, None)
-    return _freeze_registry(merged_socs, merged_boards, selections, catalog, board_socs)
+    return _freeze_registry(
+        merged_socs,
+        merged_boards,
+        selections,
+        catalog,
+        board_socs,
+        base.overlay_source if base is not None else None,
+    )
 
 
 def get_soc(name: str, *, registry: PlatformRegistry | None = None) -> SocDef:

@@ -1,0 +1,26 @@
+# Platform compatibility ownership
+
+The shared catalog supplies sourced facts. HPX retains build/capture choices and
+compatibility adapters. [The ownership guide](../astro-site/src/content/docs/guide/concepts/platforms.mdx)
+explains the public boundary; #657 tracks adoption.
+
+| Retained input | Source and distinction | Owner and disposition |
+|---|---|---|
+| `SocPolicy.probe_alias`: `Apollo330P_510L`, `AP510L`, `Atomiq110` | `platform/policy.py` is the authoritative existing HPX route. The pinned SDK's `cmake/socs/facts/{apollo330P,apollo510L,atomiq110}.cmake` has device defaults at lines 50, 50 and 66 respectively: `AP330MPA-CBR`, `AP510DLA-CBR`, `Atomiq110`. HPX's aliases must not be described as the current physical part names. | HPX retains the aliases pending catalog/probe support and a qualified capture migration; [#665](https://github.com/AmbiqAI/helia-profiler/issues/665). No alias change in this adoption. |
+| Host probe clock controls | `platform/policy.py:PROBE_CLOCK_COMPAT/CORE_CLOCKED_PROBES`; physical trace facts come from catalog `Target.trace_clock_mhz` and SDK TPIU setup. SDK `facts/atomiq110.cmake:69` says 25 MHz; that is not HPX's retained 48 MHz host setting. | HPX owns capture policy and the bounded hardware verification in [#665](https://github.com/AmbiqAI/helia-profiler/issues/665). Retain `probe-clock-compatibility`, an existing identity-bound label. No new measurement claim. |
+| Blue radio reset wiring | Pinned SDK `modules/nsx-ambiqsuite/sdk/boards/<board>/bsp/am_bsp.h`: `AM_DEVICES_BLECTRLR_RESET_PIN` is 55 for `apollo4l_blue_evb:58`, 42 for `apollo4p_blue_kbr_evb:60` and 55 for `apollo4p_blue_kxr_evb:62`. These are BSP facts, unlike the measurement gate/state/go pin choices. | HPX retains the three sourced constants in `BOARD_POLICIES` until a released catalog query exposes the wiring. Move their factual source only when that query has a consumer; holding the radio in reset remains HPX power policy. `radio-reset-bsp-wiring` records this exception. |
+| Apollo5B SDK descriptor | `platform/sdk_descriptor.py`; [catalog owner decision](https://github.com/AmbiqAI/helia-platforms/issues/64#issuecomment-6064752168) excludes a guessed physical identity. | Permanent explicit HPX compatibility route while supported. `sdk-descriptor` has no catalog target. Adding a physical catalog target needs new source evidence, not spelling normalization. |
+| AOT name mapping and aliases | `engines/helia_aot/compile.py:_BOARD_TO_AOT_PLATFORM/_LEGACY_AOT_ALIASES`; the locked compiler's installed `PlatformArgs` accepts name/CPU/memory overrides rather than HPX's catalog file or Target. | HPX retains mappings, warnings and explicit `platform_name`. [#664](https://github.com/AmbiqAI/helia-profiler/issues/664) owns adoption of a released canonical API, with upstream #979/#278 as context. No upgrade or automatic native route is bundled here. |
+| Legacy `custom_socs/custom_boards` | `platform/custom.py`: mixed factual and policy schema supports standalone parts, builtin shadowing, explicit nulls, address/probe settings and NSX profiles. Catalog schema forbids builtin replacement and does not encode all HPX choices. | Caller declarations remain resolved by HPX. Translate only a subset with an actual lossless consumer; retain this adapter for existing configurations. Native overlays are a separate explicit input, not a mandatory migration. |
+| `hpx-linker-capacity-view` | Existing `TargetSelection.compatibility` value, retained in builtin selections; `platform/linker/` now owns generated SDK source-bound windows and catalog-range intersection. | HPX. Retain the saved identity label rather than renaming it as cosmetic cleanup. Custom overlays never borrow builtin source qualification. |
+
+The SDK source audit above is against the pinned revision recorded in
+`src/helia_profiler/data/compatibility-baseline-v1.json`. Recheck these file/symbol
+references when adopting a new SDK. No external version is embedded in runtime
+policy comments. Native overlays remain limited to supported core/address/trace
+geometry; source-backed expansion is a future feature, not an inferred fact.
+
+BENCH adoption is [helia-benchmark#130](https://github.com/AmbiqAI/helia-benchmark/issues/130):
+minimum pin/lock and installed public readers, with exact merged producer
+revisions. HPX custom-target support does not expand BENCH comparison admission
+or establish compiler/simulator/physical-board equivalence.
