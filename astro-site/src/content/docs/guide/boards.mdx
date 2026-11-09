@@ -208,7 +208,8 @@ loaders. There is no new CLI flag, plugin discovery or environment search.
 Only the selected target and bases referenced by HPX custom declarations are
 projected. A native target needs supported board and SoC policy lineages that
 select the same NSX target. HPX currently requires the inherited core identity,
-non-PSRAM address geometry and trace clock, and whole-KiB memory capacities;
+non-PSRAM address geometry, trace clock and CPU frequencies exposed by HPX
+policy, and whole-KiB memory capacities;
 PSRAM must retain an address supported by the inherited HPX placement policy
 where one is known. An unknown address stays unknown. Unsupported projections
 raise `ConfigError`; use an explicit HPX custom declaration where appropriate.

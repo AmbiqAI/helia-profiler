@@ -274,6 +274,7 @@ def test_aot_native_route_still_requires_explicit_supported_override(tmp_path):
             "whole KiB",
         ),
         ({"sdk": {"trace_clock_mhz": 48}}, "trace clock"),
+        ({"clock_domains": {"cpu": {"lp": {"mhz": 120}}}}, "CPU clocks"),
     ],
 )
 def test_unsupported_native_projection_refuses_instead_of_borrowing_policy(
@@ -353,3 +354,42 @@ def test_native_board_can_receive_same_name_legacy_policy_override(tmp_path):
     assert snap.board.name == "lab" and snap.board.default_sync_gpio_pin == 27
     assert snap.board.profile_source_board == "apollo510_evb"
     assert not snap.soc.is_builtin and snap.expected_linker is None
+
+
+@pytest.mark.parametrize(
+    "soc,board",
+    [("apollo510", "apollo510_evb"), ("apollo3p", "apollo3p_evb"), ("apollo5b", "apollo5b_evb")],
+)
+def test_unrelated_overlay_preserves_legacy_builtin_bases(tmp_path, soc, board):
+    path = _overlay(tmp_path)
+    declarations = {
+        "custom_socs": {"child_chip": {"based_on": soc}},
+        "custom_boards": {"child": {"based_on": board, "soc": "child_chip"}},
+    }
+    native = _config(path, tmp_path, board="child", **declarations)
+    plain = load_config(
+        None,
+        {
+            "model": {"path": native.model.path},
+            "target": {"board": "child", "toolchain": "atfe", **declarations},
+        },
+    )
+    first, second = config_platform(native), config_platform(plain)
+    assert first.soc == second.soc and first.board == second.board
+    assert first.soc.jlink_device
+    assert first.soc.capabilities.memory == second.soc.capabilities.memory
+
+
+@pytest.mark.parametrize("board", ["apollo510_evb", "apollo3p_evb", "apollo5b_evb"])
+def test_unrelated_overlay_preserves_legacy_board_only_base(tmp_path, board):
+    custom = {"child": {"based_on": board}}
+    native = _config(_overlay(tmp_path), tmp_path, board="child", custom_boards=custom)
+    plain = load_config(
+        None,
+        {
+            "model": {"path": native.model.path},
+            "target": {"board": "child", "toolchain": "atfe", "custom_boards": custom},
+        },
+    )
+    assert config_platform(native).soc == config_platform(plain).soc
+    assert config_platform(native).board == config_platform(plain).board

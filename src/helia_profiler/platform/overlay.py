@@ -105,7 +105,18 @@ def _native_soc(target: Target, key: str, reference: Target) -> SocDef:
         )
     if target.trace_clock_mhz != reference.trace_clock_mhz:
         raise ValueError(f"{target.id}: a changed trace clock needs an explicit HPX probe policy")
-    soc = _soc(target, target.soc.id, SOC_POLICIES[key], custom=True, policy_name=key)
+    policy = SOC_POLICIES[key]
+    domain = target.cores()[0].clock_domain
+    reference_domain = reference.cores()[0].clock_domain
+    for _, point, _ in policy.cpu_points:
+        if (
+            target.operating_point(point, domain=domain).mhz
+            != reference.operating_point(point, domain=reference_domain).mhz
+        ):
+            raise ValueError(
+                f"{target.id}: changed CPU clocks need an explicit HPX clock/build policy"
+            )
+    soc = _soc(target, target.soc.id, policy, custom=True, policy_name=key)
     for region in target.memories(target.cores()[0].id, include_discouraged=True):
         if region.technology == "psram":
             access = target.reachable(target.cores()[0].id, region.name)
@@ -126,10 +137,15 @@ def _project(
     soc_names, board_names = _references(settings, selected)
     board_policies = {board.name: board for board in BOARD_POLICIES}
     for name in sorted(soc_names):
+        if name in base.socs:
+            continue
         target = catalog.resolve(name)
         key = _policy_key(target)
         socs[name] = _native_soc(target, key, _builtin_catalog().resolve(key))
+    legacy_boards = _definitions(settings.get("custom_boards"))
     for name in sorted(board_names):
+        if name in base.boards and (name != selected or name in legacy_boards):
+            continue
         target = catalog.resolve(name)
         key = _policy_key(target)
         policy = next(
