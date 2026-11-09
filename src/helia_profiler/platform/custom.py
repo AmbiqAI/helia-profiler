@@ -194,9 +194,6 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
             # Inherited, never user-declared: NPU presence is a silicon fact
             # of the based_on part (see the pinned-subset platform test).
             npu=base_soc.npu if base_soc else None,
-            catalog_has_dcache=(
-                base_soc.catalog_has_dcache if base_soc and not base_soc.is_builtin else None
-            ),
             # Likewise: the based_on part's resolved placement-base map keeps
             # working for the derivative (see SocDef.memory_bases_like).
             memory_bases_like=((base_soc.memory_bases_like or base_soc.name) if base_soc else None),
@@ -212,6 +209,16 @@ def _build_custom_socs(raw: Any, base: PlatformRegistry) -> dict[str, SocDef]:
                 base=base_soc,
             ),
         )
+        if base_soc is not None and not base_soc.is_builtin:
+            # Builtin-derived declarations retain their established default policy.
+            custom[name] = replace(
+                custom[name],
+                swo_trace_clock_mhz=base_soc.swo_trace_clock_mhz,
+                has_usb=base_soc.has_usb,
+                ssram_full_power_enum=base_soc.ssram_full_power_enum,
+                has_radio_subsystem=base_soc.has_radio_subsystem,
+                catalog_has_dcache=base_soc.catalog_has_dcache,
+            )
     return custom
 
 

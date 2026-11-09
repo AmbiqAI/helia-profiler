@@ -469,3 +469,56 @@ def test_multiple_native_psram_banks_do_not_become_one_scalar_budget(tmp_path):
     )
     with pytest.raises(ConfigError, match="one populated PSRAM region"):
         _config(path, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "soc,profile,enum,usb,radio,trace",
+    [
+        ("apollo330P", "apollo330mP_evb", "AM_HAL_PWRCTRL_SRAM_1P75M", True, True, 48),
+        ("apollo3p", "apollo3p_evb", "AM_HAL_PWRCTRL_SRAM_3M", False, False, 48),
+        ("atomiq110", "atomiq110_fpga_turbo", "AM_HAL_PWRCTRL_SRAM_3M", False, False, 48),
+        ("apollo510", "apollo510_evb", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None),
+    ],
+)
+def test_legacy_native_soc_chain_preserves_resolved_hal_and_capture_policy(
+    tmp_path, soc, profile, enum, usb, radio, trace
+):
+    path = _overlay(tmp_path, socs={"native": {"based_on": soc}})
+    cfg = _config(
+        path,
+        tmp_path,
+        board="child",
+        custom_socs={
+            "child_chip": {"based_on": "native", "jlink_device": "lab-probe"},
+            "grandchild": {"based_on": "child_chip"},
+        },
+        custom_boards={
+            "child": {"soc": "grandchild", "channel": "dev", "starter_profile_board": profile}
+        },
+    )
+    resolved = get_soc_for_board("child", registry=cfg.platform_registry)
+    assert resolved.ssram_full_power_enum == enum
+    assert resolved.has_usb is usb and resolved.has_radio_subsystem is radio
+    assert resolved.swo_trace_clock_mhz == trace
+    assert resolved.jlink_device == "lab-probe"
+    native = cfg.platform_registry.socs["native"]
+    assert resolved.npu == native.npu and resolved.catalog_has_dcache == native.catalog_has_dcache
+    assert resolved.memory_bases_like == soc
+    assert resolved.catalog_target_id is None and resolved.registered_name is None
+    assert config_platform(cfg).expected_linker is None
+    if soc == "apollo330P":
+        from jinja2 import Environment, FileSystemLoader
+
+        import helia_profiler
+
+        templates = Path(helia_profiler.__file__).parent / "firmware/templates"
+        rendered = (
+            Environment(loader=FileSystemLoader(templates))
+            .get_template("_ssram_power.j2")
+            .render(
+                manages_shared_ssram_power=True,
+                arena_region="sram",
+                ssram_full_power_enum=resolved.ssram_full_power_enum,
+            )
+        )
+        assert ".eSRAMCfg        = AM_HAL_PWRCTRL_SRAM_1P75M" in rendered
