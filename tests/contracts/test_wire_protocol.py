@@ -377,6 +377,15 @@ def _matrix() -> list[_Render]:
             power_only=True,
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
         ),
+        # The transfer timeout probe, which only a heliaAOT module with its
+        # emitted provider can run.
+        _Render(
+            "ap510|rtt|helia-aot|transfer-probe",
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"transfer_timeout_probe": True},
+        ),
         # A PSRAM arena with no blob: the one render where the psram-arena and
         # blob-in-psram gates disagree, which is what makes them separable.
         _Render(
@@ -660,6 +669,9 @@ _PREDICATES = {
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
     "has_armv8m_pmu and not power_only": lambda v: bool(v["has_armv8m_pmu"]) and not _power(v),
+    "transfer_timeout_probe and not power_only": (
+        lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)
+    ),
     "has_ethos_u": lambda v: bool(v.get("has_ethos_u", False)),
     "clean_window_trace and transport not in (swo, uart)": (
         lambda v: bool(v.get("clean_window_trace")) and v["transport"] not in ("swo", "uart")

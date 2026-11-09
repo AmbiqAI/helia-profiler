@@ -695,6 +695,44 @@ def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
         FirmwareRenderContext.from_pipeline_context(ctx)
 
 
+@pytest.mark.parametrize("provider", [None, "nsx::hpx_model_transfer"])
+def test_the_transfer_timeout_probe_needs_the_emitted_provider(tmp_path: Path, provider):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.errors import FirmwareError
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.platform import get_board, get_soc
+    from helia_profiler.results.models import PlatformInfo
+
+    model_file = tmp_path / "test.tflite"
+    model_file.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model_file)},
+            "engine": {"type": "helia-aot"},
+            "profiling": {"transfer_timeout_probe": True},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.soc = get_soc("apollo510")
+    ctx.board = get_board("apollo510_evb")
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        aot_transfer_cmake_target=provider,
+        helia_aot_version="0.0.0",
+    )
+    ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+    if provider is None:
+        with pytest.raises(FirmwareError, match="transfer_timeout_probe needs a heliaAOT module"):
+            FirmwareRenderContext.from_pipeline_context(ctx)
+        return
+    template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+    assert template_vars["transfer_timeout_probe"] is True
+
+
 @pytest.mark.parametrize("fill", ["zero", "lcg"])
 def test_render_context_carries_the_input_fill(tmp_path: Path, fill: str):
     from helia_profiler.engines.base import HeliaAotArtifacts

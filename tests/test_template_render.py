@@ -159,6 +159,7 @@ def _render_aot(
     pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
     input_fill: str = "zero",
+    transfer_timeout_probe: bool = False,
     **extra_vars: object,
 ) -> str:
     return _env.get_template(template_name).render(
@@ -169,6 +170,7 @@ def _render_aot(
             clean_window_timer=str(extra_vars.get("clean_window_timer", "dwt")),
         ),
         input_fill=input_fill,
+        transfer_timeout_probe=transfer_timeout_probe,
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],

@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 108,
-    "schemaProperties": 108,
+    "declaredFields": 109,
+    "schemaProperties": 109,
     "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -486,7 +486,7 @@
           "name": "profiling",
           "pythonType": "ProfilingConfig",
           "required": false,
-          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, extreme_mode=False)",
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, extreme_mode=False)",
           "defaultFromFactory": true
         },
         {
@@ -659,6 +659,13 @@
           "pythonType": "InputFill",
           "required": false,
           "default": "zero",
+          "defaultFromFactory": false
+        },
+        {
+          "name": "transfer_timeout_probe",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
           "defaultFromFactory": false
         },
         {
@@ -880,8 +887,8 @@
         "reachableFromRoot": true
       },
       "ProfilingConfig": {
-        "declared": 14,
-        "inSchema": 14,
+        "declared": 15,
+        "inSchema": 15,
         "reachableFromRoot": true
       },
       "PsramConfig": {
@@ -2176,6 +2183,11 @@
         "input_fill": {
           "$ref": "#/$defs/InputFill",
           "default": "zero"
+        },
+        "transfer_timeout_probe": {
+          "default": false,
+          "title": "Transfer Timeout Probe",
+          "type": "boolean"
         },
         "extreme_mode": {
           "default": false,

@@ -25,6 +25,7 @@ from ._model import (
     GATE_PSRAM_WEIGHTS_UPLOAD,
     GATE_RTT_FLUSH,
     GATE_STIMER_WINDOW,
+    GATE_TRANSFER_PROBE,
     GATE_TRANSPORT_HAS_READY_PREAMBLE,
     GATE_WEIGHTS_IN_PSRAM,
     HPX_END_SENTINEL,
@@ -909,6 +910,24 @@ CLEAN_WINDOW_SPECS: tuple[WireSpec, ...] = (
         note="Issues, waits and aborts are the run's own; the peak pieces in "
         "flight and the most checks a wait used are the provider's since it "
         "was bound.",
+    ),
+    _spec(
+        WireKey.TRANSFER_RECOVERY.wire,
+        WireKind.KEY_VALUE,
+        "profiling.transfer_timeout_probe: what the probe run returned and how "
+        "the module recovered.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_RECOVERY,
+        engines=AOT_ENGINES,
+        condition=GATE_TRANSFER_PROBE,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h; once, after the "
+        "first instrumented run",
+        value_shape="<status>,<provider>,<bind>,<init>,<run>,<pending> | no_timeout",
+        note="After a 301: the probe run's status and provider code, then the "
+        "rebind, model_init and recovery run statuses and nsx_psram_pending() "
+        "sampled after the probe run; the recovery run's HPX_OUTPUT_<i>_FNV1A64 "
+        "lines follow. no_timeout: the probe run returned 0.",
     ),
 )
 

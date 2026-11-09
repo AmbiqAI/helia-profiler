@@ -676,6 +676,23 @@ def test_input_fill_defaults_to_zero_and_lcg_is_helia_aot_only():
         load("helia-aot", "random")
 
 
+def test_transfer_timeout_probe_is_off_by_default_and_helia_aot_only():
+    def load(engine: str, probe: bool | None = None) -> ProfileConfig:
+        cli: dict = {"model": {"path": "m.tflite"}, "engine": {"type": engine}}
+        if probe is not None:
+            cli["profiling"] = {"transfer_timeout_probe": probe}
+        return load_config(None, cli)
+
+    assert load("helia-aot").profiling.transfer_timeout_probe is False
+    assert load("helia-aot", True).profiling.transfer_timeout_probe is True
+    for engine in ("helia-rt", "litert", "executorch"):
+        assert load(engine, False).profiling.transfer_timeout_probe is False
+        with pytest.raises(
+            ConfigError, match="profiling.transfer_timeout_probe applies to engine.type helia-aot"
+        ):
+            load(engine, True)
+
+
 def test_model_explorer_rejected_as_primary_output_format():
     cli = {
         "model": {"path": "m.tflite"},

@@ -355,17 +355,23 @@ def _build_cases() -> list[_CompileCase]:
             "role": "constant",
         },
     ]
-    for transport, power_only in (("rtt", False), ("swo", False), ("rtt", True)):
+    for transport, power_only, probe in (
+        ("rtt", False, False),
+        ("swo", False, False),
+        ("rtt", True, False),
+        ("rtt", False, True),
+    ):
         cases.append(
             _CompileCase(
                 case_id=f"apollo510|{transport}|helia-aot|transfer"
-                + ("|power" if power_only else ""),
+                + ("|power" if power_only else "")
+                + ("|probe" if probe else ""),
                 text=_render(
                     "apollo510",
                     transport,
                     "helia-aot",
                     power_only=power_only,
-                    overrides={"arena_regions": transfer_regions},
+                    overrides={"arena_regions": transfer_regions, "transfer_timeout_probe": probe},
                 ),
                 vars=_common_kwargs("apollo510", transport),
                 headers=aot_transfer_headers(),

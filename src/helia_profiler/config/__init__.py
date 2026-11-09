@@ -483,6 +483,11 @@ class ProfilingConfig:
     aggregation: Aggregation = DEFAULT_AGGREGATION
     # See :class:`InputFill`.
     input_fill: InputFill = InputFill.ZERO
+    # heliaAOT with an emitted transfer provider: the first instrumented run
+    # waits with a budget of one check, so a dma unit still in flight times
+    # out and the provider's recovery (rebind, model_init, one run) is
+    # reported. Every other run keeps the default budget.
+    transfer_timeout_probe: bool = False
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
@@ -734,13 +739,16 @@ class ProfileConfig:
                     "Define other boards under target.custom_boards."
                 ),
             )
-        if self.engine.type is not EngineType.HELIA_AOT and (
-            self.profiling.input_fill is not InputFill.ZERO
-        ):
-            raise ConfigError(
-                "profiling.input_fill applies to engine.type helia-aot only",
-                hint="Leave profiling.input_fill at zero for this engine.",
-            )
+        if self.engine.type is not EngineType.HELIA_AOT:
+            for setting, value in (
+                ("input_fill", self.profiling.input_fill is not InputFill.ZERO),
+                ("transfer_timeout_probe", self.profiling.transfer_timeout_probe),
+            ):
+                if value:
+                    raise ConfigError(
+                        f"profiling.{setting} applies to engine.type helia-aot only",
+                        hint=f"Leave profiling.{setting} at its default for this engine.",
+                    )
         if self.frozen and not self.build.offline:
             object.__setattr__(self, "build", replace(self.build, offline=True))
         if self.compatibility is None:

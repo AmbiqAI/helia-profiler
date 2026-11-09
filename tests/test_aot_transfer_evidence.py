@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from tests.contracts.fixture_compile_cases import _AOT_TRANSFER_STUB, aot_model_stub
+from tests.test_aot_io_digests import _fnv1a64
 from tests.test_template_render import _render_aot
 
 pytestmark = pytest.mark.host_integration
@@ -81,7 +82,15 @@ _PROVIDER = r"""
 static fake_nsx_transfer_stats_t provider_stats;
 static fake_nsx_transfer_last_t provider_last;
 static bool provider_can_sleep = true;
-int32_t fake_nsx_transfer_bind(fake_model_context_t *, const fake_nsx_transfer_options_t *) { return 0; }
+static int32_t bind_result = 0, init_result = 0, run_result = 0;
+static int binds = 0, default_binds = 0, inits = 0, runs = 0;
+int32_t fake_nsx_transfer_bind(fake_model_context_t *, const fake_nsx_transfer_options_t *options) {
+    ++binds;
+    if (options == nullptr) ++default_binds;
+    return bind_result;
+}
+int32_t fake_model_init(fake_model_context_t *) { ++inits; return init_result; }
+int32_t fake_model_run(fake_model_context_t *) { ++runs; return run_result; }
 int32_t fake_nsx_transfer_reset(void) { return 0; }
 bool fake_nsx_transfer_can_sleep(void) { return provider_can_sleep; }
 const fake_nsx_transfer_last_t *fake_nsx_transfer_last(void) { return &provider_last; }
@@ -142,36 +151,36 @@ int main() {
 
 
 def _globals(source: str) -> str:
+    """The rendered globals, through the last function of the block."""
     start = source.index("static constexpr int kMaxLayers")
-    end = source.index("static void hpx_aot_check_runs(void) {")
+    last = "static void hpx_transfer_probe_recover("
+    end = source.index(last if last in source else "static void hpx_aot_check_runs(void) {")
     end = source.index("\n}\n", end) + 3
+    if source.startswith("#endif\n", end):
+        end += len("#endif\n")
     return source[start:end]
 
 
-def _run(
-    tmp_path: Path,
-    *,
-    event: str = "ARM_PMU_L1D_CACHE_REFILL",
-    wait_can_sleep: bool = False,
-    after_can_sleep: bool = True,
-    status: int = 0,
-):
+def _model_stub() -> str:
+    """The module stand-in with model_init and model_run left to the harness."""
+    stub = aot_model_stub(external_arenas=True, transfer=True)
+    for name in ("init", "run"):
+        definition = (
+            f"static inline int32_t fake_model_{name}(fake_model_context_t *ctx) "
+            "{ (void)ctx; return 0; }"
+        )
+        assert definition in stub
+        stub = stub.replace(definition, f"int32_t fake_model_{name}(fake_model_context_t *ctx);")
+    return stub
+
+
+def _build_and_run(tmp_path: Path, source: str, main: str) -> subprocess.CompletedProcess[str]:
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("host C++ compiler required")
-    source = _render_aot(transport="rtt", clean_window_timer="stimer")
-    (tmp_path / "fake_model.h").write_text(aot_model_stub(external_arenas=True, transfer=True))
+    (tmp_path / "fake_model.h").write_text(_model_stub())
     (tmp_path / "fake_nsx_transfer.h").write_text(_AOT_TRANSFER_STUB)
-    program = (
-        _PREAMBLE
-        + '#include "fake_nsx_transfer.h"\n'
-        + _PROVIDER
-        + _globals(source)
-        + _RUN.replace("EVENT", event)
-        .replace("STATUS", str(status))
-        .replace("WAIT_CAN_SLEEP", "true" if wait_can_sleep else "false")
-        .replace("AFTER_CAN_SLEEP", "true" if after_can_sleep else "false")
-    )
+    program = _PREAMBLE + '#include "fake_nsx_transfer.h"\n' + _PROVIDER + _globals(source) + main
     path = tmp_path / "evidence.cc"
     path.write_text(program, encoding="utf-8")
     executable = tmp_path / "evidence.exe"
@@ -191,6 +200,24 @@ def _run(
         check=True,
     )
     return subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+
+
+def _run(
+    tmp_path: Path,
+    *,
+    event: str = "ARM_PMU_L1D_CACHE_REFILL",
+    wait_can_sleep: bool = False,
+    after_can_sleep: bool = True,
+    status: int = 0,
+):
+    source = _render_aot(transport="rtt", clean_window_timer="stimer")
+    main = (
+        _RUN.replace("EVENT", event)
+        .replace("STATUS", str(status))
+        .replace("WAIT_CAN_SLEEP", "true" if wait_can_sleep else "false")
+        .replace("AFTER_CAN_SLEEP", "true" if after_can_sleep else "false")
+    )
+    return _build_and_run(tmp_path, source, main)
 
 
 def test_one_run_reports_refills_overlap_and_counts(tmp_path: Path):
@@ -253,3 +280,77 @@ def test_the_power_binary_ends_with_its_terminal_on_a_refused_bind():
     function = function[: function.index("\n}\n")]
     assert 'hpx_power_terminal_fail("transfer_bind", 8U);' in function
     assert "HPX_TRANSFER_" not in source
+
+
+_PROBE = r"""
+static uint8_t output0[3] = {1, 2, 3};
+int main() {
+    fake_model_ctx.outputs[0].data = output0;
+    fake_model_ctx.outputs[0].size = sizeof(output0);
+    g_profiler_enabled = true;
+    hpx_aot_status = STATUS;
+    provider_last.error = 321;
+    bind_result = BIND;
+    init_result = BIND == 0 ? 0 : 300;
+    run_result = BIND == 0 ? 0 : 300;
+    hpx_transfer_probe_recover(7U);
+    hpx_printf("status=%ld profiling=%d binds=%d default=%d inits=%d runs=%d\n",
+               (long)hpx_aot_status, (int)g_profiler_enabled, binds, default_binds, inits, runs);
+    return 0;
+}
+"""
+
+
+def _probe(tmp_path: Path, *, status: int, bind: int = 0):
+    source = _render_aot(transport="rtt", clean_window_timer="stimer", transfer_timeout_probe=True)
+    main = _PROBE.replace("STATUS", str(status)).replace("BIND", str(bind))
+    return _build_and_run(tmp_path, source, main)
+
+
+def test_a_probe_timeout_reports_the_recovery(tmp_path: Path):
+    result = _probe(tmp_path, status=301)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "HPX_TRANSFER_RECOVERY=301,321,0,0,0,7",
+        f"HPX_OUTPUT_0_FNV1A64={_fnv1a64(bytes([1, 2, 3])):016x}",
+        "status=0 profiling=1 binds=1 default=1 inits=1 runs=1",
+    ]
+
+
+def test_a_probe_recovery_whose_bind_fails_reports_it(tmp_path: Path):
+    result = _probe(tmp_path, status=301, bind=323)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[0] == "HPX_TRANSFER_RECOVERY=301,321,323,300,300,7"
+
+
+def test_a_probe_run_without_a_timeout_rebinds_the_default_budget(tmp_path: Path):
+    result = _probe(tmp_path, status=0)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "HPX_TRANSFER_RECOVERY=no_timeout",
+        "status=0 profiling=1 binds=1 default=1 inits=0 runs=0",
+    ]
+
+
+def test_any_other_probe_failure_stops_the_capture(tmp_path: Path):
+    result = _probe(tmp_path, status=302)
+    assert result.returncode == 3
+    assert result.stdout.splitlines() == [
+        "HPX_ERROR=model_run_failed:302,provider=321,driver=0,ticket=0"
+    ]
+
+
+def test_the_probe_brackets_only_the_first_instrumented_run():
+    source = _render_aot(transport="rtt", transfer_timeout_probe=True)
+    probe_bind = source.index("hpx_transfer_bind(&hpx_probe_options);")
+    assert "hpx_probe_options = {1U, 0U};" in source
+    timed = source.index("uint32_t infer_start_cyc = DWT->CYCCNT;")
+    assert source.rindex("if (iter == 0) {", 0, probe_bind) < probe_bind
+    assert probe_bind < source.index("hpx_transfer_run_start();", probe_bind) < timed
+    sample = source.index("const uint32_t hpx_probe_pending = nsx_psram_pending();")
+    recover = source.index("hpx_transfer_probe_recover(hpx_probe_pending);")
+    assert timed < sample < source.index("profiler_print_csv();", timed) < recover
+    assert source.index("hpx_print_output_digests();", timed) < recover
+    # One pass in this render: the probe belongs to its first iteration only.
+    assert source.count("hpx_probe_options = {1U, 0U};") == 1
+    assert "hpx_transfer_probe_recover" not in _render_aot(transport="rtt")

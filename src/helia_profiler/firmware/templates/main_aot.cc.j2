@@ -527,7 +527,40 @@ static void hpx_aot_check_runs(void) {
     hpx_printf("HPX_ERROR=model_run_failed:%ld\n", (long)hpx_aot_status);
 #endif
     hpx_park();
+}{% if transfer_timeout_probe %}
+
+
+#ifdef HPX_AOT_TRANSFER
+// profiling.transfer_timeout_probe, after the probe run: the default wait
+// budget is bound again whatever the run returned. Its 301 is the probe's
+// timeout, so the recovery runs: rebind, model_init and one run, reported with
+// the probe run's status and provider code, nsx-psram's pending reads sampled
+// right after it returned, and the recovery run's output digests. Any other
+// failure stops the capture as after a loop.
+static void hpx_transfer_probe_recover(uint32_t pending) {
+    const int32_t probe = hpx_aot_status;
+    if (probe != 0 && probe != 301) {
+        hpx_aot_check_runs();
+    }
+    hpx_aot_status = 0;
+    if (probe == 0) {
+        hpx_transfer_bind(nullptr);
+        hpx_printf("HPX_TRANSFER_RECOVERY=no_timeout\n");
+        return;
+    }
+    const int32_t provider = {{ aot_prefix }}_nsx_transfer_last()->error;
+    const int32_t bind = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, nullptr);
+    const int32_t init = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
+    const bool profiling = g_profiler_enabled;
+    g_profiler_enabled = false;
+{{ self.engine_reset_inputs() }}
+    const int32_t run = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+    g_profiler_enabled = profiling;
+    hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%ld,%ld,%lu\n", (long)probe, (long)provider,
+               (long)bind, (long)init, (long)run, (unsigned long)pending);
+    hpx_print_output_digests();
 }
+#endif{% endif %}
 {% endif %}
 {%- endblock %}
 
@@ -799,12 +832,21 @@ hpx_aot_check_runs();{% endblock %}
         g_hb_iter = iter;
         g_hb_last_cyc = DWT->CYCCNT;
         g_hb_ops_since = 0;
-#ifdef HPX_AOT_TRANSFER
+#ifdef HPX_AOT_TRANSFER{% if transfer_timeout_probe and loop.index0 == 0 %}
+        if (iter == 0) {
+            // profiling.transfer_timeout_probe: this run's waits give up after
+            // one check, so a dma unit still in flight times out.
+            static const {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options = {1U, 0U};
+            hpx_transfer_bind(&hpx_probe_options);
+        }{% endif %}
         hpx_transfer_run_start();
 #endif
 {%- endblock %}
 
-{% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
+{% block engine_print_csv %}{% if transfer_timeout_probe and loop.index0 == 0 %}#ifdef HPX_AOT_TRANSFER
+        const uint32_t hpx_probe_pending = nsx_psram_pending();
+#endif
+{% endif %}        if (g_layer_capacity_exceeded) {
             hpx_printf("HPX_ERROR=operator_count_exceeds_capacity capacity=%d\n",
                        kMaxLayers);
             hpx_park();
@@ -817,7 +859,12 @@ hpx_aot_check_runs();{% endblock %}
 #ifdef HPX_AOT_TRANSFER
         hpx_transfer_report();
 #endif
-        hpx_print_output_digests();
+        hpx_print_output_digests();{% if transfer_timeout_probe and loop.index0 == 0 %}
+#ifdef HPX_AOT_TRANSFER
+        if (iter == 0) {
+            hpx_transfer_probe_recover(hpx_probe_pending);
+        }
+#endif{% endif %}
 {%- endblock %}
 
 {% block engine_profiled_summary %}

@@ -111,6 +111,11 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   before each run instead of zeros, so an output depends on every weight, not
   on biases alone. The default, `zero`, leaves captures unchanged; `lcg` is
   refused for other engines.
+- `profiling.transfer_timeout_probe: true` needs a module that ships its own
+  transfer provider (`<prefix>_nsx_transfer.h`). The first instrumented run
+  waits for its transfers with a budget of one check, so one still in flight
+  times out; hpx then rebinds the provider, runs `model_init` and one run, and
+  prints `HPX_TRANSFER_RECOVERY`. Every other run keeps the default budget.
 
 #### Target overrides
 

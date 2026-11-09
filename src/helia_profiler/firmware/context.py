@@ -246,6 +246,9 @@ class EngineContext:
     npu_tolerate_power_ack: bool = False
     #: ``profiling.input_fill``; only heliaAOT renders read it.
     input_fill: str = "zero"
+    #: ``profiling.transfer_timeout_probe``; only for a heliaAOT module with
+    #: its emitted transfer provider.
+    transfer_timeout_probe: bool = False
 
 
 @dataclass(frozen=True)
@@ -304,6 +307,16 @@ class FirmwareRenderContext:
         # sizes 0, and every ExecuTorch buffer following the resolved arena
         # region.
         if isinstance(artifacts, HeliaAotArtifacts):
+            if (
+                config.profiling.transfer_timeout_probe
+                and artifacts.aot_transfer_cmake_target is None
+            ):
+                raise FirmwareError(
+                    "profiling.transfer_timeout_probe needs a heliaAOT module with its "
+                    "emitted transfer provider, and this module has none.",
+                    hint="Convert with dma transfer units and module.type nsx, or turn "
+                    "the probe off.",
+                )
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
             aot_manifest = tuple(
@@ -435,6 +448,7 @@ class FirmwareRenderContext:
                 has_ethos_u=artifacts.resolved_backend == "ethos_u",
                 npu_tolerate_power_ack=board.is_fpga,
                 input_fill=config.profiling.input_fill.value,
+                transfer_timeout_probe=config.profiling.transfer_timeout_probe,
             ),
         )
 
@@ -554,6 +568,7 @@ class FirmwareRenderContext:
             "has_ethos_u": self.engine.has_ethos_u,
             "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
             "input_fill": self.engine.input_fill,
+            "transfer_timeout_probe": self.engine.transfer_timeout_probe,
         }
 
 
