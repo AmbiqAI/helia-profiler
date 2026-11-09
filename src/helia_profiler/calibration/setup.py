@@ -63,6 +63,7 @@ _AOT_ARGS = ("config", "engine", "config", "aot_args")
 _EFFECTIVE_CONFIG = "effective_config_sha256"
 _PAIRING_CONFIG = "effective_config_pairing_sha256"
 _HELIA_AOT = "helia-aot"
+_SETUP_DEPTH = 64
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,15 @@ class Setup:
         pairing: Mapping[str, Any] | None = None,
     ) -> Setup:
         """The setup of a nested *basis*, and of its *pairing* basis when known:
-        each one's canonical JSON digested, its leaves listed."""
+        each one's canonical JSON digested, its leaves listed.
+
+        Each basis admits at most 64 nested JSON containers, counting its root
+        as one level. Raises :class:`CalibrationError` before processing a
+        deeper basis.
+        """
+        _check_setup_depth(basis)
+        if pairing is not None:
+            _check_setup_depth(pairing)
         pairing_digest, pairing_fields = (None, None) if pairing is None else _digested(pairing)
         digest, fields = _digested(basis)
         return cls(digest, fields, helia_aot_version, basis, pairing_digest, pairing_fields)
@@ -206,7 +215,8 @@ def _setup(run: RunArtifacts, source: str) -> Setup:
 
     Raises:
         CalibrationError: when the bundle records no settings, a held field
-            holds a NaN or infinity, heliaAOT rejects the recorded engine
+            holds a NaN or infinity, the raw setup exceeds the nesting budget,
+            heliaAOT rejects the recorded engine
             arguments, or a helia-aot bundle records no
             ``engine.effective_config_sha256``.
         EngineMissingError: when heliaAOT is not installed on this host.
@@ -214,11 +224,13 @@ def _setup(run: RunArtifacts, source: str) -> Setup:
     config = run.metadata.get("config")
     if not isinstance(config, dict) or not config:
         raise CalibrationError(f"Bundle {source} records no settings in run_metadata.json.")
-    basis: dict[str, Any] = {"config": copy.deepcopy(config)}
+    basis: dict[str, Any] = {"config": config}
     for section in ("toolchain", "engine"):
         block = run.metadata.get(section)
         if isinstance(block, dict):
-            basis[section] = copy.deepcopy(block)
+            basis[section] = block
+    _check_setup_depth(basis, source=source)
+    basis = copy.deepcopy(basis)
     for excluded in SETUP_EXCLUDED:
         _remove(basis, tuple(excluded.split(".")))
     aot_args = _lookup(basis, _AOT_ARGS)
@@ -290,6 +302,25 @@ def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
     parent = _lookup(data, path[:-1])
     if isinstance(parent, dict):
         parent.pop(path[-1], None)
+
+
+def _check_setup_depth(basis: Mapping[str, Any], *, source: str | None = None) -> None:
+    """Stop at the first over-budget container before recursive setup processing."""
+    for section, value in basis.items():
+        stack = [(value, 2)]
+        while stack:
+            node, depth = stack.pop()
+            if not isinstance(node, (dict, list)):
+                continue
+            if depth > _SETUP_DEPTH:
+                label = f"Bundle {source}" if source is not None else "Calibration setup"
+                raise CalibrationError(
+                    f"{label}: section {section!r} nests deeper than {_SETUP_DEPTH} container levels.",
+                    hint=f"Use at most {_SETUP_DEPTH} nested JSON containers in the setup, "
+                    "counting its root as one level.",
+                )
+            children = node.values() if isinstance(node, dict) else node
+            stack.extend((child, depth + 1) for child in children)
 
 
 def _leaves(prefix: str, value: Any, out: dict[str, Any]) -> None:

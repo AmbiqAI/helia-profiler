@@ -47,6 +47,21 @@ writes. Unlike the result schemas it is closed: within version 2 only
 `conditions`, the names and values in `knobs`, the operator ids and the fact
 values are open, and any other change to the file's shape is a new version.
 
+Calibration setup processing accepts at most 64 nested JSON containers, counting
+the setup basis root as one level; scalar values add no level. This budget
+allows nested AOT memory rules, operator attributes and transform options beyond
+the separate eight-level conditions limit. It applies to the raw `config`,
+`engine` and `toolchain` sections, including settings later excluded from the
+setup digest, before copying or compiler-argument validation. `Setup.of` applies
+the same budget to both its setup and optional pairing basis.
+
+An over-budget setup raises `CalibrationError` naming the bundle and section;
+the CLI reports the error without a traceback. Calibration creates no new
+output and preserves an existing output on refusal, including with `--merge`.
+Accepted setup and pairing values, digests and field names keep their existing
+meaning. This processing limit adds no file fields or schema version, and does
+not change how a calibration file's retained setup digests are read.
+
 Saved plan/build/result versions and the matching-environment requirement are
 listed in [Platform facts and policy](../concepts/platforms/#saved-format-changes).
 Loading a current receipt uses recorded facts; replay and capture check the current
