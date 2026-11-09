@@ -19,7 +19,7 @@ from helia_profiler import (
     PreparedUpstreamRuntime,
     TypedFixture,
 )
-from helia_profiler.errors import ConfigError
+from helia_profiler.errors import ConfigError, PlatformError
 from helia_profiler.fixtures.image import ContractError
 from helia_profiler.fixtures.psram import (
     FixturePsramPayload,
@@ -362,7 +362,7 @@ def test_psram_memory_plan_books_staging_and_terminal(tmp_path, engine):
         if engine is EngineType.HELIA_AOT
         else "fixture_model_staging"
     )
-    assert entries[staging].size == (4 if engine is EngineType.HELIA_AOT else 5)
+    assert entries[staging].size == (4 if engine is EngineType.HELIA_AOT else 8)
     assert _add_hpx_owned_consumers(plan, ctx) == plan
 
 
@@ -631,14 +631,22 @@ def test_psram_fixture_write_is_word_padded(tmp_path, engine, size):
     names = [p.split()[-1].lstrip("*") for p in _c_arguments(signature.group(1))]
     passed = dict(zip(names[2:], _c_arguments(match.group(1)), strict=True))
 
-    def length(pattern: str) -> int:
+    def parameter(pattern: str) -> str:
         found = re.findall(pattern, source)
         assert len(found) == 1, pattern
-        return c_value(passed[found[0]], header)
+        return found[0]
+
+    def length(pattern: str) -> int:
+        return c_value(passed[parameter(pattern)], header)
 
     padded = _PADDED[size]
     write = length(r"nsx_psram_write\(offset, source, (\w+)\)")
     assert write == padded and write % 4 == 0
+    # A stored length below the checksummed one is refused before any write.
+    stored = parameter(r"nsx_psram_write\(offset, source, (\w+)\)")
+    logical = parameter(r"hpx_psram_checksum\(source, (\w+)\)")
+    body = source[signature.end() : source.index("nsx_psram_write(offset", signature.end())]
+    assert re.search(rf"\b{stored} < {logical} \|\|[^;]*\) return false;", body)
     assert length(r"(\w+) > hpx_psram_size - offset") == padded
     assert length(r"hpx_psram_offset = offset \+ (\w+);") == padded
     assert length(r"hpx_psram_checksum\(destination, (\w+)\)") == size
@@ -646,3 +654,47 @@ def test_psram_fixture_write_is_word_padded(tmp_path, engine, size):
     assert length(r"deployment_psram_weights\[10 \+ 4\*slot\] = (\w+);") == size
     assert c_value(passed["expected"], header) == payload_checksum(data)
     assert fixture_psram_payloads(ctx, regions)[0].size == size
+
+
+def test_psram_aot_plan_books_word_padded_staging_and_psram(tmp_path):
+    from helia_profiler.firmware.headers import _blob_to_header
+    from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
+    from helia_profiler.stages.plan_memory import PlanMemoryStage, _add_hpx_owned_consumers
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+    from tests.test_psram_word_writes import array_bytes
+
+    ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
+    blobs = {1: bytes(range(1, 6)), 2: bytes(i % 255 + 1 for i in range(4097))}
+    for region_id, data in blobs.items():
+        (tmp_path / f"weights{region_id}.bin").write_bytes(data)
+    constant = regions[1]
+    regions[1] = replace(constant, size=5, blob_filename="weights1.bin")
+    regions.append(replace(constant, region_id=2, size=4097, blob_filename="weights2.bin"))
+    ctx.engine_artifacts = replace(ctx.engine_artifacts, aot_arena_regions=regions)
+    ResolvePlatformStage().run(ctx)
+    ctx.arena_region, ctx.weights_region = Placement.SRAM, Placement.PSRAM
+    logical = sum(len(d) for d in blobs.values()) + 59  # 5 B, 59 B gap to 64, 4097 B
+    psram = MemoryRegionUsage(
+        region=MemoryRegion.PSRAM,
+        capacity=logical,
+        used=5 + 4097,
+        consumers=tuple(
+            MemoryConsumer(name=f"psram_constant_arena_{i}", size=len(d), kind=ConsumerKind.WEIGHTS)
+            for i, d in blobs.items()
+        ),
+    )
+    plan = _add_hpx_owned_consumers(MemoryPlan(engine=EngineType.HELIA_AOT, regions=(psram,)), ctx)
+
+    # Capacity equal to the logical layout no longer admits the padded one.
+    with pytest.raises(PlatformError, match="PSRAM"):
+        PlanMemoryStage()._validate(plan)
+    # hpx_psram_load ends at 0 + 8, then 64 + 4100.
+    planned = plan.region(MemoryRegion.PSRAM)
+    assert planned is not None and planned.used == 64 + 4100
+
+    entries = {c.name: c for r in plan.regions for c in r.consumers}
+    for region_id, data in blobs.items():
+        (tmp_path / "blob.bin").write_bytes(data)
+        header = _blob_to_header(tmp_path / "blob.bin", f"hpx_const_blob_{region_id}")
+        staged = entries[f"fixture_aot_constant_staging_{region_id}"]
+        assert staged.size == len(array_bytes(header, f"hpx_const_blob_{region_id}"))

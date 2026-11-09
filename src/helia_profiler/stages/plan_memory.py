@@ -38,6 +38,7 @@ from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
 from ..errors import PlatformError
+from ..firmware.headers import word_padded
 from ..pipeline import PipelineContext
 from ..placement import (
     ArenaRole,
@@ -155,14 +156,18 @@ class PlanMemoryStage:
                 )
 
         if model_bytes > 0:
+            # model_data[] and the fixture's PSRAM copy are word-padded; a
+            # host-uploaded PSRAM image is the model's exact bytes.
+            uploaded = weight_phys is MemoryRegion.PSRAM and ctx.fixture is None
+            stored = model_bytes if uploaded else word_padded(model_bytes)
             add(
                 weight_phys,
                 "pte_program" if engine_type is EngineType.EXECUTORCH else "model_flatbuffer",
-                model_bytes,
+                stored,
                 "weights",
             )
             if ctx.fixture is not None and weight_phys is MemoryRegion.PSRAM:
-                add(MemoryRegion.MRAM, "fixture_model_staging", model_bytes, "weights")
+                add(MemoryRegion.MRAM, "fixture_model_staging", stored, "weights")
 
         if engine_type is EngineType.EXECUTORCH and isinstance(artifacts, ExecutorchArtifacts):
             # The generated ExecuTorch runner owns several explicit buffers in
@@ -492,11 +497,15 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             if isinstance(artifacts, HeliaAotArtifacts):
                 mram = plan.region(MemoryRegion.MRAM)
                 existing = {c.name: c for c in mram.consumers} if mram else {}
+                # The PSRAM arena consumers book the logical sizes; the
+                # padding consumer holds the 64-byte alignment gaps and each
+                # payload's word padding.
                 offset = padding = 0
                 for payload in payloads:
                     alignment = (-offset) % 64
-                    padding += alignment
-                    offset += alignment + payload.size
+                    stored = word_padded(payload.size)
+                    padding += alignment + stored - payload.size
+                    offset += alignment + stored
                     name = f"mram_constant_source_{payload.region_id}"
                     if name in existing and existing[name].size != payload.size:
                         raise PlatformError("AOT PSRAM staging plan differs from pinned payload")
@@ -505,7 +514,7 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
                             MemoryRegion.MRAM,
                             MemoryConsumer(
                                 name=f"fixture_aot_constant_staging_{payload.region_id}",
-                                size=payload.size,
+                                size=stored,
                                 kind=ConsumerKind.WEIGHTS,
                                 symbol=f"hpx_const_blob_{payload.region_id}",
                             ),
