@@ -278,6 +278,9 @@ class WireKey(StrEnum):
     NUM_OUTPUTS = "num_outputs"
     INPUT_INDEXED_SIZE = "input_%d_size"
     OUTPUT_INDEXED_SIZE = "output_%d_size"
+    INPUT_INDEXED_FNV1A64 = "input_%d_fnv1a64"
+    OUTPUT_INDEXED_FNV1A64 = "output_%d_fnv1a64"
+    OUTPUT_INDEXED_HEX = "output_%d_hex"
     ARENAS_BOUND = "arenas_bound"
 
     # PSRAM

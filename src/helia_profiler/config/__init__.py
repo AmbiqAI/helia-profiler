@@ -161,6 +161,19 @@ class CleanWindowProbe(StrEnum):
     BUSY_LOOP = "busy_loop"
 
 
+class InputFill(StrEnum):
+    """What fills the model's inputs before every run.
+
+    ``ZERO`` (default) keeps every existing capture unchanged.  ``LCG`` fills
+    each input with a fixed-seed 32-bit linear congruential sequence, so an
+    output depends on every weight rather than on biases alone and a missing
+    or late weight shows in the output digests (heliaAOT only).
+    """
+
+    ZERO = "zero"
+    LCG = "lcg"
+
+
 DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
 DEFAULT_ITERATIONS = 100
@@ -468,6 +481,8 @@ class ProfilingConfig:
     # :class:`Aggregation`.  All methods first reject structurally-invalid
     # samples (uint32-wrap / frozen-zero) and log them.
     aggregation: Aggregation = DEFAULT_AGGREGATION
+    # See :class:`InputFill`.
+    input_fill: InputFill = InputFill.ZERO
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
@@ -718,6 +733,13 @@ class ProfileConfig:
                     f"Known boards: {', '.join(sorted(self.platform_registry.boards))}. "
                     "Define other boards under target.custom_boards."
                 ),
+            )
+        if self.engine.type is not EngineType.HELIA_AOT and (
+            self.profiling.input_fill is not InputFill.ZERO
+        ):
+            raise ConfigError(
+                "profiling.input_fill applies to engine.type helia-aot only",
+                hint="Leave profiling.input_fill at zero for this engine.",
             )
         if self.frozen and not self.build.offline:
             object.__setattr__(self, "build", replace(self.build, offline=True))

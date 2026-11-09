@@ -372,6 +372,23 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    # profiling.input_fill: lcg refills every input from the fixed-seed LCG in
+    # both binaries.
+    for power_only in (False, True):
+        cases.append(
+            _CompileCase(
+                case_id="apollo510|rtt|helia-aot|lcg" + ("|power" if power_only else ""),
+                text=_render(
+                    "apollo510",
+                    "rtt",
+                    "helia-aot",
+                    power_only=power_only,
+                    overrides={"input_fill": "lcg"},
+                ),
+                vars=_common_kwargs("apollo510", "rtt"),
+            )
+        )
+
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
     # exactly as firmware/__init__.py renders it.

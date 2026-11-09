@@ -31,7 +31,7 @@
 {%- endblock %}
 
 {% block engine_includes %}
-{% if not busy_loop_probe %}
+{% if not busy_loop_probe and input_fill == "zero" %}
 #define HPX_CLEAN_WORKLOAD "aot_raw_zero_refill_included_v1"
 {% endif %}
 // heliaAOT model API
@@ -379,6 +379,39 @@ static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
     .user_data = nullptr
 };
 
+{% if input_fill == "lcg" %}
+// profiling.input_fill: lcg. Every run's inputs are the same fixed-seed
+// 32-bit LCG bytes, so an output depends on every weight, not on biases alone.
+static void hpx_fill_lcg(void *data, size_t size, uint32_t seed) {
+    uint8_t *bytes = (uint8_t *)data;
+    uint32_t state = seed;
+    for (size_t i = 0; i < size; i++) {
+        state = state * 1664525U + 1013904223U;
+        bytes[i] = (uint8_t)(state >> 24);
+    }
+}
+
+{% endif %}
+{% if not power_only | default(false) %}
+// FNV-1a 64: runs are compared byte for byte by the digests of their bytes.
+static uint64_t hpx_fnv1a64(const void *data, size_t size) {
+    const uint8_t *bytes = (const uint8_t *)data;
+    uint64_t hash = 0xcbf29ce484222325ULL;
+    for (size_t i = 0; i < size; i++) {
+        hash = (hash ^ bytes[i]) * 0x100000001b3ULL;
+    }
+    return hash;
+}
+
+static void hpx_print_output_digests(void) {
+    for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
+        hpx_printf("HPX_OUTPUT_%d_FNV1A64=%016llx\n", i,
+                   (unsigned long long)hpx_fnv1a64({{ aot_prefix }}_model_ctx.outputs[i].data,
+                                                   (size_t){{ aot_prefix }}_model_ctx.outputs[i].size));
+    }
+}
+
+{% endif %}
 #ifdef HPX_AOT_TRANSFER
 // Binds the module's provider. A refusal leaves ctx.transfer unset, so
 // model_init would return 300; the provider's code says why.
@@ -683,14 +716,18 @@ static void hpx_aot_check_runs(void) {
    back through self, which supplies the surrounding newlines, so the first
    line has to glue to the block tag rather than start on the next one. #}
 {% block engine_reset_inputs_warm %}            for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
-                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+{% if input_fill == "lcg" %}                hpx_fill_lcg({{ aot_prefix }}_model_ctx.inputs[i].data,
+                             (size_t){{ aot_prefix }}_model_ctx.inputs[i].size, 0x48505831U + (uint32_t)i);
+{% else %}                memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                        {{ aot_prefix }}_model_ctx.inputs[i].size);
-            }{% endblock %}
+{% endif %}            }{% endblock %}
 
 {% block engine_reset_inputs %}        for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
-            memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
+{% if input_fill == "lcg" %}            hpx_fill_lcg({{ aot_prefix }}_model_ctx.inputs[i].data,
+                         (size_t){{ aot_prefix }}_model_ctx.inputs[i].size, 0x48505831U + (uint32_t)i);
+{% else %}            memset({{ aot_prefix }}_model_ctx.inputs[i].data, 0,
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
-        }{% endblock %}
+{% endif %}        }{% endblock %}
 
 {% block engine_invoke %}{ int32_t s = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx); if (s != 0 && hpx_aot_status == 0) { hpx_aot_status = s; } }{% endblock %}
 
@@ -772,14 +809,15 @@ hpx_aot_check_runs();{% endblock %}
                        kMaxLayers);
             hpx_park();
         }
-#ifdef HPX_AOT_TRANSFER
-        hpx_transfer_report();
-#endif
 {% if pass.group == "ethos_npu" %}
         hpx_npu_print_csv();
 {% else %}
         profiler_print_csv();
 {% endif %}
+#ifdef HPX_AOT_TRANSFER
+        hpx_transfer_report();
+#endif
+        hpx_print_output_digests();
 {%- endblock %}
 
 {% block engine_profiled_summary %}
@@ -788,4 +826,25 @@ hpx_aot_check_runs();{% endblock %}
     // whatever group happened to run last.
     hpx_npu_set_enabled(false);
 {% endif %}
+{% if transport == "rtt" %}
+    hpx_rtt_set_blocking();
+{% endif %}
+    // The last run's outputs in full, then the inputs every run received.
+    for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
+        if ((size_t){{ aot_prefix }}_model_ctx.outputs[i].size > 1024U) {
+            continue;
+        }
+        const uint8_t *bytes = (const uint8_t *){{ aot_prefix }}_model_ctx.outputs[i].data;
+        hpx_printf("HPX_OUTPUT_%d_HEX=", i);
+        for (size_t b = 0; b < (size_t){{ aot_prefix }}_model_ctx.outputs[i].size; b++) {
+            hpx_printf("%02x", (unsigned)bytes[b]);
+        }
+        hpx_printf("\n");
+    }
+{{ self.engine_reset_inputs() }}
+    for (int i = 0; i < {{ aot_prefix }}_num_inputs; i++) {
+        hpx_printf("HPX_INPUT_%d_FNV1A64=%016llx\n", i,
+                   (unsigned long long)hpx_fnv1a64({{ aot_prefix }}_model_ctx.inputs[i].data,
+                                                   (size_t){{ aot_prefix }}_model_ctx.inputs[i].size));
+    }
 {{ super() }}{% endblock %}

@@ -244,6 +244,8 @@ class EngineContext:
     executorch_io_region: str
     has_ethos_u: bool = False
     npu_tolerate_power_ack: bool = False
+    #: ``profiling.input_fill``; only heliaAOT renders read it.
+    input_fill: str = "zero"
 
 
 @dataclass(frozen=True)
@@ -432,6 +434,7 @@ class FirmwareRenderContext:
                 executorch_io_region=io_region,
                 has_ethos_u=artifacts.resolved_backend == "ethos_u",
                 npu_tolerate_power_ack=board.is_fpga,
+                input_fill=config.profiling.input_fill.value,
             ),
         )
 
@@ -550,6 +553,7 @@ class FirmwareRenderContext:
             "executorch_io_region": self.engine.executorch_io_region,
             "has_ethos_u": self.engine.has_ethos_u,
             "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
+            "input_fill": self.engine.input_fill,
         }
 
 

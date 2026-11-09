@@ -140,6 +140,9 @@ One printf format, one line per index — heliaAOT reports per-input and per-out
 | --- | --- | --- | --- | --- | --- |
 | `HPX_INPUT_%d_SIZE` | helia-aot | `always` | `unconsumed` | `diagnostic` | Byte size of input &lt;i&gt;, one line per input. Value: `bytes`. A genuine token-shape divergence: heliaAOT reports per-index sizes where TFLM and ExecuTorch report one static HPX_INPUT_SIZE. The parser stores input_0_size, input_1_size, ... and drops them. |
 | `HPX_OUTPUT_%d_SIZE` | helia-aot | `always` | `unconsumed` | `diagnostic` | Byte size of output &lt;i&gt;, one line per output. Value: `bytes`. |
+| `HPX_OUTPUT_%d_FNV1A64` | helia-aot | `not power_only` | `unconsumed` | `diagnostic` | FNV-1a 64 of output &lt;i&gt; after one instrumented run. Value: `<16 hex digits>`. One line per output after every instrumented run, so two captures of one model can be compared run by run. |
+| `HPX_INPUT_%d_FNV1A64` | helia-aot | `not power_only` | `unconsumed` | `diagnostic` | FNV-1a 64 of input &lt;i&gt; as every run received it. Value: `<16 hex digits>`. Once, after the last pass; profiling.input_fill decides the bytes. |
+| `HPX_OUTPUT_%d_HEX` | helia-aot | `not power_only`; runtime: the output is at most 1024 bytes | `unconsumed` | `diagnostic` | The bytes of output &lt;i&gt; after the last instrumented run. Value: `<2 hex digits per byte>`. Once, after the last pass. |
 
 ## Records
 

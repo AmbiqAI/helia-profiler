@@ -695,6 +695,38 @@ def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
         FirmwareRenderContext.from_pipeline_context(ctx)
 
 
+@pytest.mark.parametrize("fill", ["zero", "lcg"])
+def test_render_context_carries_the_input_fill(tmp_path: Path, fill: str):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.platform import get_board, get_soc
+    from helia_profiler.results.models import PlatformInfo
+
+    model_file = tmp_path / "test.tflite"
+    model_file.write_bytes(b"\x00")
+    config = load_config(
+        None,
+        {
+            "model": {"path": str(model_file)},
+            "engine": {"type": "helia-aot"},
+            "profiling": {"input_fill": fill},
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.soc = get_soc("apollo510")
+    ctx.board = get_board("apollo510_evb")
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        helia_aot_version="0.0.0",
+    )
+    ctx.run_metadata.platform = PlatformInfo(cpu_clock_mhz=96)
+    template_vars = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+    assert template_vars["input_fill"] == fill
+
+
 def test_render_context_tolerates_npu_power_ack_only_on_fpga_boards(tmp_path: Path):
     """npu_tolerate_power_ack is derived from board.is_fpga in
     FirmwareRenderContext.from_pipeline_context — the FPGA NPU power domain
