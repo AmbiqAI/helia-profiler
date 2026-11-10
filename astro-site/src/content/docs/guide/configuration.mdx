@@ -104,9 +104,10 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
 #### heliaAOT
 
 - A module that ships its own transfer provider (`<prefix>_nsx_transfer.h`,
-  heliaAOT's `nsx` module with dma units) needs nsx-ambiq-sdk at or after
-  commit 64cf8985 (PR #211), the first with `nsx_psram_dma_in_progress`:
-  select it with `build.nsx_modules.<module>.ref`. The pinned baseline's
+  heliaAOT's `nsx` module with dma units) needs an nsx-ambiq-sdk with
+  `nsx_psram_dma_in_progress`: PR #211 (first in commit 48712cd), or its
+  merge commit on main once merged. Select it with
+  `build.nsx_modules.<module>.ref`. The pinned baseline's
   nsx-psram has no asynchronous read, and the provider's own API check does
   not cover that accessor. hpx binds the provider before `model_init`.
 - Every heliaAOT capture now carries new lines:
@@ -144,10 +145,13 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     cleans and invalidates the D-cache over each PSRAM constant arena. A late or
     missing copy then shows in the outputs, and every constant read reaches the
     MSPI controller.
-  - It applies to any module whose stream pool hpx binds, with dma or cpu
-    units, so compared captures share one regime.
+  - It applies to any module whose stream pool or PSRAM constant arenas hpx
+    binds, with dma units, cpu units or none. A module without a pool gets the
+    invalidate alone. The unstreamed reference capture takes the setting too,
+    so compared captures share one regime.
   - It is refused on parts without an explicit D-cache (Apollo3, Apollo4), for
-    modules without a pool, and for other engines.
+    modules with neither a bound pool nor PSRAM constants, and for other
+    engines.
   - Without the setting, no capture is poisoned or invalidated.
 
 #### Target overrides

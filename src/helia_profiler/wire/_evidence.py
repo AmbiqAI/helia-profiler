@@ -133,7 +133,22 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         note="The rebind with the default budget, model_init and one more run "
         "(the pool poisoned again), and nsx_psram_pending() sampled the moment "
         "the probe run returned. A non-zero bind fails the capture as "
-        "transfer_bind_failed, a non-zero init or run as model_run_failed.",
+        "transfer_bind_failed, init as model_init_failed, run as model_run_failed.",
+    ),
+    _spec(
+        WireKey.TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64.wire,
+        WireKind.KEY_VALUE_INDEXED,
+        "FNV-1a 64 of output <i> after the probe's recovery run.",
+        WireConsumer.UNCONSUMED,
+        WireCriticality.DIAGNOSTIC,
+        key=WireKey.TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64,
+        engines=AOT_ENGINES,
+        condition=GATE_TRANSFER_PROBE,
+        runtime_gate="the module ships <prefix>_nsx_transfer.h",
+        value_shape="<16 hex digits>",
+        note="Once, after HPX_TRANSFER_RECOVERY: equal to the reference capture's "
+        "output digests when the recovery run read the right bytes. Never printed "
+        "as HPX_OUTPUT_<i>_FNV1A64, so no counted run's digest is confused with it.",
     ),
     _spec(
         WireKey.STREAM_EVIDENCE.wire,
@@ -148,9 +163,9 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         value_shape="1",
         note="The cache regime of the per-layer figures and HPX_PROFILED_INFER_*: "
         "before each instrumented run the pool is filled with 0x5A and the D-cache "
-        "is cleaned and invalidated over each PSRAM constant arena. The warm-ups "
-        "and the clean window keep a warm cache. Without the setting no capture "
-        "does either.",
+        "is cleaned and invalidated over each PSRAM constant arena (a module "
+        "without a pool gets the invalidate alone). The warm-ups and the clean "
+        "window keep a warm cache. Without the setting no capture does either.",
     ),
     _spec(
         WireKey.INPUT_FILL.wire,

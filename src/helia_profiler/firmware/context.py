@@ -582,19 +582,25 @@ class FirmwareRenderContext:
 def _check_stream_evidence(
     soc: Any, regions: tuple["ArenaRegion", ...], *, allocate_arenas: bool
 ) -> None:
-    """profiling.stream_evidence needs a bound stream pool and per-range D-cache maintenance."""
+    """profiling.stream_evidence needs per-range D-cache maintenance and something to apply
+    it to: a bound stream pool (the poison) or PSRAM constant arenas (the invalidate)."""
     if not soc.capabilities.memory.has_dcache:
         raise ConfigError(
             f"profiling.stream_evidence needs a part with an explicit D-cache (Apollo5 "
             f"family); {soc.name} has none.",
             hint="Turn profiling.stream_evidence off for this target.",
         )
-    if allocate_arenas or not any(region.role is ArenaRole.POOL for region in regions):
+    bound = () if allocate_arenas else regions
+    if not any(
+        region.role is ArenaRole.POOL
+        or (region.role is ArenaRole.CONSTANT and region.placement is Placement.PSRAM)
+        for region in bound
+    ):
         raise ConfigError(
-            "profiling.stream_evidence needs a heliaAOT module whose stream pool hpx "
-            "binds, and this module has none.",
-            hint="Convert with transfer units, memory.stream_pool and "
-            "memory.allocate_arenas: false, or turn the setting off.",
+            "profiling.stream_evidence needs a heliaAOT module whose stream pool or "
+            "PSRAM constant arenas hpx binds, and this module has neither.",
+            hint="Convert with memory.allocate_arenas: false and either memory.stream_pool "
+            "or constants in PSRAM, or turn the setting off.",
         )
 
 

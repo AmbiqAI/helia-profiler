@@ -50,9 +50,9 @@
 #include "nsx_psram.h"
 #define HPX_AOT_TRANSFER 1
 #endif
-{% if stream_evidence %}
+{% if stream_evidence and pool_regions %}
 #ifndef {{ aot_prefix }}_num_dma_units
-#error "profiling.stream_evidence needs a module with a stream pool: {{ aot_prefix }}_num_dma_units is not declared"
+#error "profiling.stream_evidence binds a stream pool, but the module does not declare {{ aot_prefix }}_num_dma_units"
 #endif
 {% endif %}
 {% if has_armv8m_pmu %}
@@ -821,10 +821,21 @@ hpx_aot_check_runs();{% endblock %}
         hpx_printf("HPX_TRANSFER_PROBE=%ld,%ld\n", (long)probe, (long)provider);
         hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%lu\n", (long)bind, (long)init, (long)run,
                    (unsigned long)pending);
+        // The recovery run's bytes: a piece the abort left to land late, or a
+        // unit not copied again, shows against the reference capture here.
+        for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
+            hpx_printf("HPX_TRANSFER_RECOVERY_OUTPUT_%d_FNV1A64=%016llx\n", i,
+                       (unsigned long long)hpx_fnv1a64({{ aot_prefix }}_model_ctx.outputs[i].data,
+                                                       (size_t){{ aot_prefix }}_model_ctx.outputs[i].size));
+        }
         if (bind != 0) {
             hpx_transfer_bind_failed(bind);
         }
-        hpx_aot_status = (probe != 0 && probe != 301) ? probe : (init != 0 ? init : run);
+        if (init != 0) {
+            hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)init);
+            hpx_park();
+        }
+        hpx_aot_status = (probe != 0 && probe != 301) ? probe : run;
         hpx_aot_check_runs();
 {% if transport == "rtt" %}
         hpx_rtt_set_nonblocking();

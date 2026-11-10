@@ -735,19 +735,22 @@ def test_the_transfer_timeout_probe_needs_the_emitted_provider(tmp_path: Path, p
 
 _SCRATCH = ("scratch", "tcm")
 _POOL = ("pool", "tcm")
+_PSRAM_CONSTANTS = ("constant", "psram")
 
 
 @pytest.mark.parametrize(
     ("soc", "board", "regions", "allocate", "refusal"),
     [
         ("apollo510", "apollo510_evb", (_SCRATCH, _POOL), False, None),
+        ("apollo510", "apollo510_evb", (_SCRATCH, _PSRAM_CONSTANTS), False, None),
+        ("apollo510", "apollo510_evb", (_SCRATCH, _PSRAM_CONSTANTS, _POOL), False, None),
         ("apollo4p", "apollo4p_evb", (_SCRATCH, _POOL), False, "explicit D-cache"),
-        ("apollo510", "apollo510_evb", (_SCRATCH,), False, "stream pool hpx binds"),
-        ("apollo510", "apollo510_evb", (_SCRATCH, _POOL), True, "stream pool hpx binds"),
+        ("apollo510", "apollo510_evb", (_SCRATCH,), False, "stream pool or PSRAM constant"),
+        ("apollo510", "apollo510_evb", (_SCRATCH, _POOL), True, "stream pool or PSRAM constant"),
     ],
-    ids=["apollo510-pool", "apollo4p", "no-pool", "internal-arenas"],
+    ids=["pool", "psram-constants", "pool-and-constants", "apollo4p", "neither", "internal"],
 )
-def test_stream_evidence_needs_an_explicit_dcache_and_a_bound_pool(
+def test_stream_evidence_needs_an_explicit_dcache_and_a_pool_or_psram_constants(
     tmp_path: Path, soc, board, regions, allocate, refusal
 ):
     from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts

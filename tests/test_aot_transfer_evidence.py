@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from tests.contracts.fixture_compile_cases import _AOT_TRANSFER_STUB, aot_model_stub
+from tests.test_aot_io_digests import _fnv1a64
 from tests.test_template_render import _render_aot
 
 pytestmark = pytest.mark.host_integration
@@ -359,6 +360,10 @@ int main() {
     const int32_t binds_by_call[] = {BINDS};
     std::memcpy(run_results, runs_by_call, sizeof(runs_by_call));
     std::memcpy(bind_results, binds_by_call, sizeof(binds_by_call));
+    init_result = INIT;
+    // Output 0 is the pool's bytes, which each fake run overwrites with 1s.
+    fake_model_ctx.outputs[0].data = pool;
+    fake_model_ctx.outputs[0].size = sizeof(pool);
 """
     + "#define HPX_AOT_TRANSFER 1\n"
     + r"""
@@ -372,7 +377,7 @@ BLOCK
 )
 
 
-def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0)):
+def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0), init=0):
     source = _render_aot(
         transport="rtt",
         clean_window_timer="stimer",
@@ -382,6 +387,7 @@ def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0)):
     main = (
         _PROBE.replace("RUNS", ", ".join(map(str, runs)))
         .replace("BINDS", ", ".join(map(str, binds)))
+        .replace("INIT", str(init))
         .replace("BLOCK", _probe_block(source))
     )
     return _build_and_run(tmp_path, source, main)
@@ -390,13 +396,18 @@ def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0)):
 def test_a_probe_timeout_reports_the_probe_and_the_recovery(tmp_path: Path):
     result = _probe(tmp_path)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == [
+    lines = result.stdout.splitlines()
+    assert lines == [
         "HPX_TRANSFER_PROBE=301,321",
         "HPX_TRANSFER_RECOVERY=0,0,0,7",
+        # The recovery run's bytes, under their own key.
+        f"HPX_TRANSFER_RECOVERY_OUTPUT_0_FNV1A64={_fnv1a64(bytes([1]) * 48):016x}",
         # One-check bind, then the default; both runs found the pool
         # poisoned; nothing ran between the probe run and the pending sample.
         "status=0 binds=2 default=1 inits=1 runs=2 poisoned=1,1 gap=0",
     ]
+    assert sum(line.startswith("HPX_TRANSFER_RECOVERY_OUTPUT_") for line in lines) == 1
+    assert not any(line.startswith("HPX_OUTPUT_") for line in lines)
 
 
 def test_a_probe_run_without_a_timeout_still_recovers(tmp_path: Path):
@@ -414,11 +425,13 @@ def test_a_probe_run_without_a_timeout_still_recovers(tmp_path: Path):
         ((302, 0), (0, 0), "HPX_ERROR=model_run_failed:302,provider=321,driver=0,ticket=0"),
         ((301, 14), (0, 0), "HPX_ERROR=model_run_failed:14,provider=321,driver=0,ticket=0"),
         ((301, 0), (0, 323), "HPX_ERROR=transfer_bind_failed:323"),
+        ((301, 0), (0, 0), "HPX_ERROR=model_init_failed:5"),
     ],
-    ids=["probe-302", "recovery-run", "recovery-bind"],
+    ids=["probe-302", "recovery-run", "recovery-bind", "recovery-init"],
 )
 def test_a_failed_probe_or_recovery_fails_the_capture(tmp_path: Path, runs, binds, error):
-    result = _probe(tmp_path, runs=runs, binds=binds)
+    init = 5 if error.startswith("HPX_ERROR=model_init_failed") else 0
+    result = _probe(tmp_path, runs=runs, binds=binds, init=init)
     assert result.returncode == 3
     lines = result.stdout.splitlines()
     assert lines[0].startswith("HPX_TRANSFER_PROBE=")
@@ -459,9 +472,12 @@ def test_the_probe_is_one_extra_run_before_the_first_pass():
         block.index("const int32_t probe = fake_model_run") : block.index("const uint32_t pending")
     ]
     assert between.count(";") == 1
-    # No digest for the probe or the recovery run.
-    assert "hpx_print_output_digests" not in block
-    assert "HPX_TRANSFER_PROBE" not in _render_aot(transport="rtt", arena_regions=_PROBE_REGIONS)
+    # The recovery run's digests only, under their own key; none for the probe run.
+    assert "hpx_print_output_digests" not in block and "HPX_OUTPUT_" not in block
+    assert block.count('"HPX_TRANSFER_RECOVERY_OUTPUT_%d_FNV1A64=') == 1
+    assert source.count("HPX_TRANSFER_RECOVERY_OUTPUT_") == 1
+    plain = _render_aot(transport="rtt", arena_regions=_PROBE_REGIONS)
+    assert "HPX_TRANSFER_PROBE" not in plain and "HPX_TRANSFER_RECOVERY_OUTPUT_" not in plain
 
 
 _STREAM_EVIDENCE = "// profiling.stream_evidence: every run starts from a poisoned stream"
@@ -485,6 +501,20 @@ def test_stream_evidence_poisons_the_pool_and_invalidates_psram_constants_per_ru
     assert block.count("am_hal_cachectrl_dcache_invalidate(") == 1
     assert "hpx_arena_buf_1, 4100U" in block
     assert '#ifndef fake_num_dma_units\n#error "profiling.stream_evidence' in source
+    assert 'hpx_printf("HPX_STREAM_EVIDENCE=1\\n");' in source
+
+
+def test_stream_evidence_on_an_unstreamed_module_invalidates_its_psram_constants():
+    """The reference capture has no pool: it takes the same cold-constant regime,
+    with nothing to poison and no stream facts required."""
+    regions = [r for r in _POOL_REGIONS if r["role"] != "pool"]
+    source = _render_aot(
+        transport="rtt", arena_region="psram", arena_regions=regions, stream_evidence=True
+    )
+    block = _evidence_block(source)
+    assert "memset(" not in block and "0x5A" not in source
+    assert block.count("am_hal_cachectrl_dcache_invalidate(") == 1
+    assert "#ifndef fake_num_dma_units" not in source
     assert 'hpx_printf("HPX_STREAM_EVIDENCE=1\\n");' in source
 
 

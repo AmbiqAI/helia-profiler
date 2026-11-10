@@ -325,6 +325,7 @@ class WireKey(StrEnum):
     TRANSFER_STATS = "transfer_stats"
     TRANSFER_PROBE = "transfer_probe"
     TRANSFER_RECOVERY = "transfer_recovery"
+    TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64 = "transfer_recovery_output_%d_fnv1a64"
     STREAM_EVIDENCE = "stream_evidence"
     INPUT_FILL = "input_fill"
 

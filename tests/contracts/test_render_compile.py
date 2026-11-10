@@ -397,6 +397,21 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    # profiling.stream_evidence on an unstreamed module (the reference capture):
+    # PSRAM constants and no pool, so no stream facts and no provider header.
+    cases.append(
+        _CompileCase(
+            case_id="apollo510|rtt|helia-aot|stream-evidence-unstreamed",
+            text=_render(
+                "apollo510",
+                "rtt",
+                "helia-aot",
+                overrides={"arena_regions": transfer_regions[:2], "stream_evidence": True},
+            ),
+            vars=_common_kwargs("apollo510", "rtt"),
+        )
+    )
+
     # profiling.input_fill: lcg refills every input from the fixed-seed LCG in
     # both binaries.
     for power_only in (False, True):
@@ -765,7 +780,7 @@ def test_stream_evidence_refuses_a_module_without_its_stream_facts(tmp_path):
     }
     broken = _compile(_prepare_case_dir(case, tmp_path / "broken"), _part_define(case.vars))
     assert broken.returncode != 0
-    assert "profiling.stream_evidence needs a module with a stream pool" in broken.stderr
+    assert "profiling.stream_evidence binds a stream pool" in broken.stderr
 
 
 @pytest.mark.parametrize("engine", FIXTURE_ENGINES)
