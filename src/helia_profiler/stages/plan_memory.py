@@ -16,7 +16,8 @@ Two responsibilities:
    resolved placement.  Each region is then sized against the SoC's
    ``MemoryLayout`` and any overflow raises ``PlatformError`` with an
    actionable hint *before* firmware is built. An overflow of MRAM alone
-   raises ``ImageTooLargeError`` instead, so ``hpx validate`` skips the case.
+   in an otherwise valid plan raises ``ImageTooLargeError`` instead, so
+   ``hpx validate`` skips the case.
 
 Auto policy (greedy fastest-fit, arena prioritized over weights):
 
@@ -296,6 +297,14 @@ class PlanMemoryStage:
         )
 
     def _validate(self, plan: MemoryPlan) -> None:
+        mram = plan.region(MemoryRegion.MRAM)
+        if mram is not None and any(
+            c.kind is ConsumerKind.ARENA and c.size > 0 for c in mram.consumers
+        ):
+            raise PlatformError(
+                "Mutable tensor arenas cannot be placed in MRAM.",
+                hint="Reduce --arena-size or select a RAM placement with sufficient capacity.",
+            )
         for r in plan.regions:
             if r.capacity == 0 and r.used > 0:
                 # overflow cannot fire on a 0-capacity region (custom SoC
@@ -329,7 +338,6 @@ class PlanMemoryStage:
             "  * reduce model size (quantise / prune); or\n"
             "  * pick a larger-memory board."
         )
-        # Weights over MRAM: the board is too small.
         too_large = all(r.region == MemoryRegion.MRAM for r in offenders)
         raise (ImageTooLargeError if too_large else PlatformError)(
             f"Memory plan does not fit:\n{detail}",

@@ -477,6 +477,22 @@ class TestPlanMemoryEngineProvided:
 
 
 class TestPlanMemoryOverflow:
+    @pytest.mark.parametrize("arena_location", [None, "sram", "tcm"])
+    def test_oversized_mutable_arena_is_a_failure(self, tmp_path: Path, arena_location):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 8 * 1024 * 1024,
+                    "arena_location": arena_location,
+                }
+            },
+        )
+        with pytest.raises(PlatformError):
+            PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is None
+
     def test_weights_over_mram_is_too_large(self, tmp_path: Path):
         overrides = {"model": {"path": str(tmp_path / "model.tflite"), "weights_location": "mram"}}
         ctx = _make_ctx(tmp_path, overrides)
@@ -780,3 +796,46 @@ def test_explicit_custom_soc_psram_limit_rejects_an_oversized_arena(tmp_path):
     )
     with pytest.raises(PlatformError, match="PSRAM"):
         PlanMemoryStage().run(ctx)
+
+
+@pytest.mark.parametrize(
+    ("model_size", "arena_size", "arena_location", "exit_code"),
+    [
+        (8 * 1024 * 1024, 65536, "tcm", 4),
+        (2048, 8 * 1024 * 1024, None, 1),
+        (4_130_000, 460_000, "tcm", 1),
+    ],
+)
+def test_planning_failure_reaches_cli_without_becoming_a_skip(
+    tmp_path, monkeypatch, model_size, arena_size, arena_location, exit_code
+):
+    from helia_profiler.cli.profile_cmd import _cmd_profile
+    from helia_profiler.placement import admit_memory_plan
+
+    ctx = _make_ctx(
+        tmp_path,
+        {
+            "model": {
+                "path": str(tmp_path / "model.tflite"),
+                "arena_size": arena_size,
+                "arena_location": arena_location,
+                "weights_location": "mram",
+            }
+        },
+    )
+    ctx.config.model.path.write_bytes(b"\x00" * model_size)
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda *_: ctx.config)
+
+    def plan_before_build(config, **kwargs):
+        assert config is ctx.config
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None and platform.expected_linker is not None
+        admit_memory_plan(ctx.memory_plan, platform.expected_linker)
+        pytest.fail("This case must stop before any firmware build or device access")
+
+    monkeypatch.setattr("helia_profiler.api._execute_profile", plan_before_build)
+    with pytest.raises(SystemExit) as exc:
+        _cmd_profile()
+    assert exc.value.code == exit_code

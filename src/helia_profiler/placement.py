@@ -59,6 +59,7 @@ def admit_memory_plan(plan: MemoryPlan, layout: LinkerInput) -> MemoryPlan:
     from .results import ConsumerKind
 
     regions = []
+    image_overflow: ImageTooLargeError | None = None
     for usage in plan.regions:
         entry = next((value for value in layout.regions if value.region is usage.region), None)
         if entry is not None and entry.capacity is None:
@@ -87,15 +88,20 @@ def admit_memory_plan(plan: MemoryPlan, layout: LinkerInput) -> MemoryPlan:
             raise PlatformError("Fixed stack reservation exceeds modelled region usage")
         capacity = region_capacity(usage.region, usage.capacity, layout)
         if used > capacity:
-            # MRAM overflow: the board is too small.
-            too_large = usage.region == MemoryRegion.MRAM
-            raise (ImageTooLargeError if too_large else PlatformError)(
+            error = ImageTooLargeError if usage.region is MemoryRegion.MRAM else PlatformError
+            failure = error(
                 f"{usage.region}: {used} B modelled usage exceeds the contiguous application "
                 f"budget of {capacity} B ({layout.script.path})",
                 hint="Reduce the requested arena/weights or select another explicit placement. "
                 "Separated allowed intervals cannot form one contiguous allocation.",
             )
+            if isinstance(failure, PlatformError):
+                raise failure
+            # A skippable MRAM overflow must not hide an invalid RAM plan or reservation.
+            image_overflow = failure
         regions.append(replace(usage, capacity=capacity, used=used, consumers=tuple(consumers)))
+    if image_overflow is not None:
+        raise image_overflow
     return replace(plan, regions=tuple(regions), has_overflow=any(r.overflow for r in regions))
 
 
