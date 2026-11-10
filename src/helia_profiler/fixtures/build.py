@@ -173,6 +173,15 @@ class _BindFixtureStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
+        artifacts = ctx.engine_artifacts
+        if isinstance(artifacts, HeliaAotArtifacts) and artifacts.aot_transfer_cmake_target:
+            # heliaAOT's model_init returns 300 while a dma module's provider is unbound.
+            raise ConfigError(
+                "Fixture capture of a heliaAOT module with a transfer provider",
+                hint="The fixture firmware does not bind the module's transfer provider. "
+                "Profile this module with hpx profile, which binds it, or convert it with "
+                "module.transfer_provider: none or cpu transfer units for a fixture.",
+            )
         self.spec.fixture.verify()
         ctx.fixture = self.spec
         ctx.model_analysis = self.spec.model.analysis
