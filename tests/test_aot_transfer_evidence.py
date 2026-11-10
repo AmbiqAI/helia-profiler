@@ -360,7 +360,7 @@ _PROBE = (
 int main() {
     samples[0].pending = 7U;
     std::memset(pool, 0, sizeof(pool));
-    provider_last.error = 321;
+    provider_last.error = PROVIDER;
     const int32_t runs_by_call[] = {RUNS};
     const int32_t binds_by_call[] = {BINDS};
     std::memcpy(run_results, runs_by_call, sizeof(runs_by_call));
@@ -385,7 +385,7 @@ BLOCK
 )
 
 
-def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0), init=0):
+def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0), init=0, provider=321):
     source = _render_aot(
         transport="rtt",
         clean_window_timer="stimer",
@@ -396,6 +396,7 @@ def _probe(tmp_path: Path, *, runs=(301, 0), binds=(0, 0), init=0):
         _PROBE.replace("RUNS", ", ".join(map(str, runs)))
         .replace("BINDS", ", ".join(map(str, binds)))
         .replace("INIT", str(init))
+        .replace("PROVIDER", str(provider))
         .replace("BLOCK", _probe_block(source))
     )
     return _build_and_run(tmp_path, source, main)
@@ -428,21 +429,32 @@ def test_a_probe_run_without_a_timeout_still_recovers(tmp_path: Path):
 
 
 @pytest.mark.parametrize(
-    ("runs", "binds", "error"),
-    [
-        ((302, 0), (0, 0), "HPX_ERROR=model_run_failed:302,provider=321,driver=0,ticket=0"),
-        ((301, 14), (0, 0), "HPX_ERROR=model_run_failed:14,provider=321,driver=0,ticket=0"),
-    ],
-    ids=["probe-302", "recovery-run"],
+    ("probe", "provider"),
+    [(302, 321), (301, 319), (301, 0)],
+    ids=["abort-failed", "busy-not-timeout", "no-provider-code"],
 )
-def test_a_failed_probe_or_recovery_run_fails_the_capture(tmp_path: Path, runs, binds, error):
-    result = _probe(tmp_path, runs=runs, binds=binds)
+def test_a_probe_failure_other_than_the_timeout_fails_before_any_recovery(
+    tmp_path: Path, probe: int, provider: int
+):
+    """Only 301 with the provider's timeout (321) is the probe's outcome."""
+    result = _probe(tmp_path, runs=(probe, 0), provider=provider)
     assert result.returncode == 3
-    lines = result.stdout.splitlines()
-    assert lines[0].startswith("HPX_TRANSFER_PROBE=")
-    assert lines[1].startswith("HPX_TRANSFER_RECOVERY=")
-    assert lines[-2] == error
-    assert lines[-1] == "parked runs=2 pool=01"
+    assert result.stdout.splitlines() == [
+        f"HPX_TRANSFER_PROBE={probe},{provider}",
+        f"HPX_ERROR=model_run_failed:{probe},provider={provider},driver=0,ticket=0",
+        "parked runs=1 pool=01",
+    ]
+
+
+def test_a_failed_recovery_run_fails_the_capture(tmp_path: Path):
+    result = _probe(tmp_path, runs=(301, 14))
+    assert result.returncode == 3
+    assert result.stdout.splitlines()[1:] == [
+        "HPX_TRANSFER_RECOVERY=0,0,14,7",
+        f"HPX_TRANSFER_RECOVERY_OUTPUT_0_FNV1A64={_fnv1a64(bytes([1]) * 48):016x}",
+        "HPX_ERROR=model_run_failed:14,provider=321,driver=0,ticket=0",
+        "parked runs=2 pool=01",
+    ]
 
 
 @pytest.mark.parametrize(

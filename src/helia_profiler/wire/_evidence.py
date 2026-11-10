@@ -117,7 +117,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         note="Once, before the first pass: an extra run outside the counted "
         "iterations with a wait budget of one check. 301 with provider 321 is a "
         "timeout; 0 means nothing was still in flight at its waits. Any other "
-        "status fails the capture as model_run_failed.",
+        "status, a 301 with another provider code included, fails the capture "
+        "as model_run_failed with the provider fields, before any recovery.",
     ),
     _spec(
         WireKey.TRANSFER_RECOVERY.wire,

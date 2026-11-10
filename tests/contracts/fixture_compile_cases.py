@@ -367,6 +367,10 @@ typedef enum {
 #define fake_num_transfer_units 4
 #define fake_num_dma_units 3
 #define fake_transfer_pieces_in_flight 2
+
+typedef enum {
+    fake_status_transfer_failed = 301,
+} fake_transfer_status_t;
 """
 
 #: ``includes-api/fake_nsx_transfer.h`` as heliaAOT emits it beside an ``nsx``
@@ -375,6 +379,11 @@ _AOT_TRANSFER_STUB = """\
 // hpx compile-check generated transfer-provider header stand-in (#676)
 #pragma once
 #include "fake_model.h"
+
+typedef enum {
+    fake_nsx_transfer_ok = 0,
+    fake_nsx_transfer_timeout = 321,
+} fake_nsx_transfer_status_t;
 
 typedef struct {
     uint32_t wait_checks;
