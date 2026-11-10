@@ -16,7 +16,7 @@ from dataclasses import replace as _dc_replace
 from pathlib import Path
 from typing import Any
 
-from ...config import ProfileConfig
+from ...config import InputFill, ProfileConfig
 from ...errors import ConfigError, EngineError
 from ...identity import Unknown
 from ...lifecycle import InstanceBoundary, Lifecycle
@@ -118,6 +118,27 @@ def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> N
             "external-arena mode, and this conversion allocates its own arenas.",
             hint="Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
             "allocates and binds every arena, the stream pool included.",
+        )
+
+
+def _check_input_fill(config: ProfileConfig, result: Any) -> None:
+    """Refuse ``input_fill: lcg`` unless every model input is an integer type.
+
+    The LCG writes raw bytes, which a float input reads as NaN, infinities
+    and huge values.
+    """
+    if config.profiling.input_fill is not InputFill.LCG:
+        return
+    other = [
+        f"{tensor.name or tensor.id} ({tensor.dtype})"
+        for tensor in result.tensors
+        if tensor.input_index is not None and not str(tensor.dtype).startswith(("int", "uint"))
+    ]
+    if other:
+        raise ConfigError(
+            "profiling.input_fill: lcg fills inputs with raw bytes, so it needs integer "
+            f"inputs; this model has {', '.join(other)}.",
+            hint="Use profiling.input_fill: zero for this model.",
         )
 
 
@@ -342,6 +363,7 @@ class HeliaAOTAdapter:
             compiler_args,
         )
 
+        _check_input_fill(config, result)
         # heliaAOT transforms/fuses ops, so the generated graph may differ
         # from the .tflite; the views describe what it actually emits.
         compiled_analysis = analyze_aot_operators(

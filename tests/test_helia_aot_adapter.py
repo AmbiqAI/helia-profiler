@@ -237,6 +237,12 @@ def _prepare(
     return HeliaAOTAdapter().prepare(config, tmp_path / "work")
 
 
+def _lcg_profiling():
+    from helia_profiler.config import InputFill
+
+    return replace(_aot_cfg({}).profiling, input_fill=InputFill.LCG)
+
+
 class TestPrepareArtifactFlags:
     """``prepare()`` derives its artifact flags from the merged AOT args."""
 
@@ -282,6 +288,27 @@ class TestPrepareArtifactFlags:
         config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
         artifacts = _prepare(monkeypatch, tmp_path, config, pool)
         assert [r.role.value for r in artifacts.aot_arena_regions] == ["pool"]
+
+    @pytest.mark.parametrize("dtype", ["float32", "float16", "bool"])
+    def test_lcg_input_fill_is_refused_for_a_non_integer_input(self, monkeypatch, tmp_path, dtype):
+        """The LCG writes raw bytes, which a float input reads as NaN and huge values."""
+        inputs = Result(
+            tensors=(
+                TensorView("a", "a", (1, 4), input_index=0),
+                TensorView("b", "b", (1, 4), dtype=dtype, input_index=1),
+            )
+        )
+        config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+        with pytest.raises(ConfigError, match=rf"input_fill: lcg.*b \({dtype}\)") as raised:
+            _prepare(monkeypatch, tmp_path, config, inputs)
+        assert "input_fill: zero" in str(raised.value.hint)
+        _prepare(monkeypatch, tmp_path / "zero", _aot_cfg({}), inputs)
+
+    @pytest.mark.parametrize("dtype", ["int8", "uint8", "int16", "int32"])
+    def test_lcg_input_fill_is_accepted_for_integer_inputs(self, monkeypatch, tmp_path, dtype):
+        inputs = Result(tensors=(TensorView("a", "a", (1, 4), dtype=dtype, input_index=0),))
+        config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+        _prepare(monkeypatch, tmp_path, config, inputs)
 
     def test_retains_compiled_graph_costs(self, monkeypatch, tmp_path):
         import json

@@ -51,7 +51,8 @@ class InputFill(StrEnum):
     ``ZERO`` (default) keeps every existing capture unchanged.  ``LCG`` fills
     each input with a fixed-seed 32-bit linear congruential sequence, so an
     output depends on every weight rather than on biases alone and a missing
-    or late weight shows in the output digests (heliaAOT only).
+    or late weight shows in the output digests (heliaAOT only).  The bytes
+    are raw, so ``LCG`` is refused for a model with a non-integer input.
     """
 
     ZERO = "zero"
