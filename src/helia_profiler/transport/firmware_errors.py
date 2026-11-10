@@ -76,7 +76,9 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "(NSX_PSRAM_ASYNC_DEPTH) is below the module's pieces in flight; 323 "
         "a drain of an earlier binding timed out.  Pin an nsx-ambiq-sdk whose "
         "nsx-psram offers the asynchronous read on this board, or convert "
-        "with module.transfer_provider: none."
+        "with cpu transfer units or without a stream pool; "
+        "module.transfer_provider: none keeps the dma units and leaves "
+        "hpx nothing to bind, so model_init then returns 300."
     ),
     FirmwareErrorCode.TRANSFER_POWER_CLAUSE: (
         "The transfer provider's sleep predicate disagreed with its pieces in "

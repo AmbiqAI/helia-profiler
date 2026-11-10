@@ -186,7 +186,8 @@ def _transfer_cmake_target(module_dir: Path, prefix: str, cmake_name: str) -> st
         raise EngineError(
             f"heliaAOT emitted {header.name}, but {cmake} declares no {target} target",
             hint="Convert with a heliaAOT whose nsx module builds its transfer provider "
-            f"as {target}, or with module.transfer_provider none.",
+            f"as {target}, or with cpu transfer units; module.transfer_provider none "
+            "keeps the dma units and leaves hpx nothing to bind.",
         )
     return target
 
