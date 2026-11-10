@@ -131,3 +131,13 @@ def test_an_unbound_arena_is_explained_where_it_surfaces():
     hint = ERROR_HINTS[FirmwareErrorCode.MODEL_INIT_FAILED]
     assert "10 means" in hint
     assert "engine.config.aot_args.memory.allocate_arenas: false" in hint
+
+
+def test_a_run_failed_under_lcg_names_the_index_input_cause():
+    """lcg is accepted for integer inputs, and an index input then fails the run."""
+    from helia_profiler.transport.firmware_errors import ERROR_HINTS
+    from helia_profiler.wire import FirmwareErrorCode
+
+    hint = ERROR_HINTS[FirmwareErrorCode.MODEL_RUN_FAILED]
+    assert "profiling.input_fill: lcg" in hint
+    assert "input_fill: zero" in hint
