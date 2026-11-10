@@ -1136,3 +1136,23 @@ def test_compare_refuses_unsupported_summary(tmp_path, version, side):
     path.write_text(json.dumps(summary))
     with pytest.raises(ReportError, match="Unsupported run summary version"):
         compare_runs(*paths)
+
+
+def test_a_cold_constant_capture_is_flagged_against_a_warm_one(tmp_path: Path):
+    """profiling.stream_evidence changes the cache regime of every instrumented
+    run: two otherwise identical captures that differ in it are told apart."""
+    paths = [tmp_path / "warm", tmp_path / "cold"]
+    for path, evidence in zip(paths, (False, True)):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"]["stream_evidence"] = evidence
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    result = compare_runs(*paths)
+
+    row = next(row for row in result.config_rows if row.key == "stream_evidence")
+    assert (row.field, row.status) == ("Stream evidence", "diff")
+    codes = [issue.code for issue in result.comparability.issues]
+    assert "dimension.stream_evidence_differs" in codes
+    same = compare_runs(paths[1], paths[1])
+    assert "dimension.stream_evidence_differs" not in [i.code for i in same.comparability.issues]

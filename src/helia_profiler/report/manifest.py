@@ -251,6 +251,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.APPLICATION_LOAD: (
             conditions.application_load if conditions is not None else None
         ),
+        ComparisonDimension.STREAM_EVIDENCE: nested_get(config, "profiling", "stream_evidence"),
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it

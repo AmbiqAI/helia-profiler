@@ -81,6 +81,7 @@ class ComparisonDimension(StrEnum):
     WEIGHTS_CACHE = "weights_cache"
     EXTERNAL_MEMORY_CLOCK = "external_memory_clock"
     APPLICATION_LOAD = "application_load"
+    STREAM_EVIDENCE = "stream_evidence"
 
 
 class DimensionEffect(StrEnum):
@@ -473,6 +474,22 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         mismatch_hint=(
             "The runs shared the core with different application loads, so "
             "the cycle counts include different interference."
+        ),
+    ),
+    # heliaAOT's profiling.stream_evidence, appended last: with it every
+    # instrumented run reads its PSRAM constants cold and starts from a
+    # poisoned stream pool. Informative, like the cache condition above. None
+    # on artifacts predating the setting -- the comparator's None-skip rule.
+    DimensionSpec(
+        ComparisonDimension.STREAM_EVIDENCE,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.RUN_METADATA,
+        ("config", "profiling", "stream_evidence"),
+        label="Stream evidence",
+        mismatch_hint=(
+            "One run read its PSRAM constants cold before every instrumented "
+            "run (profiling.stream_evidence) and the other did not, so the "
+            "per-layer cycles measure different cache regimes."
         ),
     ),
 )
