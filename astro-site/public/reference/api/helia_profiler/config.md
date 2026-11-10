@@ -172,7 +172,7 @@ Source: `src/helia_profiler/config/profiling.py:124`
 transfer_timeout_probe: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:129`
+Source: `src/helia_profiler/config/profiling.py:130`
 
 ### helia_profiler.ProfilingConfig.stream_evidence
 
@@ -182,7 +182,7 @@ Source: `src/helia_profiler/config/profiling.py:129`
 stream_evidence: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:136`
+Source: `src/helia_profiler/config/profiling.py:137`
 
 ### helia_profiler.ProfilingConfig.extreme_mode
 
@@ -192,7 +192,7 @@ Source: `src/helia_profiler/config/profiling.py:136`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:142`
+Source: `src/helia_profiler/config/profiling.py:143`
 
 ## helia_profiler.ClockSelection
 
