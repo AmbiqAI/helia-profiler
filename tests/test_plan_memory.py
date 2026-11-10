@@ -503,6 +503,28 @@ class TestPlanMemoryOverflow:
 
         assert "MRAM" in str(exc_info.value)
 
+    def test_missing_expected_layout_keeps_raw_mram_skip(self, tmp_path: Path):
+        from dataclasses import replace
+
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "weights_location": "mram",
+                    "arena_location": "tcm",
+                    "arena_size": 460_000,
+                }
+            },
+        )
+        ctx.config.model.path.write_bytes(b"\x00" * 8 * 1024 * 1024)
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None
+        ctx.run_metadata.platform_provenance = replace(platform, expected_linker=None)
+        with pytest.raises(ImageTooLargeError, match="Memory plan does not fit"):
+            PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is None
+
     def test_oversubscribed_region_raises(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         # Apollo510 DTCM is 508 KB; request far more.
@@ -804,6 +826,7 @@ def test_explicit_custom_soc_psram_limit_rejects_an_oversized_arena(tmp_path):
         (8 * 1024 * 1024, 65536, "tcm", 4),
         (2048, 8 * 1024 * 1024, None, 1),
         (4_130_000, 460_000, "tcm", 1),
+        (8 * 1024 * 1024, 460_000, "tcm", 1),
     ],
 )
 def test_planning_failure_reaches_cli_without_becoming_a_skip(

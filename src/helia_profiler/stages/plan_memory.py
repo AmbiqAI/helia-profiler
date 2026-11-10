@@ -35,6 +35,8 @@ because of the runtime upload handshake.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
+from typing import TYPE_CHECKING
 
 from ..config import DEFAULT_ARENA_SIZE_BYTES, Transport
 from ..engines import EngineType
@@ -46,11 +48,15 @@ from ..placement import (
     ArenaRole,
     MemoryRegion,
     Placement,
+    admit_memory_plan,
     placement_capacities,
     resolve_fastest_fit_placement,
 )
 from ..platform import MemoryLayout, PmuTier, SocDef, SocFamily
 from ..results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
+
+if TYPE_CHECKING:
+    from ..platform.linker.model import LinkerInput
 
 log = logging.getLogger("hpx")
 
@@ -91,7 +97,8 @@ class PlanMemoryStage:
         plan = self._select_plan(ctx)
         plan = _add_hpx_owned_consumers(plan, ctx)
         plan = self._apply_capacities(plan, ctx)
-        self._validate(plan)
+        platform = ctx.run_metadata.platform_provenance
+        self._validate(plan, expected=platform.expected_linker if platform is not None else None)
 
         ctx.memory_plan = plan
         ctx.declared_memory_plan = plan
@@ -296,7 +303,7 @@ class PlanMemoryStage:
             has_overflow=any(r.overflow for r in rebuilt),
         )
 
-    def _validate(self, plan: MemoryPlan) -> None:
+    def _validate(self, plan: MemoryPlan, *, expected: LinkerInput | None = None) -> None:
         mram = plan.region(MemoryRegion.MRAM)
         if mram is not None and any(
             c.kind is ConsumerKind.ARENA and c.size > 0 for c in mram.consumers
@@ -339,6 +346,10 @@ class PlanMemoryStage:
             "  * pick a larger-memory board."
         )
         too_large = all(r.region == MemoryRegion.MRAM for r in offenders)
+        if too_large and expected is not None:
+            # A skip must not bypass known RAM budgets or reservations checked before linking.
+            ram_regions = tuple(r for r in plan.regions if r.region is not MemoryRegion.MRAM)
+            admit_memory_plan(replace(plan, regions=ram_regions, has_overflow=False), expected)
         raise (ImageTooLargeError if too_large else PlatformError)(
             f"Memory plan does not fit:\n{detail}",
             hint=hint,
