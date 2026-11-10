@@ -125,9 +125,24 @@ def _report_files(output_dir: Path, prefix: str) -> tuple[Path, ...]:
 
 
 def _transfer_cmake_target(module_dir: Path, prefix: str, cmake_name: str) -> str | None:
-    """The provider target heliaAOT builds beside a module that emitted its header."""
+    """The provider target heliaAOT declares beside a module that emitted its header.
+
+    The name is checked against the module's own CMakeLists.txt, so a module
+    whose emission names it differently fails here rather than at configure.
+    """
     header = module_dir / "includes-api" / f"{prefix}_nsx_transfer.h"
-    return f"nsx::{cmake_name}_transfer" if header.is_file() else None
+    if not header.is_file():
+        return None
+    target = f"nsx::{cmake_name}_nsx_transfer"
+    cmake = module_dir / "CMakeLists.txt"
+    declared = cmake.read_text(encoding="utf-8") if cmake.is_file() else ""
+    if f"add_library({target} ALIAS " not in declared:
+        raise EngineError(
+            f"heliaAOT emitted {header.name}, but {cmake} declares no {target} target",
+            hint="Convert with a heliaAOT whose nsx module builds its transfer provider "
+            f"as {target}, or with module.transfer_provider none.",
+        )
+    return target
 
 
 def _installed_source() -> EngineSource | None:

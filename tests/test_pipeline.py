@@ -695,7 +695,7 @@ def test_render_context_requires_resolved_platform_metadata(tmp_path: Path):
         FirmwareRenderContext.from_pipeline_context(ctx)
 
 
-@pytest.mark.parametrize("provider", [None, "nsx::hpx_model_transfer"])
+@pytest.mark.parametrize("provider", [None, "nsx::hpx_model_nsx_transfer"])
 def test_the_transfer_timeout_probe_needs_the_emitted_provider(tmp_path: Path, provider):
     from helia_profiler.engines.base import HeliaAotArtifacts
     from helia_profiler.errors import FirmwareError

@@ -2309,7 +2309,7 @@ def test_resolved_aot_arena_regions_follow_user_memory_config_flag(
     assert region.placement is expected
 
 
-@pytest.mark.parametrize("transfer", [None, "nsx::hpx_model_transfer"])
+@pytest.mark.parametrize("transfer", [None, "nsx::hpx_model_nsx_transfer"])
 def test_aot_transfer_target_links_after_the_module_in_both_binaries(tmp_path, transfer):
     from helia_profiler.firmware.project import ProjectRenderContext, render_project_files
     from helia_profiler.platform import get_board

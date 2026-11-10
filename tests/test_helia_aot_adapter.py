@@ -74,12 +74,30 @@ class TestExtraModules:
 class TestTransferCmakeTarget:
     """A module that emitted its transfer provider header names the provider target."""
 
-    def test_header_names_the_provider_target(self, tmp_path):
+    _EMITTED = Path(__file__).parent / "fixtures" / "aot_nsx_transfer" / "CMakeLists.txt"
+
+    def test_the_target_is_the_one_the_modules_cmakelists_declares(self, tmp_path):
+        import re
+
         from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
 
         (tmp_path / "includes-api").mkdir()
         (tmp_path / "includes-api" / "kws_nsx_transfer.h").write_text("#pragma once\n")
-        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") == "nsx::kws_model_transfer"
+        emitted = self._EMITTED.read_text()
+        (tmp_path / "CMakeLists.txt").write_text(emitted)
+        (declared,) = re.findall(r"add_library\((nsx::\w+) ALIAS ", emitted)
+        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") == declared
+
+    def test_a_module_declaring_another_name_is_refused(self, tmp_path):
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "kws_nsx_transfer.h").write_text("#pragma once\n")
+        (tmp_path / "CMakeLists.txt").write_text(
+            self._EMITTED.read_text().replace("_nsx_transfer ALIAS", "_transfer ALIAS")
+        )
+        with pytest.raises(EngineError, match="declares no nsx::kws_model_nsx_transfer"):
+            _transfer_cmake_target(tmp_path, "kws", "kws_model")
 
     def test_no_header_no_target(self, tmp_path):
         from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
