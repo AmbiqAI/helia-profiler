@@ -32,7 +32,7 @@ plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/config/profiling.py:71`
+Source: `src/helia_profiler/config/profiling.py:72`
 
 ### helia_profiler.ProfilingConfig.pmu_counters
 
@@ -42,7 +42,7 @@ Source: `src/helia_profiler/config/profiling.py:71`
 pmu_counters: dict[str, str | list[str]] = field(default_factory=lambda : ...)
 ```
 
-Source: `src/helia_profiler/config/profiling.py:89`
+Source: `src/helia_profiler/config/profiling.py:90`
 
 ### helia_profiler.ProfilingConfig.per_layer
 
@@ -52,7 +52,7 @@ Source: `src/helia_profiler/config/profiling.py:89`
 per_layer: bool = True
 ```
 
-Source: `src/helia_profiler/config/profiling.py:90`
+Source: `src/helia_profiler/config/profiling.py:91`
 
 ### helia_profiler.ProfilingConfig.iterations
 
@@ -62,7 +62,7 @@ Source: `src/helia_profiler/config/profiling.py:90`
 iterations: int = DEFAULT_ITERATIONS
 ```
 
-Source: `src/helia_profiler/config/profiling.py:91`
+Source: `src/helia_profiler/config/profiling.py:92`
 
 ### helia_profiler.ProfilingConfig.warmup
 
@@ -72,7 +72,7 @@ Source: `src/helia_profiler/config/profiling.py:91`
 warmup: int = DEFAULT_WARMUP
 ```
 
-Source: `src/helia_profiler/config/profiling.py:92`
+Source: `src/helia_profiler/config/profiling.py:93`
 
 ### helia_profiler.ProfilingConfig.window_mode
 
@@ -82,7 +82,7 @@ Source: `src/helia_profiler/config/profiling.py:92`
 window_mode: WindowMode = DEFAULT_WINDOW_MODE
 ```
 
-Source: `src/helia_profiler/config/profiling.py:98`
+Source: `src/helia_profiler/config/profiling.py:99`
 
 ### helia_profiler.ProfilingConfig.window_target_ms
 
@@ -92,7 +92,7 @@ Source: `src/helia_profiler/config/profiling.py:98`
 window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
 ```
 
-Source: `src/helia_profiler/config/profiling.py:99`
+Source: `src/helia_profiler/config/profiling.py:100`
 
 ### helia_profiler.ProfilingConfig.window_min
 
@@ -102,7 +102,7 @@ Source: `src/helia_profiler/config/profiling.py:99`
 window_min: int = DEFAULT_WINDOW_MIN
 ```
 
-Source: `src/helia_profiler/config/profiling.py:100`
+Source: `src/helia_profiler/config/profiling.py:101`
 
 ### helia_profiler.ProfilingConfig.window_max
 
@@ -112,7 +112,7 @@ Source: `src/helia_profiler/config/profiling.py:100`
 window_max: int = DEFAULT_WINDOW_MAX
 ```
 
-Source: `src/helia_profiler/config/profiling.py:101`
+Source: `src/helia_profiler/config/profiling.py:102`
 
 ### helia_profiler.ProfilingConfig.clean_window_probe
 
@@ -122,7 +122,7 @@ Source: `src/helia_profiler/config/profiling.py:101`
 clean_window_probe: CleanWindowProbe = DEFAULT_CLEAN_WINDOW_PROBE
 ```
 
-Source: `src/helia_profiler/config/profiling.py:104`
+Source: `src/helia_profiler/config/profiling.py:105`
 
 ### helia_profiler.ProfilingConfig.clean_window_trace
 
@@ -132,7 +132,7 @@ Source: `src/helia_profiler/config/profiling.py:104`
 clean_window_trace: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:111`
+Source: `src/helia_profiler/config/profiling.py:112`
 
 ### helia_profiler.ProfilingConfig.force_shared_sram
 
@@ -142,7 +142,7 @@ Source: `src/helia_profiler/config/profiling.py:111`
 force_shared_sram: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:118`
+Source: `src/helia_profiler/config/profiling.py:119`
 
 ### helia_profiler.ProfilingConfig.aggregation
 
@@ -152,7 +152,7 @@ Source: `src/helia_profiler/config/profiling.py:118`
 aggregation: Aggregation = DEFAULT_AGGREGATION
 ```
 
-Source: `src/helia_profiler/config/profiling.py:122`
+Source: `src/helia_profiler/config/profiling.py:123`
 
 ### helia_profiler.ProfilingConfig.input_fill
 
@@ -162,7 +162,7 @@ Source: `src/helia_profiler/config/profiling.py:122`
 input_fill: InputFill = InputFill.ZERO
 ```
 
-Source: `src/helia_profiler/config/profiling.py:124`
+Source: `src/helia_profiler/config/profiling.py:125`
 
 ### helia_profiler.ProfilingConfig.transfer_timeout_probe
 
@@ -172,7 +172,7 @@ Source: `src/helia_profiler/config/profiling.py:124`
 transfer_timeout_probe: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:130`
+Source: `src/helia_profiler/config/profiling.py:131`
 
 ### helia_profiler.ProfilingConfig.stream_evidence
 
@@ -182,7 +182,7 @@ Source: `src/helia_profiler/config/profiling.py:130`
 stream_evidence: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:137`
+Source: `src/helia_profiler/config/profiling.py:138`
 
 ### helia_profiler.ProfilingConfig.extreme_mode
 
@@ -192,7 +192,7 @@ Source: `src/helia_profiler/config/profiling.py:137`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:143`
+Source: `src/helia_profiler/config/profiling.py:144`
 
 ## helia_profiler.ClockSelection
 

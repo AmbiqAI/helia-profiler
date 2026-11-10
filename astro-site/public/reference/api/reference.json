@@ -1189,9 +1189,9 @@
                   "returns": [],
                   "signature": "pmu_counters: dict[str, str | list[str]] = field(default_factory=lambda : ...)",
                   "source": {
-                    "line": 89,
+                    "line": 90,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L89"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L90"
                   },
                   "summary": ""
                 },
@@ -1208,9 +1208,9 @@
                   "returns": [],
                   "signature": "per_layer: bool = True",
                   "source": {
-                    "line": 90,
+                    "line": 91,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L90"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L91"
                   },
                   "summary": ""
                 },
@@ -1227,9 +1227,9 @@
                   "returns": [],
                   "signature": "iterations: int = DEFAULT_ITERATIONS",
                   "source": {
-                    "line": 91,
+                    "line": 92,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L91"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L92"
                   },
                   "summary": ""
                 },
@@ -1246,9 +1246,9 @@
                   "returns": [],
                   "signature": "warmup: int = DEFAULT_WARMUP",
                   "source": {
-                    "line": 92,
+                    "line": 93,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L92"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L93"
                   },
                   "summary": ""
                 },
@@ -1265,9 +1265,9 @@
                   "returns": [],
                   "signature": "window_mode: WindowMode = DEFAULT_WINDOW_MODE",
                   "source": {
-                    "line": 98,
+                    "line": 99,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L98"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L99"
                   },
                   "summary": ""
                 },
@@ -1284,9 +1284,9 @@
                   "returns": [],
                   "signature": "window_target_ms: int = DEFAULT_WINDOW_TARGET_MS",
                   "source": {
-                    "line": 99,
+                    "line": 100,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L99"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L100"
                   },
                   "summary": ""
                 },
@@ -1303,9 +1303,9 @@
                   "returns": [],
                   "signature": "window_min: int = DEFAULT_WINDOW_MIN",
                   "source": {
-                    "line": 100,
+                    "line": 101,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L100"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L101"
                   },
                   "summary": ""
                 },
@@ -1322,9 +1322,9 @@
                   "returns": [],
                   "signature": "window_max: int = DEFAULT_WINDOW_MAX",
                   "source": {
-                    "line": 101,
+                    "line": 102,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L101"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L102"
                   },
                   "summary": ""
                 },
@@ -1341,9 +1341,9 @@
                   "returns": [],
                   "signature": "clean_window_probe: CleanWindowProbe = DEFAULT_CLEAN_WINDOW_PROBE",
                   "source": {
-                    "line": 104,
+                    "line": 105,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L104"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L105"
                   },
                   "summary": ""
                 },
@@ -1360,9 +1360,9 @@
                   "returns": [],
                   "signature": "clean_window_trace: bool = False",
                   "source": {
-                    "line": 111,
+                    "line": 112,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L111"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L112"
                   },
                   "summary": ""
                 },
@@ -1379,9 +1379,9 @@
                   "returns": [],
                   "signature": "force_shared_sram: bool = False",
                   "source": {
-                    "line": 118,
+                    "line": 119,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L118"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L119"
                   },
                   "summary": ""
                 },
@@ -1398,9 +1398,9 @@
                   "returns": [],
                   "signature": "aggregation: Aggregation = DEFAULT_AGGREGATION",
                   "source": {
-                    "line": 122,
+                    "line": 123,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L122"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L123"
                   },
                   "summary": ""
                 },
@@ -1417,9 +1417,9 @@
                   "returns": [],
                   "signature": "input_fill: InputFill = InputFill.ZERO",
                   "source": {
-                    "line": 124,
+                    "line": 125,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L124"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L125"
                   },
                   "summary": ""
                 },
@@ -1436,9 +1436,9 @@
                   "returns": [],
                   "signature": "transfer_timeout_probe: bool = False",
                   "source": {
-                    "line": 130,
+                    "line": 131,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L130"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L131"
                   },
                   "summary": ""
                 },
@@ -1455,9 +1455,9 @@
                   "returns": [],
                   "signature": "stream_evidence: bool = False",
                   "source": {
-                    "line": 137,
+                    "line": 138,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L137"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L138"
                   },
                   "summary": ""
                 },
@@ -1474,9 +1474,9 @@
                   "returns": [],
                   "signature": "extreme_mode: bool = False",
                   "source": {
-                    "line": 143,
+                    "line": 144,
                     "path": "src/helia_profiler/config/profiling.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L143"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L144"
                   },
                   "summary": ""
                 }
@@ -1487,9 +1487,9 @@
               "returns": [],
               "signature": "ProfilingConfig()",
               "source": {
-                "line": 71,
+                "line": 72,
                 "path": "src/helia_profiler/config/profiling.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L71"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L72"
               },
               "summary": "PMU capture settings."
             },
@@ -5939,9 +5939,9 @@
                   "returns": [],
                   "signature": "baseline: RunArtifacts",
                   "source": {
-                    "line": 126,
+                    "line": 127,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L126"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L127"
                   },
                   "summary": ""
                 },
@@ -5958,9 +5958,9 @@
                   "returns": [],
                   "signature": "candidate: RunArtifacts",
                   "source": {
-                    "line": 127,
+                    "line": 128,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L127"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L128"
                   },
                   "summary": ""
                 },
@@ -5977,9 +5977,9 @@
                   "returns": [],
                   "signature": "config_rows: list[ConfigDiffRow]",
                   "source": {
-                    "line": 128,
+                    "line": 129,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L128"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L129"
                   },
                   "summary": ""
                 },
@@ -5996,9 +5996,9 @@
                   "returns": [],
                   "signature": "metrics: list[MetricDiff]",
                   "source": {
-                    "line": 129,
+                    "line": 130,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L129"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L130"
                   },
                   "summary": ""
                 },
@@ -6015,9 +6015,9 @@
                   "returns": [],
                   "signature": "layer_rows: list[LayerDiffRow]",
                   "source": {
-                    "line": 130,
+                    "line": 131,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L130"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L131"
                   },
                   "summary": ""
                 },
@@ -6034,9 +6034,9 @@
                   "returns": [],
                   "signature": "warnings: list[str] = field(default_factory=list)",
                   "source": {
-                    "line": 131,
+                    "line": 132,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L131"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L132"
                   },
                   "summary": ""
                 },
@@ -6053,9 +6053,9 @@
                   "returns": [],
                   "signature": "comparability: ComparabilityAssessment = field(default_factory=ComparabilityAssessment)",
                   "source": {
-                    "line": 132,
+                    "line": 133,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L132"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L133"
                   },
                   "summary": ""
                 },
@@ -6072,9 +6072,9 @@
                   "returns": [],
                   "signature": "verdict: ComparisonVerdict | None = None",
                   "source": {
-                    "line": 133,
+                    "line": 134,
                     "path": "src/helia_profiler/evaluation/compare.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L133"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L134"
                   },
                   "summary": ""
                 }
@@ -6085,9 +6085,9 @@
               "returns": [],
               "signature": "CompareResult(\n    baseline: RunArtifacts,\n    candidate: RunArtifacts,\n    config_rows: list[ConfigDiffRow],\n    metrics: list[MetricDiff],\n    layer_rows: list[LayerDiffRow],\n    warnings: list[str] = list(),\n    comparability: ComparabilityAssessment = ComparabilityAssessment(),\n    verdict: ComparisonVerdict | None = None,\n) -> None",
               "source": {
-                "line": 122,
+                "line": 123,
                 "path": "src/helia_profiler/evaluation/compare.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L122"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/evaluation/compare.py#L123"
               },
               "summary": "Full comparison between two profile runs."
             },
@@ -10868,9 +10868,9 @@
                   "returns": [],
                   "signature": "path: str",
                   "source": {
-                    "line": 120,
+                    "line": 123,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L120"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L123"
                   },
                   "summary": ""
                 },
@@ -10887,9 +10887,9 @@
                   "returns": [],
                   "signature": "sha256: str",
                   "source": {
-                    "line": 121,
+                    "line": 124,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L121"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L124"
                   },
                   "summary": ""
                 },
@@ -10906,9 +10906,9 @@
                   "returns": [],
                   "signature": "size_bytes: int",
                   "source": {
-                    "line": 122,
+                    "line": 125,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L122"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L125"
                   },
                   "summary": ""
                 }
@@ -10919,9 +10919,9 @@
               "returns": [],
               "signature": "FrozenModel(path: str, sha256: str, size_bytes: int) -> None",
               "source": {
-                "line": 116,
+                "line": 119,
                 "path": "src/helia_profiler/runs/plan.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L116"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L119"
               },
               "summary": "The model a plan was frozen against, identified by content."
             },
@@ -10945,9 +10945,9 @@
                   "returns": [],
                   "signature": "name: str",
                   "source": {
-                    "line": 137,
+                    "line": 140,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L137"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L140"
                   },
                   "summary": ""
                 },
@@ -10964,9 +10964,9 @@
                   "returns": [],
                   "signature": "version: str | None",
                   "source": {
-                    "line": 138,
+                    "line": 141,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L138"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L141"
                   },
                   "summary": ""
                 },
@@ -10983,9 +10983,9 @@
                   "returns": [],
                   "signature": "unavailable_reason: str | None = None",
                   "source": {
-                    "line": 139,
+                    "line": 142,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L139"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L142"
                   },
                   "summary": ""
                 },
@@ -11002,9 +11002,9 @@
                   "returns": [],
                   "signature": "lines: tuple[str, ...]",
                   "source": {
-                    "line": 142,
+                    "line": 145,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L142"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L145"
                   },
                   "summary": "The version-bearing lines version joins, or none when it is unknown."
                 }
@@ -11015,9 +11015,9 @@
               "returns": [],
               "signature": "ToolchainIdentity(name: str, version: str | None, unavailable_reason: str | None = None) -> None",
               "source": {
-                "line": 128,
+                "line": 131,
                 "path": "src/helia_profiler/runs/plan.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L128"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L131"
               },
               "summary": "The compiler a plan expects: name and exact version, never a path."
             },
@@ -11041,9 +11041,9 @@
                   "returns": [],
                   "signature": "name: str",
                   "source": {
-                    "line": 156,
+                    "line": 159,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L156"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L159"
                   },
                   "summary": ""
                 },
@@ -11060,9 +11060,9 @@
                   "returns": [],
                   "signature": "version: str | None",
                   "source": {
-                    "line": 157,
+                    "line": 160,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L157"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L160"
                   },
                   "summary": ""
                 },
@@ -11079,9 +11079,9 @@
                   "returns": [],
                   "signature": "source_commit: str | None",
                   "source": {
-                    "line": 158,
+                    "line": 161,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L158"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L161"
                   },
                   "summary": ""
                 },
@@ -11098,9 +11098,9 @@
                   "returns": [],
                   "signature": "kernels_module: str | None = None",
                   "source": {
-                    "line": 159,
+                    "line": 162,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L159"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L162"
                   },
                   "summary": ""
                 },
@@ -11117,9 +11117,9 @@
                   "returns": [],
                   "signature": "kernels_commit: str | None = None",
                   "source": {
-                    "line": 160,
+                    "line": 163,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L160"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L163"
                   },
                   "summary": ""
                 },
@@ -11136,9 +11136,9 @@
                   "returns": [],
                   "signature": "unavailable_reason: str | None = None",
                   "source": {
-                    "line": 161,
+                    "line": 164,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L161"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L164"
                   },
                   "summary": ""
                 }
@@ -11149,9 +11149,9 @@
               "returns": [],
               "signature": "FrozenRuntime(\n    name: str,\n    version: str | None,\n    source_commit: str | None,\n    kernels_module: str | None = None,\n    kernels_commit: str | None = None,\n    unavailable_reason: str | None = None,\n) -> None",
               "source": {
-                "line": 147,
+                "line": 150,
                 "path": "src/helia_profiler/runs/plan.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L147"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L150"
               },
               "summary": "The engine and kernel sources a profile build uses."
             },
@@ -11175,9 +11175,9 @@
                   "returns": [],
                   "signature": "setting: str",
                   "source": {
-                    "line": 172,
+                    "line": 175,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L172"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L175"
                   },
                   "summary": ""
                 },
@@ -11194,9 +11194,9 @@
                   "returns": [],
                   "signature": "path: str",
                   "source": {
-                    "line": 173,
+                    "line": 176,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L173"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L176"
                   },
                   "summary": ""
                 },
@@ -11213,9 +11213,9 @@
                   "returns": [],
                   "signature": "kind: str",
                   "source": {
-                    "line": 174,
+                    "line": 177,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L174"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L177"
                   },
                   "summary": ""
                 },
@@ -11232,9 +11232,9 @@
                   "returns": [],
                   "signature": "sha256: str | None = None",
                   "source": {
-                    "line": 175,
+                    "line": 178,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L175"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L178"
                   },
                   "summary": ""
                 }
@@ -11245,9 +11245,9 @@
               "returns": [],
               "signature": "LocalInput(setting: str, path: str, kind: str, sha256: str | None = None) -> None",
               "source": {
-                "line": 164,
+                "line": 167,
                 "path": "src/helia_profiler/runs/plan.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L164"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L167"
               },
               "summary": "A local file or directory the build reads instead of a pinned source."
             },
@@ -11271,9 +11271,9 @@
                   "returns": [],
                   "signature": "settings: Mapping[str, Any]",
                   "source": {
-                    "line": 190,
+                    "line": 193,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L190"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L193"
                   },
                   "summary": ""
                 },
@@ -11290,9 +11290,9 @@
                   "returns": [],
                   "signature": "model: FrozenModel",
                   "source": {
-                    "line": 191,
+                    "line": 194,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L191"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L194"
                   },
                   "summary": ""
                 },
@@ -11309,9 +11309,9 @@
                   "returns": [],
                   "signature": "baseline_id: str",
                   "source": {
-                    "line": 192,
+                    "line": 195,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L192"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L195"
                   },
                   "summary": ""
                 },
@@ -11328,9 +11328,9 @@
                   "returns": [],
                   "signature": "baseline_fingerprint: str",
                   "source": {
-                    "line": 193,
+                    "line": 196,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L193"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L196"
                   },
                   "summary": ""
                 },
@@ -11347,9 +11347,9 @@
                   "returns": [],
                   "signature": "qualification: str",
                   "source": {
-                    "line": 194,
+                    "line": 197,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L194"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L197"
                   },
                   "summary": ""
                 },
@@ -11366,9 +11366,9 @@
                   "returns": [],
                   "signature": "overrides: tuple[str, ...]",
                   "source": {
-                    "line": 195,
+                    "line": 198,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L195"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L198"
                   },
                   "summary": ""
                 },
@@ -11385,9 +11385,9 @@
                   "returns": [],
                   "signature": "local_inputs: tuple[LocalInput, ...]",
                   "source": {
-                    "line": 196,
+                    "line": 199,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L196"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L199"
                   },
                   "summary": ""
                 },
@@ -11404,9 +11404,9 @@
                   "returns": [],
                   "signature": "environment: Mapping[str, str]",
                   "source": {
-                    "line": 197,
+                    "line": 200,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L197"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L200"
                   },
                   "summary": ""
                 },
@@ -11423,9 +11423,9 @@
                   "returns": [],
                   "signature": "toolchain: ToolchainIdentity",
                   "source": {
-                    "line": 198,
+                    "line": 201,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L198"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L201"
                   },
                   "summary": ""
                 },
@@ -11442,9 +11442,9 @@
                   "returns": [],
                   "signature": "runtime: FrozenRuntime | None",
                   "source": {
-                    "line": 199,
+                    "line": 202,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L199"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L202"
                   },
                   "summary": ""
                 },
@@ -11461,9 +11461,9 @@
                   "returns": [],
                   "signature": "hpx_version: str",
                   "source": {
-                    "line": 200,
+                    "line": 203,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L200"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L203"
                   },
                   "summary": ""
                 },
@@ -11480,9 +11480,9 @@
                   "returns": [],
                   "signature": "platform: PlatformSnapshot | None = None",
                   "source": {
-                    "line": 201,
+                    "line": 204,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L201"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L204"
                   },
                   "summary": ""
                 },
@@ -11499,9 +11499,9 @@
                   "returns": [],
                   "signature": "intent_hash: str",
                   "source": {
-                    "line": 212,
+                    "line": 215,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L212"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L215"
                   },
                   "summary": "The hpx.intent hash of what this plan asks for; the HPX release is not part of it."
                 },
@@ -11518,9 +11518,9 @@
                   "returns": [],
                   "signature": "portable: bool",
                   "source": {
-                    "line": 217,
+                    "line": 220,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L217"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L220"
                   },
                   "summary": "Whether every input is pinned or content-identified, so another host can rebuild it."
                 },
@@ -11537,9 +11537,9 @@
                   "returns": [],
                   "signature": "to_dict() -> dict[str, Any]",
                   "source": {
-                    "line": 231,
+                    "line": 234,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L231"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L234"
                   },
                   "summary": "Serialize a complete plan, refusing missing recorded platform input."
                 },
@@ -11556,9 +11556,9 @@
                   "returns": [],
                   "signature": "from_dict(data: Mapping[str, Any]) -> FrozenRun",
                   "source": {
-                    "line": 255,
+                    "line": 258,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L255"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L258"
                   },
                   "summary": ""
                 },
@@ -11575,9 +11575,9 @@
                   "returns": [],
                   "signature": "save(path: str | Path) -> Path",
                   "source": {
-                    "line": 316,
+                    "line": 319,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L316"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L319"
                   },
                   "summary": "Write the plan as JSON, refusing its source model path or aliases."
                 },
@@ -11594,9 +11594,9 @@
                   "returns": [],
                   "signature": "load(path: str | Path) -> FrozenRun",
                   "source": {
-                    "line": 334,
+                    "line": 337,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L334"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L337"
                   },
                   "summary": "Read a plan written by :meth:save, verifying its intent hash."
                 },
@@ -11613,9 +11613,9 @@
                   "returns": [],
                   "signature": "config(*, model: str | Path | None = None, host: Mapping[str, Any] | None = None) -> ProfileConfig",
                   "source": {
-                    "line": 348,
+                    "line": 351,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L348"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L351"
                   },
                   "summary": "The :class:ProfileConfig this plan describes, on this host."
                 },
@@ -11632,9 +11632,9 @@
                   "returns": [],
                   "signature": "build(fixture: TypedFixture, **options: Any = {}) -> CompiledBuild",
                   "source": {
-                    "line": 397,
+                    "line": 400,
                     "path": "src/helia_profiler/runs/plan.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L397"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L400"
                   },
                   "summary": "Compile this plan for fixture's pinned inputs; see :func:~heliaprofiler.build."
                 }
@@ -11645,9 +11645,9 @@
               "returns": [],
               "signature": "FrozenRun(\n    settings: Mapping[str, Any],\n    model: FrozenModel,\n    baseline_id: str,\n    baseline_fingerprint: str,\n    qualification: str,\n    overrides: tuple[str, ...],\n    local_inputs: tuple[LocalInput, ...],\n    environment: Mapping[str, str],\n    toolchain: ToolchainIdentity,\n    runtime: FrozenRuntime | None,\n    hpx_version: str,\n    platform: PlatformSnapshot | None = None,\n) -> None",
               "source": {
-                "line": 186,
+                "line": 189,
                 "path": "src/helia_profiler/runs/plan.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L186"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runs/plan.py#L189"
               },
               "summary": "A resolved, replayable run plan."
             }
