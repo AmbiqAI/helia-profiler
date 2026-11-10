@@ -406,7 +406,7 @@ def _project_cmake_vars(ctx: ProjectRenderContext) -> dict[str, Any]:
             literal = ("ON" if value else "OFF") if isinstance(value, bool) else str(value)
             if name in profiler_vars:
                 raise ConfigError(f"CMake option {name} is owned by the profiler")
-            if name in engine_vars:
+            if name in engine_vars or name in ctx.artifacts.reserved_cmake_options:
                 raise ConfigError(f"CMake option {name} is owned by the selected engine")
             if name in options and options[name] != literal:
                 raise ConfigError(f"Conflicting module values for CMake option {name}")

@@ -26,6 +26,7 @@ from ..base import (
     SingleArenaPlacementMixin,
 )
 from ..cmsis_nn import (
+    CMSIS_NN_CMAKE_OPTIONS,
     CMSIS_NN_MODULE,
     cmsis_nn_cmake_vars,
     cmsis_nn_module_ref,
@@ -140,6 +141,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         revision = next(p.revision for p in runtime.record.providers if p.name == "helia-rt")
         return HeliaRtArtifacts(
             extra_modules=[prepare_runtime_module(runtime, work_dir)],
+            reserved_cmake_options=CMSIS_NN_CMAKE_OPTIONS
+            | {"HELIA_RT_VARIANT", _ETHOSU_CMAKE_FLAG},
             engine_header=TFLM_ENGINE_HEADER,
             engine_backend=backend,
             heliart_version=f"prepared:{revision}",
@@ -261,6 +264,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
                 cmake_vars=cmake_vars,
+                reserved_cmake_options=CMSIS_NN_CMAKE_OPTIONS
+                | {"HELIA_RT_VARIANT", _ETHOSU_CMAKE_FLAG},
                 engine_header=TFLM_ENGINE_HEADER,
                 engine_backend=backend,
                 heliart_version=version,
@@ -356,6 +361,8 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             engine_type=EngineType.HELIA_RT,
             extra_modules=extra_modules,
             cmake_vars=cmake_vars,
+            reserved_cmake_options=CMSIS_NN_CMAKE_OPTIONS
+            | {"HELIA_RT_VARIANT", _ETHOSU_CMAKE_FLAG},
             engine_header=TFLM_ENGINE_HEADER,
             engine_backend=backend,
             heliart_version=version,

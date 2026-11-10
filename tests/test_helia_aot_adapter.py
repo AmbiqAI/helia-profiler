@@ -279,6 +279,13 @@ class TestPrepareArtifactFlags:
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is False
 
+    def test_unset_engine_cache_options_remain_reserved(self, monkeypatch, tmp_path):
+        config = _aot_cfg({"config": {"cmsis_nn_requantize_inline_asm": False}})
+        artifacts = _prepare(monkeypatch, tmp_path, config)
+        unset = {"NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM", "NSX_LINKER_PROFILE"}
+        assert unset.isdisjoint(artifacts.cmake_vars)
+        assert unset <= artifacts.reserved_cmake_options
+
     def test_a_stream_pool_in_internal_arena_mode_is_refused(self, monkeypatch, tmp_path):
         """hpx binds no region when heliaAOT allocates its arenas, so the pool would
         stay unbound and model_init would fail on the board with status 10."""

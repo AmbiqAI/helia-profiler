@@ -12,6 +12,7 @@ import pytest
 from helia_profiler.config import NsxModuleOverride, load_config
 from helia_profiler.deps.dependencies import create_workspace
 from helia_profiler.engines.base import LiteRtArtifacts
+from helia_profiler.engines.helia_rt.adapter import HeliaRTAdapter
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware import generate_app
 from helia_profiler.pipeline import PipelineContext, serialize_config
@@ -21,7 +22,7 @@ from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 _REF = "6795b3d977a5b59482fc1ab2d1c65ccca8d05de3"
 
 
-def _context(tmp_path: Path, options: dict) -> PipelineContext:
+def _context(tmp_path: Path, options: dict, *, engine: dict | None = None) -> PipelineContext:
     tmp_path.mkdir(parents=True, exist_ok=True)
     model = tmp_path / "model.tflite"
     model.write_bytes(b"TFL3" + bytes(64))
@@ -29,7 +30,7 @@ def _context(tmp_path: Path, options: dict) -> PipelineContext:
         None,
         {
             "model": {"path": str(model), "weights_location": "psram"},
-            "engine": {"type": "litert"},
+            "engine": engine or {"type": "litert"},
             "target": {"board": "apollo510_evb"},
             "build": {"nsx_modules": {"nsx-psram": {"ref": _REF, "options": options}}},
             "work_dir": str(tmp_path / "work"),
@@ -161,4 +162,27 @@ def test_unapplied_or_conflicting_options_are_refused(tmp_path, kind):
             ),
         )
     with pytest.raises(ConfigError, match="unused|owned|Conflicting"):
+        generate_app(ctx)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM",
+        "ARM_NN_ENABLE_F16",
+        "NSX_HELIA_RT_ENABLE_ETHOSU",
+    ],
+)
+def test_disabled_engine_options_cannot_be_enabled_through_another_module(tmp_path, name):
+    ctx = _context(
+        tmp_path,
+        {name: True},
+        engine={
+            "type": "helia-rt",
+            "config": {"cmsis_nn_requantize_inline_asm": False},
+        },
+    )
+    ctx.engine_artifacts = HeliaRTAdapter().prepare(ctx.config, tmp_path / "engine")
+    assert name not in ctx.prepared_artifacts.cmake_vars
+    with pytest.raises(ConfigError, match=f"{name} is owned by the selected engine"):
         generate_app(ctx)

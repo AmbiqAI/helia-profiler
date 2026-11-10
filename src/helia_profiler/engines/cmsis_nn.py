@@ -27,6 +27,10 @@ CMSIS_NN_PROJECT = "ns-cmsis-nn"  # registry project (path: modules/ns-cmsis-nn)
 CMSIS_NN_MODULE = "nsx-cmsis-nn"
 ARM_CMSIS_NN_PROJECT = "arm-cmsis-nn"
 ARM_CMSIS_NN_MODULE = "arm-cmsis-nn"
+_REQUANTIZE_OPTION = "NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"
+_F32_OPTION = "ARM_NN_ENABLE_F32"
+_F16_OPTION = "ARM_NN_ENABLE_F16"
+CMSIS_NN_CMAKE_OPTIONS = frozenset({_REQUANTIZE_OPTION, _F32_OPTION, _F16_OPTION})
 
 
 def _float_compute_types(config: ProfileConfig) -> set[int] | None:
@@ -62,13 +66,13 @@ def cmsis_nn_cmake_vars(config: ProfileConfig) -> dict[str, str]:
     """
     cmake_vars: dict[str, str] = {}
     if config.engine.config.get("cmsis_nn_requantize_inline_asm", True):
-        cmake_vars["NSX_CMSIS_NN_USE_REQUANTIZE_INLINE_ASM"] = "ON"
+        cmake_vars[_REQUANTIZE_OPTION] = "ON"
     float_types = _float_compute_types(config)
     if float_types is None or float_types:
-        cmake_vars["ARM_NN_ENABLE_F32"] = "ON"
+        cmake_vars[_F32_OPTION] = "ON"
     soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
     if has_fp16_kernels(soc) and float_types and TENSOR_TYPE_FLOAT16 in float_types:
-        cmake_vars["ARM_NN_ENABLE_F16"] = "ON"
+        cmake_vars[_F16_OPTION] = "ON"
     return cmake_vars
 
 

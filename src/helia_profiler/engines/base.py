@@ -120,6 +120,8 @@ class EngineArtifacts:
 
     extra_modules: list[NsxModuleRef] = field(default_factory=list)
     cmake_vars: dict[str, str] = field(default_factory=dict)
+    #: Cache keys the engine controls even when it leaves the provider default unset.
+    reserved_cmake_options: frozenset[str] = field(default_factory=frozenset)
 
     # Optional memory plan the engine reports (e.g. heliaAOT's arena
     # regions).  If None, the ``plan_memory`` stage synthesises a conservative plan from ``model.arena_size`` and
