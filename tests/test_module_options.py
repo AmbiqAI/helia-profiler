@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from dataclasses import replace
@@ -186,3 +187,23 @@ def test_disabled_engine_options_cannot_be_enabled_through_another_module(tmp_pa
     assert name not in ctx.prepared_artifacts.cmake_vars
     with pytest.raises(ConfigError, match=f"{name} is owned by the selected engine"):
         generate_app(ctx)
+
+
+def test_top_level_cmake_assignments_are_profiler_owned(tmp_path):
+    ctx = _context(tmp_path, {})
+    app = generate_app(ctx)
+    files = [app / "CMakeLists.txt", app / "cmake/nsx/modules.cmake"]
+    names = {
+        name
+        for path in files
+        for name in re.findall(r"\bset\(\s*([A-Za-z_][A-Za-z0-9_]*)", path.read_text())
+    }
+    assert "NSX_APP_MODULES" in names
+    original = ctx.config
+    for name in sorted(names):
+        override = replace(original.build.nsx_modules["nsx-psram"], options={name: "conflicting"})
+        ctx.config = replace(
+            original, build=replace(original.build, nsx_modules={"nsx-psram": override})
+        )
+        with pytest.raises(ConfigError, match=f"{name} is owned by the profiler"):
+            generate_app(ctx)

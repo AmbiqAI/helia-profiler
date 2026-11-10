@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -730,6 +731,11 @@ def test_source_root_option_cannot_conflict_with_engine_source(tmp_path: Path, f
     ResolvePlatformStage().run(ctx)
     ctx.engine_artifacts = HeliaRTAdapter().prepare(config, ctx.work_dir)
     PlanMemoryStage().run(ctx)
+    module = next(m for m in ctx.prepared_artifacts.extra_modules if m.name == "nsx-helia-rt")
+    wrapper = (module.path / "CMakeLists.txt").read_text()
+    cache_names = set(re.findall(r"\bset\(\s*(\w+)[^\n]*\bCACHE\b", wrapper))
+    assert "HELIA_RT_TFLM_ROOT" in cache_names
+    assert cache_names <= ctx.prepared_artifacts.reserved_cmake_options
     with pytest.raises(ConfigError, match="HELIA_RT_TFLM_ROOT is owned by the selected engine"):
         generate_app(ctx)
 

@@ -386,6 +386,7 @@ class ProjectRenderContext:
 def _project_cmake_vars(ctx: ProjectRenderContext) -> dict[str, Any]:
     engine_vars = ctx.artifacts.cmake_vars
     profiler_vars = {
+        "NSX_APP_MODULES",
         "NSX_BOARD",
         "NSX_AMBIQ_BSP_LIB_SUBDIR",
         "NSX_SEGGER_RTT_BUFFER_SIZE_UP",
