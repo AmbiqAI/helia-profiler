@@ -68,7 +68,11 @@ static void hpx_printf(const char *fmt, ...) {
         ((0, 0, 0, 14), True, "HPX_ERROR=model_run_failed:14"),
     ],
 )
-def test_the_first_failed_run_is_reported_after_the_loop(tmp_path: Path, results, parked, line):
+def test_a_loop_stops_at_its_first_failed_run_and_reports_it_after(
+    tmp_path: Path, results, parked, line
+):
+    """Nothing of the loop follows the failed run: no later refill, poison or
+    run, and no more of that iteration (here, the statements around the invoke)."""
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("host C++ compiler required")
@@ -77,8 +81,11 @@ def test_the_first_failed_run_is_reported_after_the_loop(tmp_path: Path, results
         _PREAMBLE.replace("RESULTS", ", ".join(str(r) for r in results))
         + _function(source, "static void hpx_aot_check_runs(void) {")
         + "\nint main() {\n"
-        + f"    for (int i = 0; i < {len(results)}; i++) {{\n        {_invoke(source)}\n    }}\n"
-        + '    hpx_printf("loop done after %d runs\\n", runs);\n'
+        + "    int before = 0, after = 0;\n"
+        + f"    for (int i = 0; i < {len(results)}; i++) {{\n"
+        + f"        ++before;\n        {_invoke(source)}\n        ++after;\n    }}\n"
+        + '    hpx_printf("loop done after %d runs, %d starts, %d completions\\n",'
+        + " runs, before, after);\n"
         + f"    {_CHECK}\n    return 0;\n}}\n"
     )
     path = tmp_path / "check.cc"
@@ -88,7 +95,9 @@ def test_the_first_failed_run_is_reported_after_the_loop(tmp_path: Path, results
     result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
     assert result.returncode == (3 if parked else 0)
     lines = result.stdout.splitlines()
-    assert lines[0] == f"loop done after {len(results)} runs"
+    ran = next((i + 1 for i, r in enumerate(results) if r != 0), len(results))
+    completed = ran - (1 if parked else 0)
+    assert lines[0] == f"loop done after {ran} runs, {ran} starts, {completed} completions"
     assert lines[1:] == ([line] if line else [])
 
 

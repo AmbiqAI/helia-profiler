@@ -880,7 +880,7 @@ int main(void) {
         uint32_t infer_start_cyc = DWT->CYCCNT;
         {{ self.engine_invoke() }}
         profiled_infer_cycles += (uint32_t)(DWT->CYCCNT - infer_start_cyc);
-        profiled_infer_count++;
+        profiled_infer_count++;{% block engine_profiled_run_done %}{% endblock %}
 
 {% if transport == "usb_cdc" %}
         usb_timer_resume();

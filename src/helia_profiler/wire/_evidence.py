@@ -132,7 +132,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         value_shape="<bind>,<init>,<run>,<pending>",
         note="The rebind with the default budget, model_init and one more run "
         "(the pool poisoned again), and nsx_psram_pending() sampled the moment "
-        "the probe run returned. A non-zero bind fails the capture as "
+        "the probe run returned. Each step is checked before the next and a "
+        "step not taken reports -1: a non-zero bind fails the capture as "
         "transfer_bind_failed, init as model_init_failed, run as model_run_failed.",
     ),
     _spec(

@@ -63,7 +63,9 @@ static void hpx_printf(const char *fmt, ...) {
     std::vprintf(fmt, ap);
     va_end(ap);
 }
+static void (*park_report)(void) = nullptr;
 [[noreturn]] static void hpx_park(void) {
+    if (park_report != nullptr) park_report();
     std::fflush(stdout);
     std::exit(3);
 }
@@ -159,6 +161,9 @@ int main() {
     provider_stats.peak_in_flight = 2U;
     provider_stats.wait_checks_max = 7U;
     provider_can_sleep = AFTER_CAN_SLEEP;
+    hpx_transfer_after_run();
+    // The report uses the predicate latched when the run returned.
+    provider_can_sleep = true;
     hpx_transfer_report();
     hpx_aot_status = STATUS;
     provider_last.error = 319;
@@ -361,6 +366,9 @@ int main() {
     std::memcpy(run_results, runs_by_call, sizeof(runs_by_call));
     std::memcpy(bind_results, binds_by_call, sizeof(binds_by_call));
     init_result = INIT;
+    park_report = [] {
+        std::printf("parked runs=%d pool=%02x\n", runs, (unsigned)pool[0]);
+    };
     // Output 0 is the pool's bytes, which each fake run overwrites with 1s.
     fake_model_ctx.outputs[0].data = pool;
     fake_model_ctx.outputs[0].size = sizeof(pool);
@@ -424,19 +432,40 @@ def test_a_probe_run_without_a_timeout_still_recovers(tmp_path: Path):
     [
         ((302, 0), (0, 0), "HPX_ERROR=model_run_failed:302,provider=321,driver=0,ticket=0"),
         ((301, 14), (0, 0), "HPX_ERROR=model_run_failed:14,provider=321,driver=0,ticket=0"),
-        ((301, 0), (0, 323), "HPX_ERROR=transfer_bind_failed:323"),
-        ((301, 0), (0, 0), "HPX_ERROR=model_init_failed:5"),
     ],
-    ids=["probe-302", "recovery-run", "recovery-bind", "recovery-init"],
+    ids=["probe-302", "recovery-run"],
 )
-def test_a_failed_probe_or_recovery_fails_the_capture(tmp_path: Path, runs, binds, error):
-    init = 5 if error.startswith("HPX_ERROR=model_init_failed") else 0
-    result = _probe(tmp_path, runs=runs, binds=binds, init=init)
+def test_a_failed_probe_or_recovery_run_fails_the_capture(tmp_path: Path, runs, binds, error):
+    result = _probe(tmp_path, runs=runs, binds=binds)
     assert result.returncode == 3
     lines = result.stdout.splitlines()
     assert lines[0].startswith("HPX_TRANSFER_PROBE=")
     assert lines[1].startswith("HPX_TRANSFER_RECOVERY=")
-    assert lines[-1] == error
+    assert lines[-2] == error
+    assert lines[-1] == "parked runs=2 pool=01"
+
+
+@pytest.mark.parametrize(
+    ("binds", "init", "recovery", "error"),
+    [
+        ((0, 323), 0, "HPX_TRANSFER_RECOVERY=323,-1,-1,7", "HPX_ERROR=transfer_bind_failed:323"),
+        ((0, 0), 14, "HPX_TRANSFER_RECOVERY=0,14,-1,7", "HPX_ERROR=model_init_failed:14"),
+    ],
+    ids=["recovery-bind", "recovery-init"],
+)
+def test_a_failed_rebind_or_init_stops_before_the_poison_and_the_run(
+    tmp_path: Path, binds, init, recovery, error
+):
+    result = _probe(tmp_path, runs=(301, 0), binds=binds, init=init)
+    assert result.returncode == 3
+    # No digest, and after the probe run (which left the pool at 1s) no
+    # poison write and no second run.
+    assert result.stdout.splitlines() == [
+        "HPX_TRANSFER_PROBE=301,321",
+        recovery,
+        error,
+        "parked runs=1 pool=01",
+    ]
 
 
 def _two_pass_probe_render() -> str:
@@ -640,3 +669,20 @@ def test_a_probe_capture_parses_with_every_counted_iteration_intact():
     (preset,) = result.presets.values()
     assert len(preset.iterations) == 2
     assert [layer.cycles for layer in result.layers] == [101, 101]
+
+
+def test_the_sleep_predicate_is_latched_as_the_run_returns():
+    """Sampled right after the timing bracket, before the iteration sentinel
+    and the CSV, whose writes can wait on the host."""
+    source = _render_aot(transport="rtt", arena_regions=_PROBE_REGIONS)
+    latch = source.index("        hpx_transfer_after_run();")
+    assert source.rindex("profiled_infer_count++;", 0, latch) > source.rindex(
+        "profiled_infer_cycles +=", 0, latch
+    )
+    assert (
+        latch < source.index("--- HPX_ITER", latch) < source.index("profiler_print_csv();", latch)
+    )
+    assert latch < source.index("        hpx_transfer_report();", latch)
+    report = source[source.index("static void hpx_transfer_report(void) {") :]
+    report = report[: report.index("\n}\n")]
+    assert "can_sleep" not in report

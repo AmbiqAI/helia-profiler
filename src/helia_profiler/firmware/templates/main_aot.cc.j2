@@ -127,7 +127,8 @@ static HpxLayerRecord g_layers[kMaxLayers];
 {% endif %}
 static int g_num_layers = 0;
 static bool g_layer_capacity_exceeded = false;
-// The first non-zero model_run status since the last check.
+// The model_run status that ended the last loop early: a loop stops at its
+// first failed run and the check after the loop reports it.
 static int32_t hpx_aot_status = 0;
 static int g_num_counters = 0;
 static bool g_profiler_enabled = false;
@@ -474,8 +475,15 @@ static void hpx_transfer_run_start(void) {
     g_transfer_stats_before = *{{ aot_prefix }}_nsx_transfer_stats();
 }
 
-// After each instrumented run: the predicate must allow sleep again once the
-// run returned; then the run's evidence. Refills are printed only in a pass
+// The run has just returned, before anything is printed: the predicate must
+// allow sleep again.
+static void hpx_transfer_after_run(void) {
+    if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
+        g_transfer_power_clause = true;
+    }
+}
+
+// After each instrumented run's CSV, its evidence. Refills are printed only in a pass
 // that counts L1D refills: per unit over its issue window, per operator over
 // its run window (that operator's layer record). Overlap entries are
 // <id>:<DMA in progress at both ends: 1, 0, or x when an end was not
@@ -488,9 +496,6 @@ static void hpx_transfer_print_ends(const char *separator, int id, uint8_t ends)
 }
 
 static void hpx_transfer_report(void) {
-    if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
-        g_transfer_power_clause = true;
-    }
 {% if has_armv8m_pmu %}
     if (g_transfer_refill_slot >= 0) {
         hpx_printf("HPX_TRANSFER_REFILLS=");
@@ -525,6 +530,14 @@ static void hpx_transfer_report(void) {
 {% endif %}
 #endif
 
+{% if transfer_timeout_probe and not power_only | default(false) %}
+#ifdef HPX_AOT_TRANSFER
+static void hpx_transfer_print_recovery(int32_t bind, int32_t init, int32_t run, uint32_t pending) {
+    hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%lu\n", (long)bind, (long)init, (long)run,
+               (unsigned long)pending);
+}
+#endif
+{% endif %}
 // Run after every loop of model_run calls, outside timing: a failed run stops
 // the capture instead of reporting the timing of whatever it left behind.{% if power_only | default(false) %}
 static void hpx_aot_check_runs(void) {
@@ -771,7 +784,7 @@ static void hpx_aot_check_runs(void) {
                    {{ aot_prefix }}_model_ctx.inputs[i].size);
 {% endif %}        }{% endblock %}
 
-{% block engine_invoke %}{ int32_t s = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx); if (s != 0 && hpx_aot_status == 0) { hpx_aot_status = s; } }{% endblock %}
+{% block engine_invoke %}{ int32_t s = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx); if (s != 0) { hpx_aot_status = s; break; } }{% endblock %}
 
 {% block engine_runs_check %}
 hpx_aot_check_runs();{% endblock %}
@@ -811,29 +824,32 @@ hpx_aot_check_runs();{% endblock %}
         const int32_t probe = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         const uint32_t pending = nsx_psram_pending();
         const int32_t provider = {{ aot_prefix }}_nsx_transfer_last()->error;
-        const int32_t bind = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, nullptr);
-        const int32_t init = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);{{ poison_pool("        ") }}
-{{ self.engine_reset_inputs() }}
-        const int32_t run = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
 {% if transport == "rtt" %}
         hpx_rtt_set_blocking();
 {% endif %}
         hpx_printf("HPX_TRANSFER_PROBE=%ld,%ld\n", (long)probe, (long)provider);
-        hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%lu\n", (long)bind, (long)init, (long)run,
-                   (unsigned long)pending);
+        // Each recovery step is checked before the next is taken; a step not
+        // taken reports -1.
+        const int32_t bind = {{ aot_prefix }}_nsx_transfer_bind(&{{ aot_prefix }}_model_ctx, nullptr);
+        if (bind != 0) {
+            hpx_transfer_print_recovery(bind, -1, -1, pending);
+            hpx_transfer_bind_failed(bind);
+        }
+        const int32_t init = {{ aot_prefix }}_model_init(&{{ aot_prefix }}_model_ctx);
+        if (init != 0) {
+            hpx_transfer_print_recovery(bind, init, -1, pending);
+            hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)init);
+            hpx_park();
+        }{{ poison_pool("        ") }}
+{{ self.engine_reset_inputs() }}
+        const int32_t run = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+        hpx_transfer_print_recovery(bind, init, run, pending);
         // The recovery run's bytes: a piece the abort left to land late, or a
         // unit not copied again, shows against the reference capture here.
         for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
             hpx_printf("HPX_TRANSFER_RECOVERY_OUTPUT_%d_FNV1A64=%016llx\n", i,
                        (unsigned long long)hpx_fnv1a64({{ aot_prefix }}_model_ctx.outputs[i].data,
                                                        (size_t){{ aot_prefix }}_model_ctx.outputs[i].size));
-        }
-        if (bind != 0) {
-            hpx_transfer_bind_failed(bind);
-        }
-        if (init != 0) {
-            hpx_printf("HPX_ERROR=model_init_failed:%ld\n", (long)init);
-            hpx_park();
         }
         hpx_aot_status = (probe != 0 && probe != 301) ? probe : run;
         hpx_aot_check_runs();
@@ -843,6 +859,12 @@ hpx_aot_check_runs();{% endblock %}
     }
 #endif
 {% endif %}{{ super() }}{% endblock %}
+
+{% block engine_profiled_run_done %}
+#ifdef HPX_AOT_TRANSFER
+        hpx_transfer_after_run();
+#endif
+{%- endblock %}
 
 {% block engine_pass_init %}
 {% if has_ethos_u | default(false) %}
