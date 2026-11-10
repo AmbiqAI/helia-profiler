@@ -58,7 +58,12 @@ from tests.contracts.test_firmware_render_snapshots import (
     _render,
 )
 
-from .fixture_compile_cases import FIXTURE_KIND_ENGINES, aot_model_stub, render_fixture
+from .fixture_compile_cases import (
+    FIXTURE_KIND_ENGINES,
+    aot_model_stub,
+    aot_transfer_headers,
+    render_fixture,
+)
 
 # The matrix (D3) — one row per (workspace leg, target, render arm).
 # rtt-only: power/busy arms are rtt-only and transport variation is Tier 1's
@@ -82,6 +87,12 @@ class _HwCase:
     fixture_kind: str | None = None
     #: heliaAOT external arenas with constant blobs in PSRAM and TCM
     aot_arenas: bool = False
+    #: heliaAOT render overrides beyond the arenas: input_fill, and for a module
+    #: that ships its transfer provider transfer_timeout_probe and stream_evidence
+    aot_overrides: tuple[tuple[str, object], ...] = ()
+    #: the module ships <prefix>_nsx_transfer.h and binds a stream pool; the
+    #: workspace's nsx-psram must declare the accessors the render calls
+    aot_transfer: bool = False
 
 
 _MATRIX: tuple[_HwCase, ...] = (
@@ -147,6 +158,47 @@ _MATRIX: tuple[_HwCase, ...] = (
         "helia-aot",
         "hpx_profiler",
         aot_arenas=True,
+    ),
+    _HwCase(
+        "510-aot-profile-lcg",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_overrides=(("input_fill", "lcg"),),
+    ),
+    _HwCase(
+        "510-aot-transfer",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_arenas=True,
+        aot_transfer=True,
+    ),
+    _HwCase(
+        "510-aot-transfer-probe",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_arenas=True,
+        aot_transfer=True,
+        aot_overrides=(("transfer_timeout_probe", True),),
+    ),
+    _HwCase(
+        "510-aot-transfer-stream-evidence",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_arenas=True,
+        aot_transfer=True,
+        aot_overrides=(("stream_evidence", True), ("input_fill", "lcg")),
     ),
     _HwCase(
         "510-aot-profile-busy",
@@ -304,6 +356,11 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
     for module in _fixture_modules(case.fixture_kind) + (("nsx-psram",) if case.aot_arenas else ()):
         if f"{module}/" not in includes:
             return f"configured without the {module} module ({_MODULE_WARMUP[module]})"
+    if case.aot_transfer and not _declares_psram_accessors(includes):
+        return (
+            "nsx-psram without nsx_psram_dma_in_progress (warm a profile with "
+            "nsx-ambiq-sdk PR #211 or later through build.nsx_modules)"
+        )
     # Gone external checkouts break the compile.
     missing = next((d for d in _external_includes(includes, app_dir) if not Path(d).is_dir()), None)
     if missing is not None:
@@ -314,6 +371,16 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
         compiler=compiler,
         ninja_text=ninja_text,
     )
+
+
+def _declares_psram_accessors(includes: str) -> bool:
+    """The workspace's nsx_psram.h declares the accessors a provider render calls."""
+    for directory in _include_dirs(includes):
+        header = Path(directory) / "nsx_psram.h"
+        if header.is_file():
+            text = header.read_text(encoding="utf-8", errors="replace")
+            return "nsx_psram_dma_in_progress" in text and "nsx_psram_pending" in text
+    return False
 
 
 _MODULE_WARMUP = {
@@ -439,7 +506,7 @@ def _compile_command(
 def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple[Path, list[Path]]:
     scratch = tmp_path / case.case_id
     scratch.mkdir()
-    overrides = {}
+    overrides: dict[str, object] = {}
     stub_api = case.aot_arenas or (case.fixture_kind or "").startswith("psram")
     if case.engine == "helia-aot" and not stub_api:
         # The workspace's generated model module carries its real prefix;
@@ -449,16 +516,18 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             overrides = {"aot_prefix": prefix}
     if case.fixture_kind:
         text, headers = render_fixture(
-            case.fixture_kind, case.engine, aot_prefix=overrides.get("aot_prefix", "fake")
+            case.fixture_kind, case.engine, aot_prefix=str(overrides.get("aot_prefix", "fake"))
         )
         for name, content in headers.items():
             (scratch / name).write_text(content, encoding="utf-8")
     else:
         if case.aot_arenas:
-            overrides = {"arena_regions": [dict(r) for r in _AOT_ARENA_REGIONS]}
+            regions = _AOT_ARENA_REGIONS + ((_AOT_POOL_REGION,) if case.aot_transfer else ())
+            overrides = {"arena_regions": [dict(r) for r in regions]}
             for region in _AOT_ARENA_REGIONS:
                 if region["blob_filename"]:
                     _write_const_blob_header(scratch, region)
+        overrides.update(case.aot_overrides)
         text = _render(
             case.soc,
             "rtt",
@@ -470,7 +539,14 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     if case.engine == "helia-aot" and stub_api:
         # Keep real vendor headers/flags, but use a mode-correct model API
         # rather than an unrelated cached model with internal arenas.
-        (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
+        # A transfer leg adds the provider header heliaAOT emits beside the
+        # module, so the render's nsx-psram and cache calls meet the SDK's
+        # real headers.
+        if case.aot_transfer:
+            for name, content in aot_transfer_headers().items():
+                (scratch / name).write_text(content)
+        else:
+            (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
         (scratch / "fake_common.h").write_text("#pragma once\n")
     # Tier 1's vacuity rule: an empty or truncated render must not pass
     # -fsyntax-only trivially (#225).
@@ -533,6 +609,17 @@ _AOT_ARENA_REGIONS: tuple[dict, ...] = (
         "role": "scratch",
     },
 )
+
+
+#: The stream pool a transfer leg binds beside the arenas above.
+_AOT_POOL_REGION = {
+    "region_id": 3,
+    "placement": "tcm",
+    "alignment": 4096,
+    "size": 8192,
+    "blob_filename": None,
+    "role": "pool",
+}
 
 
 def _write_const_blob_header(scratch: Path, region: dict) -> None:
@@ -686,6 +773,10 @@ def test_matrix_covers_every_engine_family():
         "510-litert-power",
         "510-aot-profile",
         "510-aot-profile-arenas",
+        "510-aot-profile-lcg",
+        "510-aot-transfer",
+        "510-aot-transfer-probe",
+        "510-aot-transfer-stream-evidence",
         "510-aot-profile-busy",
         "510-et-profile",
         "510-et-profile-busy",
@@ -1105,3 +1196,64 @@ def test_aot_arena_real_toolchain_preparation_uses_generated_blob_headers(tmp_pa
         assert f'#include "{symbol}.h"' in text
     assert "hpx_const_blob_0,\n            sizeof(hpx_const_blob_0)) != 0)" in text
     assert "hpx_const_blob_1,\n           hpx_const_blob_1_len);" in text
+
+
+def test_transfer_legs_need_a_workspace_whose_psram_declares_the_accessors(
+    tmp_path: Path, monkeypatch
+):
+    case = next(c for c in _MATRIX if c.case_id == "510-aot-transfer")
+    current = load_compatibility_baseline().fingerprint
+    helper = TestWorkspaceResolution()
+    for name, declares in (("old-sdk", False), ("sdk-211", True)):
+        root = tmp_path / name
+        app = helper._make_tree(root, case, name, fingerprint=current)
+        psram = app / "modules/nsx-ambiq-sdk/modules/nsx-psram/includes-api"
+        psram.mkdir(parents=True)
+        accessors = (
+            "uint32_t nsx_psram_pending(void);\nuint32_t nsx_psram_dma_in_progress(bool *);\n"
+            if declares
+            else "uint32_t nsx_psram_read(uint32_t, void *, uint32_t);\n"
+        )
+        (psram / "nsx_psram.h").write_text(accessors)
+        (app / "build" / case.board / "build.ninja").write_text(
+            f"build CMakeFiles/{case.target}.dir/src/main.cc.obj: C ../src/main.cc\n"
+            "  DEFINES = -DX\n"
+            f"  INCLUDES = -I{app.as_posix()}/src -isystem {psram.as_posix()}\n"
+            "  FLAGS = -O2\n"
+        )
+        monkeypatch.setenv("HPX_CACHE_DIR", str(root))
+        resolved = _resolve_workspace(case)
+        if declares:
+            assert isinstance(resolved, _Workspace), resolved
+        else:
+            assert isinstance(resolved, str) and "nsx_psram_dma_in_progress" in resolved
+
+
+@pytest.mark.parametrize(
+    "case_id",
+    [
+        "510-aot-profile-lcg",
+        "510-aot-transfer",
+        "510-aot-transfer-probe",
+        "510-aot-transfer-stream-evidence",
+    ],
+)
+def test_transfer_and_fill_legs_render_what_they_name(tmp_path: Path, case_id: str):
+    case = next(c for c in _MATRIX if c.case_id == case_id)
+    app = tmp_path / "workspace"
+    (app / "src").mkdir(parents=True)
+    (app / "src" / "warm_model.h").write_text("// model API\n")
+    workspace = _Workspace(app, app / "build", Path("/compiler"), "")
+    scratch, tus = _prepare_case(case, workspace, tmp_path)
+    text = tus[0].read_text(encoding="utf-8")
+    overrides = dict(case.aot_overrides)
+    assert ("hpx_fill_lcg(" in text) is (overrides.get("input_fill") == "lcg")
+    assert ("HPX_TRANSFER_PROBE=" in text) is bool(overrides.get("transfer_timeout_probe"))
+    assert ("am_hal_cachectrl_dcache_invalidate(&hpx_range" in text) is bool(
+        overrides.get("stream_evidence")
+    )
+    if case.aot_transfer:
+        assert (scratch / "fake_nsx_transfer.h").is_file()
+        assert "#define fake_num_dma_units" in (scratch / "fake_model.h").read_text()
+        assert '__has_include("fake_nsx_transfer.h")' in text
+        assert "hpx_arena_buf_3" in text  # the stream pool is bound
