@@ -962,7 +962,7 @@ def test_nsx_module_null_version_preserves_signature_and_schema():
 
     from pydantic import TypeAdapter
 
-    assert [f.name for f in fields(NsxModuleOverride)] == ["path", "ref", "version"]
+    assert [f.name for f in fields(NsxModuleOverride)] == ["path", "ref", "version", "options"]
     assert fields(NsxModuleOverride)[2].default is None
     assert NsxModuleOverride(None, "sdk-tag", None).ref == "sdk-tag"
     with pytest.raises(ConfigError, match="exactly one"):

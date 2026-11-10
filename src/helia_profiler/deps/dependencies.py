@@ -176,6 +176,8 @@ def _override_inputs(ctx: PipelineContext) -> tuple[dict[str, Any], tuple[Depend
         elif override.ref is not None:
             inputs[name] = {"mode": "ref", "requested": override.ref}
             provenance.append(DependencyOverride("module", name, "ref", override.ref))
+        if override.options:
+            inputs[name]["options"] = dict(sorted(override.options.items()))
 
     engine_config = ctx.config.engine.config
     source_build = ctx.config.engine.type.value == "helia-rt" and bool(

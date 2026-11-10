@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import difflib
+import math
 import os
 import re
 from dataclasses import field, replace
@@ -431,16 +432,42 @@ class NsxModuleOverride:
     ``version`` is deprecated and accepts only ``None`` to preserve stored plans.
     Select remote sources with the owning project's actual Git tag or SHA in ``ref``.
 
+    ``options`` supplies literal CMake cache values for the selected module.
+    Cache names are shared by the build; conflicting values and profiler/engine-owned
+    settings are refused. Booleans become ON/OFF; single-line strings and
+    finite numbers retain their values. Empty options are omitted from
+    snapshots to preserve existing plan and build identities.
+
     Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
     ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
     ``nsx-cmsis-nn``) are configured through ``engine.config``
     (``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —
-    an entry here targeting one of those names is ignored with a warning.
+    a source override targeting one of those names is ignored with a warning,
+    and options targeting it are refused.
     """
 
     path: Path | None = None
     ref: str | None = None
     version: Annotated[None, Field(deprecated=True)] = None
+    options: dict[str, str | int | float | bool] = field(
+        default_factory=dict, metadata={"omit_empty": True}
+    )
+
+    @field_validator("options", mode="before")
+    @classmethod
+    def _validate_options(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            raise ConfigError("NsxModuleOverride.options must be a mapping")
+        for name, option in value.items():
+            if not isinstance(name, str) or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", name) is None:
+                raise ConfigError(f"Invalid CMake option name: {name!r}")
+            if type(option) not in (str, int, float, bool) or (
+                isinstance(option, float) and not math.isfinite(option)
+            ):
+                raise ConfigError(f"CMake option {name} must be a string, boolean or finite number")
+            if isinstance(option, str) and any(char in option for char in ("\0", "\n", "\r")):
+                raise ConfigError(f"CMake option {name} must be a single-line string without NUL")
+        return value
 
     @field_validator("version", mode="before")
     @classmethod

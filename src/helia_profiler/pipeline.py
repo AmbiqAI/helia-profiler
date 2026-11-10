@@ -517,7 +517,8 @@ def serialize_config(config: ProfileConfig) -> dict[str, Any]:
     non-JSON-native leaves (``Path`` \u2192 ``str``, ``Enum`` \u2192 ``.value``,
     ``set``/``tuple`` \u2192 ``list``) so the result round-trips through
     ``json.dumps``. New sub-config fields are picked up automatically \u2014
-    no hand-maintained mirror to drift.
+    no hand-maintained mirror to drift. Fields marked ``omit_empty`` retain
+    existing snapshot identities when an optional mapping is unused.
     """
     from dataclasses import fields, is_dataclass
     from enum import Enum
@@ -525,7 +526,11 @@ def serialize_config(config: ProfileConfig) -> dict[str, Any]:
 
     def _coerce(value: Any) -> Any:
         if is_dataclass(value):
-            return {field.name: _coerce(getattr(value, field.name)) for field in fields(value)}
+            return {
+                field.name: _coerce(getattr(value, field.name))
+                for field in fields(value)
+                if not (field.metadata.get("omit_empty") and not getattr(value, field.name))
+            }
         if isinstance(value, (dict, MappingProxyType)):
             return {k: _coerce(v) for k, v in value.items()}
         if isinstance(value, (list, tuple, set)):

@@ -383,8 +383,48 @@ class ProjectRenderContext:
     power_binary_enabled: bool = False
 
 
+def _project_cmake_vars(ctx: ProjectRenderContext) -> dict[str, Any]:
+    engine_vars = ctx.artifacts.cmake_vars
+    profiler_vars = {
+        "NSX_BOARD",
+        "NSX_AMBIQ_BSP_LIB_SUBDIR",
+        "NSX_SEGGER_RTT_BUFFER_SIZE_UP",
+        "NSX_SEGGER_RTT_BUFFER_SIZE_DOWN",
+        "CMAKE_EXPORT_COMPILE_COMMANDS",
+        "CMAKE_C_COMPILER_LAUNCHER",
+        "CMAKE_CXX_COMPILER_LAUNCHER",
+        "CMAKE_ASM_COMPILER_LAUNCHER",
+    }
+    active = {module["name"] for module in ctx.modules} - {
+        module.name for module in ctx.artifacts.extra_modules
+    }
+    options: dict[str, str] = {}
+    for module, override in sorted(ctx.config.build.nsx_modules.items()):
+        if override.options and module not in active:
+            raise ConfigError(f"CMake options requested for unused or engine-owned module {module}")
+        for name, value in sorted(override.options.items()):
+            literal = ("ON" if value else "OFF") if isinstance(value, bool) else str(value)
+            if name in profiler_vars:
+                raise ConfigError(f"CMake option {name} is owned by the profiler")
+            if name in engine_vars:
+                raise ConfigError(f"CMake option {name} is owned by the selected engine")
+            if name in options and options[name] != literal:
+                raise ConfigError(f"Conflicting module values for CMake option {name}")
+            options[name] = literal
+    # The template quotes cache values; keep user strings literal inside those quotes.
+    escaped = {
+        name: value.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("$", "\\$")
+        .replace("\t", "\\t")
+        for name, value in options.items()
+    }
+    return {**engine_vars, **escaped}
+
+
 def render_project_files(ctx: ProjectRenderContext) -> None:
     """Render nsx.yml, cmake/nsx/modules.cmake, and CMakeLists.txt."""
+    cmake_vars = _project_cmake_vars(ctx)
     _write_text(
         ctx.app_dir / "nsx.yml",
         _jinja_env.get_template("nsx.yml.j2").render(
@@ -414,7 +454,7 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
             board=ctx.board.name,
             engine_type=ctx.artifacts.engine_type,
             has_ethos_u=ctx.artifacts.resolved_backend == "ethos_u",
-            cmake_vars=ctx.artifacts.cmake_vars,
+            cmake_vars=cmake_vars,
             source_roots=[(root.as_posix(), name) for root, name in ctx.artifacts.source_roots],
             compiler_launcher=ctx.compiler_launcher,
             # Only heliaAOT links a generated engine target; every other

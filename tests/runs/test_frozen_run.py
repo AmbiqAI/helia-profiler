@@ -59,6 +59,35 @@ def test_a_saved_plan_reloads_and_resolves_to_the_same_config(session, tmp_path)
     assert plan.qualification == "qualified" and plan.overrides == () and plan.portable
 
 
+def test_module_options_survive_freeze_replay_and_change_intent(session, tmp_path):
+    def configured(depth):
+        return session.with_build(
+            nsx_modules={
+                "nsx-psram": {
+                    "ref": "6795b3d977a5b59482fc1ab2d1c65ccca8d05de3",
+                    "options": {"NSX_PSRAM_ASYNC_DEPTH": depth},
+                }
+            }
+        )
+
+    plan = configured(16).freeze()
+    loaded = FrozenRun.load(plan.save(tmp_path / "module-options.json"))
+    assert loaded.config().build.nsx_modules["nsx-psram"].options == {"NSX_PSRAM_ASYNC_DEPTH": 16}
+    assert loaded.intent_hash == plan.intent_hash
+    assert configured(32).freeze().intent_hash != plan.intent_hash
+
+
+def test_absent_and_empty_module_options_preserve_saved_intent(session):
+    source = {"ref": "6795b3d977a5b59482fc1ab2d1c65ccca8d05de3"}
+    absent = session.with_build(nsx_modules={"nsx-psram": source}).freeze()
+    empty = session.with_build(nsx_modules={"nsx-psram": {**source, "options": {}}}).freeze()
+    assert "options" not in absent.settings["build"]["nsx_modules"]["nsx-psram"]
+    assert absent.intent_hash == empty.intent_hash
+    assert (
+        FrozenRun.from_dict(absent.to_dict()).config().build.nsx_modules["nsx-psram"].options == {}
+    )
+
+
 @pytest.mark.parametrize("output", ["mapping", "new-file", "existing-file"])
 def test_missing_platform_is_refused_before_a_plan_is_published(session, tmp_path, output):
     plan = session.freeze()
