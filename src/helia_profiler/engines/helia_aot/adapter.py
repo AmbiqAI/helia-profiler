@@ -118,8 +118,7 @@ def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> N
             "external-arena mode, and this conversion allocates its own arenas.",
             hint="Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
             "allocates and binds every arena, the stream pool included. A fixed fixture "
-            "binds arenas only with PSRAM weights: set model.weights_location: psram, "
-            "which implies that setting.",
+            "does not take a stream pool: profile the module with hpx profile.",
         )
 
 

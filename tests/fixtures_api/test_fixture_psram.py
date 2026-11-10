@@ -208,24 +208,6 @@ def test_psram_production_render_uses_active_consumer(tmp_path, engine, arena):
         assert "tflite::GetModel(model_data)" not in source
 
 
-def test_psram_aot_render_binds_a_stream_pool_before_model_init(tmp_path):
-    from helia_profiler.engines.base import ArenaRegion
-    from helia_profiler.firmware.fixture import fixture_template_vars
-    from helia_profiler.firmware.render import _jinja_env
-    from helia_profiler.placement import ArenaRole
-
-    ctx, regions = render_context(tmp_path, EngineType.HELIA_AOT)
-    ctx.config = replace(ctx.config, model=replace(ctx.config.model, arena_location=Placement.TCM))
-    regions[0] = replace(regions[0], placement=Placement.TCM, memory="dtcm")
-    regions.append(ArenaRegion(2, "pool", 64, 16, ArenaRole.POOL, "dtcm", Placement.TCM))
-    values = fixture_template_vars(ctx, regions)
-    source = _jinja_env.get_template("fixed_fixture.cc.j2").render(
-        **values, psram_clock_hz=96000000, aot_prefix="fake", arena_regions=regions
-    )
-    assert "NSX_MEM_FAST_BSS alignas(16) static uint8_t hpx_arena_buf_storage_2[64]" in source
-    assert source.index("fake_bind_arena((fake_arena_region_t)2") < source.index("fake_model_init")
-
-
 @pytest.mark.parametrize("fault", ["internal", "missing", "size", "placement", "memory"])
 def test_psram_aot_render_refuses_inconsistent_artifacts(tmp_path, fault):
     from helia_profiler.firmware.fixture import fixture_template_vars
