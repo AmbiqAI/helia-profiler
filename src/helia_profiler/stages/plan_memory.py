@@ -28,6 +28,9 @@ Auto policy (greedy fastest-fit, arena prioritized over weights):
 * arena needs MRAM → arena=MRAM, weights=MRAM (rare; arena cannot be
   truly placed in non-volatile MRAM, so this case fails validation)
 
+ExecuTorch normalizes an automatic MRAM arena choice to its firmware's TCM
+fallback. Its per-buffer overrides still take precedence.
+
 ``auto`` never falls back to PSRAM; PSRAM requires explicit opt-in
 because of the runtime upload handshake.
 """
@@ -736,6 +739,10 @@ def _resolve_placement(ctx: PipelineContext) -> tuple[Placement, Placement]:
         tcm_cap=capacities.tcm,
         sram_cap=capacities.sram,
     )
+
+    if cfg.engine.type is EngineType.EXECUTORCH and arena_region is Placement.MRAM:
+        # Match the firmware's TCM fallback for automatic ExecuTorch runtime buffers.
+        arena_region = Placement.TCM
 
     arena_region, weights_region = _apply_explicit_overrides(
         cfg,

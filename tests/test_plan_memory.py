@@ -35,6 +35,39 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     return ctx
 
 
+def _make_executorch_auto_ctx(
+    tmp_path, planned_region, *, model_size=2048, method_size=32768, method_region=None
+):
+    model = tmp_path / "model.pte"
+    model.write_bytes(b"ET" + bytes(model_size - 2))
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(model),
+                "arena_size": 8 * 1024 * 1024,
+                "weights_location": "mram",
+            },
+            "engine": {"type": "executorch", "config": {"planned_arena_size": 16384}},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = ExecutorchArtifacts(
+        engine_type=EngineType.EXECUTORCH,
+        engine_header="nsx_executorch.h",
+        executorch_planned_arena_size=16384,
+        executorch_method_arena_size=method_size,
+        executorch_temporary_arena_size=32768,
+        executorch_input_size=40,
+        executorch_output_size=40,
+        executorch_planned_arena_region=planned_region,
+        executorch_method_arena_region=method_region,
+    )
+    return ctx
+
+
 class TestMemoryRegionUsage:
     def test_free_and_overflow(self):
         r = MemoryRegionUsage(region=MemoryRegion.SRAM, capacity=1000, used=400)
@@ -48,6 +81,45 @@ class TestMemoryRegionUsage:
 
 
 class TestPlanMemorySynthesise:
+    @pytest.mark.parametrize(
+        ("planned_region", "method_region"), [(None, None), ("tcm", "sram"), ("sram", None)]
+    )
+    def test_executorch_auto_fallback_matches_firmware_buffers(
+        self, tmp_path, planned_region, method_region
+    ):
+        from helia_profiler.firmware.context import FirmwareRenderContext
+
+        ctx = _make_executorch_auto_ctx(tmp_path, planned_region, method_region=method_region)
+        PlanMemoryStage().run(ctx)
+        assert ctx.arena_region == "tcm"
+        plan = ctx.memory_plan
+        assert plan is not None and ctx.declared_memory_plan is plan
+        rendered = FirmwareRenderContext.from_pipeline_context(ctx).engine
+        for name, field in (
+            ("planned_arena", "executorch_planned_arena_region"),
+            ("method_arena", "executorch_method_arena_region"),
+            ("temporary_arena", "executorch_temporary_arena_region"),
+            ("input_buffer", "executorch_io_region"),
+            ("output_buffer", "executorch_io_region"),
+        ):
+            region = MemoryRegion.SRAM if getattr(rendered, field) == "sram" else MemoryRegion.DTCM
+            usage = plan.region(region)
+            assert usage is not None and any(c.name == name for c in usage.consumers)
+        mram = plan.region(MemoryRegion.MRAM)
+        assert mram is not None and {c.name for c in mram.consumers} == {"pte_program"}
+
+    @pytest.mark.parametrize("planned_region", [None, "tcm", "sram"])
+    @pytest.mark.parametrize("method_size", [32768, 460_000])
+    def test_executorch_auto_fallback_does_not_hide_ram_failure(
+        self, tmp_path, planned_region, method_size
+    ):
+        ctx = _make_executorch_auto_ctx(
+            tmp_path, planned_region, model_size=8 * 1024 * 1024, method_size=method_size
+        )
+        error = ImageTooLargeError if method_size == 32768 else PlatformError
+        with pytest.raises(error):
+            PlanMemoryStage().run(ctx)
+
     def test_executorch_plan_includes_all_explicit_runtime_buffers(self, tmp_path: Path):
         model = tmp_path / "model.pte"
         model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 2048)
