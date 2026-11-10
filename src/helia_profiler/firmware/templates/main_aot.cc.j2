@@ -809,7 +809,7 @@ hpx_aot_check_runs();{% endblock %}
 
 {# profiling.transfer_timeout_probe: one extra run before the first pass,
    outside the counted iterations and every timing bracket, with the profiler
-   off. Its waits give up after one check, so a dma unit still in flight times
+   off. Its waits give up after two checks, so a dma unit still in flight times
    out (301 with the provider's timeout, 321) and the provider's abort drains
    it; nsx-psram's pending reads are sampled the moment the run returns. The
    default budget is bound again, and model_init and one more run (the pool

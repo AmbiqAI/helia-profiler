@@ -115,7 +115,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         runtime_gate="the module ships <prefix>_nsx_transfer.h",
         value_shape="<status>,<provider>",
         note="Once, before the first pass: an extra run outside the counted "
-        "iterations with a wait budget of one check. 301 with provider 321 is a "
+        "iterations whose waits give up after two checks. 301 with provider 321 is a "
         "timeout; 0 means nothing was still in flight at its waits. Any other "
         "status, a 301 with another provider code included, fails the capture "
         "as model_run_failed with the provider fields, before any recovery.",

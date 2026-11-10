@@ -123,8 +123,8 @@ class ProfilingConfig:
     # See :class:`InputFill`.
     input_fill: InputFill = InputFill.ZERO
     # heliaAOT with an emitted transfer provider: before the first pass, one
-    # extra run outside the counted iterations waits with a budget of one
-    # check, so a dma unit still in flight times out; the provider's recovery
+    # extra run outside the counted iterations gives up its waits after two
+    # checks, so a dma unit still in flight times out; the provider's recovery
     # (rebind, model_init, one run) is then reported. Every other run keeps
     # the default budget.
     transfer_timeout_probe: bool = False

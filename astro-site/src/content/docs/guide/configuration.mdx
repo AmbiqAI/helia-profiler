@@ -105,8 +105,8 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
 
 - A module that ships its own transfer provider (`<prefix>_nsx_transfer.h`,
   heliaAOT's `nsx` module with dma units) needs an nsx-ambiq-sdk with
-  `nsx_psram_dma_in_progress`: PR #211 (first in commit 48712cd), or its
-  merge commit on main once merged. Select it with
+  `nsx_psram_dma_in_progress`: main at commit
+  6795b3d977a5b59482fc1ab2d1c65ccca8d05de3 or later. Select it with
   `build.nsx_modules.<module>.ref`. The pinned baseline's
   nsx-psram has no asynchronous read, and the provider's own API check does
   not cover that accessor. hpx binds the provider before `model_init`.
@@ -135,7 +135,7 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
 - `profiling.transfer_timeout_probe: true` needs the module's provider.
   - Before the first pass, hpx runs one extra run, outside the counted
     iterations and every timing window, with the profiler off.
-  - Its waits give up after one check, so a transfer still in flight times out.
+  - Its waits give up after two checks, so a transfer still in flight times out.
   - hpx samples nsx-psram's pending reads as the run returns, binds the default
     budget again, and runs `model_init` and one more run, with the stream pool
     poisoned before each run.
