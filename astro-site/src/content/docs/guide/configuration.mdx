@@ -110,6 +110,8 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   `build.nsx_modules.<module>.ref`. The pinned baseline's
   nsx-psram has no asynchronous read, and the provider's own API check does
   not cover that accessor. hpx binds the provider before `model_init`.
+  The profile build calls the accessor in every capture of such a module, so
+  it needs nsx-psram at that commit or later; an earlier one fails to compile.
 - A module with a stream pool needs
   `engine.config.aot_args.memory.allocate_arenas: false`. hpx binds arenas
   only in that mode, and heliaAOT's `model_init` fails with 10 while the pool
