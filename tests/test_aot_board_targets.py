@@ -212,4 +212,4 @@ def test_prepare_stage_keeps_too_large(tmp_path: Path, monkeypatch: pytest.Monke
     ctx = SimpleNamespace(config=config, work_dir=tmp_path)
 
     with pytest.raises(ImageTooLargeError):
-        prepare_engine.PrepareEngineStage().run(ctx)  # type: ignore[arg-type]
+        prepare_engine.PrepareEngineStage().run(ctx)  # ty: ignore[invalid-argument-type]
