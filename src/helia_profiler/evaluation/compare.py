@@ -9,7 +9,6 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
-from ..config import InputFill
 from ..errors import ReportError
 from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
@@ -17,6 +16,7 @@ from ..results.dimensions import DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from ..results.run_summary import _require_current_summary
 from ..results.serde import nested_get, to_float, write_dict_csv
+from ..runs.plan import ABSENT_AT_DEFAULT
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .comparison_profile import (
     ComparisonProfile,
@@ -150,8 +150,6 @@ class _ConfigField:
     label: str
     path: tuple[str, ...]
     dimension: ComparisonDimension | None = None
-    #: A config-only row's value when the artifact predates the setting.
-    absent: Any = None
 
 
 def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
@@ -186,12 +184,7 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
     _dimension_row(ComparisonDimension.STREAM_EVIDENCE),
-    _ConfigField(
-        "input_fill",
-        "Input fill",
-        ("config", "profiling", "input_fill"),
-        absent=InputFill.ZERO.value,
-    ),
+    _ConfigField("input_fill", "Input fill", ("config", "profiling", "input_fill")),
     _dimension_row(ComparisonDimension.HPX_VERSION),
     _dimension_row(ComparisonDimension.COMPILER_VERSION),
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
@@ -477,7 +470,8 @@ def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigFi
     if spec.dimension is not None:
         return dimensions.get(spec.dimension)
     value = nested_get(run.metadata, *spec.path)
-    return spec.absent if value is None else value
+    # A run recorded before the setting existed ran at its absent value.
+    return ABSENT_AT_DEFAULT.get(spec.path[1:]) if value is None else value
 
 
 def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:

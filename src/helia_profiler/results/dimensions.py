@@ -30,6 +30,7 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from ..runs.plan import ABSENT_AT_DEFAULT
 from .run_summary import PowerSection
 from .serde import nested_get
 
@@ -183,7 +184,9 @@ def derive_stream_evidence(metadata: dict[str, Any]) -> bool:
     compared against one must still raise the difference. Public because the
     manifest writer records the same value.
     """
-    return nested_get(metadata, "config", "profiling", "stream_evidence") is True
+    setting = ("profiling", "stream_evidence")
+    value = nested_get(metadata, "config", *setting)
+    return (ABSENT_AT_DEFAULT[setting] if value is None else value) is True
 
 
 def _derive_power_monitor(power: dict[str, Any]) -> str:

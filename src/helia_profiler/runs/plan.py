@@ -59,12 +59,15 @@ _HOST_LOCAL_SETTINGS = (
 
 #: Settings added after plans were first frozen, with the value that means
 #: absent. At that value a setting is left out of the plan, so a plan frozen
-#: before it existed keeps its intent.
-_ABSENT_AT_DEFAULT: tuple[tuple[tuple[str, ...], object], ...] = (
-    (("target", "platform_overlay"), None),
-    (("profiling", "input_fill"), "zero"),
-    (("profiling", "transfer_timeout_probe"), False),
-    (("profiling", "stream_evidence"), False),
+#: before it existed keeps its intent; a run recorded before it existed
+#: compares as that value.
+ABSENT_AT_DEFAULT: Mapping[tuple[str, ...], object] = MappingProxyType(
+    {
+        ("target", "platform_overlay"): None,
+        ("profiling", "input_fill"): "zero",
+        ("profiling", "transfer_timeout_probe"): False,
+        ("profiling", "stream_evidence"): False,
+    }
 )
 
 #: Environment variables that can point a build at local sources.
@@ -413,7 +416,7 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
-    for (section, key), absent in _ABSENT_AT_DEFAULT:
+    for (section, key), absent in ABSENT_AT_DEFAULT.items():
         if settings[section].get(key) == absent:
             _drop(settings, (section, key))
     # Preserve symlink spelling: sidecars belong beside the selected model path.
