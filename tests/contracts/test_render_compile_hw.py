@@ -49,6 +49,7 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.deps.compatibility import load_compatibility_baseline
+from helia_profiler.firmware.headers import _blob_to_header
 from helia_profiler.hostenv.cache_dirs import hpx_cache_root
 from tests.contracts.test_firmware_render_snapshots import (
     _ENGINES,
@@ -79,6 +80,8 @@ class _HwCase:
     #: engines whose build also compiles the standalone profiler TU
     extra_profiler_tu: bool = False
     fixture_kind: str | None = None
+    #: heliaAOT external arenas with constant blobs in PSRAM and TCM
+    aot_arenas: bool = False
 
 
 _MATRIX: tuple[_HwCase, ...] = (
@@ -135,6 +138,15 @@ _MATRIX: tuple[_HwCase, ...] = (
         "apollo510",
         "helia-aot",
         "hpx_profiler",
+    ),
+    _HwCase(
+        "510-aot-profile-arenas",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_arenas=True,
     ),
     _HwCase(
         "510-aot-profile-busy",
@@ -286,10 +298,10 @@ def _resolve_candidate(app_dir: Path, case: _HwCase) -> _Workspace | str:
     if variables is None:
         hint = " (no power instrument on this bench?)" if case.power_only else ""
         return f"configured without the {case.target} target{hint}"
-    # PSRAM and power fixtures include module headers (nsx_psram.h, nsx_gpio.h)
+    # PSRAM renders and power fixtures include module headers (nsx_psram.h, nsx_gpio.h)
     # that only a workspace configured with that module puts on the include path.
     includes = variables.get("INCLUDES", "")
-    for module in _fixture_modules(case.fixture_kind):
+    for module in _fixture_modules(case.fixture_kind) + (("nsx-psram",) if case.aot_arenas else ()):
         if f"{module}/" not in includes:
             return f"configured without the {module} module ({_MODULE_WARMUP[module]})"
     # Gone external checkouts break the compile.
@@ -428,7 +440,8 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     scratch = tmp_path / case.case_id
     scratch.mkdir()
     overrides = {}
-    if case.engine == "helia-aot" and not (case.fixture_kind or "").startswith("psram"):
+    stub_api = case.aot_arenas or (case.fixture_kind or "").startswith("psram")
+    if case.engine == "helia-aot" and not stub_api:
         # The workspace's generated model module carries its real prefix;
         # render against it so the include resolves to the real header.
         prefix = _aot_prefix_in(workspace.app_dir)
@@ -440,12 +453,12 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         )
         for name, content in headers.items():
             (scratch / name).write_text(content, encoding="utf-8")
-        if case.engine == "helia-aot" and case.fixture_kind.startswith("psram"):
-            # Keep real vendor headers/flags, but use a mode-correct model API
-            # rather than an unrelated cached model with internal arenas.
-            (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
-            (scratch / "fake_common.h").write_text("#pragma once\n")
     else:
+        if case.aot_arenas:
+            overrides = {"arena_regions": [dict(r) for r in _AOT_ARENA_REGIONS]}
+            for region in _AOT_ARENA_REGIONS:
+                if region["blob_filename"]:
+                    _write_const_blob_header(scratch, region)
         text = _render(
             case.soc,
             "rtt",
@@ -454,6 +467,11 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
             clean_window_probe=case.probe,
             overrides=overrides or None,
         )
+    if case.engine == "helia-aot" and stub_api:
+        # Keep real vendor headers/flags, but use a mode-correct model API
+        # rather than an unrelated cached model with internal arenas.
+        (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
+        (scratch / "fake_common.h").write_text("#pragma once\n")
     # Tier 1's vacuity rule: an empty or truncated render must not pass
     # -fsyntax-only trivially (#225).
     assert "int main(" in text, f"[{case.case_id}] render has no 'int main(' — vacuous TU"
@@ -485,6 +503,29 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
     if model_data.is_file():
         shutil.copy(model_data, scratch / "model_data.h")
     return scratch, tus
+
+
+#: External arenas for the ``aot_arenas`` leg: odd-sized constant blobs in
+#: PSRAM and TCM (word-padded storage, logical ``_len``) and a runtime region.
+_AOT_ARENA_REGIONS: tuple[dict, ...] = (
+    {
+        "region_id": 0,
+        "placement": "psram",
+        "alignment": 16,
+        "size": 4097,
+        "blob_filename": "c0.bin",
+    },
+    {"region_id": 1, "placement": "tcm", "alignment": 16, "size": 3, "blob_filename": "c1.bin"},
+    {"region_id": 2, "placement": "sram", "alignment": 16, "size": 1024, "blob_filename": None},
+)
+
+
+def _write_const_blob_header(scratch: Path, region: dict) -> None:
+    """The generator's own header for a blob of the region's size, as production writes it."""
+    blob = scratch / region["blob_filename"]
+    blob.write_bytes(bytes(i % 255 + 1 for i in range(region["size"])))
+    symbol = f"hpx_const_blob_{region['region_id']}"
+    (scratch / f"{symbol}.h").write_text(_blob_to_header(blob, symbol), encoding="utf-8")
 
 
 def _aot_prefix_in(app_dir: Path) -> str | None:
@@ -629,6 +670,7 @@ def test_matrix_covers_every_engine_family():
         "510-litert-profile",
         "510-litert-power",
         "510-aot-profile",
+        "510-aot-profile-arenas",
         "510-aot-profile-busy",
         "510-et-profile",
         "510-et-profile-busy",
@@ -1024,3 +1066,27 @@ def test_fixture_real_toolchain_preparation_renders_current_sources(tmp_path, ca
         assert "std::memcpy(input_data_2, fixed_input_2, sizeof(fixed_input_2))" in text
         if case.engine != "helia-aot":
             assert "kTfLiteInt32" in text and "data.i32" in text
+
+
+def test_aot_arena_real_toolchain_preparation_uses_generated_blob_headers(tmp_path):
+    case = next(c for c in _MATRIX if c.aot_arenas)
+    app = tmp_path / "workspace"
+    (app / "src").mkdir(parents=True)
+    (app / "src" / "warm_model.h").write_text("// model API\n")
+    workspace = _Workspace(app, app / "build", Path("/compiler"), "")
+    scratch, tus = _prepare_case(case, workspace, tmp_path)
+    assert tus == [scratch / "main.cc"]
+    text = tus[0].read_text(encoding="utf-8")
+    assert '#include "fake_model.h"' in text
+    assert (scratch / "fake_model.h").read_text() == aot_model_stub(external_arenas=True)
+    for region in _AOT_ARENA_REGIONS:
+        symbol = f"hpx_const_blob_{region['region_id']}"
+        if region["blob_filename"] is None:
+            assert symbol not in text
+            continue
+        header = (scratch / f"{symbol}.h").read_text(encoding="utf-8")
+        assert header == _blob_to_header(scratch / region["blob_filename"], symbol)
+        assert f"{symbol}_len = {region['size']};" in header
+        assert f'#include "{symbol}.h"' in text
+    assert "hpx_const_blob_0,\n            sizeof(hpx_const_blob_0)) != 0)" in text
+    assert "hpx_const_blob_1,\n           hpx_const_blob_1_len);" in text

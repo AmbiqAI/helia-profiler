@@ -11,6 +11,25 @@ from __future__ import annotations
 from pathlib import Path
 
 
+def word_padded(size: int) -> int:
+    """Round a byte count up to whole 32-bit words.
+
+    Apollo5 ``nsx_psram_write`` refuses a length that is not a multiple of
+    four (nsx-ambiq-sdk#208), so every array the firmware may write to PSRAM
+    is stored at this size; its ``_len`` symbol keeps the logical size.
+    """
+    return (size + 3) & ~3
+
+
+def _byte_lines(data: bytes) -> list[str]:
+    """The array initializer rows, zero-padded to :func:`word_padded`."""
+    data = data.ljust(word_padded(len(data)), b"\0")
+    return [
+        "    " + ", ".join(f"0x{b:02x}" for b in data[i : i + 12]) + ","
+        for i in range(0, len(data), 12)
+    ]
+
+
 def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
     """Convert a .tflite model to a C header (xxd-style byte array).
 
@@ -23,6 +42,8 @@ def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
 
     For TCM/SRAM placement we drop ``const`` because NSX initialises these
     sections by copying from NVM at boot, which requires writable storage.
+    ``sizeof(model_data)`` is the word-padded size; ``model_data_len`` is the
+    model's byte count.
     """
     data = model_path.read_bytes()
 
@@ -44,10 +65,7 @@ def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
     if include_nsx:
         lines.append('#include "nsx_mem.h"')
     lines.append(decl)
-    for i in range(0, len(data), 12):
-        chunk = data[i : i + 12]
-        hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
-        lines.append(f"    {hex_vals},")
+    lines.extend(_byte_lines(data))
     lines.append("};")
     if weights_region in ("tcm", "sram"):
         lines.append(f"static unsigned int model_data_len = {len(data)};")
@@ -60,7 +78,8 @@ def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
     """Convert a sidecar constant blob to a C header (xxd-style byte array).
 
     The blob is placed in ``.rodata`` (const, stays in flash/MRAM) so it
-    can be memcpy'd into the runtime arena buffer at boot.
+    can be memcpy'd into the runtime arena buffer at boot.  ``sizeof`` is
+    the word-padded size; ``<symbol>_len`` is the blob's byte count.
     """
     data = blob_path.read_bytes()
     lines = [
@@ -69,11 +88,8 @@ def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
         "#pragma once",
         "#include <stddef.h>",
         f"alignas(16) static const unsigned char {symbol_name}[] = {{",
+        *_byte_lines(data),
+        "};",
+        f"static const size_t {symbol_name}_len = {len(data)};",
     ]
-    for i in range(0, len(data), 12):
-        chunk = data[i : i + 12]
-        hex_vals = ", ".join(f"0x{b:02x}" for b in chunk)
-        lines.append(f"    {hex_vals},")
-    lines.append("};")
-    lines.append(f"static const size_t {symbol_name}_len = sizeof({symbol_name});")
     return "\n".join(lines) + "\n"
