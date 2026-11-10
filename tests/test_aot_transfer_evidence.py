@@ -698,3 +698,41 @@ def test_the_sleep_predicate_is_latched_as_the_run_returns():
     report = source[source.index("static void hpx_transfer_report(void) {") :]
     report = report[: report.index("\n}\n")]
     assert "can_sleep" not in report
+
+
+def test_a_broken_power_clause_ends_the_profiled_loop(tmp_path: Path):
+    """Nothing of the loop follows a run that leaves the provider refusing sleep:
+    no CSV, no next refill, poison or run. The check after the loop reports it."""
+    compiler = shutil.which("c++")
+    if compiler is None:
+        pytest.skip("host C++ compiler required")
+    source = _render_aot(transport="rtt", arena_regions=_PROBE_REGIONS)
+    start = source.index("#ifdef HPX_AOT_TRANSFER\n        hpx_transfer_after_run();")
+    seam = source[start : source.index("#endif\n", start) + len("#endif\n")]
+    assert source.index(seam) < source.index("--- HPX_ITER", start)
+    program = (
+        r"""
+#include <cstdio>
+#define HPX_AOT_TRANSFER 1
+static bool g_transfer_power_clause = false;
+static int runs = 0, after = 0;
+static void hpx_transfer_after_run(void) { if (runs == 2) g_transfer_power_clause = true; }
+int main() {
+    for (int iter = 0; iter < 4; iter++) {
+        ++runs;
+"""
+        + seam
+        + r"""
+        ++after;
+    }
+    std::printf("%d %d %d\n", runs, after, (int)g_transfer_power_clause);
+    return 0;
+}
+"""
+    )
+    path = tmp_path / "clause.cc"
+    path.write_text(program, encoding="utf-8")
+    executable = tmp_path / "clause.exe"
+    subprocess.run([compiler, "-std=gnu++17", str(path), "-o", str(executable)], check=True)
+    result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
+    assert result.stdout.strip() == "2 1 1"

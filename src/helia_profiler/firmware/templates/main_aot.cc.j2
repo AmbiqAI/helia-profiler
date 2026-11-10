@@ -871,6 +871,11 @@ hpx_aot_check_runs();{% endblock %}
 {% block engine_profiled_run_done %}
 #ifdef HPX_AOT_TRANSFER
         hpx_transfer_after_run();
+        // A broken power clause ends the loop like a failed run: DMA may still
+        // own the pool, so no later poison or run follows it.
+        if (g_transfer_power_clause) {
+            break;
+        }
 #endif
 {%- endblock %}
 
