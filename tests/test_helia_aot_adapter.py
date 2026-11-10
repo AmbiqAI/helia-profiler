@@ -219,6 +219,11 @@ def _prepare(
     monkeypatch, tmp_path, config, result=None, source=None, *, compiler_hook=None
 ) -> HeliaAotArtifacts:
     """Run ``prepare()`` against a fake converter that calls ``compiler_hook(config, output_dir)``."""
+    _fake_converter(monkeypatch, result, source, compiler_hook=compiler_hook)
+    return HeliaAOTAdapter().prepare(config, tmp_path / "work")
+
+
+def _fake_converter(monkeypatch, result=None, source=None, *, compiler_hook=None) -> None:
     from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
     def fake_run_aot_compiler(config, output_dir, module_name, *_args):
@@ -234,7 +239,6 @@ def _prepare(
     monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)
     monkeypatch.setattr(adapter_mod, "cmsis_nn_module_ref", lambda *_a: _CMSIS_REF)
     monkeypatch.setattr(adapter_mod, "_write_attributes_header", lambda d, p: d / f"{p}.h")
-    return HeliaAOTAdapter().prepare(config, tmp_path / "work")
 
 
 def _lcg_profiling():
@@ -279,7 +283,7 @@ class TestPrepareArtifactFlags:
         """hpx binds no region when heliaAOT allocates its arenas, so the pool would
         stay unbound and model_init would fail on the board with status 10."""
         pool = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
-        with pytest.raises(ConfigError, match="stream pool") as raised:
+        with pytest.raises(EngineError, match="stream pool") as raised:
             _prepare(monkeypatch, tmp_path, _aot_cfg({}), pool)
         assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
 
@@ -288,6 +292,25 @@ class TestPrepareArtifactFlags:
         config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
         artifacts = _prepare(monkeypatch, tmp_path, config, pool)
         assert [r.role.value for r in artifacts.aot_arena_regions] == ["pool"]
+
+    @pytest.mark.parametrize("case", ["pool", "lcg"])
+    def test_a_refusal_keeps_its_hint_through_the_engine_stage(self, monkeypatch, tmp_path, case):
+        """The prepare_engine stage replaces the hint of anything but an EngineError."""
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages import PrepareEngineStage
+
+        if case == "pool":
+            result = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+            config, hint = _aot_cfg({}), "memory.allocate_arenas: false"
+        else:
+            result = Result(tensors=(TensorView("a", "a", (1, 4), "float32", input_index=0),))
+            config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+            hint = "input_fill: zero"
+        _fake_converter(monkeypatch, result)
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "stage")
+        with pytest.raises(EngineError) as raised:
+            PrepareEngineStage().run(ctx)
+        assert hint in str(raised.value.hint)
 
     @pytest.mark.parametrize("dtype", ["float32", "float16", "bool"])
     def test_lcg_input_fill_is_refused_for_a_non_integer_input(self, monkeypatch, tmp_path, dtype):
@@ -299,7 +322,7 @@ class TestPrepareArtifactFlags:
             )
         )
         config = replace(_aot_cfg({}), profiling=_lcg_profiling())
-        with pytest.raises(ConfigError, match=rf"input_fill: lcg.*b \({dtype}\)") as raised:
+        with pytest.raises(EngineError, match=rf"input_fill: lcg.*b \({dtype}\)") as raised:
             _prepare(monkeypatch, tmp_path, config, inputs)
         assert "input_fill: zero" in str(raised.value.hint)
         _prepare(monkeypatch, tmp_path / "zero", _aot_cfg({}), inputs)

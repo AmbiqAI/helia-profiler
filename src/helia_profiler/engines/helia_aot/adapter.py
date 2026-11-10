@@ -113,7 +113,7 @@ def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> N
         return
     pools = [region.region_id for region in regions if region.role is ArenaRole.POOL]
     if pools:
-        raise ConfigError(
+        raise EngineError(
             f"heliaAOT emitted a stream pool (arena {pools[0]}) that hpx binds only in "
             "external-arena mode, and this conversion allocates its own arenas.",
             hint="Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
@@ -135,7 +135,7 @@ def _check_input_fill(config: ProfileConfig, result: Any) -> None:
         if tensor.input_index is not None and not str(tensor.dtype).startswith(("int", "uint"))
     ]
     if other:
-        raise ConfigError(
+        raise EngineError(
             "profiling.input_fill: lcg fills inputs with raw bytes, so it needs integer "
             f"inputs; this model has {', '.join(other)}.",
             hint="Use profiling.input_fill: zero for this model.",
