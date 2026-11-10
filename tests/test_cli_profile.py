@@ -175,3 +175,23 @@ def test_profile_cli_exit_code_names_oversized_image(monkeypatch, error, code) -
 
     assert excinfo.value.code == code
     assert EXIT_IMAGE_TOO_LARGE == 4
+
+
+@pytest.mark.parametrize(("mixed", "exit_code"), [(False, 4), (True, 1)])
+def test_linker_translation_reaches_profile_exit_policy(monkeypatch, mixed, exit_code):
+    from helia_profiler.firmware.build import region_overflow_error
+
+    output = "ld: region `MCU_MRAM' overflowed by 8 bytes"
+    if mixed:
+        output += "\nld: region `MCU_TCM' overflowed by 16 bytes"
+    error = region_overflow_error(BuildError("build failed", details=output))
+    assert error is not None
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda *_: SimpleNamespace(verbose=0))
+
+    def fail(config, **kwargs):
+        raise error
+
+    monkeypatch.setattr("helia_profiler.api._execute_profile", fail)
+    with pytest.raises(SystemExit) as exc:
+        _run_profile_cmd()
+    assert exc.value.code == exit_code

@@ -1220,8 +1220,31 @@ class TestBuildApp:
 
         assert not stamp.exists()  # next run must fully re-verify the workspace
 
+    @pytest.mark.parametrize(
+        ("output", "error_type", "region", "advice"),
+        [
+            (
+                "ld.lld: error: section '.text' will not fit in region 'MCU_MRAM': overflowed by 434308 bytes",
+                ImageTooLargeError,
+                "MCU_MRAM",
+                "PSRAM",
+            ),
+            (
+                "ld: region `MCU_MRAM' overflowed by 8 bytes\nld: region `MCU_TCM' overflowed by 16 bytes",
+                BuildError,
+                "MCU_TCM",
+                "arena",
+            ),
+            (
+                "ld: region `MCU_TCM' overflowed by 16 bytes\nld: region `MCU_MRAM' overflowed by 8 bytes",
+                BuildError,
+                "MCU_TCM",
+                "arena",
+            ),
+        ],
+    )
     def test_linker_region_overflow_is_reported_as_a_placement_error(
-        self, tmp_path: Path, fake_dist: Path, monkeypatch
+        self, tmp_path: Path, fake_dist: Path, monkeypatch, output, error_type, region, advice
     ):
         ctx = _make_ctx(tmp_path, fake_dist)
         ResolvePlatformStage().run(ctx)
@@ -1232,19 +1255,21 @@ class TestBuildApp:
         for step in ("lock", "sync", "configure"):
             monkeypatch.setattr(f"helia_profiler.firmware.nsx_cli.{step}", lambda *a, **kw: None)
 
+        stamp = app_dir / "hpx-frozen-sync.json"
+        stamp.write_text(json.dumps({"lock_sha256": "0" * 64}), encoding="utf-8")
+        original = BuildError("nsx build failed", returncode=1, details=output)
+
         def overflowing_build(*_args, **_kwargs) -> None:
-            raise BuildError(
-                "nsx build failed",
-                details="ld.lld: error: section '.text' will not fit in region 'MCU_MRAM': "
-                "overflowed by 434308 bytes",
-            )
+            raise original
 
         monkeypatch.setattr("helia_profiler.firmware.nsx_cli.build", overflowing_build)
-        with pytest.raises(
-            ImageTooLargeError, match="does not fit in MCU_MRAM: overflowed by 434,308"
-        ) as exc:
+        with pytest.raises(error_type, match=f"does not fit in {region}") as exc:
             build_app(ctx)
-        assert "PSRAM" in (exc.value.hint or "")
+        assert type(exc.value) is error_type
+        assert exc.value.__cause__ is original
+        assert exc.value.details == output and exc.value.returncode == 1
+        assert advice in (exc.value.hint or "")
+        assert not stamp.exists()
 
     @pytest.mark.parametrize(
         ("output", "advice", "error_type", "overflow"),
@@ -1294,6 +1319,86 @@ class TestBuildApp:
         assert error.returncode == 1
         assert "ROMEM" not in output or "MRAM" not in (error.hint or "")
         assert f"overflowed by {overflow:,} bytes" in str(error)
+
+    @pytest.mark.parametrize("reverse", [False, True])
+    @pytest.mark.parametrize("split_fields", [False, True])
+    @pytest.mark.parametrize(
+        ("flash", "ram", "region", "overflow"),
+        [
+            (
+                "ld: region `MCU_MRAM' overflowed by 8 bytes",
+                "ld: region `MCU_TCM' overflowed by 16 bytes",
+                "MCU_TCM",
+                16,
+            ),
+            (
+                "ld.lld: error: section '.text' will not fit in region 'FLASH': overflowed by 8 bytes",
+                "ld.lld: error: section '.bss' will not fit in region 'SRAM': overflowed by 24 bytes",
+                "SRAM",
+                24,
+            ),
+            (
+                "L6220E: Load region LR_1 size (100 bytes) exceeds limit (80 bytes)",
+                "L6220E: Execution region MCU_TCM size (120 bytes) exceeds limit (80 bytes)",
+                "MCU_TCM",
+                40,
+            ),
+            (
+                "ld: region `ROMEM' overflowed by 8 bytes",
+                "L6220E: Execution region WORK size (120 bytes) exceeds limit (80 bytes)",
+                "WORK",
+                40,
+            ),
+            (
+                "L6220E: Load region LR_1 size (100 bytes) exceeds limit (80 bytes)",
+                "ld: region `DTCM' overflowed by 16 bytes",
+                "DTCM",
+                16,
+            ),
+        ],
+    )
+    def test_mixed_overflows_prioritize_ram(
+        self, reverse, split_fields, flash, ram, region, overflow
+    ):
+        from helia_profiler.firmware.build import region_overflow_error
+
+        first, second = (ram, flash) if reverse else (flash, ram)
+        details = first if split_fields else first + "\n" + second
+        original = BuildError(
+            second if split_fields else "nsx build failed", returncode=7, details=details
+        )
+        error = region_overflow_error(original)
+        assert type(error) is BuildError
+        assert f"{region}: overflowed by {overflow:,} bytes" in str(error)
+        assert "arena" in (error.hint or "")
+        assert error.returncode == 7 and error.details == details
+
+    @pytest.mark.parametrize("reverse", [False, True])
+    def test_multiple_flash_overflows_remain_skippable(self, reverse):
+        from helia_profiler.firmware.build import region_overflow_error
+
+        lines = [
+            "ld: region `FLASH' overflowed by 8 bytes",
+            "L6220E: Load region LR_1 size (100 bytes) exceeds limit (80 bytes)",
+        ]
+        error = region_overflow_error(
+            BuildError("build failed", details="\n".join(reversed(lines) if reverse else lines))
+        )
+        assert type(error) is ImageTooLargeError
+
+    @pytest.mark.parametrize(
+        "output",
+        [
+            "compiler error: unknown symbol",
+            "region 'FLASH' overflowed",
+            "region 'FLASH' overflowed by 0 bytes",
+            "L6220E: Load region LR_1 size (80 bytes) exceeds limit (100 bytes)",
+        ],
+    )
+    def test_unrecognized_or_nonpositive_overflow_does_not_skip(self, output):
+        from helia_profiler.firmware.build import region_overflow_error
+
+        assert region_overflow_error(BuildError("build failed", details=output)) is None
 
     def test_missing_binary_invalidates_frozen_sync_stamp(
         self, tmp_path: Path, fake_dist: Path, monkeypatch
