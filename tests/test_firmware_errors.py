@@ -120,3 +120,14 @@ def test_an_unbound_transfer_provider_is_explained_where_it_surfaces():
 
     assert "300" in ERROR_HINTS[FirmwareErrorCode.MODEL_INIT_FAILED]
     assert "300" not in ERROR_HINTS[FirmwareErrorCode.MODEL_RUN_FAILED]
+
+
+def test_an_unbound_arena_is_explained_where_it_surfaces():
+    """heliaAOT's model_init returns 10 while an arena region, such as the stream
+    pool, is unbound."""
+    from helia_profiler.transport.firmware_errors import ERROR_HINTS
+    from helia_profiler.wire import FirmwareErrorCode
+
+    hint = ERROR_HINTS[FirmwareErrorCode.MODEL_INIT_FAILED]
+    assert "10 means" in hint
+    assert "engine.config.aot_args.memory.allocate_arenas: false" in hint

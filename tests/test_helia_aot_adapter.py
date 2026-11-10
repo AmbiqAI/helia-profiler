@@ -26,7 +26,7 @@ from helia_profiler.engines.helia_aot.compile import (
 from helia_profiler.errors import ConfigError, EngineError
 from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
-from tests.aot_views import Result, TensorView, operator
+from tests.aot_views import RegionView, Result, TensorView, operator
 
 _CMSIS_REF = NsxModuleRef(name="ns-cmsis-nn", path=Path("/tmp/cmsis"))
 
@@ -268,6 +268,20 @@ class TestPrepareArtifactFlags:
         artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}))
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is False
+
+    def test_a_stream_pool_in_internal_arena_mode_is_refused(self, monkeypatch, tmp_path):
+        """hpx binds no region when heliaAOT allocates its arenas, so the pool would
+        stay unbound and model_init would fail on the board with status 10."""
+        pool = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+        with pytest.raises(ConfigError, match="stream pool") as raised:
+            _prepare(monkeypatch, tmp_path, _aot_cfg({}), pool)
+        assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
+
+    def test_a_stream_pool_in_external_arena_mode_is_accepted(self, monkeypatch, tmp_path):
+        pool = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+        config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
+        artifacts = _prepare(monkeypatch, tmp_path, config, pool)
+        assert [r.role.value for r in artifacts.aot_arena_regions] == ["pool"]
 
     def test_retains_compiled_graph_costs(self, monkeypatch, tmp_path):
         import json

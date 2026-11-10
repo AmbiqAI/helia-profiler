@@ -113,6 +113,26 @@ def test_aot_region_drift_is_rejected(tmp_path, fault):
         fixture_template_vars(ctx, [region])
 
 
+def test_aot_stream_pool_is_refused_where_the_fixture_binds_no_region(tmp_path):
+    """Only a PSRAM fixture binds AOT regions; an unbound pool fails model_init."""
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    config = replace(
+        config,
+        model=replace(config.model, arena_location=Placement.TCM, weights_location=Placement.TCM),
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path)
+    ctx.fixture = FixtureRenderSpec(fixture, METHOD, analysis_of(fixture))
+    regions = [
+        ArenaRegion(0, "scratch", 4096, 16, ArenaRole.SCRATCH, "dtcm", Placement.TCM),
+        ArenaRegion(1, "pool", 16384, 16, ArenaRole.POOL, "dtcm", Placement.TCM),
+    ]
+    fixture_template_vars(ctx, regions[:1])
+    with pytest.raises(ConfigError, match="stream pool") as raised:
+        fixture_template_vars(ctx, regions)
+    assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
+
+
 @pytest.mark.parametrize("placement,memory", [(Placement.SRAM, "dtcm"), (Placement.TCM, "sram")])
 @pytest.mark.parametrize("role", [ArenaRole.SCRATCH, ArenaRole.PERSISTENT, ArenaRole.CONSTANT])
 def test_aot_physical_bank_cannot_be_hidden_by_logical_override(tmp_path, placement, memory, role):

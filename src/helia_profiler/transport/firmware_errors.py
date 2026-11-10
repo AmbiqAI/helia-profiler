@@ -47,7 +47,10 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.MODEL_INIT_FAILED: (
         "heliaAOT model init returned a non-zero status.  Check that the "
         "generated module was built against the correct board and that any "
-        "required memories (PSRAM, SHARED_SRAM) are initialised.  300 means "
+        "required memories (PSRAM, SHARED_SRAM) are initialised.  10 means an "
+        "arena region, such as the stream pool, was not bound before model_init: "
+        "hpx binds regions only with "
+        "engine.config.aot_args.memory.allocate_arenas: false.  300 means "
         "the module has dma transfer units and no transfer provider is bound: "
         "hpx binds only the provider heliaAOT emits beside a module.type nsx "
         "module (module.transfer_provider auto); convert that way, or with cpu "

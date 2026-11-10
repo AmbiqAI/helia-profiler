@@ -102,6 +102,25 @@ def _external_arena_mode(aot_args: dict[str, Any]) -> bool:
     return not aot_args["memory"].get("allocate_arenas", True)
 
 
+def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> None:
+    """Refuse a stream pool the firmware would leave unbound.
+
+    heliaAOT expects the application to bind its stream pool in both arena
+    modes, and ``model_init`` returns its arena-unbound status (10) until it
+    is. hpx's firmware binds regions only in external-arena mode.
+    """
+    if not allocate_arenas:
+        return
+    pools = [region.region_id for region in regions if region.role is ArenaRole.POOL]
+    if pools:
+        raise ConfigError(
+            f"heliaAOT emitted a stream pool (arena {pools[0]}) that hpx binds only in "
+            "external-arena mode, and this conversion allocates its own arenas.",
+            hint="Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
+            "allocates and binds every arena, the stream pool included.",
+        )
+
+
 def _report_names(prefix: str) -> tuple[str, str]:
     return f"{prefix}_plan.json", f"{prefix}_report.json"
 
@@ -356,6 +375,7 @@ class HeliaAOTAdapter:
         # physical memory layout.
         memory_plan = _extract_memory_plan(result, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(result, prefix)
+        _check_pool_bound(arena_regions, allocate_arenas=allocate_arenas)
 
         extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)
 

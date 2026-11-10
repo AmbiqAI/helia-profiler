@@ -110,6 +110,10 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   `build.nsx_modules.<module>.ref`. The pinned baseline's
   nsx-psram has no asynchronous read, and the provider's own API check does
   not cover that accessor. hpx binds the provider before `model_init`.
+- A module with a stream pool needs
+  `engine.config.aot_args.memory.allocate_arenas: false`. hpx binds arenas
+  only in that mode, and heliaAOT's `model_init` fails with 10 while the pool
+  is unbound, so hpx refuses the conversion otherwise.
 - Every heliaAOT capture now carries new lines:
   - `HPX_INPUT_FILL`.
   - An FNV-1a 64 digest of each output after every instrumented run
