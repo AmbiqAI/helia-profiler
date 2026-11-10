@@ -710,6 +710,30 @@ def test_install_nsx_module_source_points_to_source_root(tmp_path: Path, fake_so
     assert not (module_dir / "_source_shim").exists()
 
 
+def test_source_root_option_cannot_conflict_with_engine_source(tmp_path: Path, fake_source_tree):
+    from dataclasses import replace
+
+    from helia_profiler.config import NsxModuleOverride
+    from helia_profiler.errors import ConfigError
+    from helia_profiler.firmware import generate_app
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.stages.plan_memory import PlanMemoryStage
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    config = _make_config(tmp_path, {"config": {"source_path": str(fake_source_tree)}})
+    override = NsxModuleOverride(
+        ref=config.compatibility_baseline.project("nsx-ambiq-sdk").ref,
+        options={"HELIA_RT_TFLM_ROOT": str(tmp_path / "different-runtime")},
+    )
+    config = replace(config, build=replace(config.build, nsx_modules={"nsx-core": override}))
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = HeliaRTAdapter().prepare(config, ctx.work_dir)
+    PlanMemoryStage().run(ctx)
+    with pytest.raises(ConfigError, match="HELIA_RT_TFLM_ROOT is owned by the selected engine"):
+        generate_app(ctx)
+
+
 class TestEthosUBackend:
     """engine.backend=ethos_u — NPU module + kernel flag wiring."""
 
