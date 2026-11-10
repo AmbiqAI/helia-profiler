@@ -56,6 +56,43 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.5.0...v0.6.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **platforms:** advance FrozenRun to3, CompiledBuild to4, fixture_api to8.0, RunResult to2, metadata to2, summary to21, intent basis to2 and native mapping to hpx-run-3. Earlier strict artifacts need their producing environment. Keep release treatment separate from pending patch647. target-config/1 is unchanged.
+
+### Features
+
+* **calibrate:** time every operator, pair captures and store calibration schema 2 ([#655](https://github.com/AmbiqAI/helia-profiler/issues/655)) ([fed5932](https://github.com/AmbiqAI/helia-profiler/commit/fed593220afa4725aec7edad9a33dbf095d6eca1)), closes [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+* **ci:** run private Zoo models and seal their results ([#652](https://github.com/AmbiqAI/helia-profiler/issues/652)) ([6231cd2](https://github.com/AmbiqAI/helia-profiler/commit/6231cd2e2452fcef2e52f73a4254402d457ef9b9))
+* **firmware:** bind heliaAOT's emitted transfer provider and report the board-gate evidence ([#677](https://github.com/AmbiqAI/helia-profiler/issues/677)) ([f1aac52](https://github.com/AmbiqAI/helia-profiler/commit/f1aac525f9d364b3922136b44783b122d94dd7eb)), closes [#676](https://github.com/AmbiqAI/helia-profiler/issues/676) [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+* **platform:** resolve explicit catalog overlays with HPX policy ([#666](https://github.com/AmbiqAI/helia-profiler/issues/666)) ([fb6ff57](https://github.com/AmbiqAI/helia-profiler/commit/fb6ff579d39c760b2701a1358e34d4d07706f752)), closes [#657](https://github.com/AmbiqAI/helia-profiler/issues/657)
+* **platforms:** adopt shared catalog facts and retain provenance ([b90d174](https://github.com/AmbiqAI/helia-profiler/commit/b90d1748160c9c41c5c028a81be6b989745d1134)), closes [#657](https://github.com/AmbiqAI/helia-profiler/issues/657)
+* **platforms:** verify linker sources and admit application intervals ([0614526](https://github.com/AmbiqAI/helia-profiler/commit/061452676b9f7c2dfd20093c3cb5b1765830d9e5)), closes [#657](https://github.com/AmbiqAI/helia-profiler/issues/657)
+* record measurement conditions in every result and add hpx calibrate ([#653](https://github.com/AmbiqAI/helia-profiler/issues/653)) ([0659f2d](https://github.com/AmbiqAI/helia-profiler/commit/0659f2dacb531b6e9d12405f0fd638be5c3aec2e)), closes [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+* **runtime:** adopt heliaRT 2.5.0 ([#654](https://github.com/AmbiqAI/helia-profiler/issues/654)) ([927973a](https://github.com/AmbiqAI/helia-profiler/commit/927973a23a2d5be822b4e6929b4a4980481342da)), closes [#586](https://github.com/AmbiqAI/helia-profiler/issues/586)
+* **validate:** let a models file skip an engine per model ([#651](https://github.com/AmbiqAI/helia-profiler/issues/651)) ([146f465](https://github.com/AmbiqAI/helia-profiler/commit/146f465ec4be6bb862c2a81661ee24160bd041e4))
+* **zoo:** add encrypted private models to the Zoo registry ([#650](https://github.com/AmbiqAI/helia-profiler/issues/650)) ([288ae41](https://github.com/AmbiqAI/helia-profiler/commit/288ae4140b0806f0f3ed65c0e7fe2754730e71f5))
+* **zoo:** add fomo-cuedc-animals to the Zoo list ([#645](https://github.com/AmbiqAI/helia-profiler/issues/645)) ([5938430](https://github.com/AmbiqAI/helia-profiler/commit/5938430f7f51c417c0a8d53e530ca5457b24cd04))
+* **zoo:** add heartkit-arr a16w8 with a LiteRT skip ([#646](https://github.com/AmbiqAI/helia-profiler/issues/646)) ([1145010](https://github.com/AmbiqAI/helia-profiler/commit/11450104d7911e401c4b7dbcfa9ac50e0fd960b5))
+
+
+### Bug Fixes
+
+* adopt SDK 5.2.30 and preserve production header diagnostics ([#660](https://github.com/AmbiqAI/helia-profiler/issues/660)) ([a2815c2](https://github.com/AmbiqAI/helia-profiler/commit/a2815c2053a3b8c207e496ece4d718f828754c91))
+* **build:** prioritize RAM failures in mixed linker overflows ([#679](https://github.com/AmbiqAI/helia-profiler/issues/679)) ([5d67ae0](https://github.com/AmbiqAI/helia-profiler/commit/5d67ae0538cff6428dec810bfc5be3e059c96eed)), closes [#678](https://github.com/AmbiqAI/helia-profiler/issues/678) [#643](https://github.com/AmbiqAI/helia-profiler/issues/643)
+* **calibrate:** bound setup nesting before recursive processing ([#675](https://github.com/AmbiqAI/helia-profiler/issues/675)) ([644e4b9](https://github.com/AmbiqAI/helia-profiler/commit/644e4b983895d657eee1d0d008d2e981f7c26aea)), closes [#656](https://github.com/AmbiqAI/helia-profiler/issues/656)
+* **firmware:** clamp hpx_printf's length to its line buffer ([#658](https://github.com/AmbiqAI/helia-profiler/issues/658)) ([777dca3](https://github.com/AmbiqAI/helia-profiler/commit/777dca3d85076af6c135acefb6e76055c15f9bac))
+* **firmware:** pad PSRAM writes to a multiple of four bytes ([#674](https://github.com/AmbiqAI/helia-profiler/issues/674)) ([c3a90b3](https://github.com/AmbiqAI/helia-profiler/commit/c3a90b31fddab2a0cf64bd3192f102a291754f73))
+* **firmware:** support relocated LiteRT schema headers ([#649](https://github.com/AmbiqAI/helia-profiler/issues/649)) ([126f5dc](https://github.com/AmbiqAI/helia-profiler/commit/126f5dc4e638776060fd3820f04aaea47b55fb9f)), closes [#586](https://github.com/AmbiqAI/helia-profiler/issues/586)
+* **platform:** correct PSRAM admission and RSS HAL routing ([#670](https://github.com/AmbiqAI/helia-profiler/issues/670)) ([e56027c](https://github.com/AmbiqAI/helia-profiler/commit/e56027c0363de9e856a7291e8ba1bbcba4d2e36e)), closes [#668](https://github.com/AmbiqAI/helia-profiler/issues/668) [#669](https://github.com/AmbiqAI/helia-profiler/issues/669) [#657](https://github.com/AmbiqAI/helia-profiler/issues/657)
+* **platform:** preserve capabilities in builtin-derived custom targets ([#673](https://github.com/AmbiqAI/helia-profiler/issues/673)) ([b0883b8](https://github.com/AmbiqAI/helia-profiler/commit/b0883b8b2057ed2f84ed81973185589ab039faeb)), closes [#667](https://github.com/AmbiqAI/helia-profiler/issues/667)
+* refuse excessive calibration JSON nesting cleanly ([#661](https://github.com/AmbiqAI/helia-profiler/issues/661)) ([6c17d6f](https://github.com/AmbiqAI/helia-profiler/commit/6c17d6f8a8c45b560a665d9e6b21f15b89be46b8))
+* **runtime:** handle retired heliaRT header dependencies ([8593dad](https://github.com/AmbiqAI/helia-profiler/commit/8593dada5d0e797940fa9defd8d480ac8955cefe)), closes [#586](https://github.com/AmbiqAI/helia-profiler/issues/586)
+* **validate:** distinguish MRAM skips from invalid memory plans ([#671](https://github.com/AmbiqAI/helia-profiler/issues/671)) ([e8b3bfc](https://github.com/AmbiqAI/helia-profiler/commit/e8b3bfc0b67abbeb264d0d60061c95a93f691164))
+
 ## [0.5.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.4.1...v0.5.0) (2026-11-04)
 
 
