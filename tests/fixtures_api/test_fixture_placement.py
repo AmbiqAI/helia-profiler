@@ -117,6 +117,7 @@ def test_aot_stream_pool_with_internal_arenas_is_refused_by_prepare(tmp_path, mo
     """A pool with internal arenas is refused by prepare() before any fixture
     stage, so it never reaches model_init unbound; the hint says a fixture does
     not take a stream pool."""
+    pytest.importorskip("helia_aot")
     from helia_profiler.errors import EngineError
     from helia_profiler.fixtures import build as builder
     from tests.aot_views import RegionView, Result
@@ -161,6 +162,7 @@ def _emit_transfer_provider(_config, output_dir):
 def test_aot_module_with_a_transfer_provider_is_refused_on_the_fixture_path(tmp_path, monkeypatch):
     """The fixture firmware binds no transfer provider, so heliaAOT's model_init
     would return 300 on the board; the profile path binds it and is not refused."""
+    pytest.importorskip("helia_aot")
     from helia_profiler.engines.base import HeliaAotArtifacts
     from helia_profiler.fixtures import build as builder
     from helia_profiler.stages import PrepareEngineStage
@@ -192,6 +194,7 @@ def test_aot_module_with_a_transfer_provider_is_refused_on_the_fixture_path(tmp_
 def test_aot_cpu_stream_pool_is_refused_on_the_fixture_path(tmp_path, monkeypatch, alignment):
     """A cpu-unit module ships no provider but still has a stream pool, which the
     fixture does not take; the profile path binds it and is not refused."""
+    pytest.importorskip("helia_aot")
     from helia_profiler.engines.base import HeliaAotArtifacts
     from helia_profiler.fixtures import build as builder
     from helia_profiler.stages import PrepareEngineStage
