@@ -71,6 +71,7 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
                 "alignment": 1,
                 "size": size,
                 "blob_filename": "w.bin",
+                "role": "constant",
             },
             {
                 "region_id": 1,
@@ -78,6 +79,7 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
                 "alignment": 16,
                 "size": size,
                 "blob_filename": "w.bin",
+                "role": "constant",
             },
         ],
     )
@@ -101,3 +103,49 @@ def test_main_aot_psram_write_is_word_padded(tmp_path: Path, size: int):
     advance = re.findall(r"psram_off \+= (.+?);", out)
     assert len(advance) == 1
     assert c_value(advance[0].removeprefix("(uint32_t)"), headers[0]) == padded
+
+
+def _psram_regions(alignment: int, *, blob: bool) -> list[dict[str, object]]:
+    return [
+        {
+            "region_id": 0,
+            "placement": "tcm",
+            "alignment": 16,
+            "size": 64,
+            "blob_filename": None,
+            "role": "scratch",
+        },
+        {
+            "region_id": 1,
+            "placement": "psram",
+            "alignment": alignment,
+            "size": 100,
+            "blob_filename": "c.bin" if blob else None,
+            "role": "constant",
+        },
+        {
+            "region_id": 2,
+            "placement": "psram",
+            "alignment": alignment,
+            "size": 8,
+            "blob_filename": None,
+            "role": "scratch",
+        },
+    ]
+
+
+@pytest.mark.parametrize(("alignment", "line"), [(1, 32), (16, 32), (32, 32), (64, 64)])
+def test_main_aot_stacks_psram_arenas_on_cache_lines(alignment: int, line: int):
+    out = _render_aot(arena_region="psram", arena_regions=_psram_regions(alignment, blob=True))
+    rounding = re.findall(r"psram_off = \(psram_off \+ (\d+) - 1u\) & ~\((\d+)u - 1u\);", out)
+    assert rounding == [(str(line), str(line))] * 2
+
+
+def test_main_aot_syncs_the_dcache_after_writing_constants_to_psram():
+    out = _render_aot(arena_region="psram", arena_regions=_psram_regions(16, blob=True))
+    sync = out.index("    HPX_CACHE_SYNC_SHARED_DATA();")
+    assert out.rindex("HPX_CONST_BLOB_LOADED", 0, sync) > out.rindex("nsx_psram_write(", 0, sync)
+    assert sync < out.index("fake_model_init(&fake_model_ctx);")
+    assert out.count("HPX_CACHE_SYNC_SHARED_DATA();") == 1
+    no_blob = _render_aot(arena_region="psram", arena_regions=_psram_regions(16, blob=False))
+    assert "HPX_CACHE_SYNC_SHARED_DATA();" not in no_blob

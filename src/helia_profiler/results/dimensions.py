@@ -31,6 +31,20 @@ from types import MappingProxyType
 from typing import Any, Mapping
 
 from .run_summary import PowerSection
+from .serde import nested_get
+
+#: Settings added after plans were first frozen, with the value that means
+#: absent. At that value a setting is left out of the plan, so a plan frozen
+#: before it existed keeps its intent; a run recorded before it existed
+#: compares as that value.
+ABSENT_AT_DEFAULT: Mapping[tuple[str, ...], object] = MappingProxyType(
+    {
+        ("target", "platform_overlay"): None,
+        ("profiling", "input_fill"): "zero",
+        ("profiling", "transfer_timeout_probe"): False,
+        ("profiling", "stream_evidence"): False,
+    }
+)
 
 
 class ComparisonDimension(StrEnum):
@@ -81,6 +95,7 @@ class ComparisonDimension(StrEnum):
     WEIGHTS_CACHE = "weights_cache"
     EXTERNAL_MEMORY_CLOCK = "external_memory_clock"
     APPLICATION_LOAD = "application_load"
+    STREAM_EVIDENCE = "stream_evidence"
 
 
 class DimensionEffect(StrEnum):
@@ -172,6 +187,18 @@ def derive_architecture_flags(metadata: dict[str, Any]) -> str | None:
         return None
     flags = image["architecture_flags"]
     return " ".join(sorted(flags)) if flags else None
+
+
+def derive_stream_evidence(metadata: dict[str, Any]) -> bool:
+    """``profiling.stream_evidence``, with an absent setting read as off.
+
+    Artifacts made before the setting existed ran warm, so a cold capture
+    compared against one must still raise the difference. Public because the
+    manifest writer records the same value.
+    """
+    setting = ("profiling", "stream_evidence")
+    value = nested_get(metadata, "config", *setting)
+    return (ABSENT_AT_DEFAULT[setting] if value is None else value) is True
 
 
 def _derive_power_monitor(power: dict[str, Any]) -> str:
@@ -473,6 +500,22 @@ _DIMENSION_SPECS: tuple[DimensionSpec, ...] = (
         mismatch_hint=(
             "The runs shared the core with different application loads, so "
             "the cycle counts include different interference."
+        ),
+    ),
+    # heliaAOT's profiling.stream_evidence, appended last: with it every
+    # instrumented run reads its PSRAM constants cold and starts from a
+    # poisoned stream pool. Informative, like the cache condition above.
+    DimensionSpec(
+        ComparisonDimension.STREAM_EVIDENCE,
+        DimensionEffect.INFORMATIVE,
+        ArtifactSource.RUN_METADATA,
+        ("config", "profiling", "stream_evidence"),
+        label="Stream evidence",
+        derive=derive_stream_evidence,
+        mismatch_hint=(
+            "One run read its PSRAM constants cold before every instrumented "
+            "run (profiling.stream_evidence) and the other did not, so the "
+            "per-layer cycles measure different cache regimes."
         ),
     ),
 )

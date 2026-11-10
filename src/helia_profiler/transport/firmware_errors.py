@@ -47,7 +47,45 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
     FirmwareErrorCode.MODEL_INIT_FAILED: (
         "heliaAOT model init returned a non-zero status.  Check that the "
         "generated module was built against the correct board and that any "
-        "required memories (PSRAM, SHARED_SRAM) are initialised."
+        "required memories (PSRAM, SHARED_SRAM) are initialised.  10 means an "
+        "arena region, such as the stream pool, was not bound before model_init: "
+        "hpx binds regions only with "
+        "engine.config.aot_args.memory.allocate_arenas: false.  300 means "
+        "the module has dma transfer units and no transfer provider is bound: "
+        "hpx binds only the provider heliaAOT emits beside a module.type nsx "
+        "module (module.transfer_provider auto); convert that way, or with cpu "
+        "transfer units."
+    ),
+    FirmwareErrorCode.MODEL_RUN_FAILED: (
+        "A heliaAOT model run failed, so the capture records no timing from "
+        "that loop, even if its timing lines were printed.  For a module with dma transfer units: 301 means a "
+        "transfer failed, with the "
+        "provider's own code as provider= and the nsx-psram status as "
+        "driver= (provider 319 with driver NSX_PSRAM_STATUS_BUSY means another "
+        "nsx-psram client or a blocking call held the queue: retry the run); "
+        "302 means the provider's abort failed and the module needs the "
+        "provider's reset, then model_init.  Other codes are the module's own "
+        "status codes (see its generated tensors header)."
+    ),
+    FirmwareErrorCode.TRANSFER_BIND_FAILED: (
+        "The heliaAOT module's own transfer provider refused to bind, so its "
+        "dma units cannot run.  The code is the provider's: 311 means the "
+        "linked nsx-psram lacks the API version the provider was emitted "
+        "for; 312 PSRAM is not ready or XIP is off; 313 this part has no "
+        "asynchronous PSRAM read; 314 nsx-psram's async depth "
+        "(NSX_PSRAM_ASYNC_DEPTH) is below the module's pieces in flight; 323 "
+        "a drain of an earlier binding timed out.  Pin an nsx-ambiq-sdk whose "
+        "nsx-psram offers the asynchronous read on this board, or convert "
+        "with cpu transfer units or without a stream pool; "
+        "module.transfer_provider: none keeps the dma units and leaves "
+        "hpx nothing to bind, so model_init then returns 300."
+    ),
+    FirmwareErrorCode.TRANSFER_POWER_CLAUSE: (
+        "The transfer provider's sleep predicate disagreed with its pieces in "
+        "flight: it allowed deep sleep while a dma unit's wait was starting, or "
+        "refused it after a run returned.  DMA into DTCM is not allowed in deep "
+        "sleep, so this is a provider or nsx-psram defect; report it with the "
+        "capture."
     ),
     FirmwareErrorCode.NPU_INIT_FAILED: (
         "Ethos-U NPU bring-up failed before any inference ran.  On FPGA "

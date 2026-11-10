@@ -158,6 +158,9 @@ def _render_aot(
     has_ethos_u: bool = False,
     pmu_passes: list[dict[str, object]] | None = None,
     psram_clock_hz: int = 48_000_000,
+    input_fill: str = "zero",
+    transfer_timeout_probe: bool = False,
+    stream_evidence: bool = False,
     **extra_vars: object,
 ) -> str:
     return _env.get_template(template_name).render(
@@ -167,6 +170,9 @@ def _render_aot(
             power_window_timer=power_window_timer,
             clean_window_timer=str(extra_vars.get("clean_window_timer", "dwt")),
         ),
+        input_fill=input_fill,
+        transfer_timeout_probe=transfer_timeout_probe,
+        stream_evidence=stream_evidence,
         aot_prefix="fake",
         cmsis_device_header=cmsis_device_header,
         aot_op_manifest=[{"id": 0, "op_type": "CONV_2D"}],
@@ -574,6 +580,7 @@ class TestMainAotCcRender:
                     "alignment": 64,
                     "size": 4096,
                     "blob_filename": None,
+                    "role": "scratch",
                 }
             ],
         )
@@ -629,6 +636,7 @@ class TestMainAotCcRender:
                     "alignment": 64,
                     "size": 4096,
                     "blob_filename": "weights.bin",
+                    "role": "constant",
                 }
             ],
             psram_clock_hz=125_000_000,

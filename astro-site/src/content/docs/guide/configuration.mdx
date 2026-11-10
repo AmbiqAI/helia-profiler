@@ -101,6 +101,73 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
 - After a successful run, tighten `model.arena_size` from the reported
   `allocated_arena` rather than growing it blindly.
 
+#### heliaAOT
+
+- A module that ships its own transfer provider (`<prefix>_nsx_transfer.h`,
+  heliaAOT's `nsx` module with dma units) needs an nsx-ambiq-sdk with
+  `nsx_psram_dma_in_progress`: main at commit
+  6795b3d977a5b59482fc1ab2d1c65ccca8d05de3 or later. Select it with
+  `build.nsx_modules.<module>.ref`. The pinned baseline's
+  nsx-psram has no asynchronous read, and the provider's own API check does
+  not cover that accessor. hpx binds the provider before `model_init`.
+  The profile build calls the accessor in every capture of such a module, so
+  it needs nsx-psram at that commit or later; an earlier one fails to compile.
+  A fixed fixture binds neither a transfer provider nor a stream pool, so a
+  fixture capture of a module with either (dma or cpu transfer units) is
+  refused; profile it with `hpx profile`, or convert it without streaming for
+  a fixture.
+- A module with a stream pool needs
+  `engine.config.aot_args.memory.allocate_arenas: false`. hpx binds arenas
+  only in that mode, and heliaAOT's `model_init` fails with 10 while the pool
+  is unbound, so hpx refuses the conversion otherwise.
+- Every heliaAOT capture now carries new lines:
+  - `HPX_INPUT_FILL`.
+  - An FNV-1a 64 digest of each output after every instrumented run
+    (`HPX_OUTPUT_<i>_FNV1A64`).
+  - At the end, the input digests and the bytes of each output up to 1024
+    bytes (`-` for an empty one), so two captures of one model compare byte
+    for byte.
+
+  The host keeps these values as printed strings.
+- `profiling.input_fill: lcg` fills every input from a fixed-seed 32-bit LCG
+  before each run instead of zeros, so an output depends on every weight, not
+  on biases alone.
+  - The default, `zero`, leaves the measurements unchanged.
+  - Inputs are refilled inside the clean (and power-gated) window, as zeros
+    always were, so under `lcg` the clean latency and energy include the LCG
+    fill (a few cycles per input byte). The capture records no clean workload
+    for them.
+  - `lcg` writes raw bytes, so it is refused unless every model input is
+    int8, uint8 or int16. A float input would read NaN, infinities and huge
+    values, and 32- and 64-bit integer inputs hold indices or lengths, which
+    not every kernel bounds. Use `zero` for such a model. `lcg` is also
+    refused for other engines.
+- `profiling.transfer_timeout_probe: true` needs the module's provider.
+  - Before the first pass, hpx runs one extra run, outside the counted
+    iterations and every timing window, with the profiler off.
+  - Its waits give up after two checks, so a transfer still in flight times out.
+  - hpx samples nsx-psram's pending reads as the run returns, binds the default
+    budget again, and runs `model_init` and one more run, with the stream pool
+    poisoned before each run.
+  - The capture prints `HPX_TRANSFER_PROBE=<status>,<provider>` and
+    `HPX_TRANSFER_RECOVERY=<bind>,<init>,<run>,<pending>`.
+  - Any other failure fails the capture.
+- `profiling.stream_evidence: true` changes the cache regime of the per-layer
+  figures and `HPX_PROFILED_INFER_*`. The warm-ups and the clean window keep a
+  warm cache. The capture says `HPX_STREAM_EVIDENCE=1`.
+  - Before every instrumented run, hpx fills the stream pool with `0x5A` and
+    cleans and invalidates the D-cache over each PSRAM constant arena. A late or
+    missing copy then shows in the outputs, and every constant read reaches the
+    MSPI controller.
+  - It applies to any module whose stream pool or PSRAM constant arenas hpx
+    binds, with dma units, cpu units or none. A module without a pool gets the
+    invalidate alone. The unstreamed reference capture takes the setting too,
+    so compared captures share one regime.
+  - It is refused on parts without an explicit D-cache (Apollo3, Apollo4), for
+    modules with neither a bound pool nor PSRAM constants, and for other
+    engines.
+  - Without the setting, no capture is poisoned or invalidated.
+
 #### Target overrides
 
 - `target.platform_overlay` loads one explicit catalog YAML file, resolved from

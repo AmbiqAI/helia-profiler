@@ -258,6 +258,10 @@ class HeliaAotArtifacts(EngineArtifacts):
     #: CMake target the app links against (``nsx::<module>``).
     aot_cmake_target: str
     helia_aot_version: str
+    #: The module's emitted transfer provider (``nsx::<module>_nsx_transfer``),
+    #: linked after :attr:`aot_cmake_target`; ``None`` when the module ships
+    #: no ``includes-api/<prefix>_nsx_transfer.h``.
+    aot_transfer_cmake_target: str | None = None
 
     #: False when the AOT module expects externally bound arenas.
     aot_allocate_arenas: bool = True

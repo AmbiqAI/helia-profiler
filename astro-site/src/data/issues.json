@@ -10,7 +10,7 @@
     "issues": 27,
     "comparability": 7,
     "families": 3,
-    "familyCodes": 29
+    "familyCodes": 30
   },
   "issues": [
     {
@@ -365,7 +365,8 @@
         "weights_memory",
         "weights_cache",
         "external_memory_clock",
-        "application_load"
+        "application_load",
+        "stream_evidence"
       ],
       "codes": [
         "dimension.hpx_version_differs",
@@ -387,7 +388,8 @@
         "dimension.weights_memory_differs",
         "dimension.weights_cache_differs",
         "dimension.external_memory_clock_differs",
-        "dimension.application_load_differs"
+        "dimension.application_load_differs",
+        "dimension.stream_evidence_differs"
       ]
     }
   ]

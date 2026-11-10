@@ -103,6 +103,7 @@ from .fixture_compile_cases import (  # noqa: E402
     FIXTURE_KIND_ENGINES,
     FIXTURE_SCOPES,
     aot_model_stub,
+    aot_transfer_headers,
     render_fixture,
 )
 
@@ -333,6 +334,101 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    # A module that emitted its transfer provider: every heliaAOT render above
+    # compiles without the provider header, these with it, so the bind, the
+    # evidence, the provider-aware checks and the stream pool's per-run poison
+    # and constant invalidate reach the gate (#676).
+    transfer_regions = [
+        {
+            "region_id": 0,
+            "placement": "tcm",
+            "alignment": 64,
+            "size": 4096,
+            "blob_filename": None,
+            "role": "scratch",
+        },
+        {
+            "region_id": 1,
+            "placement": "psram",
+            "alignment": 64,
+            "size": 8192,
+            "blob_filename": "constants.bin",
+            "role": "constant",
+        },
+        {
+            "region_id": 2,
+            "placement": "tcm",
+            "alignment": 4096,
+            "size": 8192,
+            "blob_filename": None,
+            "role": "pool",
+        },
+    ]
+    # (soc, transport, power_only, probe, stream_evidence). apollo4p: the plain
+    # transfer render compiles on a part without per-range D-cache upkeep;
+    # stream_evidence is refused there at configuration.
+    for soc, transport, power_only, probe, evidence in (
+        ("apollo510", "rtt", False, False, False),
+        ("apollo510", "swo", False, False, False),
+        ("apollo510", "rtt", True, False, False),
+        ("apollo510", "rtt", False, True, False),
+        ("apollo510", "rtt", False, False, True),
+        ("apollo4p", "rtt", False, False, False),
+    ):
+        cases.append(
+            _CompileCase(
+                case_id=f"{soc}|{transport}|helia-aot|transfer"
+                + ("|power" if power_only else "")
+                + ("|probe" if probe else "")
+                + ("|stream-evidence" if evidence else ""),
+                text=_render(
+                    soc,
+                    transport,
+                    "helia-aot",
+                    power_only=power_only,
+                    overrides={
+                        "arena_regions": transfer_regions,
+                        "transfer_timeout_probe": probe,
+                        "stream_evidence": evidence,
+                    },
+                ),
+                vars=_common_kwargs(soc, transport),
+                headers=aot_transfer_headers(),
+            )
+        )
+
+    # profiling.stream_evidence on an unstreamed module (the reference capture):
+    # PSRAM constants and no pool, so no stream facts and no provider header.
+    cases.append(
+        _CompileCase(
+            case_id="apollo510|rtt|helia-aot|stream-evidence-unstreamed",
+            text=_render(
+                "apollo510",
+                "rtt",
+                "helia-aot",
+                overrides={"arena_regions": transfer_regions[:2], "stream_evidence": True},
+            ),
+            vars=_common_kwargs("apollo510", "rtt"),
+        )
+    )
+
+    # profiling.input_fill: lcg refills every input from the fixed-seed LCG in
+    # both binaries.
+    for power_only in (False, True):
+        cases.append(
+            _CompileCase(
+                case_id="apollo510|rtt|helia-aot|lcg" + ("|power" if power_only else ""),
+                text=_render(
+                    "apollo510",
+                    "rtt",
+                    "helia-aot",
+                    power_only=power_only,
+                    overrides={"input_fill": "lcg"},
+                ),
+                vars=_common_kwargs("apollo510", "rtt"),
+            )
+        )
+
     # hpx_pmu_profiler.cc: the second TU of every TFLM/heliaRT app
     # (CMakeLists.txt.j2 compiles it into both binaries), rendered per SoC
     # exactly as firmware/__init__.py renders it.
@@ -367,7 +463,10 @@ def _dedup(cases: list[_CompileCase]) -> list[_CompileCase]:
     failure names every scenario it covers."""
     by_digest: dict[str, _CompileCase] = {}
     for case in cases:
-        digest = hashlib.sha256(case.text.encode("utf-8")).hexdigest()
+        unit = case.text + "".join(
+            f"\0{name}\0{text}" for name, text in sorted(case.headers.items())
+        )
+        digest = hashlib.sha256(unit.encode("utf-8")).hexdigest()
         if digest in by_digest:
             by_digest[digest].aliases.append(case.case_id)
         else:
@@ -462,9 +561,14 @@ def _prepare_case_dir(case: _CompileCase, base: Path) -> Path:
     if '#include "model_data.h"' in case.text:
         (case_dir / "model_data.h").write_text(_MODEL_DATA_STUB)
     if '#include "fake_model.h"' in case.text:
-        (case_dir / "fake_model.h").write_text(
-            aot_model_stub(external_arenas="deployment_psram_weights" in case.text)
-        )
+        if "fake_model.h" not in case.headers:
+            # A render that requires the stream facts gets a module that has them.
+            (case_dir / "fake_model.h").write_text(
+                aot_model_stub(
+                    external_arenas="deployment_psram_weights" in case.text,
+                    transfer="#ifndef fake_num_dma_units" in case.text,
+                )
+            )
         (case_dir / "fake_common.h").write_text(_AOT_COMMON_STUB)
     for region_id in set(_CONST_BLOB_INCLUDE.findall(case.text)):
         (case_dir / f"hpx_const_blob_{region_id}.h").write_text(_const_blob_stub(region_id))
@@ -627,6 +731,56 @@ def test_gate_fails_on_an_unused_local_variable(tmp_path):
     assert result.returncode != 0, "gate passed a TU with an unused local variable"
     assert "hpx_orphaned_by_injection" in result.stderr
     assert "-Wunused-variable" in result.stderr or "unused" in result.stderr
+
+
+@pytest.mark.parametrize("power_only", [False, True])
+def test_transfer_cases_compile_the_provider_code(tmp_path, power_only):
+    """The transfer cases reach the code under __has_include, so a provider
+    header missing what that code calls fails them (#676)."""
+    (case,) = [
+        case
+        for case in _build_cases()
+        if case.case_id == "apollo510|rtt|helia-aot|transfer" + ("|power" if power_only else "")
+    ]
+    restored = _compile(_prepare_case_dir(case, tmp_path / "ok"), _part_define(case.vars))
+    assert restored.returncode == 0, restored.stderr
+    declaration = (
+        "int32_t fake_nsx_transfer_bind("
+        if power_only
+        else "bool fake_nsx_transfer_can_sleep(void);"
+    )
+    header = case.headers["fake_nsx_transfer.h"]
+    assert declaration in header
+    case.headers = {
+        **case.headers,
+        "fake_nsx_transfer.h": header.replace(declaration, "int32_t hpx_removed_for_test("),
+    }
+    broken = _compile(_prepare_case_dir(case, tmp_path / "broken"), _part_define(case.vars))
+    assert broken.returncode != 0
+    assert ("fake_nsx_transfer_bind" if power_only else "fake_nsx_transfer_can_sleep") in (
+        broken.stderr
+    )
+
+
+def test_stream_evidence_refuses_a_module_without_its_stream_facts(tmp_path):
+    """profiling.stream_evidence fails closed on a context header without
+    <p>_num_dma_units instead of silently skipping the poison and invalidate."""
+    (case,) = [
+        case
+        for case in _build_cases()
+        if case.case_id == "apollo510|rtt|helia-aot|transfer|stream-evidence"
+    ]
+    model = case.headers["fake_model.h"]
+    assert "#define fake_num_dma_units" in model
+    restored = _compile(_prepare_case_dir(case, tmp_path / "ok"), _part_define(case.vars))
+    assert restored.returncode == 0, restored.stderr
+    case.headers = {
+        **case.headers,
+        "fake_model.h": model.replace("#define fake_num_dma_units 3\n", ""),
+    }
+    broken = _compile(_prepare_case_dir(case, tmp_path / "broken"), _part_define(case.vars))
+    assert broken.returncode != 0
+    assert "profiling.stream_evidence binds a stream pool" in broken.stderr
 
 
 @pytest.mark.parametrize("engine", FIXTURE_ENGINES)

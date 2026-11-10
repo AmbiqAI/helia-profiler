@@ -16,7 +16,7 @@ from dataclasses import replace as _dc_replace
 from pathlib import Path
 from typing import Any
 
-from ...config import ProfileConfig
+from ...config import InputFill, ProfileConfig
 from ...errors import ConfigError, EngineError
 from ...identity import Unknown
 from ...lifecycle import InstanceBoundary, Lifecycle
@@ -102,6 +102,52 @@ def _external_arena_mode(aot_args: dict[str, Any]) -> bool:
     return not aot_args["memory"].get("allocate_arenas", True)
 
 
+def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> None:
+    """Refuse a stream pool the firmware would leave unbound.
+
+    heliaAOT expects the application to bind its stream pool in both arena
+    modes, and ``model_init`` returns its arena-unbound status (10) until it
+    is. hpx's firmware binds regions only in external-arena mode.
+    """
+    if not allocate_arenas:
+        return
+    pools = [region.region_id for region in regions if region.role is ArenaRole.POOL]
+    if pools:
+        raise EngineError(
+            f"heliaAOT emitted a stream pool (arena {pools[0]}) that hpx binds only in "
+            "external-arena mode, and this conversion allocates its own arenas.",
+            hint="Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
+            "allocates and binds every arena, the stream pool included. A fixed fixture "
+            "does not take a stream pool: profile the module with hpx profile.",
+        )
+
+
+#: Input types whose every bit pattern is a valid data value.
+_LCG_INPUT_DTYPES = frozenset({"int8", "uint8", "int16"})
+
+
+def _check_input_fill(config: ProfileConfig, result: Any) -> None:
+    """Refuse ``input_fill: lcg`` unless every model input is int8, uint8 or int16.
+
+    The LCG writes raw bytes. A float input reads them as NaN, infinities and
+    huge values; a 32- or 64-bit integer input holds indices or lengths in
+    practice, and not every kernel bounds those.
+    """
+    if config.profiling.input_fill is not InputFill.LCG:
+        return
+    other = [
+        f"{tensor.name or tensor.id} ({tensor.dtype})"
+        for tensor in result.tensors
+        if tensor.input_index is not None and str(tensor.dtype) not in _LCG_INPUT_DTYPES
+    ]
+    if other:
+        raise EngineError(
+            "profiling.input_fill: lcg fills inputs with raw bytes, so it needs int8, "
+            f"uint8 or int16 inputs; this model has {', '.join(other)}.",
+            hint="Use profiling.input_fill: zero for this model.",
+        )
+
+
 def _report_names(prefix: str) -> tuple[str, str]:
     return f"{prefix}_plan.json", f"{prefix}_report.json"
 
@@ -122,6 +168,28 @@ def _report_files(output_dir: Path, prefix: str) -> tuple[Path, ...]:
             raise EngineError(f"More than one heliaAOT {name} in the work directory")
         found += matches
     return tuple(found)
+
+
+def _transfer_cmake_target(module_dir: Path, prefix: str, cmake_name: str) -> str | None:
+    """The provider target heliaAOT declares beside a module that emitted its header.
+
+    The name is checked against the module's own CMakeLists.txt, so a module
+    whose emission names it differently fails here rather than at configure.
+    """
+    header = module_dir / "includes-api" / f"{prefix}_nsx_transfer.h"
+    if not header.is_file():
+        return None
+    target = f"nsx::{cmake_name}_nsx_transfer"
+    cmake = module_dir / "CMakeLists.txt"
+    declared = cmake.read_text(encoding="utf-8") if cmake.is_file() else ""
+    if f"add_library({target} ALIAS " not in declared:
+        raise EngineError(
+            f"heliaAOT emitted {header.name}, but {cmake} declares no {target} target",
+            hint="Convert with a heliaAOT whose nsx module builds its transfer provider "
+            f"as {target}, or with cpu transfer units; module.transfer_provider none "
+            "keeps the dma units and leaves hpx nothing to bind.",
+        )
+    return target
 
 
 def _installed_source() -> EngineSource | None:
@@ -302,6 +370,7 @@ class HeliaAOTAdapter:
             compiler_args,
         )
 
+        _check_input_fill(config, result)
         # heliaAOT transforms/fuses ops, so the generated graph may differ
         # from the .tflite; the views describe what it actually emits.
         compiled_analysis = analyze_aot_operators(
@@ -335,6 +404,7 @@ class HeliaAOTAdapter:
         # physical memory layout.
         memory_plan = _extract_memory_plan(result, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(result, prefix)
+        _check_pool_bound(arena_regions, allocate_arenas=allocate_arenas)
 
         extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)
 
@@ -350,6 +420,7 @@ class HeliaAOTAdapter:
             aot_prefix=prefix,
             aot_module_name=module_name,
             aot_cmake_target=f"nsx::{cmake_name}",
+            aot_transfer_cmake_target=_transfer_cmake_target(aot_module_dir, prefix, cmake_name),
             helia_aot_version=aot_version,
             aot_allocate_arenas=allocate_arenas,
             aot_user_memory_config=user_memory_config,

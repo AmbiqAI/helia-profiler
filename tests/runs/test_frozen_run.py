@@ -840,3 +840,25 @@ def test_pre_retirement_module_plans_require_the_originating_reader(mode):
     with pytest.raises(ConfigError, match="Unsupported frozen run plan version"):
         FrozenRun.load(source)
     assert source.read_bytes() == original
+
+
+def test_profiling_settings_added_later_stay_out_of_a_plan_at_their_default(session, monkeypatch):
+    monkeypatch.setattr(
+        "helia_profiler.results.dependencies.installed_aot_source",
+        lambda: {"package": "helia-aot", "version": "0.30.0", "commit": "abc123"},
+    )
+    aot = session.with_engine("helia-aot")
+    plan = aot.freeze()
+    stored = plan.to_dict()["settings"]["profiling"]
+    assert not {"input_fill", "transfer_timeout_probe", "stream_evidence"} & set(stored)
+    assert plan.config().profiling.input_fill == "zero"
+    for change in (
+        {"input_fill": "lcg"},
+        {"transfer_timeout_probe": True},
+        {"stream_evidence": True},
+    ):
+        changed = aot.with_profiling(**change).freeze()
+        ((setting, value),) = change.items()
+        assert changed.to_dict()["settings"]["profiling"][setting] == value
+        assert changed.intent_hash != plan.intent_hash
+        assert getattr(changed.config().profiling, setting) == value

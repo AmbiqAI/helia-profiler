@@ -97,12 +97,14 @@ def test_base_blocks_are_the_documented_set():
         "engine_pmu_storage_sram_resident",
         "engine_pre_start",
         "engine_print_csv",
+        "engine_profiled_run_done",
         "engine_profiled_summary",
         "engine_profiler_off",
         "engine_profiler_on",
         "engine_psram_metadata",
         "engine_reset_inputs",
         "engine_reset_inputs_warm",
+        "engine_runs_check",
         "engine_start_metadata",
         "engine_window_prologue",
         "engine_window_restore",
@@ -112,7 +114,7 @@ def test_base_blocks_are_the_documented_set():
 def test_base_block_count_is_pinned():
     """Belt to the set assertion's braces: a rename that swaps one name for
     another keeps the count, but an accidental extra seam does not."""
-    assert len(_blocks(BASE)) == 27
+    assert len(_blocks(BASE)) == 29
 
 
 #: Blocks every engine must supply: the base renders nothing (or nothing
@@ -155,11 +157,14 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_early_globals",
         "engine_io_metadata",
         "engine_model_setup",
+        "engine_pass_preamble",
         "engine_pass_profile_arm",
         "engine_pass_warmup_arm",
+        "engine_profiled_run_done",
         "engine_profiled_summary",
         "engine_profiler_on",
         "engine_psram_metadata",
+        "engine_runs_check",
         "engine_window_prologue",
         "engine_window_restore",
     }
@@ -279,9 +284,11 @@ LEADING_NEWLINE_BLOCKS = {
     "engine_pass_profile_arm",
     "engine_pass_warmup_arm",
     "engine_pre_start",
+    "engine_profiled_run_done",
     "engine_profiled_summary",
     "engine_profiler_on",
     "engine_psram_metadata",
+    "engine_runs_check",
     "engine_start_metadata",
     "engine_window_prologue",
 }
@@ -326,6 +333,11 @@ CONDITIONAL_OVERRIDES = {
         "both branches lead with a newline: the busy_loop branch delegates to "
         "super() (whose base content opens with one) and the else branch opens "
         "one itself"
+    ),
+    ("main_aot.cc.j2", "engine_pass_preamble"): (
+        "the transfer_timeout_probe branch opens with its own newline and then "
+        "super() follows, whose base content opens with one; without the probe "
+        "only super() renders"
     ),
 }
 
@@ -410,7 +422,6 @@ def test_reserved_default_blocks_are_the_documented_set():
     for child in CHILDREN:
         claimed |= _blocks(child)
     assert base_blocks - claimed == {
-        "engine_pass_preamble",
         # No engine keeps its per-layer storage in TCM yet, so the "true"
         # default stands for all three children (#161).
         "engine_pmu_storage_sram_resident",

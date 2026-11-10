@@ -110,6 +110,7 @@ def test_family_membership_and_order_are_the_documented_sets():
         "weights_cache",
         "external_memory_clock",
         "application_load",
+        "stream_evidence",
     ]
     assert [d.value for d in MEMORY_DIMENSION_MISMATCH.dimensions] == ["link_family"]
     assert MEMORY_DIMENSION_MISMATCH.code_for(ComparisonDimension.LINK_FAMILY) == (

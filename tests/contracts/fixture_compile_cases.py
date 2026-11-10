@@ -352,8 +352,68 @@ static inline int32_t fake_bind_arena(fake_arena_region_t region, uint8_t *buf, 
 """
 
 
-def aot_model_stub(*, external_arenas: bool) -> str:
+#: The facts a module with a stream pool adds to its context header: the
+#: transfer states the callback receives and the transfer counts.
+_AOT_TRANSFER_STATES = """\
+typedef enum {
+    fake_op_state_run_started = 0,
+    fake_op_state_run_finished,
+    fake_op_state_transfer_wait_started,
+    fake_op_state_transfer_wait_finished,
+    fake_op_state_transfer_issue_started,
+    fake_op_state_transfer_issue_finished,
+} fake_operator_state_t;
+
+#define fake_num_transfer_units 4
+#define fake_num_dma_units 3
+#define fake_transfer_pieces_in_flight 2
+
+typedef enum {
+    fake_status_transfer_failed = 301,
+} fake_transfer_status_t;
+"""
+
+#: ``includes-api/fake_nsx_transfer.h`` as heliaAOT emits it beside an ``nsx``
+#: module with dma units: declarations only.
+_AOT_TRANSFER_STUB = """\
+// hpx compile-check generated transfer-provider header stand-in (#676)
+#pragma once
+#include "fake_model.h"
+
+typedef enum {
+    fake_nsx_transfer_ok = 0,
+    fake_nsx_transfer_timeout = 321,
+} fake_nsx_transfer_status_t;
+
+typedef struct {
+    uint32_t wait_checks;
+    uint32_t drain_timeout_us;
+} fake_nsx_transfer_options_t;
+typedef struct { int32_t error; uint32_t driver_status; uint32_t ticket; } fake_nsx_transfer_last_t;
+typedef struct { uint32_t issues, waits, aborts, peak_in_flight, wait_checks_max; } fake_nsx_transfer_stats_t;
+
+int32_t fake_nsx_transfer_bind(fake_model_context_t *ctx, const fake_nsx_transfer_options_t *options);
+int32_t fake_nsx_transfer_reset(void);
+bool fake_nsx_transfer_can_sleep(void);
+const fake_nsx_transfer_last_t *fake_nsx_transfer_last(void);
+const fake_nsx_transfer_stats_t *fake_nsx_transfer_stats(void);
+"""
+
+
+def aot_model_stub(*, external_arenas: bool, transfer: bool = False) -> str:
     """Mode-correct generated API stand-in shared by the compile gates."""
+    stub = _AOT_MODEL_STUB
     if external_arenas:
-        return _AOT_MODEL_STUB.replace("extern const void * const fake_arena_buffers[4];", "")
-    return _AOT_MODEL_STUB
+        stub = stub.replace("extern const void * const fake_arena_buffers[4];", "")
+    if transfer:
+        states = stub[stub.index("typedef enum {") : stub.index("} fake_operator_state_t;\n")]
+        stub = stub.replace(states + "} fake_operator_state_t;\n", _AOT_TRANSFER_STATES)
+    return stub
+
+
+def aot_transfer_headers() -> dict[str, str]:
+    """The headers of a module that emitted its transfer provider."""
+    return {
+        "fake_model.h": aot_model_stub(external_arenas=True, transfer=True),
+        "fake_nsx_transfer.h": _AOT_TRANSFER_STUB,
+    }

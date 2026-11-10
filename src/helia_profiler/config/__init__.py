@@ -67,6 +67,20 @@ from .power import (
     PowerConfig,
     PowerFirmware,
 )
+from .profiling import (
+    DEFAULT_AGGREGATION,
+    DEFAULT_CLEAN_WINDOW_PROBE,
+    DEFAULT_ITERATIONS,
+    DEFAULT_WARMUP,
+    DEFAULT_WINDOW_MAX,
+    DEFAULT_WINDOW_MIN,
+    DEFAULT_WINDOW_MODE,
+    DEFAULT_WINDOW_TARGET_MS,
+    CleanWindowProbe,
+    InputFill,
+    ProfilingConfig,
+    WindowMode,
+)
 
 # Shared default used when the user leaves model.arena_size unset.
 # Keep plan-memory and firmware generation aligned so auto placement
@@ -132,47 +146,10 @@ class OutputFormat(StrEnum):
     MODEL_EXPLORER = "model-explorer"
 
 
-class WindowMode(StrEnum):
-    """Clean / GPIO-gated end-to-end window sizing.
-
-    ``FIXED`` reuses ``iterations`` for the clean pass (historical
-    behaviour).  ``AUTO`` (default) lets the firmware size the gated window
-    at runtime from the measured clean-inference time so short models run
-    more iterations and big models run fewer — filling a consistent ~1 s
-    wall-clock window for ordinary profiling.  External power capture raises
-    this to a longer minimum window so host-side GPIO polling and Joulescope
-    packet alignment have several seconds to settle.
-    """
-
-    FIXED = "fixed"
-    AUTO = "auto"
-
-
-class CleanWindowProbe(StrEnum):
-    """What runs inside the clean GPIO-gated window.
-
-    ``INFER`` runs the model.  ``BUSY_LOOP`` is an opt-in bench probe that
-    keeps the gate high around a calibrated CPU spin for roughly
-    ``window_target_ms`` so bring-up can distinguish wrong gate semantics
-    from inference behaviour.
-    """
-
-    INFER = "infer"
-    BUSY_LOOP = "busy_loop"
-
-
 DEFAULT_BOARD = "apollo510_evb"
 DEFAULT_TOOLCHAIN = Toolchain.ARM_NONE_EABI_GCC
-DEFAULT_ITERATIONS = 100
-DEFAULT_WARMUP = 5
-DEFAULT_WINDOW_MODE = WindowMode.AUTO
-DEFAULT_WINDOW_TARGET_MS = 1000
 DEFAULT_POWER_WINDOW_TARGET_MS = 5000
 DEFAULT_POWER_MIN_WINDOW_MS = 1000
-DEFAULT_WINDOW_MIN = 10
-DEFAULT_WINDOW_MAX = 500000
-DEFAULT_CLEAN_WINDOW_PROBE = CleanWindowProbe.INFER
-DEFAULT_AGGREGATION = Aggregation.MEDIAN
 DEFAULT_TRANSPORT = Transport.RTT
 
 # Heartbeat defaults — firmware emits progress lines so the host can detect
@@ -417,96 +394,6 @@ class TargetConfig:
 
 
 @pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
-class ProfilingConfig:
-    """PMU capture settings.
-
-    Counter selection is specified via *pmu_counters* — a mapping of
-    compute-unit group (``cpu``, ``mve``, ``memory``, ``ethos_npu``) to a
-    selection:
-
-    * ``"default"`` — curated set of the most useful counters.
-    * ``"all"``     — every counter in the group (multi-pass).
-    * ``["NAME", …]`` — explicit counter names.
-
-    The ``ethos_npu`` group samples the Ethos-U NPU's own PMU (NPU cycles,
-    MAC activity, SRAM/external bus beats) and requires an NPU-equipped board
-    plus ``engine.backend: ethos_u`` (engine.type helia-rt or helia-aot).
-
-    """
-
-    pmu_counters: dict[str, str | list[str]] = field(default_factory=lambda: {"cpu": "default"})
-    per_layer: bool = True
-    iterations: int = DEFAULT_ITERATIONS
-    warmup: int = DEFAULT_WARMUP
-    # See :class:`WindowMode`.  Under ``auto`` the firmware chooses the
-    # clean-window iteration count at runtime to fill ``window_target_ms`` of
-    # wall-time, clamped to ``[window_min, window_max]``, and reports the
-    # actual count it ran (``HPX_CLEAN_INFER_COUNT``), which the host divides
-    # into the gated energy for per-inference numbers.
-    window_mode: WindowMode = DEFAULT_WINDOW_MODE
-    window_target_ms: int = DEFAULT_WINDOW_TARGET_MS
-    window_min: int = DEFAULT_WINDOW_MIN
-    window_max: int = DEFAULT_WINDOW_MAX
-    # Optional bench probe for the clean GPIO-gated window — see
-    # :class:`CleanWindowProbe`.
-    clean_window_probe: CleanWindowProbe = DEFAULT_CLEAN_WINDOW_PROBE
-    # Sanity-check diagnostic: when true, the firmware emits an
-    # ``HPX_CLEAN_ITER=<n>`` line over the active transport on every iteration
-    # of the clean (GPIO-gated power) window.  This proves the device is
-    # genuinely looping inferences for the whole measured window rather than
-    # stalling/sleeping.  It perturbs the power reading (extra transport
-    # traffic inside the gate), so leave it OFF for real measurements.
-    clean_window_trace: bool = False
-    # Static-power diagnostic: when true, the firmware unconditionally powers
-    # and retains the full shared SSRAM array at boot (mirroring AutoDeploy's
-    # ns_power_config(bNeedSharedSRAM=true)), even when the model runs entirely
-    # from TCM.  Used to measure the SSRAM static/retention contribution to
-    # the power floor.  SRAM-resident arena/weights power the array on
-    # regardless; this flag forces it on for the TCM case too.
-    force_shared_sram: bool = False
-    # How per-layer counters are aggregated across profiled iterations — see
-    # :class:`Aggregation`.  All methods first reject structurally-invalid
-    # samples (uint32-wrap / frozen-zero) and log them.
-    aggregation: Aggregation = DEFAULT_AGGREGATION
-    # Extreme benchmarking mode: power down memory regions the model does not
-    # use to lower the energy floor.  Powers down the shared SSRAM array and
-    # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
-    # weights and arena both live in TCM. Code keeps running from MRAM, so
-    # transports (RTT/USB/SWO) and printf remain available throughout the run.
-    extreme_mode: bool = False
-
-    @field_validator("pmu_counters", mode="before")
-    @classmethod
-    def _normalize_pmu_counters(cls, value: Any) -> Any:
-        if not isinstance(value, dict):
-            return value
-        normalized: dict[str, str | list[str]] = {}
-        for group, selection in value.items():
-            normalized[str(group)] = selection if isinstance(selection, list) else str(selection)
-        return normalized
-
-    @model_validator(mode="after")
-    def _validate(self) -> ProfilingConfig:
-        if self.window_min < 1:
-            raise ValueError(f"window_min must be >= 1, got {self.window_min}.")
-        if self.window_max < self.window_min:
-            raise ValueError(
-                f"window_max ({self.window_max}) must be >= window_min ({self.window_min})."
-            )
-        if self.window_target_ms < 1:
-            raise ValueError(f"window_target_ms must be >= 1, got {self.window_target_ms}.")
-        if self.extreme_mode and self.force_shared_sram:
-            raise ValueError(
-                "profiling.extreme_mode and profiling.force_shared_sram are "
-                "mutually exclusive: extreme mode powers the shared SSRAM "
-                "array down while force_shared_sram forces it on. The "
-                "firmware partials each assume the other lever is absent, "
-                "and template include order silently decided the winner."
-            )
-        return self
-
-
-@pydantic_dataclass(frozen=True, config=ConfigDict(extra="forbid"))
 class OutputConfig:
     """Report output settings."""
 
@@ -719,6 +606,17 @@ class ProfileConfig:
                     "Define other boards under target.custom_boards."
                 ),
             )
+        if self.engine.type is not EngineType.HELIA_AOT:
+            for setting, value in (
+                ("input_fill", self.profiling.input_fill is not InputFill.ZERO),
+                ("transfer_timeout_probe", self.profiling.transfer_timeout_probe),
+                ("stream_evidence", self.profiling.stream_evidence),
+            ):
+                if value:
+                    raise ConfigError(
+                        f"profiling.{setting} applies to engine.type helia-aot only",
+                        hint=f"Leave profiling.{setting} at its default for this engine.",
+                    )
         if self.frozen and not self.build.offline:
             object.__setattr__(self, "build", replace(self.build, offline=True))
         if self.compatibility is None:

@@ -58,6 +58,10 @@ _HEARTBEAT_COUNT = "heartbeat_count"
 _LAST_HEARTBEAT = "last_heartbeat"
 _ANNOUNCED_CLEAN_ITERS = "announced_clean_iters"
 
+# heliaAOT's digests, output bytes and transfer lines: values whose leading
+# zeros and length are the content, kept as the strings the firmware printed.
+_RAW_VALUE_KEY_RE = re.compile(r"^(?:(?:input|output)_\d+_(?:fnv1a64|hex)|transfer_\w+)$")
+
 _STRING_COLS = frozenset({"Layer", "Op", "tag", "name", "overflow"})
 
 # A per-layer counter at or above this value is treated as a uint32 underflow
@@ -69,6 +73,17 @@ _UINT32_WRAP_THRESHOLD = 1 << 31
 _CYCLES_COL = "ARM_PMU_CPU_CYCLES"
 
 _TRUNCATED_HINT = "Check transport integrity and capture timeouts, then retry."
+
+
+def _meta_value(key: str, value: str) -> Any:
+    """An int where the value is one, except for the keys whose values are
+    digests, bytes or lists, which keep their leading zeros and length."""
+    if _RAW_VALUE_KEY_RE.match(key):
+        return value
+    try:
+        return int(value)
+    except ValueError:
+        return value
 
 
 def parse_firmware_output(
@@ -133,12 +148,7 @@ def parse_firmware_output(
         m = KEY_VALUE_RE.match(line)
         if m:
             key = m.group(1).lower()
-            val: Any = m.group(2)
-            try:
-                val = int(val)
-            except ValueError:
-                pass
-            meta_kv[key] = val
+            meta_kv[key] = _meta_value(key, m.group(2))
             continue
 
         m = HPX_PRESET_SENTINEL_RE.match(line)

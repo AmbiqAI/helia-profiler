@@ -26,7 +26,7 @@ from helia_profiler.engines.helia_aot.compile import (
 from helia_profiler.errors import ConfigError, EngineError
 from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
-from tests.aot_views import Result, TensorView, operator
+from tests.aot_views import RegionView, Result, TensorView, operator
 
 _CMSIS_REF = NsxModuleRef(name="ns-cmsis-nn", path=Path("/tmp/cmsis"))
 
@@ -69,6 +69,42 @@ class TestExtraModules:
         npu = next(m for m in mods if m.name == NSX_NPU_MODULE)
         assert npu.local is False
         assert npu.project == NSX_NPU_PROJECT
+
+
+class TestTransferCmakeTarget:
+    """A module that emitted its transfer provider header names the provider target."""
+
+    _EMITTED = Path(__file__).parent / "fixtures" / "aot_nsx_transfer" / "CMakeLists.txt"
+
+    def test_the_target_is_the_one_the_modules_cmakelists_declares(self, tmp_path):
+        import re
+
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "kws_nsx_transfer.h").write_text("#pragma once\n")
+        emitted = self._EMITTED.read_text()
+        (tmp_path / "CMakeLists.txt").write_text(emitted)
+        (declared,) = re.findall(r"add_library\((nsx::\w+) ALIAS ", emitted)
+        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") == declared
+
+    def test_a_module_declaring_another_name_is_refused(self, tmp_path):
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "kws_nsx_transfer.h").write_text("#pragma once\n")
+        (tmp_path / "CMakeLists.txt").write_text(
+            self._EMITTED.read_text().replace("_nsx_transfer ALIAS", "_transfer ALIAS")
+        )
+        with pytest.raises(EngineError, match="declares no nsx::kws_model_nsx_transfer"):
+            _transfer_cmake_target(tmp_path, "kws", "kws_model")
+
+    def test_no_header_no_target(self, tmp_path):
+        from helia_profiler.engines.helia_aot.adapter import _transfer_cmake_target
+
+        (tmp_path / "includes-api").mkdir()
+        (tmp_path / "includes-api" / "other_nsx_transfer.h").write_text("#pragma once\n")
+        assert _transfer_cmake_target(tmp_path, "kws", "kws_model") is None
 
 
 class TestEngineBackendPropagation:
@@ -183,6 +219,11 @@ def _prepare(
     monkeypatch, tmp_path, config, result=None, source=None, *, compiler_hook=None
 ) -> HeliaAotArtifacts:
     """Run ``prepare()`` against a fake converter that calls ``compiler_hook(config, output_dir)``."""
+    _fake_converter(monkeypatch, result, source, compiler_hook=compiler_hook)
+    return HeliaAOTAdapter().prepare(config, tmp_path / "work")
+
+
+def _fake_converter(monkeypatch, result=None, source=None, *, compiler_hook=None) -> None:
     from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
     def fake_run_aot_compiler(config, output_dir, module_name, *_args):
@@ -198,7 +239,12 @@ def _prepare(
     monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)
     monkeypatch.setattr(adapter_mod, "cmsis_nn_module_ref", lambda *_a: _CMSIS_REF)
     monkeypatch.setattr(adapter_mod, "_write_attributes_header", lambda d, p: d / f"{p}.h")
-    return HeliaAOTAdapter().prepare(config, tmp_path / "work")
+
+
+def _lcg_profiling():
+    from helia_profiler.config import InputFill
+
+    return replace(_aot_cfg({}).profiling, input_fill=InputFill.LCG)
 
 
 class TestPrepareArtifactFlags:
@@ -232,6 +278,63 @@ class TestPrepareArtifactFlags:
         artifacts = _prepare(monkeypatch, tmp_path, _aot_cfg({}))
         assert artifacts.aot_allocate_arenas is True
         assert artifacts.aot_user_memory_config is False
+
+    def test_a_stream_pool_in_internal_arena_mode_is_refused(self, monkeypatch, tmp_path):
+        """hpx binds no region when heliaAOT allocates its arenas, so the pool would
+        stay unbound and model_init would fail on the board with status 10."""
+        pool = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+        with pytest.raises(EngineError, match="stream pool") as raised:
+            _prepare(monkeypatch, tmp_path, _aot_cfg({}), pool)
+        assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
+
+    def test_a_stream_pool_in_external_arena_mode_is_accepted(self, monkeypatch, tmp_path):
+        pool = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+        config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
+        artifacts = _prepare(monkeypatch, tmp_path, config, pool)
+        assert [r.role.value for r in artifacts.aot_arena_regions] == ["pool"]
+
+    @pytest.mark.parametrize("case", ["pool", "lcg"])
+    def test_a_refusal_keeps_its_hint_through_the_engine_stage(self, monkeypatch, tmp_path, case):
+        """The prepare_engine stage replaces the hint of anything but an EngineError."""
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages import PrepareEngineStage
+
+        if case == "pool":
+            result = Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", size=16384),))
+            config, hint = _aot_cfg({}), "memory.allocate_arenas: false"
+        else:
+            result = Result(tensors=(TensorView("a", "a", (1, 4), "float32", input_index=0),))
+            config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+            hint = "input_fill: zero"
+        _fake_converter(monkeypatch, result)
+        ctx = PipelineContext(config=config, work_dir=tmp_path / "stage")
+        with pytest.raises(EngineError) as raised:
+            PrepareEngineStage().run(ctx)
+        assert hint in str(raised.value.hint)
+
+    @pytest.mark.parametrize("dtype", ["float32", "float16", "bool", "int32", "int64"])
+    def test_lcg_input_fill_is_refused_for_other_than_data_inputs(
+        self, monkeypatch, tmp_path, dtype
+    ):
+        """The LCG writes raw bytes: a float input reads NaN and huge values, and a
+        32- or 64-bit input holds indices or lengths that some kernels never bound."""
+        inputs = Result(
+            tensors=(
+                TensorView("a", "a", (1, 4), input_index=0),
+                TensorView("b", "b", (1, 4), dtype=dtype, input_index=1),
+            )
+        )
+        config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+        with pytest.raises(EngineError, match=rf"input_fill: lcg.*b \({dtype}\)") as raised:
+            _prepare(monkeypatch, tmp_path, config, inputs)
+        assert "input_fill: zero" in str(raised.value.hint)
+        _prepare(monkeypatch, tmp_path / "zero", _aot_cfg({}), inputs)
+
+    @pytest.mark.parametrize("dtype", ["int8", "uint8", "int16"])
+    def test_lcg_input_fill_is_accepted_for_data_inputs(self, monkeypatch, tmp_path, dtype):
+        inputs = Result(tensors=(TensorView("a", "a", (1, 4), dtype=dtype, input_index=0),))
+        config = replace(_aot_cfg({}), profiling=_lcg_profiling())
+        _prepare(monkeypatch, tmp_path, config, inputs)
 
     def test_retains_compiled_graph_costs(self, monkeypatch, tmp_path):
         import json

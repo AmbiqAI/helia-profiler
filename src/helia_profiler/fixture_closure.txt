@@ -37,6 +37,7 @@ config/__init__.py
 config/_yaml.py
 config/platform.py
 config/power.py
+config/profiling.py
 console/__init__.py
 console/analysis.py
 console/base.py
@@ -323,6 +324,7 @@ validation/report.py
 validation/runner.py
 vocab.py
 wire/__init__.py
+wire/_evidence.py
 wire/_faults.py
 wire/_model.py
 wire/_power.py

@@ -222,21 +222,28 @@ _TCM_REGION = {
     "alignment": 64,
     "size": 4096,
     "blob_filename": None,
+    "role": "scratch",
 }
-_TCM_BLOB_REGION = {**_TCM_REGION, "region_id": 1, "blob_filename": "weights.bin"}
+_TCM_BLOB_REGION = {
+    **_TCM_REGION,
+    "region_id": 1,
+    "blob_filename": "weights.bin",
+    "role": "constant",
+}
 _PSRAM_BLOB_REGION = {
     "region_id": 2,
     "placement": "psram",
     "alignment": 64,
     "size": 8192,
     "blob_filename": "psram_weights.bin",
+    "role": "constant",
 }
 #: A PSRAM arena region with NO sidecar blob. Without it every PSRAM-placed
 #: region in the matrix also carried a blob, which made
 #: ``GATE_AOT_PSRAM_ARENAS`` and ``GATE_AOT_CONST_BLOBS_IN_PSRAM`` true on
 #: exactly the same renders: swapping the two conditions between specs left the
 #: census green.
-_PSRAM_REGION = {**_PSRAM_BLOB_REGION, "region_id": 3, "blob_filename": None}
+_PSRAM_REGION = {**_PSRAM_BLOB_REGION, "region_id": 3, "blob_filename": None, "role": "scratch"}
 
 
 class _Render:
@@ -376,6 +383,24 @@ def _matrix() -> list[_Render]:
             "helia-aot",
             power_only=True,
             overrides={"arena_regions": [_TCM_REGION, _PSRAM_BLOB_REGION]},
+        ),
+        # Stream evidence, which only a heliaAOT module with a stream pool on
+        # an Apollo5-family part can run.
+        _Render(
+            "ap510|rtt|helia-aot|stream-evidence",
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"stream_evidence": True},
+        ),
+        # The transfer timeout probe, which only a heliaAOT module with its
+        # emitted provider can run.
+        _Render(
+            "ap510|rtt|helia-aot|transfer-probe",
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"transfer_timeout_probe": True},
         ),
         # A PSRAM arena with no blob: the one render where the psram-arena and
         # blob-in-psram gates disagree, which is what makes them separable.
@@ -659,6 +684,11 @@ _PREDICATES = {
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
+    "has_armv8m_pmu and not power_only": lambda v: bool(v["has_armv8m_pmu"]) and not _power(v),
+    "stream_evidence": lambda v: bool(v.get("stream_evidence")),
+    "transfer_timeout_probe and not power_only": (
+        lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)
+    ),
     "has_ethos_u": lambda v: bool(v.get("has_ethos_u", False)),
     "clean_window_trace and transport not in (swo, uart)": (
         lambda v: bool(v.get("clean_window_trace")) and v["transport"] not in ("swo", "uart")
@@ -978,6 +1008,9 @@ def test_error_code_catalogue():
         "bind_arena_failed",
         "const_blob_psram_write_failed",
         "model_init_failed",
+        "model_run_failed",
+        "transfer_bind_failed",
+        "transfer_power_clause",
         "npu_init_failed",
         "executorch",
         "operator_count_exceeds_capacity",

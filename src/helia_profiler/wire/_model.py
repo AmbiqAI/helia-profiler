@@ -219,6 +219,9 @@ class FirmwareErrorCode(StrEnum):
     BIND_ARENA_FAILED = "bind_arena_failed"
     CONST_BLOB_PSRAM_WRITE_FAILED = "const_blob_psram_write_failed"
     MODEL_INIT_FAILED = "model_init_failed"
+    MODEL_RUN_FAILED = "model_run_failed"
+    TRANSFER_BIND_FAILED = "transfer_bind_failed"
+    TRANSFER_POWER_CLAUSE = "transfer_power_clause"
     NPU_INIT_FAILED = "npu_init_failed"
     EXECUTORCH = "executorch"
     OPERATOR_COUNT_EXCEEDS_CAPACITY = "operator_count_exceeds_capacity"
@@ -275,6 +278,9 @@ class WireKey(StrEnum):
     NUM_OUTPUTS = "num_outputs"
     INPUT_INDEXED_SIZE = "input_%d_size"
     OUTPUT_INDEXED_SIZE = "output_%d_size"
+    INPUT_INDEXED_FNV1A64 = "input_%d_fnv1a64"
+    OUTPUT_INDEXED_FNV1A64 = "output_%d_fnv1a64"
+    OUTPUT_INDEXED_HEX = "output_%d_hex"
     ARENAS_BOUND = "arenas_bound"
 
     # PSRAM
@@ -312,6 +318,16 @@ class WireKey(StrEnum):
     # ExecuTorch PMU bring-up
     PMU_INIT_STATUS = "pmu_init_status"
     PMU_SELFTEST_CPU_CYCLES = "pmu_selftest_cpu_cycles"
+
+    # heliaAOT transfer provider, per instrumented run
+    TRANSFER_REFILLS = "transfer_refills"
+    TRANSFER_OVERLAP = "transfer_overlap"
+    TRANSFER_STATS = "transfer_stats"
+    TRANSFER_PROBE = "transfer_probe"
+    TRANSFER_RECOVERY = "transfer_recovery"
+    TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64 = "transfer_recovery_output_%d_fnv1a64"
+    STREAM_EVIDENCE = "stream_evidence"
+    INPUT_FILL = "input_fill"
 
     @property
     def wire(self) -> str:
@@ -483,3 +499,6 @@ GATE_ATTACH_WAIT = (
 )
 GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
+GATE_PMU_PROFILE = "has_armv8m_pmu and not power_only"
+GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
+GATE_STREAM_EVIDENCE = "stream_evidence"

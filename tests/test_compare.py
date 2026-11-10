@@ -1136,3 +1136,87 @@ def test_compare_refuses_unsupported_summary(tmp_path, version, side):
     path.write_text(json.dumps(summary))
     with pytest.raises(ReportError, match="Unsupported run summary version"):
         compare_runs(*paths)
+
+
+def test_a_cold_constant_capture_is_flagged_against_a_warm_one(tmp_path: Path):
+    """profiling.stream_evidence changes the cache regime of every instrumented
+    run: two otherwise identical captures that differ in it are told apart."""
+    paths = [tmp_path / "warm", tmp_path / "cold"]
+    for path, evidence in zip(paths, (False, True)):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"]["stream_evidence"] = evidence
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    result = compare_runs(*paths)
+
+    row = next(row for row in result.config_rows if row.key == "stream_evidence")
+    assert (row.field, row.status) == ("Stream evidence", "diff")
+    codes = [issue.code for issue in result.comparability.issues]
+    assert "dimension.stream_evidence_differs" in codes
+    same = compare_runs(paths[1], paths[1])
+    assert "dimension.stream_evidence_differs" not in [i.code for i in same.comparability.issues]
+
+
+def test_a_cold_constant_capture_is_flagged_against_a_baseline_without_the_setting(
+    tmp_path: Path,
+):
+    """An artifact made before profiling.stream_evidence existed ran warm, so its
+    absent setting reads as off and a cold capture against it is still flagged."""
+    paths = [tmp_path / "older", tmp_path / "cold"]
+    for path, evidence in zip(paths, (None, True)):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"].pop("stream_evidence", None)
+        if evidence is not None:
+            metadata["config"]["profiling"]["stream_evidence"] = evidence
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    result = compare_runs(*paths)
+
+    row = next(row for row in result.config_rows if row.key == "stream_evidence")
+    assert (row.baseline, row.candidate, row.status) == (False, True, "diff")
+    codes = [issue.code for issue in result.comparability.issues]
+    assert "dimension.stream_evidence_differs" in codes
+    older = compare_runs(paths[0], paths[0])
+    assert "dimension.stream_evidence_differs" not in [i.code for i in older.comparability.issues]
+
+
+def test_input_fill_has_a_config_row(tmp_path: Path):
+    """profiling.input_fill changes the bytes every kernel sees."""
+    paths = [tmp_path / "zero", tmp_path / "lcg"]
+    for path, fill in zip(paths, ("zero", "lcg")):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"]["input_fill"] = fill
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    result = compare_runs(*paths)
+
+    row = next(row for row in result.config_rows if row.key == "input_fill")
+    assert (row.field, row.baseline, row.candidate, row.status) == (
+        "Input fill",
+        "zero",
+        "lcg",
+        "diff",
+    )
+
+
+def test_an_absent_input_fill_reads_as_zero(tmp_path: Path):
+    """An artifact made before profiling.input_fill existed filled zeros."""
+    paths = [tmp_path / "older", tmp_path / "zero", tmp_path / "lcg"]
+    for path, fill in zip(paths, (None, "zero", "lcg")):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"].pop("input_fill", None)
+        if fill is not None:
+            metadata["config"]["profiling"]["input_fill"] = fill
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    def row(baseline: Path, candidate: Path):
+        result = compare_runs(baseline, candidate)
+        found = next(row for row in result.config_rows if row.key == "input_fill")
+        return found.baseline, found.candidate, found.status
+
+    assert row(paths[0], paths[1]) == ("zero", "zero", "same")
+    assert row(paths[0], paths[2]) == ("zero", "lcg", "diff")

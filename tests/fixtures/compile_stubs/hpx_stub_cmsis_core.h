@@ -68,6 +68,7 @@ static inline void SCB_InvalidateDCache(void) {}
 
 // --- Armv8-M PMU (M55 parts only; guarded by the per-part header) --------
 #if defined(HPX_STUB_HAS_ARMV8M_PMU)
+#define ARM_PMU_L1D_CACHE_REFILL 0x0003
 static inline uint32_t ARM_PMU_Get_CNTR_OVS(void) { return 0U; }
 static inline void ARM_PMU_Set_CNTR_OVS(uint32_t mask) { (void)mask; }
 static inline void ARM_PMU_Enable(void) {}

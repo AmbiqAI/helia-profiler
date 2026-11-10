@@ -173,6 +173,19 @@ class _BindFixtureStage:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
+        artifacts = ctx.engine_artifacts
+        if isinstance(artifacts, HeliaAotArtifacts) and (
+            artifacts.aot_transfer_cmake_target
+            or any(region.role is ArenaRole.POOL for region in artifacts.aot_arena_regions)
+        ):
+            # heliaAOT's model_init fails while a dma module's provider (300) or a
+            # stream pool (10) is unbound, and the fixture binds neither.
+            raise ConfigError(
+                "Fixture capture of a heliaAOT module that streams weights",
+                hint="The fixture firmware binds neither a transfer provider nor a stream "
+                "pool. Profile this module with hpx profile, or convert it without "
+                "streaming for a fixture.",
+            )
         self.spec.fixture.verify()
         ctx.fixture = self.spec
         ctx.model_analysis = self.spec.model.analysis

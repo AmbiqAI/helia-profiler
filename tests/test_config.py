@@ -10,6 +10,7 @@ from helia_profiler.config import (
     ClockSelection,
     EngineConfig,
     EngineType,
+    InputFill,
     ModelConfig,
     NsxModuleOverride,
     PowerConfig,
@@ -89,6 +90,7 @@ _ENUM_VOCABULARIES = [
     (CleanWindowProbe, {"INFER": "infer", "BUSY_LOOP": "busy_loop"}),
     (Aggregation, {"MEAN": "mean", "MEDIAN": "median", "TRIMMED": "trimmed"}),
     (PowerFirmware, {"DEDICATED": "dedicated", "SHARED": "shared"}),
+    (InputFill, {"ZERO": "zero", "LCG": "lcg"}),
 ]
 _ENUM_VOCABULARY_IDS = [enum_cls.__name__ for enum_cls, _ in _ENUM_VOCABULARIES]
 
@@ -653,6 +655,58 @@ def test_extreme_mode_and_force_shared_sram_are_mutually_exclusive():
             "profiling": {lever: True},
         }
         load_config(None, cli_one)
+
+
+def test_input_fill_defaults_to_zero_and_lcg_is_helia_aot_only():
+    def load(engine: str, fill: str | None = None) -> ProfileConfig:
+        cli: dict = {"model": {"path": "m.tflite"}, "engine": {"type": engine}}
+        if fill is not None:
+            cli["profiling"] = {"input_fill": fill}
+        return load_config(None, cli)
+
+    assert load("helia-aot").profiling.input_fill is InputFill.ZERO
+    assert load("helia-aot", "lcg").profiling.input_fill is InputFill.LCG
+    for engine in ("helia-rt", "litert", "executorch"):
+        assert load(engine, "zero").profiling.input_fill is InputFill.ZERO
+        with pytest.raises(
+            ConfigError, match="profiling.input_fill applies to engine.type helia-aot"
+        ):
+            load(engine, "lcg")
+    with pytest.raises(ConfigError, match="Input should be 'zero' or 'lcg'"):
+        load("helia-aot", "random")
+
+
+def test_transfer_timeout_probe_is_off_by_default_and_helia_aot_only():
+    def load(engine: str, probe: bool | None = None) -> ProfileConfig:
+        cli: dict = {"model": {"path": "m.tflite"}, "engine": {"type": engine}}
+        if probe is not None:
+            cli["profiling"] = {"transfer_timeout_probe": probe}
+        return load_config(None, cli)
+
+    assert load("helia-aot").profiling.transfer_timeout_probe is False
+    assert load("helia-aot", True).profiling.transfer_timeout_probe is True
+    for engine in ("helia-rt", "litert", "executorch"):
+        assert load(engine, False).profiling.transfer_timeout_probe is False
+        with pytest.raises(
+            ConfigError, match="profiling.transfer_timeout_probe applies to engine.type helia-aot"
+        ):
+            load(engine, True)
+
+
+def test_stream_evidence_is_off_by_default_and_helia_aot_only():
+    def load(engine: str, evidence: bool | None = None) -> ProfileConfig:
+        cli: dict = {"model": {"path": "m.tflite"}, "engine": {"type": engine}}
+        if evidence is not None:
+            cli["profiling"] = {"stream_evidence": evidence}
+        return load_config(None, cli)
+
+    assert load("helia-aot").profiling.stream_evidence is False
+    assert load("helia-aot", True).profiling.stream_evidence is True
+    for engine in ("helia-rt", "litert", "executorch"):
+        with pytest.raises(
+            ConfigError, match="profiling.stream_evidence applies to engine.type helia-aot"
+        ):
+            load(engine, True)
 
 
 def test_model_explorer_rejected_as_primary_output_format():

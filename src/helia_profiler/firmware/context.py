@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 from ..config import DEFAULT_ARENA_SIZE_BYTES, CleanWindowProbe, Transport
 from ..engines import EngineType
 from ..engines.base import ExecutorchArtifacts, HeliaAotArtifacts
-from ..errors import FirmwareError, PipelineError
-from ..placement import Placement
+from ..errors import ConfigError, FirmwareError, PipelineError
+from ..placement import ArenaRole, Placement
 from ..platform.counters import (
     plan_passes,
     resolve_counters,
@@ -244,6 +244,14 @@ class EngineContext:
     executorch_io_region: str
     has_ethos_u: bool = False
     npu_tolerate_power_ack: bool = False
+    #: ``profiling.input_fill``; only heliaAOT renders read it.
+    input_fill: str = "zero"
+    #: ``profiling.transfer_timeout_probe``; only for a heliaAOT module with
+    #: its emitted transfer provider.
+    transfer_timeout_probe: bool = False
+    #: ``profiling.stream_evidence``; only for a heliaAOT module that binds a
+    #: stream pool, on a part with an explicit D-cache.
+    stream_evidence: bool = False
 
 
 @dataclass(frozen=True)
@@ -302,8 +310,20 @@ class FirmwareRenderContext:
         # sizes 0, and every ExecuTorch buffer following the resolved arena
         # region.
         if isinstance(artifacts, HeliaAotArtifacts):
+            if (
+                config.profiling.transfer_timeout_probe
+                and artifacts.aot_transfer_cmake_target is None
+            ):
+                raise FirmwareError(
+                    "profiling.transfer_timeout_probe needs a heliaAOT module with its "
+                    "emitted transfer provider, and this module has none.",
+                    hint="Convert with dma transfer units and module.type nsx, or turn "
+                    "the probe off.",
+                )
             aot_prefix = artifacts.aot_prefix
             allocate_arenas = artifacts.aot_allocate_arenas
+            if config.profiling.stream_evidence:
+                _check_stream_evidence(soc, aot_arena_regions, allocate_arenas=allocate_arenas)
             aot_manifest = tuple(
                 AotOpContext(
                     id=-1 if op["id"] is None else int(op["id"]),
@@ -432,6 +452,9 @@ class FirmwareRenderContext:
                 executorch_io_region=io_region,
                 has_ethos_u=artifacts.resolved_backend == "ethos_u",
                 npu_tolerate_power_ack=board.is_fpga,
+                input_fill=config.profiling.input_fill.value,
+                transfer_timeout_probe=config.profiling.transfer_timeout_probe,
+                stream_evidence=config.profiling.stream_evidence,
             ),
         )
 
@@ -550,7 +573,35 @@ class FirmwareRenderContext:
             "executorch_io_region": self.engine.executorch_io_region,
             "has_ethos_u": self.engine.has_ethos_u,
             "npu_tolerate_power_ack": self.engine.npu_tolerate_power_ack,
+            "input_fill": self.engine.input_fill,
+            "transfer_timeout_probe": self.engine.transfer_timeout_probe,
+            "stream_evidence": self.engine.stream_evidence,
         }
+
+
+def _check_stream_evidence(
+    soc: Any, regions: tuple["ArenaRegion", ...], *, allocate_arenas: bool
+) -> None:
+    """profiling.stream_evidence needs per-range D-cache maintenance and something to apply
+    it to: a bound stream pool (the poison) or PSRAM constant arenas (the invalidate)."""
+    if not soc.capabilities.memory.has_dcache:
+        raise ConfigError(
+            f"profiling.stream_evidence needs a part with an explicit D-cache (Apollo5 "
+            f"family); {soc.name} has none.",
+            hint="Turn profiling.stream_evidence off for this target.",
+        )
+    bound = () if allocate_arenas else regions
+    if not any(
+        region.role is ArenaRole.POOL
+        or (region.role is ArenaRole.CONSTANT and region.placement is Placement.PSRAM)
+        for region in bound
+    ):
+        raise ConfigError(
+            "profiling.stream_evidence needs a heliaAOT module whose stream pool or "
+            "PSRAM constant arenas hpx binds, and this module has neither.",
+            hint="Convert with memory.allocate_arenas: false and either memory.stream_pool "
+            "or constants in PSRAM, or turn the setting off.",
+        )
 
 
 def resolve_window_timer(

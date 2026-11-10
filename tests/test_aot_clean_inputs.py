@@ -65,18 +65,20 @@ unsigned char storage[8];
 const int fake_num_inputs=2;
 Context fake_model_ctx={{{storage,3},{storage+3,5}}};
 int calls=0, bad=0, refills=0;
+int32_t hpx_aot_status=0;
 bool aliases;
 void* refill(void* dst, int value, unsigned size) {
     ++refills;
     DWT->CYCCNT += 7;
     return std::memset(dst,value,size);
 }
-void fake_model_run(Context* ctx) {
+int32_t fake_model_run(Context* ctx) {
     for (auto input: ctx->inputs)
         for(unsigned i=0;i<input.size;++i) bad += ((unsigned char*)input.data)[i] != 0;
     ++calls;
     if(aliases) std::memset(storage,91,sizeof(storage));
     DWT->CYCCNT += 100;
+    return 0;
 }
 int main(int argc,char**) {
     aliases=argc>1;

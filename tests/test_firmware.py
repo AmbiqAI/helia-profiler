@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from contextlib import nullcontext
 from dataclasses import replace
 from pathlib import Path
@@ -2306,6 +2307,53 @@ def test_resolved_aot_arena_regions_follow_user_memory_config_flag(
 
     (region,) = _resolved_aot_arena_regions(ctx)
     assert region.placement is expected
+
+
+@pytest.mark.parametrize("transfer", [None, "nsx::hpx_model_nsx_transfer"])
+def test_aot_transfer_target_links_after_the_module_in_both_binaries(tmp_path, transfer):
+    from helia_profiler.firmware.project import ProjectRenderContext, render_project_files
+    from helia_profiler.platform import get_board
+
+    artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        aot_transfer_cmake_target=transfer,
+        helia_aot_version="0.0.0",
+    )
+    memory = SimpleNamespace(arena_region=Placement.TCM, weights_region=Placement.MRAM)
+    render_context = SimpleNamespace(
+        memory=memory,
+        pmu=SimpleNamespace(has_armv8m_pmu=True),
+        sync=SimpleNamespace(power_sync_enabled=False),
+        power_binary_needs_gpio=False,
+        power_monitor=SimpleNamespace(power_monitor=None),
+    )
+    config = load_config(None, {"model": {"path": "m.tflite"}, "engine": {"type": "helia-aot"}})
+    render_project_files(
+        ProjectRenderContext(
+            app_dir=tmp_path,
+            board=get_board("apollo510_evb"),
+            config=config,
+            artifacts=artifacts,
+            modules=[],
+            module_registry_yaml="",
+            render_context=render_context,  # ty: ignore[invalid-argument-type]
+            arena_regions=[],
+            compiler_launcher="",
+            channel="stable",
+            rtt_buffer_size_up=4096,
+            power_binary_enabled=True,
+        )
+    )
+    cmake = (tmp_path / "CMakeLists.txt").read_text()
+    assert cmake.count("    nsx::hpx_model\n") == 2
+    if transfer is None:
+        assert "_transfer" not in cmake
+    else:
+        linked = re.findall(r"    nsx::hpx_model\n\s*    (\S+)\n", cmake)
+        assert linked == [transfer, transfer]
 
 
 @pytest.mark.parametrize("transport", ["rtt", "uart", "swo", "usb_cdc"])

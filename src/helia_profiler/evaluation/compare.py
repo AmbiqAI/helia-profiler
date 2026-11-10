@@ -12,7 +12,7 @@ from typing import Any
 from ..errors import ReportError
 from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..results.dimensions import DIMENSION_REGISTRY
+from ..results.dimensions import ABSENT_AT_DEFAULT, DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from ..results.run_summary import _require_current_summary
 from ..results.serde import nested_get, to_float, write_dict_csv
@@ -182,6 +182,8 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _ConfigField("arena_size", "Arena size", ("config", "model", "arena_size")),
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
+    _dimension_row(ComparisonDimension.STREAM_EVIDENCE),
+    _ConfigField("input_fill", "Input fill", ("config", "profiling", "input_fill")),
     _dimension_row(ComparisonDimension.HPX_VERSION),
     _dimension_row(ComparisonDimension.COMPILER_VERSION),
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
@@ -466,7 +468,9 @@ def _coerce_csv_value(value: Any) -> Any:
 def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigField) -> Any:
     if spec.dimension is not None:
         return dimensions.get(spec.dimension)
-    return nested_get(run.metadata, *spec.path)
+    value = nested_get(run.metadata, *spec.path)
+    # A run recorded before the setting existed ran at its absent value.
+    return ABSENT_AT_DEFAULT.get(spec.path[1:]) if value is None else value
 
 
 def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:

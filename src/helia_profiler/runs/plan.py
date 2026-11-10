@@ -26,6 +26,7 @@ from .._semantic_hash import require, semantic_hash
 from ..config.platform import config_platform
 from ..errors import ConfigError
 from ..platform.provenance import PlatformSnapshot
+from ..results.dimensions import ABSENT_AT_DEFAULT
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -403,8 +404,9 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     }
     for path in _HOST_LOCAL_SETTINGS:
         _drop(settings, path)
-    if settings["target"].get("platform_overlay") is None:
-        _drop(settings, ("target", "platform_overlay"))
+    for (section, key), absent in ABSENT_AT_DEFAULT.items():
+        if settings[section].get(key) == absent:
+            _drop(settings, (section, key))
     # Preserve symlink spelling: sidecars belong beside the selected model path.
     model_path = Path(config.model.path).expanduser().absolute()
     baseline = config.compatibility_baseline

@@ -424,6 +424,11 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
                 if isinstance(ctx.artifacts, HeliaAotArtifacts)
                 else ""
             ),
+            aot_transfer_cmake_target=(
+                ctx.artifacts.aot_transfer_cmake_target
+                if isinstance(ctx.artifacts, HeliaAotArtifacts)
+                else None
+            ),
             transport=ctx.config.target.transport,
             rtt_buffer_size_up=ctx.rtt_buffer_size_up,
             arena_region=ctx.render_context.memory.arena_region,

@@ -6,7 +6,7 @@ from dataclasses import replace
 import pytest
 
 from helia_profiler import Placement
-from helia_profiler.engines import EngineType
+from helia_profiler.engines import EngineType, get_adapter
 from helia_profiler.engines.base import ArenaRegion
 from helia_profiler.errors import ConfigError
 from helia_profiler.firmware.fixture import fixture_template_vars
@@ -111,6 +111,128 @@ def test_aot_region_drift_is_rejected(tmp_path, fault):
         region = replace(region, placement=Placement.MRAM, memory="mram")
     with pytest.raises(ConfigError):
         fixture_template_vars(ctx, [region])
+
+
+def test_aot_stream_pool_with_internal_arenas_is_refused_by_prepare(tmp_path, monkeypatch):
+    """A pool with internal arenas is refused by prepare() before any fixture
+    stage, so it never reaches model_init unbound; the hint says a fixture does
+    not take a stream pool."""
+    pytest.importorskip("helia_aot")
+    from helia_profiler.errors import EngineError
+    from helia_profiler.fixtures import build as builder
+    from tests.aot_views import RegionView, Result
+    from tests.test_helia_aot_adapter import _fake_converter
+
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    config = replace(
+        config,
+        model=replace(config.model, arena_location=Placement.TCM, weights_location=Placement.TCM),
+        work_dir=tmp_path / "work",
+    )
+    monkeypatch.setattr(
+        builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: analysis_of(fixture)
+    )
+    _fake_converter(monkeypatch, Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", 0, 64),)))
+    with pytest.raises(EngineError, match="stream pool") as raised:
+        builder.build_fixed_fixture(config, fixture, method=METHOD, compile=False)
+    assert raised.value.hint == (
+        "Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
+        "allocates and binds every arena, the stream pool included. A fixed fixture "
+        "does not take a stream pool: profile the module with hpx profile."
+    )
+
+
+_STREAMED_FIXTURE_HINT = (
+    "The fixture firmware binds neither a transfer provider nor a stream pool. "
+    "Profile this module with hpx profile, or convert it without streaming for a fixture."
+)
+
+
+def _emit_transfer_provider(_config, output_dir):
+    """What heliaAOT's nsx module writes beside a module with dma units."""
+    module = output_dir / "hpx_model"
+    (module / "includes-api").mkdir(parents=True)
+    (module / "includes-api" / "hpx_nsx_transfer.h").write_text("#pragma once\n")
+    (module / "CMakeLists.txt").write_text(
+        "add_library(nsx::hpx_model_nsx_transfer ALIAS hpx_model_nsx_transfer)\n"
+    )
+
+
+def test_aot_module_with_a_transfer_provider_is_refused_on_the_fixture_path(tmp_path, monkeypatch):
+    """The fixture firmware binds no transfer provider, so heliaAOT's model_init
+    would return 300 on the board; the profile path binds it and is not refused."""
+    pytest.importorskip("helia_aot")
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.fixtures import build as builder
+    from helia_profiler.stages import PrepareEngineStage
+    from tests.test_helia_aot_adapter import _fake_converter
+
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    config = replace(
+        config,
+        model=replace(config.model, arena_location=Placement.TCM, weights_location=Placement.TCM),
+        work_dir=tmp_path / "work",
+    )
+    monkeypatch.setattr(
+        builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: analysis_of(fixture)
+    )
+    _fake_converter(monkeypatch, compiler_hook=_emit_transfer_provider)
+    with pytest.raises(ConfigError, match="streams") as raised:
+        builder.build_fixed_fixture(config, fixture, method=METHOD, compile=False)
+    assert raised.value.hint == _STREAMED_FIXTURE_HINT
+
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "profile")
+    PrepareEngineStage().run(ctx)
+    artifacts = ctx.engine_artifacts
+    assert isinstance(artifacts, HeliaAotArtifacts)
+    assert artifacts.aot_transfer_cmake_target == "nsx::hpx_model_nsx_transfer"
+
+
+@pytest.mark.parametrize("alignment", [64, 4096])
+def test_aot_cpu_stream_pool_is_refused_on_the_fixture_path(tmp_path, monkeypatch, alignment):
+    """A cpu-unit module ships no provider but still has a stream pool, which the
+    fixture does not take; the profile path binds it and is not refused."""
+    pytest.importorskip("helia_aot")
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.fixtures import build as builder
+    from helia_profiler.stages import PrepareEngineStage
+    from tests.aot_views import RegionView, Result
+    from tests.test_helia_aot_adapter import _fake_converter
+
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
+    config = replace(
+        config,
+        model=replace(config.model, arena_location=Placement.TCM, weights_location=Placement.PSRAM),
+        work_dir=tmp_path / "work",
+    )
+    monkeypatch.setattr(
+        builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: analysis_of(fixture)
+    )
+
+    def emit_blob(_config, output_dir):
+        (output_dir / "hpx_model" / "hpx_arena_1.bin").write_bytes(b"abcd")
+
+    regions = (
+        RegionView(0, "DTCM", "DTCM", "scratch", 0, 256),
+        RegionView(1, "PSRAM", "PSRAM", "constant", 0, 4, 64, sidecar_file="hpx_arena_1.bin"),
+        RegionView(2, "DTCM", "DTCM", "pool", 0, 16384, alignment),
+    )
+    _fake_converter(monkeypatch, Result(regions=regions), compiler_hook=emit_blob)
+    with pytest.raises(ConfigError, match="streams") as raised:
+        builder.build_fixed_fixture(config, fixture, method=METHOD, compile=False)
+    assert raised.value.hint == _STREAMED_FIXTURE_HINT
+
+    ctx = PipelineContext(
+        config=get_adapter(EngineType.HELIA_AOT).placement_config(config),
+        work_dir=tmp_path / "profile",
+    )
+    PrepareEngineStage().run(ctx)
+    artifacts = ctx.engine_artifacts
+    assert isinstance(artifacts, HeliaAotArtifacts)
+    assert [r.role for r in artifacts.aot_arena_regions][-1] is ArenaRole.POOL
 
 
 @pytest.mark.parametrize("placement,memory", [(Placement.SRAM, "dtcm"), (Placement.TCM, "sram")])

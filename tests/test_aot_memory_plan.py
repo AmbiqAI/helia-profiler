@@ -164,6 +164,14 @@ class TestExtractArenaRegions:
         assert regions[0].alignment == 64
         assert regions[0].blob_filename == "hpx_arena_1.bin"
 
+    def test_stream_pool_is_a_tcm_region_named_for_its_role(self):
+        region = _region(2, "DTCM", "pool", alignment=4096)
+        (pool,) = _extract_arena_regions(_regions(region), "hpx")
+        assert pool.role is ArenaRole.POOL
+        assert pool.placement is Placement.TCM
+        assert pool.name == "hpx_arena_pool_dtcm"
+        assert pool.alignment == 4096
+
     def test_mram_stays_mram(self):
         regions = _extract_arena_regions(_regions(_region(0, "MRAM", "constant")), "hpx")
         assert regions[0].placement is Placement.MRAM
