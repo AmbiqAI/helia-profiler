@@ -8,11 +8,14 @@ from pathlib import Path
 import pytest
 
 import helia_profiler.engines.executorch as executorch_mod
-from helia_profiler.config import load_config
+from helia_profiler.config import NsxModuleOverride, load_config
 from helia_profiler.engines.executorch import ExecuTorchAdapter
-from helia_profiler.errors import EngineError
-from helia_profiler.firmware import _jinja_env
+from helia_profiler.errors import ConfigError, EngineError
+from helia_profiler.firmware import _jinja_env, generate_app
 from helia_profiler.firmware.context import resolve_window_timer
+from helia_profiler.pipeline import PipelineContext
+from helia_profiler.stages.plan_memory import PlanMemoryStage
+from helia_profiler.stages.resolve_platform import ResolvePlatformStage
 
 
 def _render_executorch_template(**overrides) -> str:
@@ -236,6 +239,21 @@ def test_adapter_enables_ns_ops_for_ns_provider(tmp_path: Path):
         tmp_path / "work",
     )
     assert artifacts.cmake_vars["NSX_EXECUTORCH_ENABLE_NS_OPS"] == "ON"
+
+
+def test_ns_provider_options_cannot_be_routed_through_core(tmp_path: Path):
+    config = _config(tmp_path, _source_tree(tmp_path), backend="ns")
+    override = NsxModuleOverride(
+        ref=config.compatibility_baseline.project("nsx-ambiq-sdk").ref,
+        options={"ARM_NN_ENABLE_F16": True},
+    )
+    config = replace(config, build=replace(config.build, nsx_modules={"nsx-core": override}))
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = ExecuTorchAdapter().prepare(config, ctx.work_dir)
+    PlanMemoryStage().run(ctx)
+    with pytest.raises(ConfigError, match="ARM_NN_ENABLE_F16 is owned by the selected engine"):
+        generate_app(ctx)
 
 
 def test_adapter_defaults_ns_ops_off(tmp_path: Path):
