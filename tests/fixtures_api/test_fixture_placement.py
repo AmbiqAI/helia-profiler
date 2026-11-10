@@ -114,8 +114,9 @@ def test_aot_region_drift_is_rejected(tmp_path, fault):
 
 
 def test_aot_stream_pool_with_internal_arenas_is_refused_by_prepare(tmp_path, monkeypatch):
-    """A fixture binds AOT regions only in external-arena mode; prepare() refuses
-    the module before any render, so the pool never reaches model_init unbound."""
+    """A fixture binds AOT regions only with PSRAM weights, which imply external
+    arenas; prepare() refuses the module before any render, so the pool never
+    reaches model_init unbound, and its hint names the fixture's way out."""
     from helia_profiler.errors import EngineError
     from helia_profiler.fixtures import build as builder
     from tests.aot_views import RegionView, Result
@@ -134,7 +135,12 @@ def test_aot_stream_pool_with_internal_arenas_is_refused_by_prepare(tmp_path, mo
     _fake_converter(monkeypatch, Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", 0, 64),)))
     with pytest.raises(EngineError, match="stream pool") as raised:
         builder.build_fixed_fixture(config, fixture, method=METHOD, compile=False)
-    assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
+    assert raised.value.hint == (
+        "Set engine.config.aot_args.memory.allocate_arenas: false so the firmware "
+        "allocates and binds every arena, the stream pool included. A fixed fixture "
+        "binds arenas only with PSRAM weights: set model.weights_location: psram, "
+        "which implies that setting."
+    )
 
 
 @pytest.mark.parametrize("placement,memory", [(Placement.SRAM, "dtcm"), (Placement.TCM, "sram")])
