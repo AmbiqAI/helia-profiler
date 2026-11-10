@@ -129,29 +129,39 @@ _NONVOLATILE_REGIONS = ("MRAM", "ROMEM", "FLASH")
 
 
 def _find_overflow(text: str) -> tuple[str, int, bool] | None:
-    """Region, overflow bytes and whether it is a load region."""
-    match = _REGION_OVERFLOW.search(text)
-    if match is not None:
-        return match["region"], int(match["bytes"]), False
-    match = _ARMLINK_OVERFLOW.search(text)
-    if match is not None:
-        overflow = int(match["size"]) - int(match["limit"])
-        return match["region"], overflow, match["kind"] == "Load"
-    return None
+    """Region, positive overflow bytes and nonvolatile status; prefer RAM failures."""
+    nonvolatile_overflow = None
+    for pattern in (_REGION_OVERFLOW, _ARMLINK_OVERFLOW):
+        for match in pattern.finditer(text):
+            region = match["region"]
+            is_load = pattern is _ARMLINK_OVERFLOW and match["kind"] == "Load"
+            overflow = (
+                int(match["bytes"])
+                if pattern is _REGION_OVERFLOW
+                else int(match["size"]) - int(match["limit"])
+            )
+            if overflow <= 0:
+                continue
+            nonvolatile = is_load or any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
+            found = region, overflow, nonvolatile
+            if not nonvolatile:
+                return found
+            if nonvolatile_overflow is None:
+                nonvolatile_overflow = found
+    return nonvolatile_overflow
 
 
 def region_overflow_error(exc: BuildError) -> BuildError | None:
     """A linker region overflow as a placement error, or ``None`` for other failures.
 
-    A nonvolatile overflow is an :class:`ImageTooLargeError`, the same
-    outcome as the post-build flash check.
+    Nonvolatile-only overflow is an :class:`ImageTooLargeError`, the same
+    outcome as the post-build flash check. Any reported RAM overflow takes
+    precedence so validation does not skip a configuration failure.
     """
     found = _find_overflow(f"{exc.details or ''}\n{exc}")
     if found is None:
         return None
-    region, overflow, is_load = found
-    # Scatter load regions live in flash.
-    nonvolatile = is_load or any(kind in region.upper() for kind in _NONVOLATILE_REGIONS)
+    region, overflow, nonvolatile = found
     cls, hint = (
         (
             ImageTooLargeError,
