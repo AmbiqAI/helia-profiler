@@ -9,6 +9,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+from ..config import InputFill
 from ..errors import ReportError
 from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
@@ -149,6 +150,8 @@ class _ConfigField:
     label: str
     path: tuple[str, ...]
     dimension: ComparisonDimension | None = None
+    #: A config-only row's value when the artifact predates the setting.
+    absent: Any = None
 
 
 def _dimension_row(dimension: ComparisonDimension) -> _ConfigField:
@@ -183,7 +186,12 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
     _dimension_row(ComparisonDimension.STREAM_EVIDENCE),
-    _ConfigField("input_fill", "Input fill", ("config", "profiling", "input_fill")),
+    _ConfigField(
+        "input_fill",
+        "Input fill",
+        ("config", "profiling", "input_fill"),
+        absent=InputFill.ZERO.value,
+    ),
     _dimension_row(ComparisonDimension.HPX_VERSION),
     _dimension_row(ComparisonDimension.COMPILER_VERSION),
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),
@@ -468,7 +476,8 @@ def _coerce_csv_value(value: Any) -> Any:
 def _config_value(run: RunArtifacts, dimensions: dict[str, Any], spec: _ConfigField) -> Any:
     if spec.dimension is not None:
         return dimensions.get(spec.dimension)
-    return nested_get(run.metadata, *spec.path)
+    value = nested_get(run.metadata, *spec.path)
+    return spec.absent if value is None else value
 
 
 def _compare_config(base: RunArtifacts, cand: RunArtifacts) -> list[ConfigDiffRow]:

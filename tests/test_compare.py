@@ -1200,3 +1200,23 @@ def test_input_fill_has_a_config_row(tmp_path: Path):
         "lcg",
         "diff",
     )
+
+
+def test_an_absent_input_fill_reads_as_zero(tmp_path: Path):
+    """An artifact made before profiling.input_fill existed filled zeros."""
+    paths = [tmp_path / "older", tmp_path / "zero", tmp_path / "lcg"]
+    for path, fill in zip(paths, (None, "zero", "lcg")):
+        _write_run(path, toolchain="atfe", total_cycles=1000, avg_us=10, layer_cycles=[800, 200])
+        metadata = json.loads((path / "run_metadata.json").read_text())
+        metadata["config"]["profiling"].pop("input_fill", None)
+        if fill is not None:
+            metadata["config"]["profiling"]["input_fill"] = fill
+        (path / "run_metadata.json").write_text(json.dumps(metadata))
+
+    def row(baseline: Path, candidate: Path):
+        result = compare_runs(baseline, candidate)
+        found = next(row for row in result.config_rows if row.key == "input_fill")
+        return found.baseline, found.candidate, found.status
+
+    assert row(paths[0], paths[1]) == ("zero", "zero", "same")
+    assert row(paths[0], paths[2]) == ("zero", "lcg", "diff")
