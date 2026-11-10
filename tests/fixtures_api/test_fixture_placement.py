@@ -113,23 +113,27 @@ def test_aot_region_drift_is_rejected(tmp_path, fault):
         fixture_template_vars(ctx, [region])
 
 
-def test_aot_stream_pool_is_refused_where_the_fixture_binds_no_region(tmp_path):
-    """Only a PSRAM fixture binds AOT regions; an unbound pool fails model_init."""
+def test_aot_stream_pool_with_internal_arenas_is_refused_by_prepare(tmp_path, monkeypatch):
+    """A fixture binds AOT regions only in external-arena mode; prepare() refuses
+    the module before any render, so the pool never reaches model_init unbound."""
+    from helia_profiler.errors import EngineError
+    from helia_profiler.fixtures import build as builder
+    from tests.aot_views import RegionView, Result
+    from tests.test_helia_aot_adapter import _fake_converter
+
     fixture = typed(tmp_path)
     config = config_for(tmp_path, fixture, EngineType.HELIA_AOT)
     config = replace(
         config,
         model=replace(config.model, arena_location=Placement.TCM, weights_location=Placement.TCM),
+        work_dir=tmp_path / "work",
     )
-    ctx = PipelineContext(config=config, work_dir=tmp_path)
-    ctx.fixture = FixtureRenderSpec(fixture, METHOD, analysis_of(fixture))
-    regions = [
-        ArenaRegion(0, "scratch", 4096, 16, ArenaRole.SCRATCH, "dtcm", Placement.TCM),
-        ArenaRegion(1, "pool", 16384, 16, ArenaRole.POOL, "dtcm", Placement.TCM),
-    ]
-    fixture_template_vars(ctx, regions[:1])
-    with pytest.raises(ConfigError, match="stream pool") as raised:
-        fixture_template_vars(ctx, regions)
+    monkeypatch.setattr(
+        builder, "analyze_typed_fixture_model_for_engine", lambda *a, **kw: analysis_of(fixture)
+    )
+    _fake_converter(monkeypatch, Result(regions=(RegionView(0, "DTCM", "DTCM", "pool", 0, 64),)))
+    with pytest.raises(EngineError, match="stream pool") as raised:
+        builder.build_fixed_fixture(config, fixture, method=METHOD, compile=False)
     assert "engine.config.aot_args.memory.allocate_arenas: false" in str(raised.value.hint)
 
 

@@ -22,15 +22,6 @@ def validate_fixture_regions(
     ctx: PipelineContext, regions: list[ArenaRegion]
 ) -> dict[str, Any] | None:
     artifacts = ctx.engine_artifacts
-    external = isinstance(artifacts, HeliaAotArtifacts) and not artifacts.aot_allocate_arenas
-    if not external and any(region.role is ArenaRole.POOL for region in regions):
-        # The fixture binds regions only in external-arena mode; an unbound pool
-        # fails model_init with heliaAOT's arena-unbound status.
-        raise ConfigError(
-            "Fixture AOT stream pool requires external arenas",
-            hint="A fixture binds AOT regions only with PSRAM weights, converted with "
-            "engine.config.aot_args.memory.allocate_arenas: false.",
-        )
     intent = {}
     plan = ctx.memory_plan
     explicit = False
