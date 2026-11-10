@@ -7,7 +7,7 @@ import pytest
 from helia_profiler.config import load_config
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import ExecutorchArtifacts, HeliaAotArtifacts, HeliaRtArtifacts
-from helia_profiler.errors import PlatformError
+from helia_profiler.errors import ImageTooLargeError, PlatformError
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.placement import MemoryRegion
 from helia_profiler.results import ConsumerKind, MemoryConsumer, MemoryPlan, MemoryRegionUsage
@@ -35,6 +35,39 @@ def _make_ctx(tmp_path: Path, overrides: dict | None = None) -> PipelineContext:
     return ctx
 
 
+def _make_executorch_auto_ctx(
+    tmp_path, planned_region, *, model_size=2048, method_size=32768, method_region=None
+):
+    model = tmp_path / "model.pte"
+    model.write_bytes(b"ET" + bytes(model_size - 2))
+    config = load_config(
+        None,
+        {
+            "model": {
+                "path": str(model),
+                "arena_size": 8 * 1024 * 1024,
+                "weights_location": "mram",
+            },
+            "engine": {"type": "executorch", "config": {"planned_arena_size": 16384}},
+            "work_dir": str(tmp_path / "work"),
+        },
+    )
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "work")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = ExecutorchArtifacts(
+        engine_type=EngineType.EXECUTORCH,
+        engine_header="nsx_executorch.h",
+        executorch_planned_arena_size=16384,
+        executorch_method_arena_size=method_size,
+        executorch_temporary_arena_size=32768,
+        executorch_input_size=40,
+        executorch_output_size=40,
+        executorch_planned_arena_region=planned_region,
+        executorch_method_arena_region=method_region,
+    )
+    return ctx
+
+
 class TestMemoryRegionUsage:
     def test_free_and_overflow(self):
         r = MemoryRegionUsage(region=MemoryRegion.SRAM, capacity=1000, used=400)
@@ -48,6 +81,45 @@ class TestMemoryRegionUsage:
 
 
 class TestPlanMemorySynthesise:
+    @pytest.mark.parametrize(
+        ("planned_region", "method_region"), [(None, None), ("tcm", "sram"), ("sram", None)]
+    )
+    def test_executorch_auto_fallback_matches_firmware_buffers(
+        self, tmp_path, planned_region, method_region
+    ):
+        from helia_profiler.firmware.context import FirmwareRenderContext
+
+        ctx = _make_executorch_auto_ctx(tmp_path, planned_region, method_region=method_region)
+        PlanMemoryStage().run(ctx)
+        assert ctx.arena_region == "tcm"
+        plan = ctx.memory_plan
+        assert plan is not None and ctx.declared_memory_plan is plan
+        rendered = FirmwareRenderContext.from_pipeline_context(ctx).engine
+        for name, field in (
+            ("planned_arena", "executorch_planned_arena_region"),
+            ("method_arena", "executorch_method_arena_region"),
+            ("temporary_arena", "executorch_temporary_arena_region"),
+            ("input_buffer", "executorch_io_region"),
+            ("output_buffer", "executorch_io_region"),
+        ):
+            region = MemoryRegion.SRAM if getattr(rendered, field) == "sram" else MemoryRegion.DTCM
+            usage = plan.region(region)
+            assert usage is not None and any(c.name == name for c in usage.consumers)
+        mram = plan.region(MemoryRegion.MRAM)
+        assert mram is not None and {c.name for c in mram.consumers} == {"pte_program"}
+
+    @pytest.mark.parametrize("planned_region", [None, "tcm", "sram"])
+    @pytest.mark.parametrize("method_size", [32768, 460_000])
+    def test_executorch_auto_fallback_does_not_hide_ram_failure(
+        self, tmp_path, planned_region, method_size
+    ):
+        ctx = _make_executorch_auto_ctx(
+            tmp_path, planned_region, model_size=8 * 1024 * 1024, method_size=method_size
+        )
+        error = ImageTooLargeError if method_size == 32768 else PlatformError
+        with pytest.raises(error):
+            PlanMemoryStage().run(ctx)
+
     def test_executorch_plan_includes_all_explicit_runtime_buffers(self, tmp_path: Path):
         model = tmp_path / "model.pte"
         model.write_bytes(b"\x00\x00\x00\x00ET" + b"\x00" * 2048)
@@ -326,7 +398,7 @@ class TestPlanMemorySynthesise:
         assert ctx.memory_plan is not None
         platform = ctx.run_metadata.platform_provenance
         assert platform is not None and platform.expected_linker is not None
-        with pytest.raises(PlatformError, match="MRAM"):
+        with pytest.raises(ImageTooLargeError, match="MRAM"):
             admit_memory_plan(ctx.memory_plan, platform.expected_linker)
 
     def test_synth_plan_explicit_mram_falls_back_to_sram_when_tcm_too_small(self, tmp_path: Path):
@@ -477,6 +549,54 @@ class TestPlanMemoryEngineProvided:
 
 
 class TestPlanMemoryOverflow:
+    @pytest.mark.parametrize("arena_location", [None, "sram", "tcm"])
+    def test_oversized_mutable_arena_is_a_failure(self, tmp_path: Path, arena_location):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "arena_size": 8 * 1024 * 1024,
+                    "arena_location": arena_location,
+                }
+            },
+        )
+        with pytest.raises(PlatformError):
+            PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is None
+
+    def test_weights_over_mram_is_too_large(self, tmp_path: Path):
+        overrides = {"model": {"path": str(tmp_path / "model.tflite"), "weights_location": "mram"}}
+        ctx = _make_ctx(tmp_path, overrides)
+        (tmp_path / "model.tflite").write_bytes(b"\x00" * 8 * 1024 * 1024)
+
+        with pytest.raises(ImageTooLargeError, match="Memory plan does not fit") as exc_info:
+            PlanMemoryStage().run(ctx)
+
+        assert "MRAM" in str(exc_info.value)
+
+    def test_missing_expected_layout_keeps_raw_mram_skip(self, tmp_path: Path):
+        from dataclasses import replace
+
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "model": {
+                    "path": str(tmp_path / "model.tflite"),
+                    "weights_location": "mram",
+                    "arena_location": "tcm",
+                    "arena_size": 460_000,
+                }
+            },
+        )
+        ctx.config.model.path.write_bytes(b"\x00" * 8 * 1024 * 1024)
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None
+        ctx.run_metadata.platform_provenance = replace(platform, expected_linker=None)
+        with pytest.raises(ImageTooLargeError, match="Memory plan does not fit"):
+            PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is None
+
     def test_oversubscribed_region_raises(self, tmp_path: Path):
         ctx = _make_ctx(tmp_path)
         # Apollo510 DTCM is 508 KB; request far more.
@@ -770,3 +890,47 @@ def test_explicit_custom_soc_psram_limit_rejects_an_oversized_arena(tmp_path):
     )
     with pytest.raises(PlatformError, match="PSRAM"):
         PlanMemoryStage().run(ctx)
+
+
+@pytest.mark.parametrize(
+    ("model_size", "arena_size", "arena_location", "exit_code"),
+    [
+        (8 * 1024 * 1024, 65536, "tcm", 4),
+        (2048, 8 * 1024 * 1024, None, 1),
+        (4_130_000, 460_000, "tcm", 1),
+        (8 * 1024 * 1024, 460_000, "tcm", 1),
+    ],
+)
+def test_planning_failure_reaches_cli_without_becoming_a_skip(
+    tmp_path, monkeypatch, model_size, arena_size, arena_location, exit_code
+):
+    from helia_profiler.cli.profile_cmd import _cmd_profile
+    from helia_profiler.placement import admit_memory_plan
+
+    ctx = _make_ctx(
+        tmp_path,
+        {
+            "model": {
+                "path": str(tmp_path / "model.tflite"),
+                "arena_size": arena_size,
+                "arena_location": arena_location,
+                "weights_location": "mram",
+            }
+        },
+    )
+    ctx.config.model.path.write_bytes(b"\x00" * model_size)
+    monkeypatch.setattr("helia_profiler.config.load_config", lambda *_: ctx.config)
+
+    def plan_before_build(config, **kwargs):
+        assert config is ctx.config
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        platform = ctx.run_metadata.platform_provenance
+        assert platform is not None and platform.expected_linker is not None
+        admit_memory_plan(ctx.memory_plan, platform.expected_linker)
+        pytest.fail("This case must stop before any firmware build or device access")
+
+    monkeypatch.setattr("helia_profiler.api._execute_profile", plan_before_build)
+    with pytest.raises(SystemExit) as exc:
+        _cmd_profile()
+    assert exc.value.code == exit_code

@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from helia_profiler.engines import EngineType
-from helia_profiler.errors import PlatformError
+from helia_profiler.errors import ImageTooLargeError, PlatformError
 from helia_profiler.placement import admit_memory_plan
 from helia_profiler.platform.linker.budget import bind_application_ranges
 from helia_profiler.platform.linker.data import characterized_input
@@ -87,3 +87,43 @@ def test_gnu_floating_stack_still_consumes_app_space():
         admit_memory_plan(_plan(region.app_window.length, stack=16384), layout)
     result = admit_memory_plan(_plan(region.app_window.length - 16384, stack=16384), layout)
     assert len(result.regions[0].consumers) == 2
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize("ram_overflow", [False, True])
+def test_mram_skip_requires_all_other_regions_to_fit(reverse, ram_overflow):
+    layout = characterized_input("apollo510", LinkFamily.GNU)
+    assert layout is not None
+    layout = replace(
+        layout, regions=tuple(replace(r, allowed=(r.app_window,)) for r in layout.regions)
+    )
+    regions = []
+    for region in (MemoryRegion.MRAM, MemoryRegion.DTCM):
+        entry = next(r for r in layout.regions if r.region is region)
+        assert entry.capacity is not None
+        used = entry.capacity + (1 if region is MemoryRegion.MRAM or ram_overflow else 0)
+        regions.append(MemoryRegionUsage(region, 1 << 30, used))
+    if reverse:
+        regions.reverse()
+    plan = MemoryPlan(EngineType.HELIA_RT, tuple(regions))
+    error = PlatformError if ram_overflow else ImageTooLargeError
+    with pytest.raises(error, match="DTCM" if ram_overflow else "MRAM"):
+        admit_memory_plan(plan, layout)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_mram_overflow_does_not_hide_fixed_stack_mismatch(reverse):
+    layout = characterized_input("apollo510", LinkFamily.ARMLINK)
+    assert layout is not None
+    layout = replace(
+        layout, regions=tuple(replace(r, allowed=(r.app_window,)) for r in layout.regions)
+    )
+    mram = next(r for r in layout.regions if r.region is MemoryRegion.MRAM)
+    assert mram.capacity is not None
+    regions = (
+        MemoryRegionUsage(MemoryRegion.MRAM, 1 << 30, mram.capacity + 1),
+        _plan(16, stack=1).regions[0],
+    )
+    plan = MemoryPlan(EngineType.HELIA_RT, regions[::-1] if reverse else regions)
+    with pytest.raises(PlatformError, match="boot stack differs"):
+        admit_memory_plan(plan, layout)
