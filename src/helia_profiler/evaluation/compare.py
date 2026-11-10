@@ -183,6 +183,7 @@ _CONFIG_FIELDS: tuple[_ConfigField, ...] = (
     _dimension_row(ComparisonDimension.ARENA_LOCATION),
     _dimension_row(ComparisonDimension.WEIGHTS_LOCATION),
     _dimension_row(ComparisonDimension.STREAM_EVIDENCE),
+    _ConfigField("input_fill", "Input fill", ("config", "profiling", "input_fill")),
     _dimension_row(ComparisonDimension.HPX_VERSION),
     _dimension_row(ComparisonDimension.COMPILER_VERSION),
     _dimension_row(ComparisonDimension.SYSTEM_CLOCK_HZ),

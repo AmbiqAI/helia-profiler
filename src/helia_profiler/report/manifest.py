@@ -18,7 +18,7 @@ from ..results import (
     ResultManifest,
     RunStatus,
 )
-from ..results.dimensions import derive_architecture_flags
+from ..results.dimensions import derive_architecture_flags, derive_stream_evidence
 from ..results.serde import nested_get, sha256_file
 from .contracts import (
     PROFILE_RESULTS_SCHEMA,
@@ -251,7 +251,7 @@ def _comparability(ctx: PipelineContext) -> dict[str, Any]:
         ComparisonDimension.APPLICATION_LOAD: (
             conditions.application_load if conditions is not None else None
         ),
-        ComparisonDimension.STREAM_EVIDENCE: nested_get(config, "profiling", "stream_evidence"),
+        ComparisonDimension.STREAM_EVIDENCE: derive_stream_evidence({"config": config}),
     }
     if ctx.power_result is not None:
         # A run that measured no power has nothing to say about how it
