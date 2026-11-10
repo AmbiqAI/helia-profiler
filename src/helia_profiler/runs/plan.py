@@ -26,6 +26,7 @@ from .._semantic_hash import require, semantic_hash
 from ..config.platform import config_platform
 from ..errors import ConfigError
 from ..platform.provenance import PlatformSnapshot
+from ..results.dimensions import ABSENT_AT_DEFAULT
 
 if TYPE_CHECKING:
     from ..config import ProfileConfig
@@ -55,19 +56,6 @@ _HOST_LOCAL_SETTINGS = (
     ("build", "compiler_launcher"),
     ("build", "offline"),
     ("frozen",),  # alias that forces build.offline
-)
-
-#: Settings added after plans were first frozen, with the value that means
-#: absent. At that value a setting is left out of the plan, so a plan frozen
-#: before it existed keeps its intent; a run recorded before it existed
-#: compares as that value.
-ABSENT_AT_DEFAULT: Mapping[tuple[str, ...], object] = MappingProxyType(
-    {
-        ("target", "platform_overlay"): None,
-        ("profiling", "input_fill"): "zero",
-        ("profiling", "transfer_timeout_probe"): False,
-        ("profiling", "stream_evidence"): False,
-    }
 )
 
 #: Environment variables that can point a build at local sources.

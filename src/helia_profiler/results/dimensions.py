@@ -30,9 +30,21 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Mapping
 
-from ..runs.plan import ABSENT_AT_DEFAULT
 from .run_summary import PowerSection
 from .serde import nested_get
+
+#: Settings added after plans were first frozen, with the value that means
+#: absent. At that value a setting is left out of the plan, so a plan frozen
+#: before it existed keeps its intent; a run recorded before it existed
+#: compares as that value.
+ABSENT_AT_DEFAULT: Mapping[tuple[str, ...], object] = MappingProxyType(
+    {
+        ("target", "platform_overlay"): None,
+        ("profiling", "input_fill"): "zero",
+        ("profiling", "transfer_timeout_probe"): False,
+        ("profiling", "stream_evidence"): False,
+    }
+)
 
 
 class ComparisonDimension(StrEnum):

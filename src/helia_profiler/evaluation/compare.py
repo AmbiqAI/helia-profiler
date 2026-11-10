@@ -12,11 +12,10 @@ from typing import Any
 from ..errors import ReportError
 from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
-from ..results.dimensions import DIMENSION_REGISTRY
+from ..results.dimensions import ABSENT_AT_DEFAULT, DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
 from ..results.run_summary import _require_current_summary
 from ..results.serde import nested_get, to_float, write_dict_csv
-from ..runs.plan import ABSENT_AT_DEFAULT
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .comparison_profile import (
     ComparisonProfile,
