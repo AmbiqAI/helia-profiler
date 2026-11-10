@@ -57,8 +57,8 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "transfer units."
     ),
     FirmwareErrorCode.MODEL_RUN_FAILED: (
-        "A heliaAOT model run failed, so no timing from that loop is "
-        "reported.  For a module with dma transfer units: 301 means a "
+        "A heliaAOT model run failed, so the capture records no timing from "
+        "that loop, even if its timing lines were printed.  For a module with dma transfer units: 301 means a "
         "transfer failed, with the "
         "provider's own code as provider= and the nsx-psram status as "
         "driver= (provider 319 with driver NSX_PSRAM_STATUS_BUSY means another "

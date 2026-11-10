@@ -538,15 +538,16 @@ static void hpx_transfer_print_recovery(int32_t bind, int32_t init, int32_t run,
 }
 #endif
 {% endif %}
-// Run after every loop of model_run calls, outside timing: a failed run stops
-// the capture instead of reporting the timing of whatever it left behind.{% if power_only | default(false) %}
+// Run after every loop of model_run calls, outside timing: a failed run fails
+// the capture, so the host records no timing from it, even where a window's
+// timing lines were printed first.{% if power_only | default(false) %}
 static void hpx_aot_check_runs(void) {
     if (hpx_aot_status != 0) {
         hpx_power_terminal_fail("model_run", 9U);
     }
 }
 {% else %} With
-// a provider, a broken power clause stops it the same way.
+// a provider, a broken power clause fails the capture the same way.
 static void hpx_aot_check_runs(void) {
 #ifdef HPX_AOT_TRANSFER
     if (hpx_aot_status == 0 && !g_transfer_power_clause) {
