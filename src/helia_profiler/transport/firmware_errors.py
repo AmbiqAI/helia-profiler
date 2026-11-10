@@ -65,10 +65,7 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "nsx-psram client or a blocking call held the queue: retry the run); "
         "302 means the provider's abort failed and the module needs the "
         "provider's reset, then model_init.  Other codes are the module's own "
-        "status codes (see its generated tensors header).  Under "
-        "profiling.input_fill: lcg, an input that holds indices (GATHER, "
-        "GATHER_ND) gets out-of-range values and the kernel refuses them: "
-        "profile such a model with input_fill: zero."
+        "status codes (see its generated tensors header)."
     ),
     FirmwareErrorCode.TRANSFER_BIND_FAILED: (
         "The heliaAOT module's own transfer provider refused to bind, so its "

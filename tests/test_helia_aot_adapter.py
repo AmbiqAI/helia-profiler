@@ -312,9 +312,12 @@ class TestPrepareArtifactFlags:
             PrepareEngineStage().run(ctx)
         assert hint in str(raised.value.hint)
 
-    @pytest.mark.parametrize("dtype", ["float32", "float16", "bool"])
-    def test_lcg_input_fill_is_refused_for_a_non_integer_input(self, monkeypatch, tmp_path, dtype):
-        """The LCG writes raw bytes, which a float input reads as NaN and huge values."""
+    @pytest.mark.parametrize("dtype", ["float32", "float16", "bool", "int32", "int64"])
+    def test_lcg_input_fill_is_refused_for_other_than_data_inputs(
+        self, monkeypatch, tmp_path, dtype
+    ):
+        """The LCG writes raw bytes: a float input reads NaN and huge values, and a
+        32- or 64-bit input holds indices or lengths that some kernels never bound."""
         inputs = Result(
             tensors=(
                 TensorView("a", "a", (1, 4), input_index=0),
@@ -327,8 +330,8 @@ class TestPrepareArtifactFlags:
         assert "input_fill: zero" in str(raised.value.hint)
         _prepare(monkeypatch, tmp_path / "zero", _aot_cfg({}), inputs)
 
-    @pytest.mark.parametrize("dtype", ["int8", "uint8", "int16", "int32"])
-    def test_lcg_input_fill_is_accepted_for_integer_inputs(self, monkeypatch, tmp_path, dtype):
+    @pytest.mark.parametrize("dtype", ["int8", "uint8", "int16"])
+    def test_lcg_input_fill_is_accepted_for_data_inputs(self, monkeypatch, tmp_path, dtype):
         inputs = Result(tensors=(TensorView("a", "a", (1, 4), dtype=dtype, input_index=0),))
         config = replace(_aot_cfg({}), profiling=_lcg_profiling())
         _prepare(monkeypatch, tmp_path, config, inputs)

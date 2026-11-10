@@ -52,7 +52,7 @@ class InputFill(StrEnum):
     each input with a fixed-seed 32-bit linear congruential sequence, so an
     output depends on every weight rather than on biases alone and a missing
     or late weight shows in the output digests (heliaAOT only).  The bytes
-    are raw, so ``LCG`` is refused for a model with a non-integer input.
+    are raw, so ``LCG`` is refused unless every input is int8, uint8 or int16.
     """
 
     ZERO = "zero"

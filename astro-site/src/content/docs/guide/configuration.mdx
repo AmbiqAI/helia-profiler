@@ -133,11 +133,11 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     always were, so under `lcg` the clean latency and energy include the LCG
     fill (a few cycles per input byte). The capture records no clean workload
     for them.
-  - `lcg` writes raw bytes, so it is refused for a model with a non-integer
-    input (float inputs would read NaN, infinities and huge values), and for
-    other engines. It suits data inputs only: an integer input that holds
-    indices (GATHER, GATHER_ND) gets out-of-range values, and the run fails as
-    `model_run_failed`. Use `zero` for such a model.
+  - `lcg` writes raw bytes, so it is refused unless every model input is
+    int8, uint8 or int16. A float input would read NaN, infinities and huge
+    values, and 32- and 64-bit integer inputs hold indices or lengths, which
+    not every kernel bounds. Use `zero` for such a model. `lcg` is also
+    refused for other engines.
 - `profiling.transfer_timeout_probe: true` needs the module's provider.
   - Before the first pass, hpx runs one extra run, outside the counted
     iterations and every timing window, with the profiler off.

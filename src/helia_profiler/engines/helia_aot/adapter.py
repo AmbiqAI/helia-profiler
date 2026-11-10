@@ -121,23 +121,28 @@ def _check_pool_bound(regions: list[ArenaRegion], *, allocate_arenas: bool) -> N
         )
 
 
-def _check_input_fill(config: ProfileConfig, result: Any) -> None:
-    """Refuse ``input_fill: lcg`` unless every model input is an integer type.
+#: Input types whose every bit pattern is a valid data value.
+_LCG_INPUT_DTYPES = frozenset({"int8", "uint8", "int16"})
 
-    The LCG writes raw bytes, which a float input reads as NaN, infinities
-    and huge values.
+
+def _check_input_fill(config: ProfileConfig, result: Any) -> None:
+    """Refuse ``input_fill: lcg`` unless every model input is int8, uint8 or int16.
+
+    The LCG writes raw bytes. A float input reads them as NaN, infinities and
+    huge values; a 32- or 64-bit integer input holds indices or lengths in
+    practice, and not every kernel bounds those.
     """
     if config.profiling.input_fill is not InputFill.LCG:
         return
     other = [
         f"{tensor.name or tensor.id} ({tensor.dtype})"
         for tensor in result.tensors
-        if tensor.input_index is not None and not str(tensor.dtype).startswith(("int", "uint"))
+        if tensor.input_index is not None and str(tensor.dtype) not in _LCG_INPUT_DTYPES
     ]
     if other:
         raise EngineError(
-            "profiling.input_fill: lcg fills inputs with raw bytes, so it needs integer "
-            f"inputs; this model has {', '.join(other)}.",
+            "profiling.input_fill: lcg fills inputs with raw bytes, so it needs int8, "
+            f"uint8 or int16 inputs; this model has {', '.join(other)}.",
             hint="Use profiling.input_fill: zero for this model.",
         )
 
