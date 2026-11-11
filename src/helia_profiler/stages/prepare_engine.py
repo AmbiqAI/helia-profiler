@@ -6,7 +6,7 @@ import logging
 
 from ..engines import get_adapter
 from ..engines.base import PreparedRuntimeAdapter
-from ..errors import EngineError
+from ..errors import EngineError, ImageTooLargeError
 from ..pipeline import PipelineContext
 from ..results import EngineInfo
 
@@ -45,7 +45,7 @@ class PrepareEngineStage:
                 artifacts = adapter.prepare_runtime(ctx.config, ctx.work_dir, self.runtime)
             else:
                 raise EngineError(f"{adapter.name} cannot consume a prepared runtime")
-        except EngineError:
+        except (EngineError, ImageTooLargeError):
             raise
         except Exception as exc:
             raise EngineError(

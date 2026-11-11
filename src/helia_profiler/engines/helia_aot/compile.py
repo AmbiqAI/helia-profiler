@@ -27,7 +27,13 @@ import jinja2
 from ...config import DEFAULT_ARENA_SIZE_BYTES, ProfileConfig
 from ...config.platform import config_platform
 from ...engines import EngineType
-from ...errors import ConfigError, EngineError, EngineMissingError
+from ...errors import (
+    ConfigError,
+    EngineError,
+    EngineMissingError,
+    HpxError,
+    ImageTooLargeError,
+)
 from ...placement import Placement, placement_capacities, resolve_fastest_fit_placement
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
@@ -326,6 +332,28 @@ def convert_with_views(converter: Any) -> Any:
     return result
 
 
+#: One rejected heliaAOT constant placement.
+_REJECTED_CANDIDATE = re.compile(r"^\s*- candidate (?:runtime=)?(\w+):", re.MULTILINE)
+
+
+def _compile_failure(exc: Exception) -> HpxError:
+    """The hpx error for a failed heliaAOT compile.
+
+    Constants that fit no MRAM candidate mean the board is too small,
+    the same outcome as an MRAM link overflow, so ``hpx validate`` skips.
+    """
+    message = f"heliaAOT compilation failed: {exc}"
+    text = str(exc)
+    rejected = _REJECTED_CANDIDATE.findall(text)
+    if (
+        text.startswith("Insufficient memory for constant tensor")
+        and rejected
+        and all(name.upper() == "MRAM" for name in rejected)
+    ):
+        return ImageTooLargeError(message, hint="Use a smaller model or a board with more MRAM.")
+    return EngineError(message)
+
+
 def _run_aot_compiler(
     config: ProfileConfig,
     output_dir: Path,
@@ -389,7 +417,7 @@ def _run_aot_compiler(
     except EngineError:
         raise
     except Exception as exc:
-        raise EngineError(f"heliaAOT compilation failed: {exc}") from exc
+        raise _compile_failure(exc) from exc
 
     module_dir = output_dir / module_name
     if not module_dir.is_dir():

@@ -170,3 +170,46 @@ def test_callers_keep_the_refusal_and_its_hint(analysis_boundary):
     with pytest.raises(EngineError, match="^heliaAOT returned no conversion views") as refused:
         engine_analysis.analyze_for_engine(model, engine="helia-aot", board="apollo510_evb")
     assert refused.value.hint
+
+
+_MRAM_ONLY = (
+    "Insufficient memory for constant tensor 4 (1024000 bytes) on target apollo3p_evb. "
+    "Rejected candidates:\n"
+    "  - candidate MRAM: needs 1024000 bytes (incl. 0 padding for alignment=4), only \n"
+    "950368 remaining"
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "too_large"),
+    [
+        (_MRAM_ONLY, True),
+        (_MRAM_ONLY.replace("candidate MRAM:", "candidate runtime=MRAM:"), True),
+        (_MRAM_ONLY + "\n  - candidate SRAM: needs 1024000 bytes, only 10 remaining", False),
+        ("Insufficient memory for persistent tensor 2 (10 bytes) on target x.", False),
+        ("unsupported operator", False),
+    ],
+)
+def test_compile_failure_marks_mram_overflow(text: str, too_large: bool):
+    from helia_profiler.engines.helia_aot.compile import _compile_failure
+    from helia_profiler.errors import EngineError, ImageTooLargeError
+
+    error = _compile_failure(ValueError(text))
+
+    assert isinstance(error, ImageTooLargeError if too_large else EngineError)
+    assert str(error).startswith("heliaAOT compilation failed")
+
+
+def test_prepare_stage_keeps_too_large(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from helia_profiler.errors import ImageTooLargeError
+    from helia_profiler.stages import prepare_engine
+
+    adapter = SimpleNamespace(
+        name="helia-aot", prepare=Mock(side_effect=ImageTooLargeError("too big"))
+    )
+    monkeypatch.setattr(prepare_engine, "get_adapter", lambda _engine: adapter)
+    config = SimpleNamespace(engine=SimpleNamespace(type=SimpleNamespace(value="helia-aot")))
+    ctx = SimpleNamespace(config=config, work_dir=tmp_path)
+
+    with pytest.raises(ImageTooLargeError):
+        prepare_engine.PrepareEngineStage().run(ctx)  # ty: ignore[invalid-argument-type]
