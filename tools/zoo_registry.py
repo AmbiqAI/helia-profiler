@@ -26,7 +26,9 @@ whose ``hf:`` entries name files as ``<repo>@<commit>/<path>``.
 ``ZOO_AGE_KEY_FILE`` or ``~/.config/helia-profiler/zoo-private.key``) and
 ``HF_TOKEN`` (or ``hf auth login``); without either, private models are
 skipped with a warning. Errors for private models name only the opaque ID.
-Edit the list with ``tools/zoo_private.py``.
+Edit the list with ``tools/zoo_private.py``. Private entries may carry
+``title``, ``task`` and ``domain`` for the dashboard, as Zoo records do;
+the registry ignores them.
 """
 
 from __future__ import annotations
@@ -54,6 +56,9 @@ _HF_URI = re.compile(r"(?P<repo>(?:datasets/)?[\w.-]+/[\w.-]+)@(?P<rev>[0-9a-f]{
 _HF_HOST = "https://huggingface.co"
 # EngineType values; a test keeps them equal.
 ENGINES = frozenset({"helia-rt", "helia-aot", "litert", "executorch"})
+
+# Dashboard labels; hf entries only.
+LABELS = ("title", "task", "domain")
 
 Resolver = Callable[[str], Any]
 # (hf uri, sha256) -> local file
@@ -89,6 +94,11 @@ def parse_model_list(text: str, label: str | Path) -> list[dict[str, Any]]:
             raise ValueError(f"{label}: skip must map engine to reason")
         if unknown := sorted(set(map(str, skip)) - ENGINES):
             raise ValueError(f"{label}: skip names unknown engine {', '.join(unknown)}")
+        if labels := [key for key in LABELS if key in entry]:
+            if "zoo" in entry:
+                raise ValueError(f"{label}: zoo entries take labels from the Zoo record")
+            if not all(isinstance(entry[key], str) and entry[key].strip() for key in labels):
+                raise ValueError(f"{label}: {', '.join(labels)} must be non-empty text")
         arena = entry["arena_size"]
         if isinstance(arena, bool) or not isinstance(arena, int) or arena <= 0:
             raise ValueError(f"{label}: arena_size must be a positive integer")

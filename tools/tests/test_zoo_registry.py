@@ -276,6 +276,38 @@ def test_invalid_hf_entry_refuses(change, message):
         zoo_registry.parse_private_list(yaml.safe_dump({"models": [entry]}))
 
 
+def test_private_labels_stay_out_of_registry(tmp_path, monkeypatch):
+    labels = {"title": "Tiny VAD", "task": "voice-activity-detection", "domain": "audio"}
+    _private(monkeypatch, [{**_hf_entry(b"private graph", 16384), **labels}])
+    fetch, _ = _fake_hf(tmp_path, b"private graph")
+
+    code, _, private = _run_private(tmp_path, fetch=fetch)
+
+    assert code == 0
+    (spec,) = yaml.safe_load(private.read_text(encoding="utf-8"))["models"].values()
+    assert not set(labels) & set(spec)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"task": ""}, "must be non-empty text"),
+        ({"domain": 3}, "must be non-empty text"),
+        ({"title": "   "}, "must be non-empty text"),
+    ],
+)
+def test_invalid_private_labels_refuse(change, message):
+    entry = {**_hf_entry(b"x"), **change}
+    with pytest.raises(ValueError, match=message):
+        zoo_registry.parse_private_list(yaml.safe_dump({"models": [entry]}))
+
+
+def test_zoo_entry_labels_refuse(tmp_path):
+    entry = {**_entry("a8w8", b"x"), "task": "keyword-spotting"}
+    with pytest.raises(ValueError, match="labels from the Zoo record"):
+        zoo_registry.load_model_list(_write_list(tmp_path / "zoo.yaml", [entry]))
+
+
 @pytest.mark.parametrize(
     ("env", "saved"),
     [
