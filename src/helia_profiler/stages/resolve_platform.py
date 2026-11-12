@@ -30,6 +30,12 @@ class ResolvePlatformStage:
         ctx.board = board
         ctx.soc = soc
 
+        if ctx.config.profiling.dcache == "off" and not soc.capabilities.memory.has_dcache:
+            raise ConfigError(
+                f"profiling.dcache=off is unsupported on {soc.name}.",
+                hint="Data-cache control requires an Apollo5 target with a data cache.",
+            )
+
         selection = ctx.config.target.clock
 
         cpu_domain = soc.cpu_clock

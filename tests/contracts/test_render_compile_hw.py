@@ -87,8 +87,8 @@ class _HwCase:
     fixture_kind: str | None = None
     #: heliaAOT external arenas with constant blobs in PSRAM and TCM
     aot_arenas: bool = False
-    #: heliaAOT render overrides beyond the arenas: input_fill, and for a module
-    #: that ships its transfer provider transfer_timeout_probe and stream_evidence
+    #: heliaAOT render overrides beyond arenas: input_fill, dcache, and transfer
+    #: evidence for a module that ships its transfer provider
     aot_overrides: tuple[tuple[str, object], ...] = ()
     #: the module ships <prefix>_nsx_transfer.h and binds a stream pool; the
     #: workspace's nsx-psram must declare the accessors the render calls
@@ -167,6 +167,15 @@ _MATRIX: tuple[_HwCase, ...] = (
         "helia-aot",
         "hpx_profiler",
         aot_overrides=(("input_fill", "lcg"),),
+    ),
+    _HwCase(
+        "510-aot-dcache-off",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_overrides=(("dcache", "off"),),
     ),
     _HwCase(
         "510-aot-transfer",
@@ -251,6 +260,15 @@ _MATRIX: tuple[_HwCase, ...] = (
         "apollo330P",
         "helia-aot",
         "hpx_profiler",
+    ),
+    _HwCase(
+        "330-aot-dcache-off",
+        "apollo330mP_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo330mP_evb",
+        "apollo330P",
+        "helia-aot",
+        "hpx_profiler",
+        aot_overrides=(("dcache", "off"),),
     ),
 ) + tuple(
     _HwCase(
@@ -774,6 +792,7 @@ def test_matrix_covers_every_engine_family():
         "510-aot-profile",
         "510-aot-profile-arenas",
         "510-aot-profile-lcg",
+        "510-aot-dcache-off",
         "510-aot-transfer",
         "510-aot-transfer-probe",
         "510-aot-transfer-stream-evidence",
@@ -783,6 +802,7 @@ def test_matrix_covers_every_engine_family():
         "330-rt-profile",
         "330-litert-power",
         "330-aot-profile",
+        "330-aot-dcache-off",
         "510-litert-fixture-tcn",
         "510-helia-aot-fixture-tcn",
         "510-litert-fixture-kws",

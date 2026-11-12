@@ -37,6 +37,7 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
         target=aot_target_name(ctx.config),
         cpu_hz=cpu_hz,
         weights_memory=_weights_memory(ctx),
+        weights_cache=meta.dcache or "on",
         external_memory_clock=_external_memory_clock_mhz(ctx),
     )
 

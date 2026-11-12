@@ -21,7 +21,7 @@ from neuralspotx.file_lock import file_mutex
 from ._version import __version__
 from .config import ProfileConfig
 from .engines.base import EngineAdapter, EngineArtifacts
-from .errors import HpxError, PipelineError
+from .errors import CaptureError, HpxError, PipelineError
 from .evaluation import RunEvaluation
 from .hostenv.toolchain_probe import SymbolEntry
 from .modelcost import ModelAnalysis
@@ -264,6 +264,14 @@ class PipelineContext:
     def publish_profile_result(self, result: PmuResult) -> None:
         if self.profile_run is None or self.profile_run.deployment is None:
             raise PipelineError("Profile firmware must be deployed before capture.")
+        reported = result.meta.dcache
+        if reported not in (None, "on", "off"):
+            raise CaptureError(f"Invalid firmware data-cache mode: {reported!r}")
+        if (reported or "on") != self.config.profiling.dcache:
+            raise CaptureError(
+                "Firmware data-cache mode does not match profiling.dcache.",
+                hint="Rebuild and flash the profile firmware with the requested cache setting.",
+            )
         self.profile_run = replace(self.profile_run, result=result)
 
     def publish_power_plan(self, plan: PowerRunPlan) -> None:
@@ -517,8 +525,8 @@ def serialize_config(config: ProfileConfig) -> dict[str, Any]:
     non-JSON-native leaves (``Path`` \u2192 ``str``, ``Enum`` \u2192 ``.value``,
     ``set``/``tuple`` \u2192 ``list``) so the result round-trips through
     ``json.dumps``. New sub-config fields are picked up automatically \u2014
-    no hand-maintained mirror to drift. Fields marked ``omit_empty`` retain
-    existing snapshot identities when an optional mapping is unused.
+    no hand-maintained mirror to drift. Fields marked ``omit_empty`` or
+    ``omit_default`` preserve identities when an optional setting is unused.
     """
     from dataclasses import fields, is_dataclass
     from enum import Enum
@@ -529,7 +537,13 @@ def serialize_config(config: ProfileConfig) -> dict[str, Any]:
             return {
                 field.name: _coerce(getattr(value, field.name))
                 for field in fields(value)
-                if not (field.metadata.get("omit_empty") and not getattr(value, field.name))
+                if not (
+                    (field.metadata.get("omit_empty") and not getattr(value, field.name))
+                    or (
+                        field.metadata.get("omit_default")
+                        and getattr(value, field.name) == field.default
+                    )
+                )
             }
         if isinstance(value, (dict, MappingProxyType)):
             return {k: _coerce(v) for k, v in value.items()}

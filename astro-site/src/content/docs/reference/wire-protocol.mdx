@@ -74,6 +74,7 @@ Valueless lines that coordinate host and firmware around attach and model upload
 
 | Token | Scope | Condition | Consumer | Criticality | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `HPX_DCACHE` | all | `has_dcache and not power_only` | `firmware_meta` | `protocol` | Data-cache policy applied before warmup and measurement. Value: `on \| off`. An off request requires a matching report; old on/default streams may omit it. |
 | `HPX_VERSION` | all | `not power_only` | `diagnostic` | `diagnostic` | Protocol version of the emitting firmware. Value: `int (currently 1)`. Compared against HPX_PROTOCOL_VERSION and then discarded: a mismatch logs a warning and never reaches summary.json. |
 | `HPX_ENGINE` | all | `not power_only` | `unconsumed` | `diagnostic` | Which inference engine produced this build. Value: `engine id with hyphens underscored (helia_aot)`. |
 | `HPX_EXTREME_MODE` | all | `not power_only` | `unconsumed` | `diagnostic` | Whether the extreme low-power mode was actually engaged. Value: `0 \| 1`. Resolved at render time: requires arena and weights both in TCM. |
@@ -178,6 +179,7 @@ Token-then-payload lines. The space after the token defeats the key/value regex,
 
 | Token | Scope | Condition | Consumer | Criticality | Notes |
 | --- | --- | --- | --- | --- | --- |
+| `HPX_ERROR=dcache_config` | all | `dcache == off and not power_only` | `transport_control` | `protocol` | Data-cache write publication or disable failed before measurement. Value: `status=<HAL status>`. Host hint: yes. |
 | `HPX_ERROR=schema_mismatch` | helia-rt, litert | `always` | `transport_control` | `protocol` | The model's TFLite schema version is not the one firmware was built for. Value: `schema_mismatch:<found>_vs_<expected>`. Host hint: yes. |
 | `HPX_ERROR=unsupported_op` | helia-rt, litert | `always` | `transport_control` | `protocol` | An operator in the model is not registered in the resolver. Value: `kind=custom\|builtin [builtin=<n>] name=<s> index=<n>`. Host hint: yes. |
 | `HPX_ERROR=missing_ops` | helia-rt, litert | `always` | `transport_control` | `protocol` | Summary count of unregistered operators after the preflight walk. Value: `count=<n> hint=rebuild_with_op_registration`. Host hint: yes. |

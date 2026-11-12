@@ -52,12 +52,15 @@ static inline void nsx_core_fail_loop(void) {}
 #if defined(AM_PART_APOLLO3P)
 #define NSX_CACHE_HAS_INVALIDATE_OBSERVED 0
 #define NSX_CACHE_HAS_SYNC_SHARED 0
+#define NSX_CACHE_HAS_EXPLICIT_DCACHE 0
 #elif defined(AM_PART_APOLLO4P)
 #define NSX_CACHE_HAS_INVALIDATE_OBSERVED 0
 #define NSX_CACHE_HAS_SYNC_SHARED 1
+#define NSX_CACHE_HAS_EXPLICIT_DCACHE 0
 #else
 #define NSX_CACHE_HAS_INVALIDATE_OBSERVED 1
 #define NSX_CACHE_HAS_SYNC_SHARED 1
+#define NSX_CACHE_HAS_EXPLICIT_DCACHE 1
 #endif
 
 static inline uint32_t nsx_cache_flush(void) { return 0U; }

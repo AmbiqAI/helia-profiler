@@ -29,6 +29,7 @@ static inline uint32_t am_hal_debug_enable(void) { return 0U; }
 static inline uint32_t am_hal_debug_disable(void) { return 0U; }
 
 // --- D-cache range maintenance (am_hal_cachectrl.h) ----------------------
+static inline uint32_t am_hal_cachectrl_dcache_disable(void) { return 0U; }
 typedef struct {
     uint32_t ui32StartAddr;
     uint32_t ui32Size;

@@ -1,0 +1,24 @@
+{% if dcache | default("on") == "off" %}
+#if !NSX_CACHE_HAS_EXPLICIT_DCACHE
+#error "profiling.dcache=off requires explicit data-cache control"
+#endif
+    {
+        // nsx_cache_disable also disables I-cache; keep this setting data-only.
+        // https://github.com/AmbiqAI/nsx-ambiq-sdk/blob/main/modules/nsx-core/src/nsx_cache.c
+        uint32_t cache_status = nsx_cache_publish_writes();
+        if (cache_status == 0U) {
+            cache_status = am_hal_cachectrl_dcache_disable();
+        }
+        if (cache_status != 0U) {
+{% if power_only | default(false) %}
+            hpx_power_terminal_fail("dcache_config", cache_status);
+{% else %}
+            hpx_printf("HPX_ERROR=dcache_config status=%lu\n", (unsigned long)cache_status);
+            return 1;
+{% endif %}
+        }
+    }
+{% endif %}
+{% if has_dcache | default(false) and not power_only | default(false) %}
+    hpx_printf("HPX_DCACHE={{ dcache | default('on') }}\n");
+{% endif %}

@@ -203,15 +203,25 @@ def _publish(tmp_path: Path, ctx) -> Path:
     return out
 
 
-def test_every_artifact_records_the_same_conditions(tmp_path: Path) -> None:
+@pytest.mark.parametrize("cache_mode", ["on", "off"])
+def test_every_artifact_records_the_same_conditions(tmp_path: Path, cache_mode: str) -> None:
     ctx = _ctx(tmp_path, measured_clock_hz=249_600_000)
+    ctx.config = dataclasses.replace(
+        ctx.config, profiling=dataclasses.replace(ctx.config.profiling, dcache=cache_mode)
+    )
+    set_profile_result(
+        ctx,
+        dataclasses.replace(
+            ctx.captured_pmu, meta=dataclasses.replace(ctx.captured_pmu.meta, dcache=cache_mode)
+        ),
+    )
     out = _publish(tmp_path, ctx)
 
     expected = {
         "target": "apollo510_evb",
         "cpu_hz": ctx_platform_mhz(ctx) * 1_000_000,
         "weights_memory": "mram",
-        "weights_cache": "on",
+        "weights_cache": cache_mode,
         "application_load": "none",
     }
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
@@ -222,7 +232,7 @@ def test_every_artifact_records_the_same_conditions(tmp_path: Path) -> None:
     assert metadata["conditions"] == expected
     manifest = load_result_manifest(out / "result_manifest.json", verify=True)
     assert manifest.comparability["weights_memory"] == "mram"
-    assert manifest.comparability["weights_cache"] == "on"
+    assert manifest.comparability["weights_cache"] == cache_mode
     assert manifest.comparability["external_memory_clock"] is None
     assert manifest.comparability["application_load"] == "none"
     assert ctx.run_metadata.conditions == Conditions.from_dict(summary["conditions"])

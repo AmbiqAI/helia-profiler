@@ -10,6 +10,7 @@ from ._model import (
     GATE_AOT_EXTERNAL_ARENAS,
     GATE_AOT_PSRAM_ARENAS,
     GATE_BUSY_LOOP_PROBE,
+    GATE_DCACHE_OFF,
     GATE_HAS_ETHOS_U,
     GATE_NOT_POWER_ONLY,
     GATE_PSRAM_NEEDED,
@@ -28,6 +29,16 @@ from ._model import (
 )
 
 ERROR_SPECS: tuple[WireSpec, ...] = (
+    _spec(
+        error_token(FirmwareErrorCode.DCACHE_CONFIG),
+        WireKind.ERROR,
+        "Data-cache write publication or disable failed before measurement.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        condition=GATE_DCACHE_OFF,
+        value_shape="status=<HAL status>",
+        has_host_hint=True,
+    ),
     _spec(
         error_token(FirmwareErrorCode.SCHEMA_MISMATCH),
         WireKind.ERROR,

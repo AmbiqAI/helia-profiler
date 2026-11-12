@@ -168,6 +168,36 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     engines.
   - Without the setting, no capture is poisoned or invalidated.
 
+#### Data-cache policy
+
+For an Apollo5 profiler run, use `profiling.dcache: "off"` to disable the
+data cache after engine initialization and before warmup and measurement:
+
+```yaml
+profiling:
+  dcache: "off"
+```
+
+In Python, use `Session().with_profiling(dcache="off")`. The default `"on"`
+retains normal system initialization. YAML boolean aliases are normalized to
+`"on"`/`"off"`; other values fail validation. Targets without an explicit
+data cache refuse `"off"` before a build. The setting leaves instruction-cache
+policy unchanged.
+
+The off path publishes dirty writes before disabling the data cache. A failed
+cache operation stops the capture. Apollo5 profile firmware reports
+`HPX_DCACHE=on|off`; a missing or mismatching report cannot satisfy an off
+request. The bundle records the report in `firmware.dcache` and the existing
+`conditions.weights_cache` comparison dimension. Older streams without the
+field retain the existing on/default interpretation.
+
+Regular profiler firmware and its matching dedicated power image follow this
+policy. Fixed fixture methods reject `"off"`; use ordinary profiling for a
+cache-controlled capture. The on/default setting is omitted from saved
+configuration snapshots to preserve older intent identities; off remains
+explicit and changes the run intent. Keep the model, module options, clocks
+and placements fixed when comparing on/off captures.
+
 #### Target overrides
 
 - `target.platform_overlay` loads one explicit catalog YAML file, resolved from

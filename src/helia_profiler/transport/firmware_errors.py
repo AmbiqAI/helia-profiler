@@ -23,6 +23,11 @@ log = logging.getLogger("hpx")
 # completeness is pinned by tests/contracts/test_wire_protocol.py, so a new
 # code without a hint fails that test.
 ERROR_HINTS: dict[FirmwareErrorCode, str] = {
+    FirmwareErrorCode.DCACHE_CONFIG: (
+        "The target could not publish cached writes or disable its data cache. "
+        "No cache-off measurement was taken. Check the target HAL and rebuild "
+        "the profile firmware, or use profiling.dcache=on."
+    ),
     FirmwareErrorCode.SCHEMA_MISMATCH: (
         "The model's schema version does not match what the firmware was "
         "built for.  Re-export the model with a matching TFLite version."

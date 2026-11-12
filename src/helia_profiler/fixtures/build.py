@@ -157,6 +157,11 @@ def _validate(config: ProfileConfig, fixture: FixedFixture | TypedFixture) -> No
         raise ConfigError("Explicit bounded arena capacity required")
     if config.power.enabled or config.target.ensure_board_powered:
         raise ConfigError("Fixture build cannot enable power or instrument operations")
+    if config.profiling.dcache != "on":
+        raise ConfigError(
+            "Fixed fixture methods do not support profiling.dcache=off.",
+            hint="Use ordinary profiler firmware for data-cache-controlled captures.",
+        )
     if config.work_dir is None or config.clean:
         raise ConfigError("Fixture build requires an explicit preserved work directory")
     if not 0 <= config.profiling.warmup <= 10000 or not 1 <= config.profiling.iterations <= 100000:

@@ -28,6 +28,14 @@ def test_paired_tcm_placement_reaches_the_config(tmp_path):
     _validate(config, tcm.fixture)
 
 
+def test_fixture_refuses_an_unimplemented_cache_policy(tmp_path):
+    fixture = typed(tmp_path)
+    config = config_for(tmp_path, fixture)
+    config = replace(config, profiling=replace(config.profiling, dcache="off"))
+    with pytest.raises(ConfigError, match="Fixed fixture.*dcache=off"):
+        _validate(config, fixture)
+
+
 @pytest.mark.parametrize("board", ["apollo510_evb", "apollo510b_evb"])
 @pytest.mark.parametrize("engine", [EngineType.LITERT, EngineType.HELIA_AOT])
 @pytest.mark.parametrize("placement", [Placement.SRAM, Placement.TCM])

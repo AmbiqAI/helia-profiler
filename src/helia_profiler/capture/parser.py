@@ -202,7 +202,11 @@ def parse_firmware_output(
             rxdqs_delay=meta_kv.get(WireKey.PSRAM_RXDQS_DELAY, 0),
         )
 
+    dcache = meta_kv.get(WireKey.DCACHE)
+    if dcache not in (None, "on", "off"):
+        raise CaptureError(f"Invalid HPX_DCACHE mode: {dcache!r}")
     firmware_meta = FirmwareMeta(
+        dcache=dcache,
         model_size=meta_kv.get(WireKey.MODEL_SIZE),
         arena_size=meta_kv.get(WireKey.ARENA_SIZE),
         allocated_arena=meta_kv.get(WireKey.ALLOCATED_ARENA),

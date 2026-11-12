@@ -170,6 +170,7 @@ class MemoryContext:
     ssram_full_power_enum: str
     force_shared_sram: bool
     psram_clock_hz: int
+    dcache: str = "on"
 
 
 @dataclass(frozen=True)
@@ -392,6 +393,7 @@ class FirmwareRenderContext:
                 ssram_full_power_enum=soc.ssram_full_power_enum,
                 force_shared_sram=config.profiling.force_shared_sram,
                 psram_clock_hz=config.target.psram.clock_hz,
+                dcache=config.profiling.dcache,
             ),
             pmu=PmuContext(
                 pmu_passes=pmu_passes,
@@ -507,6 +509,7 @@ class FirmwareRenderContext:
             "arena_regions": self.memory.arena_regions,
             "allocate_arenas": self.memory.allocate_arenas,
             "has_dcache": self.memory.has_dcache,
+            "dcache": self.memory.dcache,
             "manages_shared_ssram_power": self.memory.manages_shared_ssram_power,
             "ssram_full_power_enum": self.memory.ssram_full_power_enum,
             "force_shared_sram": self.memory.force_shared_sram,
