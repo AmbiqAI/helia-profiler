@@ -153,8 +153,8 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     `HPX_TRANSFER_RECOVERY=<bind>,<init>,<run>,<pending>`.
   - Any other failure fails the capture.
 - `profiling.stream_evidence: true` changes the cache regime of the per-layer
-  figures and `HPX_PROFILED_INFER_*`. The warm-ups and the clean window keep a
-  warm cache. The capture says `HPX_STREAM_EVIDENCE=1`.
+  figures and `HPX_PROFILED_INFER_*`. The warm-ups and clean window follow
+  `profiling.dcache`. The capture says `HPX_STREAM_EVIDENCE=1`.
   - Before every instrumented run, hpx fills the stream pool with `0x5A` and
     cleans and invalidates the D-cache over each PSRAM constant arena. A late or
     missing copy then shows in the outputs, and every constant read reaches the
