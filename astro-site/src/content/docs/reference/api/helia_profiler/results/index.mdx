@@ -210,7 +210,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"FirmwareMeta"}
   kind={"class"}
   language={"python"}
-  signature={"FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n    measured_clock_hz: int | None = None,\n) -> None"}
+  signature={"FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n    measured_clock_hz: int | None = None,\n    dcache: str | None = None,\n) -> None"}
   level={2}
   summary={"Metadata reported by the profiler firmware at startup."}
   source={{"path":"src/helia_profiler/results/models.py","line":115,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L115"}}
@@ -590,6 +590,20 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   </RefSymbol>
 
   <RefSymbol
+    id={"helia_profiler.FirmwareMeta.dcache"}
+    name={"dcache"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"dcache: str | None = None"}
+    level={3}
+    source={{"path":"src/helia_profiler/results/models.py","line":181,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L181"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
     id={"helia_profiler.FirmwareMeta.reported_model_bytes"}
     name={"reported_model_bytes"}
     kind={"attribute"}
@@ -597,7 +611,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"reported_model_bytes: int | None"}
     level={3}
     summary={"modelsize when it is a usable byte count, else None."}
-    source={{"path":"src/helia_profiler/results/models.py","line":182,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L182"}}
+    source={{"path":"src/helia_profiler/results/models.py","line":184,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L184"}}
   >
 
     ``model_size`` when it is a usable byte count, else ``None``.
@@ -620,7 +634,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"Conditions(\n    target: str,\n    cpu_hz: int | None = None,\n    weights_memory: str | None = None,\n    weights_cache: str = 'on',\n    external_memory_clock: int | None = None,\n    application_load: str = 'none',\n) -> None"}
   level={2}
   summary={"The board conditions a run's measurements refer to."}
-  source={{"path":"src/helia_profiler/results/models.py","line":197,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L197"}}
+  source={{"path":"src/helia_profiler/results/models.py","line":199,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L199"}}
 >
 
   `dataclass`
@@ -690,10 +704,8 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     source={{"path":"src/helia_profiler/results/models.py","line":227,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L227"}}
   >
 
-    Whether the weights are read through the cache. Every
-    run this release makes records ``on``; ``off`` and
-    ``emulated:<bytes>`` await the firmware work of
-    AmbiqAI/helia-profiler#648.
+    The reported data-cache policy, ``on`` or ``off``.
+    Missing cache metadata in older firmware retains the ``on`` baseline.
 
   </RefSymbol>
 

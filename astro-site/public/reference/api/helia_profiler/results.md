@@ -189,6 +189,7 @@ FirmwareMeta(
     psram: PsramInfo | None = None,
     presets: tuple[str, ...] = (),
     measured_clock_hz: int | None = None,
+    dcache: str | None = None,
 ) -> None
 ```
 
@@ -463,6 +464,16 @@ measured_clock_hz: int | None = None
 
 Source: `src/helia_profiler/results/models.py:179`
 
+### helia_profiler.FirmwareMeta.dcache
+
+`attribute` · `python`
+
+```python
+dcache: str | None = None
+```
+
+Source: `src/helia_profiler/results/models.py:181`
+
 ### helia_profiler.FirmwareMeta.reported_model_bytes
 
 `attribute` · `python`
@@ -479,7 +490,7 @@ as text. Anything that needs a number asks here instead of assuming;
 the raw value stays on ``model_size`` so diagnostics can still quote
 what the device actually said.
 
-Source: `src/helia_profiler/results/models.py:182`
+Source: `src/helia_profiler/results/models.py:184`
 
 ## helia_profiler.Conditions
 
@@ -508,7 +519,7 @@ conditions.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/models.py:197`
+Source: `src/helia_profiler/results/models.py:199`
 
 ### helia_profiler.Conditions.target
 
@@ -557,10 +568,8 @@ Source: `src/helia_profiler/results/models.py:226`
 weights_cache: str = 'on'
 ```
 
-Whether the weights are read through the cache. Every
-run this release makes records ``on``; ``off`` and
-``emulated:<bytes>`` await the firmware work of
-AmbiqAI/helia-profiler#648.
+The reported data-cache policy, ``on`` or ``off``.
+Missing cache metadata in older firmware retains the ``on`` baseline.
 
 Source: `src/helia_profiler/results/models.py:227`
 

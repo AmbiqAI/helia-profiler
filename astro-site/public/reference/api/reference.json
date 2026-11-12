@@ -1479,6 +1479,25 @@
                     "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L144"
                   },
                   "summary": ""
+                },
+                {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.ProfilingConfig.dcache",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "dcache",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})",
+                  "source": {
+                    "line": 147,
+                    "path": "src/helia_profiler/config/profiling.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L147"
+                  },
+                  "summary": ""
                 }
               ],
               "name": "ProfilingConfig",
@@ -18791,6 +18810,25 @@
                   "summary": ""
                 },
                 {
+                  "description": "",
+                  "examples": [],
+                  "id": "helia_profiler.FirmwareMeta.dcache",
+                  "kind": "attribute",
+                  "language": "python",
+                  "members": [],
+                  "name": "dcache",
+                  "params": [],
+                  "raises": [],
+                  "returns": [],
+                  "signature": "dcache: str | None = None",
+                  "source": {
+                    "line": 181,
+                    "path": "src/helia_profiler/results/models.py",
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L181"
+                  },
+                  "summary": ""
+                },
+                {
                   "description": "``model_size`` when it is a usable byte count, else ``None``.\n\nThe wire parser keeps an unparseable ``HPX_MODEL_SIZE`` as the raw\nstring it received, so a corrupted or foreign line reaches consumers\nas text. Anything that needs a number asks here instead of assuming;\nthe raw value stays on ``model_size`` so diagnostics can still quote\nwhat the device actually said.",
                   "examples": [],
                   "id": "helia_profiler.FirmwareMeta.reported_model_bytes",
@@ -18803,9 +18841,9 @@
                   "returns": [],
                   "signature": "reported_model_bytes: int | None",
                   "source": {
-                    "line": 182,
+                    "line": 184,
                     "path": "src/helia_profiler/results/models.py",
-                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L182"
+                    "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L184"
                   },
                   "summary": "modelsize when it is a usable byte count, else None."
                 }
@@ -18814,7 +18852,7 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n    measured_clock_hz: int | None = None,\n) -> None",
+              "signature": "FirmwareMeta(\n    model_size: int | None = None,\n    arena_size: int | None = None,\n    allocated_arena: int | None = None,\n    input_size: int | None = None,\n    output_size: int | None = None,\n    num_tensors: int | None = None,\n    num_inputs: int | None = None,\n    num_outputs: int | None = None,\n    num_presets: int | None = None,\n    system_clock_hz: int | None = None,\n    profiled_infer_count: int | None = None,\n    profiled_infer_total_us: int | None = None,\n    profiled_infer_avg_us: int | None = None,\n    clean_infer_count: int | None = None,\n    clean_infer_total_cycles: int | None = None,\n    clean_infer_avg_cycles: int | None = None,\n    clean_infer_avg_us: int | None = None,\n    clean_stalled_iters: int | None = None,\n    clean_partial_iters: int | None = None,\n    clean_ref_cycles: int | None = None,\n    clean_dwt_rate_cyc: int | None = None,\n    clean_dwt_rate_us: int | None = None,\n    clean_attach_wait_us: int | None = None,\n    psram: PsramInfo | None = None,\n    presets: tuple[str, ...] = (),\n    measured_clock_hz: int | None = None,\n    dcache: str | None = None,\n) -> None",
               "source": {
                 "line": 115,
                 "path": "src/helia_profiler/results/models.py",
@@ -18887,7 +18925,7 @@
                   "summary": ""
                 },
                 {
-                  "description": "Whether the weights are read through the cache. Every\nrun this release makes records ``on``; ``off`` and\n``emulated:<bytes>`` await the firmware work of\nAmbiqAI/helia-profiler#648.",
+                  "description": "The reported data-cache policy, ``on`` or ``off``.\nMissing cache metadata in older firmware retains the ``on`` baseline.",
                   "examples": [],
                   "id": "helia_profiler.Conditions.weights_cache",
                   "kind": "attribute",
@@ -18993,9 +19031,9 @@
               "returns": [],
               "signature": "Conditions(\n    target: str,\n    cpu_hz: int | None = None,\n    weights_memory: str | None = None,\n    weights_cache: str = 'on',\n    external_memory_clock: int | None = None,\n    application_load: str = 'none',\n) -> None",
               "source": {
-                "line": 197,
+                "line": 199,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L197"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L199"
               },
               "summary": "The board conditions a run's measurements refer to."
             },

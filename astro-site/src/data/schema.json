@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 111,
-    "schemaProperties": 111,
+    "declaredFields": 112,
+    "schemaProperties": 112,
     "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -493,7 +493,7 @@
           "name": "profiling",
           "pythonType": "ProfilingConfig",
           "required": false,
-          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, extreme_mode=False)",
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, extreme_mode=False, dcache='on')",
           "defaultFromFactory": true
         },
         {
@@ -687,6 +687,13 @@
           "pythonType": "bool",
           "required": false,
           "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "dcache",
+          "pythonType": "Literal['on', 'off']",
+          "required": false,
+          "default": "on",
           "defaultFromFactory": false
         }
       ],
@@ -901,8 +908,8 @@
         "reachableFromRoot": true
       },
       "ProfilingConfig": {
-        "declared": 16,
-        "inSchema": 16,
+        "declared": 17,
+        "inSchema": 17,
         "reachableFromRoot": true
       },
       "PsramConfig": {
@@ -2232,6 +2239,15 @@
           "default": false,
           "title": "Extreme Mode",
           "type": "boolean"
+        },
+        "dcache": {
+          "default": "on",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "title": "Dcache",
+          "type": "string"
         }
       },
       "title": "ProfilingConfig",
