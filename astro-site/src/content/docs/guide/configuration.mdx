@@ -215,6 +215,51 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
   toolchain, engine backend, variant and version, overrides (including
   local content hashes) and the module-relevant build settings.
 
+#### Module build options
+
+Use `build.nsx_modules.<module>.options` alongside an explicit `ref` or `path`
+to set a module's CMake cache values before NSX loads it:
+
+```yaml
+build:
+  nsx_modules:
+    nsx-psram:
+      ref: <actual-project-tag-or-commit-SHA>
+      options:
+        NSX_PSRAM_ASYNC_DEPTH: 16
+```
+
+The Python equivalent is:
+
+```python
+from helia_profiler import Session
+
+session = Session().with_build(nsx_modules={
+    "nsx-psram": {
+        "ref": "<actual-project-tag-or-commit-SHA>",
+        "options": {"NSX_PSRAM_ASYNC_DEPTH": 16},
+    },
+})
+```
+
+Values are literal single-line strings, finite numbers or booleans; booleans
+become CMake `ON`/`OFF`. Names must be identifiers such as
+`NSX_PSRAM_ASYNC_DEPTH`. Strings are not expanded as CMake expressions.
+The selected module owns the supported options and their ranges. hpx does
+not infer queue depth from a model or increase it automatically.
+
+CMake cache names are global to the build. hpx refuses conflicting values
+across modules, keys controlled by the profiler or selected engine, and options targeting
+unused or engine-owned modules. Configure engine-provided modules through
+`engine.config` instead. An option does not enable an otherwise unused module.
+
+Nonempty options are recorded beside the source selector in frozen plans
+and the bundle's configuration, and in dependency workspace inputs. Changing
+an option selects a different workspace. Absent or empty options preserve
+existing plan and workspace identities. These records describe the requested
+build settings; provider compilation and binding still determine whether the
+selected source supports them.
+
 #### Migrating module version overrides
 
 Non-null `build.nsx_modules.<module>.version`,

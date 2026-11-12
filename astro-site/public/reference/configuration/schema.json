@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 110,
-    "schemaProperties": 110,
+    "declaredFields": 111,
+    "schemaProperties": 111,
     "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -300,6 +300,13 @@
           "required": false,
           "default": null,
           "defaultFromFactory": false
+        },
+        {
+          "name": "options",
+          "pythonType": "dict[str, str | int | float | bool]",
+          "required": false,
+          "default": {},
+          "defaultFromFactory": true
         }
       ],
       "OutputConfig": [
@@ -874,8 +881,8 @@
         "reachableFromRoot": false
       },
       "NsxModuleOverride": {
-        "declared": 3,
-        "inSchema": 3,
+        "declared": 4,
+        "inSchema": 4,
         "reachableFromRoot": true
       },
       "OutputConfig": {
@@ -1709,7 +1716,7 @@
     },
     "NsxModuleOverride": {
       "additionalProperties": false,
-      "description": "Override resolution for a single NSX module.\n\nExactly one mode must be set:\n* *path* — use a local directory as the module source (``local: true``).\n* *ref* — resolve the module's project at a specific git ref/tag.\n\n``version`` is deprecated and accepts only ``None`` to preserve stored plans.\nSelect remote sources with the owning project's actual Git tag or SHA in ``ref``.\n\nOnly applies to modules NSX resolves itself (e.g. ``nsx-core``,\n``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,\n``nsx-cmsis-nn``) are configured through ``engine.config``\n(``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —\nan entry here targeting one of those names is ignored with a warning.",
+      "description": "Override resolution for a single NSX module.\n\nExactly one mode must be set:\n* *path* — use a local directory as the module source (``local: true``).\n* *ref* — resolve the module's project at a specific git ref/tag.\n\n``version`` is deprecated and accepts only ``None`` to preserve stored plans.\nSelect remote sources with the owning project's actual Git tag or SHA in ``ref``.\n\n``options`` supplies literal CMake cache values for the selected module.\nCache names are shared by the build; conflicting values and profiler/engine-owned\nsettings are refused. Booleans become ON/OFF; single-line strings and\nfinite numbers retain their values. Empty options are omitted from\nsnapshots to preserve existing plan and build identities.\n\nOnly applies to modules NSX resolves itself (e.g. ``nsx-core``,\n``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,\n``nsx-cmsis-nn``) are configured through ``engine.config``\n(``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —\na source override targeting one of those names is ignored with a warning,\nand options targeting it are refused.",
       "properties": {
         "path": {
           "anyOf": [
@@ -1741,6 +1748,26 @@
           "deprecated": true,
           "title": "Version",
           "type": "null"
+        },
+        "options": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Options",
+          "type": "object"
         }
       },
       "title": "NsxModuleOverride",

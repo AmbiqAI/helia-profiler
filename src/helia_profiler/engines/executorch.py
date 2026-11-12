@@ -22,7 +22,7 @@ from .base import (
     PsramWeightsSource,
     SingleArenaPlacementMixin,
 )
-from .cmsis_nn import arm_cmsis_nn_module_ref, cmsis_nn_module_ref
+from .cmsis_nn import CMSIS_NN_CMAKE_OPTIONS, arm_cmsis_nn_module_ref, cmsis_nn_module_ref
 
 log = logging.getLogger("hpx")
 
@@ -545,6 +545,7 @@ class ExecuTorchAdapter(SingleArenaPlacementMixin):
         provider_module = _provider_module_ref(config, work_dir, provider)
         return ExecutorchArtifacts(
             engine_type=EngineType.EXECUTORCH,
+            reserved_cmake_options=CMSIS_NN_CMAKE_OPTIONS if provider == "ns" else frozenset(),
             source_roots=((source_root, "nsx-executorch"),),
             extra_modules=[
                 # The provider must precede nsx-executorch so NSX configures it

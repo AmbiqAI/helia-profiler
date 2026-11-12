@@ -26,6 +26,7 @@ from ..base import (
     SingleArenaPlacementMixin,
 )
 from ..cmsis_nn import (
+    CMSIS_NN_CMAKE_OPTIONS,
     CMSIS_NN_MODULE,
     cmsis_nn_cmake_vars,
     cmsis_nn_module_ref,
@@ -54,6 +55,11 @@ log = logging.getLogger("hpx")
 # custom-op kernel against that real driver instead of its host stub.
 # Mirrors the hardware-validated NSX npu-tflm app wiring.
 _ETHOSU_CMAKE_FLAG = "NSX_HELIA_RT_ENABLE_ETHOSU"
+_RESERVED_CMAKE_OPTIONS = CMSIS_NN_CMAKE_OPTIONS | {
+    "HELIA_RT_VARIANT",
+    "HELIA_RT_TFLM_ROOT",
+    _ETHOSU_CMAKE_FLAG,
+}
 # Older heliaRT trees have Ethos-U only in the root build: their NSX wrapper
 # does not declare the flag and silently ignores it.
 _ETHOSU_NSX_OPTION = re.compile(rf"^[ \t]*option\s*\(\s*{_ETHOSU_CMAKE_FLAG}\b", re.MULTILINE)
@@ -140,6 +146,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
         revision = next(p.revision for p in runtime.record.providers if p.name == "helia-rt")
         return HeliaRtArtifacts(
             extra_modules=[prepare_runtime_module(runtime, work_dir)],
+            reserved_cmake_options=_RESERVED_CMAKE_OPTIONS,
             engine_header=TFLM_ENGINE_HEADER,
             engine_backend=backend,
             heliart_version=f"prepared:{revision}",
@@ -261,6 +268,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
                 engine_type=EngineType.HELIA_RT,
                 extra_modules=extra_modules,
                 cmake_vars=cmake_vars,
+                reserved_cmake_options=_RESERVED_CMAKE_OPTIONS,
                 engine_header=TFLM_ENGINE_HEADER,
                 engine_backend=backend,
                 heliart_version=version,
@@ -356,6 +364,7 @@ class HeliaRTAdapter(SingleArenaPlacementMixin):
             engine_type=EngineType.HELIA_RT,
             extra_modules=extra_modules,
             cmake_vars=cmake_vars,
+            reserved_cmake_options=_RESERVED_CMAKE_OPTIONS,
             engine_header=TFLM_ENGINE_HEADER,
             engine_backend=backend,
             heliart_version=version,

@@ -1,6 +1,6 @@
 # Configuration reference
 
-Every hpx.yml key: 110 fields across 15 configuration models, generated from the package.
+Every hpx.yml key: 111 fields across 15 configuration models, generated from the package.
 
 ## ProfileConfig
 
@@ -354,17 +354,25 @@ Exactly one mode must be set:
 ``version`` is deprecated and accepts only ``None`` to preserve stored plans.
 Select remote sources with the owning project's actual Git tag or SHA in ``ref``.
 
+``options`` supplies literal CMake cache values for the selected module.
+Cache names are shared by the build; conflicting values and profiler/engine-owned
+settings are refused. Booleans become ON/OFF; single-line strings and
+finite numbers retain their values. Empty options are omitted from
+snapshots to preserve existing plan and build identities.
+
 Only applies to modules NSX resolves itself (e.g. ``nsx-core``,
 ``nsx-ambiq-bsp``). Engine-provided modules (``nsx-helia-rt``,
 ``nsx-cmsis-nn``) are configured through ``engine.config``
 (``dist_path``/``source_path``/``source``/``cmsis_nn_path``/``cmsis_nn_ref``) instead —
-an entry here targeting one of those names is ignored with a warning.
+a source override targeting one of those names is ignored with a warning,
+and options targeting it are refused.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | `path` | `Path \| None` |  | Path |
 | `ref` | `str \| None` |  | Ref |
 | `version` | `Annotated[NoneType, FieldInfo(annotation=NoneType, required=True, deprecated=True)]` |  | Version |
+| `options` | `dict[str, str \| int \| float \| bool]` | {} | Options Default built per instance. |
 
 ## MonitorBoardPreset
 

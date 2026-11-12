@@ -32,7 +32,7 @@ from ..base import (
     HeliaAotArtifacts,
     PsramWeightsSource,
 )
-from ..cmsis_nn import cmsis_nn_cmake_vars, cmsis_nn_module_ref
+from ..cmsis_nn import CMSIS_NN_CMAKE_OPTIONS, cmsis_nn_cmake_vars, cmsis_nn_module_ref
 from ..ethos_u import nsx_npu_module_ref
 from .compile import (
     _DEFAULT_MODULE_NAME,
@@ -416,6 +416,7 @@ class HeliaAOTAdapter:
                 attr_var: str(attr_header),
                 **engine_cmake_vars,
             },
+            reserved_cmake_options=CMSIS_NN_CMAKE_OPTIONS | {"NSX_LINKER_PROFILE"},
             engine_header=f"{prefix}_model.h",
             aot_prefix=prefix,
             aot_module_name=module_name,
