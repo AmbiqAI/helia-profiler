@@ -295,7 +295,7 @@ def _reconcile_linker(metadata: dict[str, Any] | None, platform: PlatformSnapsho
 
 
 def load_result(location: str | Path) -> ProfileResultRecord | RunResultRecord:
-    """Strictly load an ordinary profile manifest, a saved run result, or the directory of either.
+    """Strictly load a profile or model-only manifest, saved run result, or their directory.
 
     The file's ``schema`` decides how it is read: ``hpx.result-manifest``
     gives a :class:`ProfileResultRecord`, ``hpx.run-result`` a
@@ -340,8 +340,8 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
         return _load_run(path, raw)
     _schema(data, "hpx.result-manifest", 1)
     manifest = ResultManifest.from_dict(data)
-    if manifest.bundle_type != "profile":
-        raise ResultReadError("unsupported_kind", "Expected an ordinary profile result bundle")
+    if manifest.bundle_type not in {"profile", "profile-model-only"}:
+        raise ResultReadError("unsupported_kind", "Expected a profile result bundle")
     if manifest.status is RunStatus.INCOMPLETE:
         raise ResultReadError("incomplete_result", "Native result is incomplete")
     _paths(manifest, root)
@@ -396,6 +396,10 @@ def _load_result(location: Path) -> ProfileResultRecord | RunResultRecord:
                             "invalid_summary", f"Invalid byte size: {section}.{name}"
                         )
         summary = RunSummary.from_dict(summary_data)
+        if (not summary.per_layer_profiling) != (manifest.bundle_type == "profile-model-only"):
+            raise ResultReadError(
+                "identity_mismatch", "Summary differs from manifest profiling capability"
+            )
     if metadata is not None:
         _schema(metadata, RUN_METADATA_SCHEMA, RUN_METADATA_SCHEMA_VERSION)
         if (

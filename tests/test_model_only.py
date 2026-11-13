@@ -165,9 +165,19 @@ def test_layer_capable_truncation_is_still_an_error(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("fmt", ["csv", "json"])
 def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, fmt):
+    from helia_profiler.firmware.render import _jinja_env
+
     ctx = _ctx(tmp_path, fmt=fmt)
     result = parse_firmware_output(_lines())
     set_profile_result(ctx, result)
+    ctx.firmware_dir = tmp_path / "firmware"
+    source = ctx.firmware_dir / "src/main.cc"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        _jinja_env.get_template("main_aot.cc.j2").render(
+            **FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
+        )
+    )
     lock = tmp_path / "source.lock"
     lock.write_text("schema_version: 4\ntargets: {}\n")
     ctx.dependency_lock_path = lock
@@ -203,6 +213,34 @@ def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, 
     assert "HPX_OUTPUT_0_HEX=0001" in raw
     assert manifest.validity.value == "valid"
     assert load_run_artifacts(out).layers == []
+    from helia_profiler.api import load_result, observations
+    from helia_profiler.readers.native import ProfileResultRecord
+
+    record = load_result(out)
+    assert isinstance(record, ProfileResultRecord)
+    assert record.summary is not None and record.summary.per_layer_profiling is False
+    view = observations(record)
+    items = {item["id"]: item for item in view["observations"]}
+    assert items["latency.restore_invoke.v1"]["value"] == 0.004
+    assert items["latency.profiled_invoke.v1"]["value"] is None
+    from typer.testing import CliRunner
+
+    from helia_profiler.api import export_result, inspect_result
+    from helia_profiler.cli.results_cmd import app
+
+    assert inspect_result(out).code is None
+    export_result(record, tmp_path / "portable.json")
+    assert json.loads((tmp_path / "portable.json").read_text()) == view
+    runner = CliRunner()
+    for command in ("inspect", "show"):
+        response = runner.invoke(app, [command, str(out)])
+        assert response.exit_code == 0, response.output
+    exported = runner.invoke(
+        app, ["export", str(out), "--output", str(tmp_path / "cli-portable.json")]
+    )
+    assert exported.exit_code == 0, exported.output
+    assert json.loads((tmp_path / "cli-portable.json").read_text()) == view
+
     comparison = compare_runs(out, out)
     assert comparison.comparability.run_metrics_comparable
     assert not comparison.comparability.layers_comparable
