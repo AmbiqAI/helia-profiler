@@ -240,17 +240,7 @@ def parse_firmware_output(
     _check_presets(firmware_meta, list(presets))
     _check_iterations(presets, meta_kv.get(WireKey.ITERATIONS))
     if firmware_meta.per_layer_profiling is False:
-        if firmware_meta.num_presets != 0 or presets:
-            raise CaptureError("Model-only capture must announce zero PMU passes.")
-        if not (
-            in_session
-            and saw_end
-            and firmware_meta.clean_infer_count
-            and firmware_meta.clean_infer_count > 0
-            and firmware_meta.clean_infer_total_cycles
-            and firmware_meta.clean_infer_total_cycles > 0
-        ):
-            raise CaptureError("Model-only capture lacks complete clean-window timing.")
+        _check_model_timing(firmware_meta, presets, completed=in_session and saw_end)
 
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
@@ -315,6 +305,22 @@ def parse_firmware_output(
         groups=groups,
         raw_output=tuple(lines) if firmware_meta.per_layer_profiling is False else (),
     )
+
+
+def _check_model_timing(
+    meta: FirmwareMeta, presets: dict[str, _PresetData], *, completed: bool
+) -> None:
+    if meta.num_presets != 0 or presets:
+        raise CaptureError("Model-only capture must announce zero PMU passes.")
+    positive = (meta.clean_infer_count, meta.clean_infer_total_cycles, meta.clean_infer_avg_cycles)
+    microseconds = meta.clean_infer_avg_us
+    if (
+        not completed
+        or any(type(value) is not int or value <= 0 for value in positive)
+        or type(microseconds) is not int
+        or microseconds < 0
+    ):
+        raise CaptureError("Model-only capture lacks complete clean-window timing.")
 
 
 def _per_layer_capability(metadata: dict[str, Any]) -> bool | None:

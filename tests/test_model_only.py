@@ -103,12 +103,44 @@ def test_unknown_capability_is_rejected(replacement):
         "HPX_NUM_PRESETS=0",
         "HPX_CLEAN_INFER_COUNT=10",
         "HPX_CLEAN_INFER_TOTAL_CYCLES=10000",
+        "HPX_CLEAN_INFER_AVG_CYCLES=1000",
+        "HPX_CLEAN_INFER_AVG_US=4",
         "--- HPX_END ---",
     ],
 )
 def test_model_only_stream_requires_complete_evidence(drop):
     with pytest.raises(CaptureError):
         parse_firmware_output([line for line in _lines() if line != drop])
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("COUNT", "bad"),
+        ("TOTAL_CYCLES", "bad"),
+        ("AVG_CYCLES", "bad"),
+        ("AVG_US", "bad"),
+        ("COUNT", "0"),
+        ("TOTAL_CYCLES", "0"),
+        ("AVG_CYCLES", "0"),
+        ("AVG_US", "-1"),
+    ],
+)
+def test_invalid_model_timing_is_a_capture_error(field, value):
+    key = f"HPX_CLEAN_INFER_{field}="
+    lines = [key + value if line.startswith(key) else line for line in _lines()]
+    with pytest.raises(CaptureError, match="clean-window timing"):
+        parse_firmware_output(lines)
+
+
+def test_sub_microsecond_model_timing_retains_positive_cycle_measurement():
+    lines = [
+        "HPX_CLEAN_INFER_AVG_US=0" if line.startswith("HPX_CLEAN_INFER_AVG_US=") else line
+        for line in _lines()
+    ]
+    result = parse_firmware_output(lines)
+    assert result.meta.clean_infer_avg_us == 0
+    assert result.meta.clean_infer_avg_cycles == 1000
 
 
 def test_model_only_stream_does_not_accept_an_empty_announced_pass():
