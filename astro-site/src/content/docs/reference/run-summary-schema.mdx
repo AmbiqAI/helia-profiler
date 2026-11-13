@@ -27,6 +27,13 @@ checks that the rendered JSON still matches the assembled data. A dropped
 section, unmodelled field or changed value fails that check. The model owns
 emission order and omission of optional fields whose value is `None`.
 
+The optional `per_layer_profiling` boolean defaults to `true` when absent.
+An explicitly model-only summary records `false`, `layers: 0`, and
+`total_cycles: null`; its clean model measurements remain in `latency`.
+Its result manifest uses `bundle_type: "profile-model-only"`. This is an
+additive mode within the existing extensible envelope; ordinary `profile`
+bundles continue to require layer measurements. See [model-only results](../../guide/output/#model-only-results).
+
 Reading a summary alone does not verify a result bundle's hashes, establish
 measurement validity or establish comparability with another run. Use the
 verified result loaders described in [Re-analyse saved results](../../examples/reanalyse-results/),

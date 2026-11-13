@@ -112,3 +112,24 @@ def test_analysis_of_a_real_conversion_matches_the_source_model():
     pools = [layer for layer in compiled.layers if layer.op == "AVERAGE_POOL_2D"]
     assert [layer.params["filter_h"] for layer in pools] == [25]
     assert all(layer.ops > 0 for layer in pools)
+
+
+@pytest.mark.parametrize("schedule", ["table", "static"])
+def test_prepared_profiling_capability_matches_the_emitted_callback(tmp_path, schedule):
+    from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+
+    config = Session.from_dict(
+        {
+            "model": {"path": str(KWS)},
+            "engine": {
+                "type": "helia-aot",
+                "config": {"aot_args": {"module": {"schedule": schedule}}},
+            },
+            "target": {"board": BOARD},
+        }
+    ).resolve()
+    artifacts = HeliaAOTAdapter().prepare(config, tmp_path)
+    source = (tmp_path / "aot_output/hpx_model/src/hpx_model.c").read_text()
+    assert artifacts.per_layer_profiling is (schedule == "table")
+    assert ("ctx->callback(" in source) is artifacts.per_layer_profiling
+    assert artifacts.aot_op_manifest

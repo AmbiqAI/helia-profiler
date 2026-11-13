@@ -228,6 +228,8 @@ def _brief_compare_value(value: Any, *, limit: int = 56) -> str:
 def _friendly_metric_name(name: str) -> str:
     labels = {
         "total_cycles": "Total cycles",
+        "device_clean_infer_avg_cycles": "Clean model cycles",
+        "device_clean_infer_avg_us": "Clean model latency",
         "device_profiled_infer_avg_us": "Avg profiled inference",
         "device_profiled_infer_total_us": "Total profiled inference",
         "layers": "Layers",

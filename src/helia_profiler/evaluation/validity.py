@@ -209,15 +209,17 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
 
     if ctx.pmu_result is not None:
         meta = ctx.pmu_result.meta
-        # A clean window that completed inferences in zero elapsed time was
-        # timed by a clock that never moved. The power binary's twin of this
+        # Positive cycle totals distinguish sub-microsecond rounding from a
+        # stopped clock. The power binary's twin of this
         # rule (firmware_window_clock_is_frozen) runs only at the power
         # terminal, so a PROFILE-only STIMER window needs its own check
         # (#128). STIMER-window binaries report stimer_dead before the window
         # when the crystal is unfit (#110), so reaching this check without
         # that error points at a lost line on a lossy transport.
+        elapsed_cycles = meta.clean_infer_total_cycles
+        clock_advanced = type(elapsed_cycles) is int and elapsed_cycles > 0
         if meta.clean_infer_count and (
-            meta.clean_infer_avg_us == 0 or meta.clean_infer_total_cycles == 0
+            elapsed_cycles == 0 or (meta.clean_infer_avg_us == 0 and not clock_advanced)
         ):
             issues.append(
                 _warning(

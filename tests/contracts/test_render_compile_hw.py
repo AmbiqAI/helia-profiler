@@ -151,6 +151,15 @@ _MATRIX: tuple[_HwCase, ...] = (
         "hpx_profiler",
     ),
     _HwCase(
+        "510-aot-model-only",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_overrides=(("per_layer_profiling", False), ("pmu_passes", ()), ("pmu_pass_names", ())),
+    ),
+    _HwCase(
         "510-aot-profile-arenas",
         "apollo510_evb-arm-none-eabi-gcc-helia-aot",
         "apollo510_evb",
@@ -790,6 +799,7 @@ def test_matrix_covers_every_engine_family():
         "510-litert-profile",
         "510-litert-power",
         "510-aot-profile",
+        "510-aot-model-only",
         "510-aot-profile-arenas",
         "510-aot-profile-lcg",
         "510-aot-dcache-off",

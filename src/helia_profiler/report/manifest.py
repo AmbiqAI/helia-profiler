@@ -38,6 +38,7 @@ _MEDIA_TYPES = {
     ".csv": "text/csv",
     ".json": "application/json",
     ".lock": "application/yaml",
+    ".txt": "text/plain",
 }
 
 
@@ -68,7 +69,11 @@ def _write_result_manifest(
         provenance=_provenance(ctx),
         comparability=_comparability(ctx),
         artifacts=artifacts,
-        bundle_type="profile",
+        bundle_type=(
+            "profile-model-only"
+            if ctx.captured_pmu.meta.per_layer_profiling is False
+            else "profile"
+        ),
     )
     return manifest.write(output_dir / "result_manifest.json")
 
@@ -87,6 +92,8 @@ def _result_artifact(path: Path, output_dir: Path) -> ResultArtifact:
 
 def _artifact_metadata(relative: str) -> dict[str, Any]:
     """Classify known products without closing the manifest to new artifacts."""
+    if relative == "firmware_output.txt":
+        return _artifact_fields("diagnostic", "hpx.firmware-output", optional=True)
     name = Path(relative).name
     if name == "summary.json":
         return _artifact_fields(

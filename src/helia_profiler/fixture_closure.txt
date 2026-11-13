@@ -119,6 +119,7 @@ firmware/op_resolver.py
 firmware/project.py
 firmware/render.py
 firmware/templates/CMakeLists.txt.j2
+firmware/templates/_aot_layer_profiler.j2
 firmware/templates/_ble_reset.j2
 firmware/templates/_busy_loop_calibration.j2
 firmware/templates/_cache_shims.j2

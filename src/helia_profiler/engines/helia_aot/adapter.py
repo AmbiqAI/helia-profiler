@@ -46,6 +46,7 @@ from .compile import (
     effective_aot_args,
     effective_config_digest,
     effective_config_pairing_digest,
+    without_knob_values,
 )
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
 
@@ -345,6 +346,9 @@ class HeliaAOTAdapter:
         )
 
         compiler_args = effective_aot_args(compiler_config)
+        schedule = without_knob_values(compiler_args)["module"]["schedule"]
+        if schedule not in {"table", "static"}:
+            raise EngineError(f"Unknown heliaAOT profiling capability for schedule {schedule!r}")
         effective_config_sha256, effective_config_keys = effective_config_digest(
             compiler_args,
             module_name=module_name,
@@ -410,6 +414,7 @@ class HeliaAOTAdapter:
 
         return HeliaAotArtifacts(
             engine_type=EngineType.HELIA_AOT,
+            per_layer_profiling=schedule != "static",
             engine_backend=config.engine.backend,
             extra_modules=extra_modules,
             cmake_vars={

@@ -264,6 +264,14 @@ class PipelineContext:
     def publish_profile_result(self, result: PmuResult) -> None:
         if self.profile_run is None or self.profile_run.deployment is None:
             raise PipelineError("Profile firmware must be deployed before capture.")
+        expected_layers = (
+            self.engine_artifacts.per_layer_profiling if self.engine_artifacts else True
+        )
+        if (result.meta.per_layer_profiling is not False) != expected_layers:
+            raise CaptureError(
+                "Firmware per-layer profiling capability does not match the prepared engine.",
+                hint="Rebuild and flash the profile firmware for this module schedule.",
+            )
         reported = result.meta.dcache
         if reported not in (None, "on", "off"):
             raise CaptureError(f"Invalid firmware data-cache mode: {reported!r}")

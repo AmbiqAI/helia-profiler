@@ -397,6 +397,28 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    for power, probe in ((False, False), (True, False), (False, True)):
+        cases.append(
+            _CompileCase(
+                case_id=f"apollo510|rtt|helia-aot|transfer|model-only|power={power}|probe={probe}",
+                text=_render(
+                    "apollo510",
+                    "rtt",
+                    "helia-aot",
+                    power_only=power,
+                    overrides={
+                        "arena_regions": transfer_regions,
+                        "per_layer_profiling": False,
+                        "pmu_passes": [],
+                        "pmu_pass_names": [],
+                        "transfer_timeout_probe": probe,
+                    },
+                ),
+                vars=_common_kwargs("apollo510", "rtt"),
+                headers=aot_transfer_headers(),
+            )
+        )
+
     # profiling.stream_evidence on an unstreamed module (the reference capture):
     # PSRAM constants and no pool, so no stream facts and no provider header.
     cases.append(

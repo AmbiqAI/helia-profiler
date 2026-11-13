@@ -8,7 +8,7 @@
   },
   "counts": {
     "issues": 27,
-    "comparability": 7,
+    "comparability": 9,
     "families": 3,
     "familyCodes": 30
   },
@@ -265,6 +265,12 @@
       "metricGroup": null
     },
     {
+      "code": "metric.clean_timing_scope_mismatch",
+      "severity": "metric_blocking",
+      "description": "Clean model timing omitted because inference scope is unknown or differs.",
+      "metricGroup": "clean_timing"
+    },
+    {
       "code": "metric.power_integrity_invalid",
       "severity": "metric_blocking",
       "description": "Power metrics omitted because a power result's integrity is not valid.",
@@ -292,6 +298,12 @@
       "code": "topology.layer_count_mismatch",
       "severity": "layer_blocking",
       "description": "Per-layer deltas omitted because layer counts differ.",
+      "metricGroup": null
+    },
+    {
+      "code": "topology.layer_profiling_unavailable",
+      "severity": "layer_blocking",
+      "description": "Per-layer deltas unavailable for a model-only capture.",
       "metricGroup": null
     },
     {

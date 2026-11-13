@@ -154,6 +154,7 @@ def test_child_override_sets_are_the_documented_ones():
         "engine_profiler_on",
     }
     assert _blocks("main_aot.cc.j2") == REQUIRED_ENGINE_BLOCKS | {
+        "engine_pmu_storage_sram_resident",
         "engine_early_globals",
         "engine_io_metadata",
         "engine_model_setup",
@@ -421,8 +422,4 @@ def test_reserved_default_blocks_are_the_documented_set():
     claimed: set[str] = set()
     for child in CHILDREN:
         claimed |= _blocks(child)
-    assert base_blocks - claimed == {
-        # No engine keeps its per-layer storage in TCM yet, so the "true"
-        # default stands for all three children (#161).
-        "engine_pmu_storage_sram_resident",
-    }
+    assert base_blocks - claimed == set()

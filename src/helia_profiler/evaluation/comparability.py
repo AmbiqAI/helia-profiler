@@ -286,7 +286,37 @@ def assess_comparability(
 
     baseline_ops = [row.get("op") for row in baseline.layers]
     candidate_ops = [row.get("op") for row in candidate.layers]
-    if len(baseline.layers) != len(candidate.layers):
+    if any(run.summary.get("per_layer_profiling") is False for run in (baseline, candidate)):
+        scopes = [
+            (
+                nested_get(run.summary, "latency", "clean_workload"),
+                nested_get(run.metadata, "config", "profiling", "clean_window_probe"),
+            )
+            for run in (baseline, candidate)
+        ]
+        workload, probe = scopes[0]
+        if (
+            not isinstance(workload, str)
+            or not workload
+            or probe != "infer"
+            or scopes[0] != scopes[1]
+        ):
+            issues.append(
+                _issue(
+                    ComparabilityCode.METRIC_CLEAN_TIMING_SCOPE_MISMATCH,
+                    "Clean model timing omitted because recorded inference workloads or "
+                    "probes differ or are unknown.",
+                    baseline=scopes[0],
+                    candidate=scopes[1],
+                )
+            )
+        issues.append(
+            _issue(
+                ComparabilityCode.TOPOLOGY_LAYER_PROFILING_UNAVAILABLE,
+                "Per-layer deltas unavailable because a capture is model-only.",
+            )
+        )
+    elif len(baseline.layers) != len(candidate.layers):
         issues.append(
             _issue(
                 ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,

@@ -353,7 +353,10 @@ def print_results(console: HpxConsole, ctx: PipelineContext) -> None:
     if ctx.board is not None:
         overview.add_row("Board", ctx.board.name)
 
-    overview.add_row("Layers", str(len(layers)))
+    if meta.per_layer_profiling is False:
+        overview.add_row("Profiling", "model only (no per-layer callbacks)")
+    else:
+        overview.add_row("Layers", str(len(layers)))
     overview.add_row(
         "Total cycles",
         f"[bold cyan]{total_cycles:,.0f}[/bold cyan]"

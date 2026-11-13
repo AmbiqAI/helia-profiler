@@ -14,7 +14,7 @@ from ..modelcost import LayerAttributor
 from ..results import ComparisonDimension, ResultManifest, load_result_manifest
 from ..results.dimensions import ABSENT_AT_DEFAULT, DIMENSION_REGISTRY
 from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
-from ..results.run_summary import _require_current_summary
+from ..results.run_summary import RunSummary
 from ..results.serde import nested_get, to_float, write_dict_csv
 from .comparability import ComparabilityAssessment, assess_comparability, read_dimensions
 from .comparison_profile import (
@@ -211,7 +211,9 @@ def compare_runs(
 
     config_rows = _compare_config(baseline, candidate)
     include_groups = frozenset(
-        group for group in ("power", "memory") if comparability.metric_group_comparable(group)
+        group
+        for group in ("power", "memory", "clean_timing")
+        if comparability.metric_group_comparable(group)
     )
     metrics = _compare_metrics(
         baseline.summary,
@@ -262,7 +264,7 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     metadata_path = _declared_artifact(run_dir, "run_metadata.json", declared)
     summary = _read_json(summary_path)
     try:
-        _require_current_summary(summary)
+        RunSummary.from_dict(summary)
     except ValueError as exc:
         raise ReportError(str(exc)) from exc
     metadata = _read_json(metadata_path)
@@ -271,7 +273,14 @@ def load_run_artifacts(path: Path) -> RunArtifacts:
     json_path = run_dir / "profile_results.json"
     csv_available = csv_path.is_file() and "profile_results.csv" in declared
     json_available = json_path.is_file() and "profile_results.json" in declared
-    if csv_available:
+    model_only = manifest.bundle_type == "profile-model-only"
+    if model_only != (summary.get("per_layer_profiling") is False):
+        raise ReportError("Profile manifest and summary disagree about model-only capture.")
+    if model_only:
+        if csv_available or json_available or summary.get("layers") != 0:
+            raise ReportError("Model-only bundle declares per-layer results.")
+        layers = []
+    elif csv_available:
         layers = _read_layer_csv(csv_path)
     elif json_available:
         layers = _read_layer_json(json_path)

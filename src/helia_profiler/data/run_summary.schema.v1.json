@@ -176,6 +176,10 @@
           ]
         }
       }
+    },
+    "per_layer_profiling": {
+      "type": "boolean",
+      "description": "False for a model-only profile; absence retains per-layer profiling semantics."
     }
   },
   "additionalProperties": true

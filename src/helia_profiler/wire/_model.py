@@ -257,6 +257,7 @@ class WireKey(StrEnum):
     SYNC_GPIO = "sync_gpio"
     SYSTEM_CLOCK_HZ = "system_clock_hz"
     DCACHE = "dcache"
+    PER_LAYER_PROFILING = "per_layer_profiling"
     MEASURED_CLOCK_HZ = "measured_clock_hz"
     BURST_AVAIL = "burst_avail"
     BURST_ENGAGED = "burst_engaged"
@@ -474,6 +475,9 @@ def _spec(*args, **kwargs) -> WireSpec:
 # cannot silently become an unchecked condition.
 GATE_NOT_POWER_ONLY = "not power_only"
 GATE_DCACHE_METADATA = "has_dcache and not power_only"
+GATE_MODEL_ONLY = "not per_layer_profiling and not power_only"
+GATE_LAYER_PROFILE = "per_layer_profiling and not power_only"
+GATE_LAYER_CALLBACKS = "per_layer_profiling"
 GATE_DCACHE_OFF = "dcache == off and not power_only"
 GATE_TRANSPORT_HAS_READY_PREAMBLE = "not power_only and transport != usb_cdc"
 GATE_RTT_FLUSH = "not power_only and transport == rtt"
@@ -503,6 +507,6 @@ GATE_ATTACH_WAIT = (
 )
 GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
-GATE_PMU_PROFILE = "has_armv8m_pmu and not power_only"
+GATE_PMU_PROFILE = "has_armv8m_pmu and per_layer_profiling and not power_only"
 GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
 GATE_STREAM_EVIDENCE = "stream_evidence"

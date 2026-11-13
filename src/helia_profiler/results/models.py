@@ -72,7 +72,9 @@ class LayerResult:
 
 
 def total_layer_cycles(layers: Sequence[LayerResult]) -> float | None:
-    """Return a complete sum; a missing constituent is not a measured zero."""
+    """Return a complete sum; absent layers or cycles are not a measured zero."""
+    if not layers:
+        return None
     total = 0.0
     for layer in layers:
         if layer.cycles is None:
@@ -180,6 +182,8 @@ class FirmwareMeta:
     measured_clock_hz: int | None = None
     #: Data-cache policy reported by the firmware; absent in older streams.
     dcache: str | None = None
+    #: False for an explicitly model-only capture; absent in older streams.
+    per_layer_profiling: bool | None = None
 
     @property
     def reported_model_bytes(self) -> int | None:
@@ -288,6 +292,8 @@ class PmuResult:
     #: ``counters`` contain all columns for that compute unit, merged
     #: across multiple firmware passes.
     groups: dict[str, list[LayerResult]] = field(default_factory=dict)
+    #: Exact model-only stream, retaining optional tensor digests and diagnostics.
+    raw_output: tuple[str, ...] = ()
 
 
 @dataclass

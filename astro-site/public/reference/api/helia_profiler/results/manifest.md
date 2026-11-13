@@ -593,4 +593,4 @@ Load a result manifest and optionally verify its sibling artifacts.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/manifest.py:251`
+Source: `src/helia_profiler/results/manifest.py:258`

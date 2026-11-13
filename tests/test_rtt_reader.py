@@ -1722,8 +1722,8 @@ def test_firmware_meta_keeps_positional_order():
 
     names = [f.name for f in fields(FirmwareMeta)]
     assert names.index("profiled_infer_count") == names.index("system_clock_hz") + 1
-    assert names[-2:] == ["measured_clock_hz", "dcache"]
-    legacy_args = astuple(FirmwareMeta())[:-2] + (96_000_000,)
+    assert names.index("measured_clock_hz") < names.index("dcache")
+    legacy_args = astuple(FirmwareMeta())[: names.index("measured_clock_hz")] + (96_000_000,)
     meta = FirmwareMeta(*legacy_args)
     assert meta.measured_clock_hz == 96_000_000
     assert meta.dcache is None

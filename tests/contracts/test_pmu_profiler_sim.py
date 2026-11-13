@@ -203,10 +203,14 @@ _TEMPLATES = Path(__file__).parents[2] / "src" / "helia_profiler" / "firmware" /
 
 
 @pytest.mark.parametrize(
-    "template", ["hpx_pmu_profiler.cc.j2", "main_aot.cc.j2", "main_executorch.cc.j2"]
+    "template", ["hpx_pmu_profiler.cc.j2", "_aot_layer_profiler.j2", "main_executorch.cc.j2"]
 )
 def test_every_engine_reads_layers_through_the_shared_helper(template):
     source = (_TEMPLATES / template).read_text(encoding="utf-8")
+    if template == "_aot_layer_profiler.j2":
+        assert '{% include "_aot_layer_profiler.j2" %}' in (
+            _TEMPLATES / "main_aot.cc.j2"
+        ).read_text(encoding="utf-8")
 
     assert '{% include "_pmu_read.j2" %}' in source
     assert "hpx_pmu_read_layer(" in source
@@ -287,7 +291,7 @@ def _build_aot(tmp_path: Path, *, soc: str, max_ops: int) -> Path:
     region = _slice(
         text,
         "static constexpr int kMaxLayers",
-        "// AOT model context with profiling callback",
+        f"static {prefix}_model_context_t",
         keep_end=False,
     )
     print_block = _slice(

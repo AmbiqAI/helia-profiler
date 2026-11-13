@@ -101,6 +101,8 @@ def _write_summary(
         "total_cycles": total_cycles,
         "overflow_detected": pmu.overflow_detected,
     }
+    if meta.per_layer_profiling is False:
+        summary["per_layer_profiling"] = False
     if ctx.run_metadata.compatibility is not None:
         summary["compatibility"] = ctx.run_metadata.compatibility.to_dict()
     if ctx.run_metadata.dependencies is not None:

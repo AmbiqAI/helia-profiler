@@ -454,7 +454,7 @@ class RunSummary:
 
     engine: str
     layers: int
-    #: Complete sum of per-layer cycles, or None when any layer is missing.
+    #: Complete sum of per-layer cycles, or None when layer measurements are unavailable.
     #: Use :attr:`total_cycles_int` for a rounded reading.
     total_cycles: float | None
     overflow_detected: bool
@@ -481,6 +481,7 @@ class RunSummary:
     power: PowerSection | None = None
     latency: LatencySection | None = None
     extras: Mapping[str, Any] = field(default_factory=dict)
+    per_layer_profiling: bool = field(default=True, kw_only=True)
 
     @property
     def total_cycles_int(self) -> int | None:
@@ -497,6 +498,8 @@ class RunSummary:
             "total_cycles": self.total_cycles,
             "overflow_detected": self.overflow_detected,
         }
+        if not self.per_layer_profiling:
+            out["per_layer_profiling"] = False
         _put(out, "compatibility", self.compatibility)
         _put(out, "dependencies", self.dependencies)
         _put(out, "identity", self.identity)
@@ -529,6 +532,11 @@ class RunSummary:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> RunSummary:
         _require_current_summary(data)
+        per_layer = data.get("per_layer_profiling", True)
+        if type(per_layer) is not bool:
+            raise ValueError("per_layer_profiling must be a boolean")
+        if not per_layer and (data.get("layers") != 0 or data.get("total_cycles") is not None):
+            raise ValueError("Model-only summaries cannot contain per-layer measurements")
         known = {
             "schema",
             "schema_version",
@@ -536,6 +544,7 @@ class RunSummary:
             "layers",
             "total_cycles",
             "overflow_detected",
+            "per_layer_profiling",
             "compatibility",
             "dependencies",
             "identity",
@@ -564,6 +573,7 @@ class RunSummary:
             layers=to_int(data.get("layers")) or 0,
             total_cycles=data.get("total_cycles"),
             overflow_detected=bool(data.get("overflow_detected", False)),
+            per_layer_profiling=per_layer,
             validity=(str(data["validity"]) if data.get("validity") is not None else None),
             issues=_tuple_of_mappings(data.get("issues")),
             schema=str(data.get("schema", RUN_SUMMARY_SCHEMA)),
