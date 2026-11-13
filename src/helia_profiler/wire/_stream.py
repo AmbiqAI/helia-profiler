@@ -18,6 +18,9 @@ from ._model import (
     GATE_CLEAN_WINDOW_TRACE,
     GATE_DCACHE_METADATA,
     GATE_HAS_ETHOS_U,
+    GATE_LAYER_CALLBACKS,
+    GATE_LAYER_PROFILE,
+    GATE_MODEL_ONLY,
     GATE_NOT_POWER_ONLY,
     GATE_NOT_STIMER_WINDOW,
     GATE_POWER_ONLY,
@@ -78,6 +81,7 @@ SENTINEL_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
         condition=GATE_NOT_POWER_ONLY,
+        engine_conditions={EngineType.HELIA_AOT: GATE_LAYER_PROFILE},
         literal="--- HPX_PRESET <name> ---",
         value_shape="pass name (no spaces)",
     ),
@@ -88,6 +92,7 @@ SENTINEL_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.TRANSPORT_CONTROL,
         WireCriticality.PROTOCOL,
         condition=GATE_NOT_POWER_ONLY,
+        engine_conditions={EngineType.HELIA_AOT: GATE_LAYER_PROFILE},
         literal="--- HPX_ITER <n> ---",
         value_shape="decimal iteration index",
         note="A stream with iterations but no preset marker is legacy; the "
@@ -156,6 +161,19 @@ HANDSHAKE_SPECS: tuple[WireSpec, ...] = (
 
 
 START_HEADER_SPECS: tuple[WireSpec, ...] = (
+    _spec(
+        WireKey.PER_LAYER_PROFILING.wire,
+        WireKind.KEY_VALUE,
+        "Explicit model-only capture: no per-operator passes or layer results.",
+        WireConsumer.FIRMWARE_META,
+        WireCriticality.PROTOCOL,
+        key=WireKey.PER_LAYER_PROFILING,
+        condition=GATE_MODEL_ONLY,
+        engines=AOT_ENGINES,
+        value_shape="0",
+        note="Requires zero announced passes and a complete clean model window. "
+        "Absence retains legacy per-layer expectations.",
+    ),
     _spec(
         WireKey.DCACHE.wire,
         WireKind.KEY_VALUE,
@@ -891,6 +909,7 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
         "Progress inside an instrumented inference, between operators.",
         WireConsumer.DIAGNOSTIC,
         WireCriticality.DIAGNOSTIC,
+        engine_conditions={EngineType.HELIA_AOT: GATE_LAYER_CALLBACKS},
         value_shape="pass=<n> iter=<n> layer=<n>",
         runtime_gate="heartbeat cadence reached (ops or elapsed time)",
         note="Three emit sites, one format: TFLM's profiler class, heliaAOT's "
@@ -904,6 +923,7 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
         WireConsumer.DIAGNOSTIC,
         WireCriticality.DIAGNOSTIC,
         condition=GATE_NOT_POWER_ONLY,
+        engine_conditions={EngineType.HELIA_AOT: GATE_LAYER_PROFILE},
         value_shape="pass=<n>",
     ),
     _spec(

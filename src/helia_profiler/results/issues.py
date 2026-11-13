@@ -328,6 +328,7 @@ class ComparabilityCode(StrEnum):
     IDENTITY_MODEL_MISMATCH = "identity.model_mismatch"
     METRIC_POWER_INTEGRITY_INVALID = "metric.power_integrity_invalid"
     TOPOLOGY_LAYER_COUNT_MISMATCH = "topology.layer_count_mismatch"
+    TOPOLOGY_LAYER_PROFILING_UNAVAILABLE = "topology.layer_profiling_unavailable"
     TOPOLOGY_OPERATION_SEQUENCE_MISMATCH = "topology.operation_sequence_mismatch"
 
 
@@ -378,6 +379,11 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,
         ComparabilitySeverity.LAYER_BLOCKING,
         "Per-layer deltas omitted because layer counts differ.",
+    ),
+    ComparabilitySpec(
+        ComparabilityCode.TOPOLOGY_LAYER_PROFILING_UNAVAILABLE,
+        ComparabilitySeverity.LAYER_BLOCKING,
+        "Per-layer deltas unavailable for a model-only capture.",
     ),
     ComparabilitySpec(
         ComparabilityCode.TOPOLOGY_OPERATION_SEQUENCE_MISMATCH,

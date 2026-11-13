@@ -25,14 +25,18 @@
    Read those docstrings — and _main_base.cc.j2's prelude — for the full
    dead-DWT / busy-loop-STIMER rationale (issues #106/#107/#112). #}
 
+{% set per_layer_profiling = per_layer_profiling | default(true) %}
+
+{% block engine_pmu_storage_sram_resident %}{{ "true" if per_layer_profiling else "false" }}{% endblock %}
+
 {% block engine_file_header %}
 /**
  * @file main.cc
  * @brief heliaPROFILER firmware (heliaAOT) — auto-generated, do not edit.
  *
- * Runs AOT-compiled inference with per-layer PMU profiling via the model
- * operator callback.  Emits CSV results over {{ transport | upper }} for the host-side
- * capture stage to parse.
+ * Runs AOT-compiled inference with whole-model timing and, when supported,
+ * per-layer PMU profiling via the operator callback. Results travel over
+ * {{ transport | upper }} to the host capture stage.
  */
 {%- endblock %}
 
@@ -76,330 +80,14 @@
 {%- endblock %}
 
 {% block engine_globals %}
-// Large proxy models can compile to well over 2048 operators; keep enough
-// headroom here to avoid silently truncating the capture stream. Templated
-// from soc.pmu_max_ops (not hardcoded -- see hpx_pmu_profiler.h.j2's
-// kMaxLayers for the analogous heliaRT constant: a fixed 4096 here is
-// ~96 KB of g_layers[] alone, meaningful on 240 KB-TCM parts).
-static constexpr int kMaxLayers = {{ pmu_max_ops }};
-static constexpr int kMaxEvents = 4;
-
-struct HpxLayerRecord {
-    uint32_t counters[kMaxEvents];
-    bool overflow;
-};
-
-{% if has_armv8m_pmu %}
-static nsx_pmu_config_t g_pmu_cfg;
-{% include "_pmu_read.j2" %}
-
-// Restarts the event counters; DWT->CYCCNT, which times the run, keeps counting.
-static inline void hpx_pmu_restart(void) {
-    uint32_t saved_cyccnt = DWT->CYCCNT;
-    nsx_pmu_reset_counters();
-    DWT->CYCCNT = saved_cyccnt;
-#if (__CORTEX_M >= 55U)
-    ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
-#endif
-}
-{% else %}
-static uint32_t g_op_start_cyccnt = 0;
+{% if per_layer_profiling %}
+{% include "_aot_layer_profiler.j2" %}
 {% endif %}
-{% if not power_only | default(false) %}
-// g_layers is plain-old-data (no vtable), so unlike heliaRT's polymorphic
-// HpxPmuProfiler (main.cc.j2) it's safe in a NOLOAD/zero-init section --
-// no initialized image needs preserving. Moved off TCM for the same
-// reason as that fix: this array alone is kMaxLayers*(4*4+1, padded to
-// 20) bytes -- 80 KB at the default 4096 -- a meaningful bite out of
-// AP330's 240 KB TCM budget when combined with the arena and any
-// per-tensor TCM placement overrides. power_only builds never run
-// per-layer profiling, so this only needs the SRAM move in the
-// transport-attached binary.
-//
-// AP5 family requires the shared SSRAM power domain to be explicitly
-// powered on for this array to be readable/writable (see
-// _ssram_power.j2, driven by pmu_profiler_sram_resident before its
-// include in main()) -- without it a TCM-resident-arena render leaves
-// the domain off and per-layer writes land in an unbacked bank.
-NSX_MEM_SRAM_BSS static HpxLayerRecord g_layers[kMaxLayers];
-{% else %}
-static HpxLayerRecord g_layers[kMaxLayers];
-{% endif %}
-static int g_num_layers = 0;
-static bool g_layer_capacity_exceeded = false;
 // The model_run status that ended the last loop early: a loop stops at its
 // first failed run and the check after the loop reports it.
 static int32_t hpx_aot_status = 0;
-static int g_num_counters = 0;
-static bool g_profiler_enabled = false;
-static const char* g_counter_names[kMaxEvents] = {};
-{% if not power_only | default(false) %}
-
-#ifdef HPX_AOT_TRANSFER
-// Per instrumented run, beside the layer records: for each transfer unit's
-// issue and each operator's run, whether the MSPI controller's DMA was in
-// progress (bit 0) and nsx-psram had reads pending (bit 1) at both ends; the
-// L1D refills over each unit's issue window; and a latch for the provider's
-// power clause.
-static uint8_t g_transfer_unit_overlap[{{ aot_prefix }}_num_transfer_units];
-NSX_MEM_SRAM_BSS static uint8_t g_transfer_op_overlap[kMaxLayers];
-{% if has_armv8m_pmu %}
-static uint32_t g_transfer_unit_refills[{{ aot_prefix }}_num_transfer_units];
-static int g_transfer_refill_slot = -1;
-{% endif %}
-static bool g_transfer_power_clause = false;
-static uint32_t g_transfer_sample_failures = 0;
-static {{ aot_prefix }}_nsx_transfer_stats_t g_transfer_stats_before;
-
-// One sample: bit 0 when the DMA-in-progress bit read set, bit 1 when
-// nsx-psram had reads pending, bit 2 when the bit could not be read, which is
-// no evidence either way.
-static uint8_t hpx_transfer_sample(void) {
-    bool dma = false;
-    const bool sampled = nsx_psram_dma_in_progress(&dma) == 0U;
-    if (!sampled) {
-        ++g_transfer_sample_failures;
-    }
-    return (uint8_t)((sampled ? (dma ? 1U : 0U) : 4U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
-}
-
-// Both ends: a flag holds only when set at both, and an end not sampled
-// leaves the DMA flag unknown.
-static inline uint8_t hpx_transfer_ends(uint8_t first, uint8_t last) {
-    return (uint8_t)((first & last & 3U) | ((first | last) & 4U));
-}
-#endif
-{% endif %}
-
-// Heartbeat state — cheap counters/timestamps updated on each op finish so
-// the host can detect a hung run without wall-clock timeouts.
-static uint32_t g_hb_every_cyc = 0;
-static int      g_hb_every_ops = 0;
-static uint32_t g_hb_last_cyc = 0;
-static int      g_hb_ops_since = 0;
-static int      g_hb_pass = 0;
-static int      g_hb_iter = 0;
-
-// AOT operator name table — extracted from the AIR graph by heliaPROFILER.
-// Maps sequential execution index → operator type string.
-// heliaAOT may fuse/remove ops, so this reflects the *actual* compiled graph.
-{% if aot_op_manifest %}
-static constexpr int kNumAotOps = {{ aot_op_manifest | length }};
-struct AotOpInfo {
-    int32_t id;           // .tflite operator index; -1 when it has none or several
-    const char *op_type;  // e.g. "CONV_2D", "FULLY_CONNECTED"
-};
-static const AotOpInfo kAotOps[kNumAotOps] = {
-{% for op in aot_op_manifest %}
-    { {{ op.id }}, "{{ op.op_type | upper }}" },
-{% endfor %}
-};
-
-static const char *aot_op_name(int layer_idx) {
-    if (layer_idx >= 0 && layer_idx < kNumAotOps) return kAotOps[layer_idx].op_type;
-    return "unknown";
-}
-
-static int32_t aot_op_id(int layer_idx) {
-    if (layer_idx >= 0 && layer_idx < kNumAotOps) return kAotOps[layer_idx].id;
-    return layer_idx;
-}
-{% else %}
-// No operator manifest available — fall back to index-based names.
-static const char *aot_op_name(int /*layer_idx*/) { return "op"; }
-static int32_t aot_op_id(int layer_idx) { return layer_idx; }
-{% endif %}
-
-{% if has_armv8m_pmu %}
-static void profiler_set_counter_names(const char* const names[], int num_names) {
-    int limit = (num_names > kMaxEvents) ? kMaxEvents : num_names;
-    if (limit < 0) {
-        limit = 0;
-    }
-    for (int i = 0; i < limit; i++) {
-        g_counter_names[i] = names[i];
-    }
-    for (int i = limit; i < kMaxEvents; i++) {
-        g_counter_names[i] = nullptr;
-    }
-}
-
-static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
-    nsx_pmu_reset_config(&g_pmu_cfg);
-    g_pmu_cfg.api = &nsx_pmu_V1_0_0;
-    int n = (num_events > kMaxEvents) ? kMaxEvents : num_events;
-    for (int i = 0; i < n; i++) {
-        nsx_pmu_event_create(&g_pmu_cfg.events[i], event_ids[i],
-                            NSX_PMU_EVENT_COUNTER_SIZE_32);
-    }
-    nsx_pmu_init(&g_pmu_cfg);
-    g_num_counters = n;
-}
-{% else %}
-static void profiler_init_custom(const uint32_t[], int) {
-    g_num_counters = 1;
-}
-{% endif %}
-
-static void profiler_clear(void) {
-    g_num_layers = 0;
-    g_layer_capacity_exceeded = false;
-}
-
-static void profiler_print_csv(void) {
-    if (g_num_layers == 0) return;
-    hpx_printf("\"Layer\",\"Op\"");
-{% if has_armv8m_pmu %}
-    for (int e = 0; e < g_num_counters; e++) {
-        if (!g_pmu_cfg.events[e].enabled) break;
-        if (g_counter_names[e] != nullptr)
-            hpx_printf(",\"%s\"", g_counter_names[e]);
-        else
-            hpx_printf(",\"0x%04lx\"", (unsigned long)g_pmu_cfg.events[e].eventId);
-    }
-{% else %}
-    hpx_printf(",\"ARM_PMU_CPU_CYCLES\"");
-{% endif %}
-    hpx_printf(",\"overflow\"\n");
-    for (int i = 0; i < g_num_layers; i++) {
-        const auto &rec = g_layers[i];
-        // Print: Layer index, Op type with AOT operator ID for uniqueness.
-        // Format: "CONV_2D:3" — type:id, so the host can disambiguate
-        // multiple operators of the same type.
-        hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));
-        for (int e = 0; e < g_num_counters; e++) {
-    {% if has_armv8m_pmu %}
-            if (!g_pmu_cfg.events[e].enabled) break;
-    {% endif %}
-            hpx_printf(",%lu", (unsigned long)rec.counters[e]);
-        }
-        hpx_printf(",%d\n", rec.overflow ? 1 : 0);
-    }
-}
-
-// AOT operator callback — PMU start/stop per operator.  This is heliaAOT's
-// equivalent of heliaRT's per-op profiler hooks.
-static void model_operator_cb(
-    int32_t op,
-    {{ aot_prefix }}_operator_state_t state,
-    int32_t status,
-    void *user_data
-) {
-    (void)op;
-    (void)status;
-    (void)user_data;
-
-    if (!g_profiler_enabled) return;
-{% if not power_only | default(false) %}
-
-#ifdef HPX_AOT_TRANSFER
-    // Transfer states arrive outside every operator's run window; for them
-    // op is the unit id.
-    if (state == {{ aot_prefix }}_op_state_transfer_wait_started) {
-        // A dma unit's pieces are in flight until this wait: deep sleep must
-        // be refused.
-        if ({{ aot_prefix }}_nsx_transfer_can_sleep()) {
-            g_transfer_power_clause = true;
-        }
-        return;
-    }
-    if (state == {{ aot_prefix }}_op_state_transfer_issue_started ||
-        state == {{ aot_prefix }}_op_state_transfer_issue_finished) {
-        if (op < 0 || op >= {{ aot_prefix }}_num_transfer_units) {
-            return;
-        }
-        if (state == {{ aot_prefix }}_op_state_transfer_issue_started) {
-            g_transfer_unit_overlap[op] = hpx_transfer_sample();
-{% if has_armv8m_pmu %}
-            if (g_transfer_refill_slot >= 0) {
-                hpx_pmu_restart();
-            }
-{% endif %}
-        } else {
-{% if has_armv8m_pmu %}
-            if (g_transfer_refill_slot >= 0) {
-                (void)hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters);
-                g_transfer_unit_refills[op] = g_pmu_cfg.counter[g_transfer_refill_slot].counterValue;
-            }
-{% endif %}
-            g_transfer_unit_overlap[op] = hpx_transfer_ends(g_transfer_unit_overlap[op], hpx_transfer_sample());
-        }
-        return;
-    }
-    if (state == {{ aot_prefix }}_op_state_run_started && g_num_layers < kMaxLayers) {
-        g_transfer_op_overlap[g_num_layers] = hpx_transfer_sample();
-    }
-#endif
-{% endif %}
-
-    if (state == {{ aot_prefix }}_op_state_run_started) {
-{% if has_armv8m_pmu %}
-        // Reset PMU counters at the start of each operator
-        hpx_pmu_restart();
-{% else %}
-    g_op_start_cyccnt = DWT->CYCCNT;
-{% endif %}
-    } else if (state == {{ aot_prefix }}_op_state_run_finished) {
-        // Read PMU counters after each operator completes
-        if (g_num_layers >= kMaxLayers) {
-            g_layer_capacity_exceeded = true;
-            return;
-        }
-        int idx = g_num_layers++;
-{% if has_armv8m_pmu %}
-        g_layers[idx].overflow = hpx_pmu_read_layer(&g_pmu_cfg, g_num_counters);
-        for (int i = 0; i < g_num_counters; i++) {
-            g_layers[idx].counters[i] = g_pmu_cfg.counter[i].counterValue;
-        }
-    {% else %}
-        g_layers[idx].counters[0] = DWT->CYCCNT - g_op_start_cyccnt;
-        g_layers[idx].overflow = false;
-    {% endif %}
-{% if not power_only | default(false) %}
-#ifdef HPX_AOT_TRANSFER
-        g_transfer_op_overlap[idx] = hpx_transfer_ends(g_transfer_op_overlap[idx], hpx_transfer_sample());
-#endif
-{% endif %}
-        // Heartbeat emission (inter-op gap, not contaminating a layer)
-        ++g_hb_ops_since;
-        const bool by_ops = (g_hb_every_ops > 0) &&
-                            (g_hb_ops_since >= g_hb_every_ops);
-        bool by_time = false;
-        if (g_hb_every_cyc > 0) {
-            uint32_t now = DWT->CYCCNT;
-            uint32_t delta = now - g_hb_last_cyc;
-            by_time = (delta >= g_hb_every_cyc);
-        }
-        if (by_ops || by_time) {
-            hpx_printf("HPX_HEARTBEAT phase=infer pass=%d iter=%d layer=%d\n",
-                       g_hb_pass, g_hb_iter, g_num_layers);
-            g_hb_last_cyc = DWT->CYCCNT;
-            g_hb_ops_since = 0;
-        }
-    }
-}
-
-// AOT model context with profiling callback
-// ---------------------------------------------------------------------------
-{% if has_ethos_u | default(false) and not power_only | default(false) %}
-// Engine seams for the engine-agnostic _npu_pmu.j2 (see its header). The
-// driver hooks fire inside an operator's run window, i.e. after the
-// callback's run_started (g_num_layers not yet incremented) and before
-// run_finished assigns this record index — so the executing layer's ordinal
-// is exactly g_num_layers.
-#define HPX_NPU_MAX_LAYERS kMaxLayers
-static inline int hpx_npu_current_layer(void) { return g_num_layers; }
-static inline int hpx_npu_num_layers(void) { return g_num_layers; }
-static inline void hpx_npu_print_row_head(int i) {
-    // Same "TYPE:id" tag as profiler_print_csv() so the host merges this
-    // preset with ARM-PMU presets by layer index and tag.
-    hpx_printf("%d,%s:%ld", i, aot_op_name(i), (long)aot_op_id(i));
-}
-{% include "_npu_pmu.j2" %}
-{% endif %}
-
 static {{ aot_prefix }}_model_context_t {{ aot_prefix }}_model_ctx = {
-    .callback = model_operator_cb,
+    .callback = {{ "model_operator_cb" if per_layer_profiling else "nullptr" }},
     .user_data = nullptr
 };
 
@@ -455,7 +143,7 @@ static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *opt
         hpx_transfer_bind_failed(status);
     }
 }
-{% if not power_only | default(false) %}
+{% if not power_only | default(false) and per_layer_profiling %}
 
 // Before each instrumented run: clears the run's evidence and notes the
 // provider's counters, which the report after the run turns into deltas.
@@ -550,7 +238,7 @@ static void hpx_aot_check_runs(void) {
 // a provider, a broken power clause fails the capture the same way.
 static void hpx_aot_check_runs(void) {
 #ifdef HPX_AOT_TRANSFER
-    if (hpx_aot_status == 0 && !g_transfer_power_clause) {
+    if (hpx_aot_status == 0 && {% if per_layer_profiling %}!g_transfer_power_clause{% else %}{{ aot_prefix }}_nsx_transfer_can_sleep(){% endif %}) {
         return;
     }
 #else
@@ -597,10 +285,12 @@ static void hpx_aot_check_runs(void) {
     hpx_printf("HPX_HEARTBEAT_ENABLED=%d\n", (int)kHbEnabled);
     hpx_printf("HPX_HEARTBEAT_EVERY_N_OPS=%d\n", kHbEveryNOps);
     hpx_printf("HPX_HEARTBEAT_EVERY_MS=%lu\n", (unsigned long)kHbEveryMs);
+{% if per_layer_profiling %}
     g_hb_every_cyc = (kHbEnabled && kHbEveryMs > 0)
         ? (uint32_t)((uint64_t)SystemCoreClock / 1000U * kHbEveryMs)
         : 0U;
     g_hb_every_ops = kHbEnabled ? kHbEveryNOps : 0;
+{% endif %}
 
     hpx_printf("HPX_HEARTBEAT phase=init\n");
 {%- endblock %}
@@ -765,7 +455,7 @@ static void hpx_aot_check_runs(void) {
     hpx_printf("HPX_STREAM_EVIDENCE=1\n");{% endif %}
 {%- endblock %}
 
-{% block engine_profiler_off %}        g_profiler_enabled = false;{% endblock %}
+{% block engine_profiler_off %}{% if per_layer_profiling %}        g_profiler_enabled = false;{% endif %}{% endblock %}
 
 {# The two reset-inputs blocks are multi-line but carry NO leading or trailing
    newline of their own: the base reuses each at several sites by calling it
@@ -791,18 +481,19 @@ static void hpx_aot_check_runs(void) {
 hpx_aot_check_runs();{% endblock %}
 
 {% block engine_window_prologue %}
+{% if per_layer_profiling %}
         // model_operator_cb() is a no-op during this window (guarded by
         // g_profiler_enabled), but the AOT runtime still dispatches it via
         // an indirect call for every operator start/finish
         // ({{ aot_prefix }}_model.c already null-checks ctx->callback before
         // calling it) -- AutoDeploy's power binary has no callback at all.
         // Drop to nullptr for the measured window; restored right after.
-        {{ aot_prefix }}_model_ctx.callback = nullptr;
+{% endif %}        {{ aot_prefix }}_model_ctx.callback = nullptr;
 {%- endblock %}
 
-{% block engine_window_restore %}        // Restore the per-op callback for the instrumented per-layer passes below.
+{% block engine_window_restore %}{% if per_layer_profiling %}        // Restore the per-op callback for the instrumented per-layer passes below.
         {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
-{% endblock %}
+{% endif %}{% endblock %}
 
 {# heliaAOT re-arms the profiler per pass (engine_pass_profile_arm), so there
    is nothing to re-enable at the end of the clean window. #}
@@ -959,7 +650,10 @@ hpx_aot_check_runs();{% endblock %}
 {%- endblock %}
 
 {% block engine_profiled_summary %}
-{% if has_ethos_u | default(false) %}
+{% if not per_layer_profiling and not power_only | default(false) %}
+    hpx_print_output_digests();
+{% endif %}
+{% if has_ethos_u | default(false) and per_layer_profiling %}
     // Passes are done; leave NPU PMU tracking disabled rather than armed on
     // whatever group happened to run last.
     hpx_npu_set_enabled(false);

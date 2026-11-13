@@ -185,6 +185,7 @@ class PmuContext:
     #: ``soc.pmu_max_ops`` — sizes the per-layer instrumentation storage in
     #: every engine's firmware (kMaxLayers / kMaxOps).
     pmu_max_ops: int
+    per_layer_profiling: bool = True
 
 
 @dataclass(frozen=True)
@@ -276,6 +277,11 @@ class FirmwareRenderContext:
         soc = ctx.resolved_soc
         board = ctx.resolved_board
         artifacts = ctx.prepared_artifacts
+        if not artifacts.per_layer_profiling and config.profiling.stream_evidence:
+            raise FirmwareError(
+                "profiling.stream_evidence requires per-layer callbacks.",
+                hint="Use module.schedule: table for instrumented transfer evidence.",
+            )
         engine_type = artifacts.engine_type
         arena_region = ctx.arena_region or Placement.TCM
         weights_region = ctx.weights_region or Placement.MRAM
@@ -370,7 +376,8 @@ class FirmwareRenderContext:
             temporary_arena_region = default_executorch_region
             io_region = default_executorch_region
 
-        pmu_passes = tuple(_resolve_pmu_passes(config, soc))
+        per_layer_profiling = artifacts.per_layer_profiling
+        pmu_passes = tuple(_resolve_pmu_passes(config, soc)) if per_layer_profiling else ()
         transport = config.target.transport
         printf_linkage = "static " if engine_type is EngineType.HELIA_AOT else ""
         return cls(
@@ -396,6 +403,7 @@ class FirmwareRenderContext:
                 dcache=config.profiling.dcache,
             ),
             pmu=PmuContext(
+                per_layer_profiling=per_layer_profiling,
                 pmu_passes=pmu_passes,
                 pmu_pass_names=tuple(p.name for p in pmu_passes),
                 has_armv8m_pmu="armv8m-pmu" in soc.profiling_backends,
@@ -515,6 +523,7 @@ class FirmwareRenderContext:
             "force_shared_sram": self.memory.force_shared_sram,
             "psram_clock_hz": self.memory.psram_clock_hz,
             "pmu_passes": self.pmu.pmu_passes,
+            "per_layer_profiling": self.pmu.per_layer_profiling,
             "pmu_pass_names": self.pmu.pmu_pass_names,
             "has_armv8m_pmu": self.pmu.has_armv8m_pmu,
             "cmsis_device_header": self.pmu.cmsis_device_header,

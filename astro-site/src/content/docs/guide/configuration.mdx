@@ -168,6 +168,30 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     engines.
   - Without the setting, no capture is poisoned or invalidated.
 
+#### Static heliaAOT schedules
+
+Select a static schedule through the heliaAOT configuration:
+
+```yaml
+engine:
+  type: helia-aot
+  config:
+    aot_args:
+      module:
+        schedule: static
+```
+
+Use the same mapping with `Session.from_dict(...)`, or pass the `config`
+mapping to `Session.with_engine("helia-aot", config=...)`. Run the YAML with
+`hpx profile model.tflite --config hpx.yml`.
+
+A static module omits per-operator callbacks. HPX records this capability,
+plans no per-layer PMU passes, and keeps the clean whole-model timing and
+compiler metadata. The result is a [model-only bundle](../output/#model-only-results).
+`profiling.stream_evidence` requires callbacks and is refused for this schedule;
+use `module.schedule: table` for per-layer counters and instrumented transfer
+evidence. Table schedules and interpreter engines retain their layer requirements.
+
 #### Data-cache policy
 
 For an Apollo5 profiler run, use `profiling.dcache: "off"` to disable the

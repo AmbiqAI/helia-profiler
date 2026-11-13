@@ -314,6 +314,24 @@ def _matrix() -> list[_Render]:
                 _Render(f"{soc}|rtt|{engine}|power", soc, "rtt", engine, power_only=True)
             )
 
+    for power in (False, True):
+        for npu in (False, True):
+            renders.append(
+                _Render(
+                    f"apollo510|rtt|helia-aot|model-only|power={power}|npu={npu}",
+                    "apollo510",
+                    "rtt",
+                    "helia-aot",
+                    power_only=power,
+                    overrides={
+                        "per_layer_profiling": False,
+                        "pmu_passes": [],
+                        "pmu_pass_names": [],
+                        "has_ethos_u": npu,
+                    },
+                )
+            )
+
     # Each entry flips one declarative condition; the census below asserts
     # that WIRE_CONDITIONS is exactly the set these renders exercise.
     renders += [
@@ -685,6 +703,11 @@ def _attach_wait(v: dict) -> bool:
 #: ``WIRE_CONDITIONS`` — a condition invented in ``wire.py`` without a
 #: predicate here cannot slip through unchecked.
 _PREDICATES = {
+    "not per_layer_profiling and not power_only": lambda v: not v.get("per_layer_profiling", True)
+    and not _power(v),
+    "per_layer_profiling and not power_only": lambda v: v.get("per_layer_profiling", True)
+    and not _power(v),
+    "per_layer_profiling": lambda v: v.get("per_layer_profiling", True),
     "has_dcache and not power_only": lambda v: bool(v.get("has_dcache")) and not _power(v),
     "dcache == off and not power_only": lambda v: v.get("dcache", "on") == "off" and not _power(v),
     "not power_only": lambda v: not _power(v),
@@ -714,7 +737,11 @@ _PREDICATES = {
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
-    "has_armv8m_pmu and not power_only": lambda v: bool(v["has_armv8m_pmu"]) and not _power(v),
+    "has_armv8m_pmu and per_layer_profiling and not power_only": lambda v: v.get(
+        "per_layer_profiling", True
+    )
+    and bool(v["has_armv8m_pmu"])
+    and not _power(v),
     "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
         lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)

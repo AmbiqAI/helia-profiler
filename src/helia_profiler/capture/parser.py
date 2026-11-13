@@ -206,6 +206,7 @@ def parse_firmware_output(
     if dcache not in (None, "on", "off"):
         raise CaptureError(f"Invalid HPX_DCACHE mode: {dcache!r}")
     firmware_meta = FirmwareMeta(
+        per_layer_profiling=_per_layer_capability(meta_kv),
         dcache=dcache,
         model_size=meta_kv.get(WireKey.MODEL_SIZE),
         arena_size=meta_kv.get(WireKey.ARENA_SIZE),
@@ -238,6 +239,18 @@ def parse_firmware_output(
     )
     _check_presets(firmware_meta, list(presets))
     _check_iterations(presets, meta_kv.get(WireKey.ITERATIONS))
+    if firmware_meta.per_layer_profiling is False:
+        if firmware_meta.num_presets != 0 or presets:
+            raise CaptureError("Model-only capture must announce zero PMU passes.")
+        if not (
+            in_session
+            and saw_end
+            and firmware_meta.clean_infer_count
+            and firmware_meta.clean_infer_count > 0
+            and firmware_meta.clean_infer_total_cycles
+            and firmware_meta.clean_infer_total_cycles > 0
+        ):
+            raise CaptureError("Model-only capture lacks complete clean-window timing.")
 
     typed_presets: dict[str, PresetResult] = {}
     for name, pd in presets.items():
@@ -300,7 +313,17 @@ def parse_firmware_output(
         layers=merged_layers,
         overflow_detected=overflow_detected,
         groups=groups,
+        raw_output=tuple(lines) if firmware_meta.per_layer_profiling is False else (),
     )
+
+
+def _per_layer_capability(metadata: dict[str, Any]) -> bool | None:
+    value = metadata.get(WireKey.PER_LAYER_PROFILING)
+    if value is None:
+        return None
+    if type(value) is not int or value not in (0, 1):
+        raise CaptureError(f"Invalid HPX_PER_LAYER_PROFILING value: {value!r}")
+    return bool(value)
 
 
 def _check_presets(meta: FirmwareMeta, parsed: list[str]) -> None:

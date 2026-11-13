@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from ._model import (
     AOT_ENGINES,
+    GATE_LAYER_PROFILE,
     GATE_NOT_POWER_ONLY,
     GATE_PMU_PROFILE,
     GATE_STREAM_EVIDENCE,
@@ -82,7 +83,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.DIAGNOSTIC,
         key=WireKey.TRANSFER_OVERLAP,
         engines=AOT_ENGINES,
-        condition=GATE_NOT_POWER_ONLY,
+        condition=GATE_LAYER_PROFILE,
         runtime_gate="the module ships <prefix>_nsx_transfer.h",
         value_shape="<unit>:<dma>/<pending>,...;<op>:<dma>/<pending>,...",
         note="Each flag is 1 only when set at both ends. <dma> is x when the "
@@ -96,7 +97,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         WireCriticality.DIAGNOSTIC,
         key=WireKey.TRANSFER_STATS,
         engines=AOT_ENGINES,
-        condition=GATE_NOT_POWER_ONLY,
+        condition=GATE_LAYER_PROFILE,
         runtime_gate="the module ships <prefix>_nsx_transfer.h",
         value_shape="<issues>,<waits>,<aborts>,<peak_in_flight>,<wait_checks_max>,<unsampled>",
         note="Issues, waits and aborts are the run's own; the peak pieces in "

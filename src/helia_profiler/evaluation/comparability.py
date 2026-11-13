@@ -286,7 +286,14 @@ def assess_comparability(
 
     baseline_ops = [row.get("op") for row in baseline.layers]
     candidate_ops = [row.get("op") for row in candidate.layers]
-    if len(baseline.layers) != len(candidate.layers):
+    if any(run.summary.get("per_layer_profiling") is False for run in (baseline, candidate)):
+        issues.append(
+            _issue(
+                ComparabilityCode.TOPOLOGY_LAYER_PROFILING_UNAVAILABLE,
+                "Per-layer deltas unavailable because a capture is model-only.",
+            )
+        )
+    elif len(baseline.layers) != len(candidate.layers):
         issues.append(
             _issue(
                 ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,

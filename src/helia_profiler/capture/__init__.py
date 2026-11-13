@@ -144,7 +144,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
 
     result = parse_firmware_output(lines, aggregation=ctx.config.profiling.aggregation)
-    if not result.layers:
+    if not result.layers and result.meta.per_layer_profiling is not False:
         raise CaptureError(
             f"No layer data parsed from firmware output ({len(lines)} lines).",
             hint=_truncation_hint(str(transport)),

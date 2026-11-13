@@ -72,7 +72,13 @@ def profile_run_identity(ctx: PipelineContext) -> RunIdentity:
 
 
 def _observation_hash(pmu: PmuResult) -> str:
-    return semantic_hash("observation", measured_facts(pmu))
+    facts = measured_facts(pmu)
+    # Diagnostic text is not a measurement. An unreported capability keeps the
+    # existing layer-only observation basis.
+    facts.pop("raw_output")
+    if pmu.meta.per_layer_profiling is None:
+        facts["meta"].pop("per_layer_profiling")
+    return semantic_hash("observation", facts)
 
 
 def _module(provenance: DependencyProvenance, name: str) -> DependencyModule | None:

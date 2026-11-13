@@ -22,7 +22,7 @@ import subprocess
 import sys
 import time
 import traceback
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +72,7 @@ class CaseResult:
     # Metrics — populated on success
     layers: int | None = None
     total_cycles: int | None = None
+    per_layer_profiling: bool = field(default=True, kw_only=True)
     latency_avg_us: float | None = None
     clean_workload: str | None = None
     power_workload: str | None = None
@@ -584,6 +585,7 @@ def run_case(
         try:
             summary = load_run_summary(summary_path)
             result.layers = summary.layers or None
+            result.per_layer_profiling = summary.per_layer_profiling
             latency = summary.latency
             if latency is not None and latency.device_clean_infer_avg_cycles is not None:
                 result.total_cycles = int(latency.device_clean_infer_avg_cycles)
@@ -675,7 +677,7 @@ def validation_health_issues(result: CaseResult) -> tuple[str, ...]:
     if result.status != "pass":
         issues.append(f"run failed — {result.error}")
         return tuple(issues)
-    if not result.layers or result.layers < 1:
+    if result.per_layer_profiling and (not result.layers or result.layers < 1):
         issues.append("summary.json reports no layers")
     if not result.total_cycles or result.total_cycles <= 0:
         issues.append("total_cycles == 0 (PMU capture looks broken)")

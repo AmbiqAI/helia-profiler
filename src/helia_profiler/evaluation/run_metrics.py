@@ -101,7 +101,29 @@ def _compare_metrics(
     include_groups: frozenset[str] = frozenset({"power", "memory"}),
 ) -> list[MetricDiff]:
     metrics: list[MetricDiff] = []
-    for spec in _METRIC_FIELDS:
+    fields = _METRIC_FIELDS
+    if any(run.get("per_layer_profiling") is False for run in (base, cand)):
+        fields = tuple(
+            spec
+            for spec in fields
+            if spec.name
+            not in {
+                "layers",
+                "total_cycles",
+                "device_profiled_infer_avg_us",
+                "device_profiled_infer_total_us",
+            }
+        ) + (
+            _MetricField(
+                "device_clean_infer_avg_cycles",
+                ("latency", "device_clean_infer_avg_cycles"),
+                "cycles",
+            ),
+            _MetricField(
+                "device_clean_infer_avg_us", ("latency", "device_clean_infer_avg_us"), "us"
+            ),
+        )
+    for spec in fields:
         b = nested_get(base, *spec.path)
         c = nested_get(cand, *spec.path)
         diff = _metric_diff(spec, b, c, include_groups)

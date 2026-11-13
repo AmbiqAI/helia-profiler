@@ -77,10 +77,25 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     detailed = ctx.config.output.detailed
     analysis = ctx.model_analysis
 
-    if fmt == "csv":
+    if pmu.meta.per_layer_profiling is False:
+        for pattern in (
+            "profile_results.csv",
+            "profile_results.json",
+            "detailed/profile_*.csv",
+            "model_explorer/me_overlay_*.json",
+        ):
+            for stale in output_dir.glob(pattern):
+                stale.unlink()
+        if pmu.raw_output:
+            raw = output_dir / "firmware_output.txt"
+            raw.write_text("\n".join(pmu.raw_output) + "\n", encoding="utf-8")
+            paths.append(raw)
+    elif fmt == "csv":
+        (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_csv(pmu, output_dir, analysis, aot_op_manifest=_aot_manifest(ctx))
         paths.append(p)
     elif fmt == "json":
+        (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_json(
             pmu,
             ctx.power_result,
@@ -119,7 +134,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
             paths.append(p)
     paths.extend(_write_aot_plan(ctx, output_dir))
 
-    if ctx.config.output.model_explorer:
+    if ctx.config.output.model_explorer and pmu.meta.per_layer_profiling is not False:
         try:
             me_dir = output_dir / "model_explorer"
             me_dir.mkdir(parents=True, exist_ok=True)

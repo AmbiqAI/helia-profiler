@@ -138,6 +138,9 @@ class EngineArtifacts:
     #: with the name the image records it under instead of its host path.
     source_roots: tuple[tuple[Path, str], ...] = ()
 
+    #: False when the generated module has no per-operator measurement callbacks.
+    per_layer_profiling: bool = True
+
     #: Engine type this class is pinned to — ``None`` on the base, which
     #: accepts any.  Read by :meth:`__post_init__`.
     _PINNED_ENGINE_TYPE: ClassVar[EngineType | None] = None

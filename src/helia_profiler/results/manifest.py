@@ -234,9 +234,16 @@ class ResultManifest:
                 raise ReportError(f"Result artifact digest mismatch: {artifact.path}")
 
     def _verify_required_artifacts(self) -> None:
-        if self.status is not RunStatus.COMPLETE or self.bundle_type != "profile":
+        if self.status is not RunStatus.COMPLETE or self.bundle_type not in {
+            "profile",
+            "profile-model-only",
+        }:
             return
-        required = {"hpx.summary", "hpx.run-metadata", "hpx.profile-layers"}
+        required = {"hpx.summary", "hpx.run-metadata"}
+        if self.bundle_type == "profile":
+            required.add("hpx.profile-layers")
+        elif any(artifact.name == "hpx.profile-layers" for artifact in self.artifacts):
+            raise ReportError("Model-only profile manifest cannot declare layer measurements.")
         if "dependencies" in self.provenance:
             required.add("hpx.nsx-lock")
         declared = {artifact.name for artifact in self.artifacts if artifact.optional is False}

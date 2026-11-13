@@ -318,6 +318,9 @@ int main(void) {
     hpx_printf("HPX_ITERATIONS={{ iterations }}\n");
     hpx_printf("HPX_WARMUP={{ warmup }}\n");
     hpx_printf("HPX_NUM_PRESETS=%d\n", {{ pmu_passes | length }});
+{% if not per_layer_profiling | default(true) %}
+    hpx_printf("HPX_PER_LAYER_PROFILING=0\n");
+{% endif %}
     hpx_printf("HPX_PRESETS={{ pmu_pass_names | join(',') }}\n");
     hpx_printf("HPX_POWER_SYNC=%s\n", kPowerSyncEnabled ? "gpio" : "none");{% block engine_psram_metadata %}
 {% if psram_needed %}
