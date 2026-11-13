@@ -92,7 +92,9 @@ Compiler operator/placement tables remain compilation facts. The captured
 stream is retained as `firmware_output.txt`, declared and hashed in the
 manifest, including available input/output digests and diagnostics.
 
-`hpx compare` accepts these bundles and compares clean model timing. It
+`hpx compare` accepts these bundles and compares clean model timing only
+when both record the same known workload and the `infer` probe. Unknown or
+different scopes omit clean-timing deltas and record a comparability issue. It
 marks per-layer comparisons unavailable, including when both inputs are
 model-only. Validation health checks use the clean model timing. Per-layer
 calibration still requires measured layers and refuses their absence.

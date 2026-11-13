@@ -11,6 +11,7 @@ from helia_profiler.engines.base import HeliaAotArtifacts
 from helia_profiler.errors import CaptureError, FirmwareError
 from helia_profiler.evaluation.compare import compare_runs, load_run_artifacts
 from helia_profiler.firmware.context import FirmwareRenderContext
+from helia_profiler.pipeline import serialize_config
 from helia_profiler.report import write_report
 from helia_profiler.results import DeploymentRecord, load_result_manifest
 from helia_profiler.results.run_summary import load_run_summary
@@ -53,6 +54,7 @@ def _ctx(tmp_path, *, fmt="csv", per_layer=False):
     ctx.run_metadata.run_id = "model-only-test"
     ctx.run_metadata.timestamp = "2026-11-13T00:00:00+00:00"
     ctx.run_metadata.hpx_version = "0.6.0"
+    ctx.run_metadata.config_snapshot = serialize_config(ctx.config)
     return ctx
 
 
@@ -171,11 +173,22 @@ def test_layer_capable_truncation_is_still_an_error(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("fmt", ["csv", "json"])
-def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, fmt):
+@pytest.mark.parametrize("avg_us", [0, 4])
+def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, fmt, avg_us):
     from helia_profiler.firmware.render import _jinja_env
 
     ctx = _ctx(tmp_path, fmt=fmt)
     result = parse_firmware_output(_lines())
+    avg_cycles = 25 if avg_us == 0 else 1000
+    result = replace(
+        result,
+        meta=replace(
+            result.meta,
+            clean_infer_avg_us=avg_us,
+            clean_infer_avg_cycles=avg_cycles,
+            clean_infer_total_cycles=avg_cycles * 10,
+        ),
+    )
     set_profile_result(ctx, result)
     ctx.firmware_dir = tmp_path / "firmware"
     source = ctx.firmware_dir / "src/main.cc"
@@ -183,7 +196,8 @@ def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, 
     source.write_text(
         _jinja_env.get_template("main_aot.cc.j2").render(
             **FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
-        )
+        ),
+        encoding="utf-8",
     )
     lock = tmp_path / "source.lock"
     lock.write_text("schema_version: 4\ntargets: {}\n")
@@ -210,7 +224,7 @@ def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, 
     assert summary.per_layer_profiling is False
     assert summary.layers == 0 and summary.total_cycles is None
     assert summary.latency is not None
-    assert summary.latency.device_clean_infer_avg_cycles == 1000
+    assert summary.latency.device_clean_infer_avg_cycles == avg_cycles
     meta = json.loads((out / "run_metadata.json").read_text())
     assert meta["firmware"]["per_layer_profiling"] is False
     manifest = load_result_manifest(out / "result_manifest.json", verify=True)
@@ -228,7 +242,7 @@ def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, 
     assert record.summary is not None and record.summary.per_layer_profiling is False
     view = observations(record)
     items = {item["id"]: item for item in view["observations"]}
-    assert items["latency.restore_invoke.v1"]["value"] == 0.004
+    assert items["latency.restore_invoke.v1"]["value"] == avg_us / 1000
     assert items["latency.profiled_invoke.v1"]["value"] is None
     from typer.testing import CliRunner
 
@@ -254,6 +268,57 @@ def test_model_only_bundle_retains_timing_and_omits_layer_projections(tmp_path, 
     assert not comparison.layer_rows
     assert any(metric.name == "device_clean_infer_avg_cycles" for metric in comparison.metrics)
     assert not any(metric.name == "layers" for metric in comparison.metrics)
+
+
+@pytest.mark.parametrize("capabilities", [(False, True), (True, False), (False, False)])
+@pytest.mark.parametrize(
+    "workloads,probes,comparable",
+    [
+        (("refill-v1", "refill-v1"), ("infer", "infer"), True),
+        (("refill-v1", "other"), ("infer", "infer"), False),
+        ((None, "refill-v1"), ("infer", "infer"), False),
+        ((None, None), ("infer", "infer"), False),
+        (("refill-v1", "refill-v1"), ("infer", "busy_loop"), False),
+        (("refill-v1", "refill-v1"), ("busy_loop", "infer"), False),
+        (("refill-v1", "refill-v1"), ("busy_loop", "busy_loop"), False),
+        (("refill-v1", "refill-v1"), (None, "infer"), False),
+        (("refill-v1", "refill-v1"), (None, None), False),
+    ],
+)
+def test_clean_model_timing_requires_known_matching_inference_scope(
+    tmp_path, monkeypatch, capabilities, workloads, probes, comparable
+):
+    from helia_profiler.evaluation.compare import RunArtifacts
+
+    runs = []
+    for index, (capability, workload, probe) in enumerate(zip(capabilities, workloads, probes)):
+        runs.append(
+            RunArtifacts(
+                path=tmp_path / str(index),
+                summary={
+                    "per_layer_profiling": capability,
+                    "binary": {"text": 100 + index},
+                    "latency": {
+                        "clean_workload": workload,
+                        "device_clean_infer_avg_us": 4 + index,
+                        "device_clean_infer_avg_cycles": 1000 + index,
+                    },
+                },
+                metadata={"config": {"profiling": {"clean_window_probe": probe}}},
+                layers=[],
+            )
+        )
+    by_path = {run.path: run for run in runs}
+    monkeypatch.setattr("helia_profiler.evaluation.compare.load_run_artifacts", by_path.__getitem__)
+    result = compare_runs(runs[0].path, runs[1].path)
+    clean = [metric for metric in result.metrics if metric.name.startswith("device_clean_")]
+    assert bool(clean) is comparable
+    if comparable:
+        assert len(clean) == 2
+        assert all(metric.delta == 1 for metric in clean)
+    else:
+        assert not result.comparability.metric_group_comparable("clean_timing")
+    assert any(metric.name == "binary.text" and metric.delta == 1 for metric in result.metrics)
 
 
 @pytest.mark.parametrize("power", [False, True])

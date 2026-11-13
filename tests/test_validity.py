@@ -983,6 +983,28 @@ class TestProfileCleanWindowFrozen:
 
         assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN not in [i.code for i in result.issues]
 
+    def test_positive_cycle_total_disambiguates_microsecond_rounding(self, tmp_path):
+        ctx = self._profile_only(tmp_path, count=10, avg_us=0)
+        assert ctx.pmu_result is not None
+        set_profile_result(
+            ctx,
+            replace(
+                ctx.pmu_result, meta=replace(ctx.pmu_result.meta, clean_infer_total_cycles=250)
+            ),
+        )
+        result = evaluate_run(ctx)
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN not in [i.code for i in result.issues]
+
+    def test_zero_cycle_total_still_flags_an_advanced_microsecond_average(self, tmp_path):
+        ctx = self._profile_only(tmp_path, count=10, avg_us=4)
+        assert ctx.pmu_result is not None
+        set_profile_result(
+            ctx,
+            replace(ctx.pmu_result, meta=replace(ctx.pmu_result.meta, clean_infer_total_cycles=0)),
+        )
+        result = evaluate_run(ctx)
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN in [i.code for i in result.issues]
+
 
 class TestCleanWindowStall:
     """``profile.clean_window_stalled`` — the #121 detector's host half.

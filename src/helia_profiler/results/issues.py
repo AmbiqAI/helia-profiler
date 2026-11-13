@@ -327,6 +327,7 @@ class ComparabilityCode(StrEnum):
     RESULT_DEGRADED = "result.degraded"
     IDENTITY_MODEL_MISMATCH = "identity.model_mismatch"
     METRIC_POWER_INTEGRITY_INVALID = "metric.power_integrity_invalid"
+    METRIC_CLEAN_TIMING_SCOPE_MISMATCH = "metric.clean_timing_scope_mismatch"
     TOPOLOGY_LAYER_COUNT_MISMATCH = "topology.layer_count_mismatch"
     TOPOLOGY_LAYER_PROFILING_UNAVAILABLE = "topology.layer_profiling_unavailable"
     TOPOLOGY_OPERATION_SEQUENCE_MISMATCH = "topology.operation_sequence_mismatch"
@@ -379,6 +380,12 @@ _COMPARABILITY_SPECS: tuple[ComparabilitySpec, ...] = (
         ComparabilityCode.TOPOLOGY_LAYER_COUNT_MISMATCH,
         ComparabilitySeverity.LAYER_BLOCKING,
         "Per-layer deltas omitted because layer counts differ.",
+    ),
+    ComparabilitySpec(
+        ComparabilityCode.METRIC_CLEAN_TIMING_SCOPE_MISMATCH,
+        ComparabilitySeverity.METRIC_BLOCKING,
+        "Clean model timing omitted because inference scope is unknown or differs.",
+        metric_group="clean_timing",
     ),
     ComparabilitySpec(
         ComparabilityCode.TOPOLOGY_LAYER_PROFILING_UNAVAILABLE,

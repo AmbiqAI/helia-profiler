@@ -35,7 +35,7 @@ class _MetricField:
     """One declared run-level metric row.
 
     ``group`` names the metric group whose comparability gate governs the
-    row (``"power"``, ``"memory"``) -- ``None`` rows are always emitted.
+    row; ``None`` rows are always emitted.
     Group rows absent on BOTH sides are skipped (a run that measured no
     power has nothing to say about power); one-sided absence still emits,
     so an axis change (a region present on one SoC only) stays visible.
@@ -98,7 +98,7 @@ def _compare_metrics(
     base: dict[str, Any],
     cand: dict[str, Any],
     *,
-    include_groups: frozenset[str] = frozenset({"power", "memory"}),
+    include_groups: frozenset[str] = frozenset({"power", "memory", "clean_timing"}),
 ) -> list[MetricDiff]:
     metrics: list[MetricDiff] = []
     fields = _METRIC_FIELDS
@@ -118,9 +118,13 @@ def _compare_metrics(
                 "device_clean_infer_avg_cycles",
                 ("latency", "device_clean_infer_avg_cycles"),
                 "cycles",
+                group="clean_timing",
             ),
             _MetricField(
-                "device_clean_infer_avg_us", ("latency", "device_clean_infer_avg_us"), "us"
+                "device_clean_infer_avg_us",
+                ("latency", "device_clean_infer_avg_us"),
+                "us",
+                group="clean_timing",
             ),
         )
     for spec in fields:

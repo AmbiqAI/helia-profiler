@@ -211,7 +211,9 @@ def compare_runs(
 
     config_rows = _compare_config(baseline, candidate)
     include_groups = frozenset(
-        group for group in ("power", "memory") if comparability.metric_group_comparable(group)
+        group
+        for group in ("power", "memory", "clean_timing")
+        if comparability.metric_group_comparable(group)
     )
     metrics = _compare_metrics(
         baseline.summary,
