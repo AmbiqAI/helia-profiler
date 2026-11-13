@@ -217,9 +217,9 @@ def evaluate_run(ctx: PipelineContext) -> RunEvaluation:
         # when the crystal is unfit (#110), so reaching this check without
         # that error points at a lost line on a lossy transport.
         elapsed_cycles = meta.clean_infer_total_cycles
+        clock_advanced = type(elapsed_cycles) is int and elapsed_cycles > 0
         if meta.clean_infer_count and (
-            elapsed_cycles == 0
-            or (meta.clean_infer_avg_us == 0 and (elapsed_cycles is None or elapsed_cycles < 0))
+            elapsed_cycles == 0 or (meta.clean_infer_avg_us == 0 and not clock_advanced)
         ):
             issues.append(
                 _warning(

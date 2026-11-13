@@ -1005,6 +1005,26 @@ class TestProfileCleanWindowFrozen:
         result = evaluate_run(ctx)
         assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN in [i.code for i in result.issues]
 
+    def test_malformed_legacy_cycle_total_remains_degraded(self, tmp_path):
+        ctx = self._profile_only(tmp_path, count=10, avg_us=0)
+        captured = parse_firmware_output(
+            [
+                "--- HPX_START ---",
+                "HPX_CLEAN_INFER_COUNT=10",
+                "HPX_CLEAN_INFER_TOTAL_CYCLES=1 7",
+                "HPX_CLEAN_INFER_AVG_US=0",
+                "--- HPX_PRESET basic_cpu ---",
+                "--- HPX_ITER 0 ---",
+                "Layer,Op,ARM_PMU_CPU_CYCLES",
+                "0,CONV_2D,25",
+                "--- HPX_END ---",
+            ]
+        )
+        set_profile_result(ctx, captured)
+        result = evaluate_run(ctx)
+        assert result.validity is ResultValidity.DEGRADED
+        assert IssueCode.PROFILE_CLEAN_WINDOW_FROZEN in [i.code for i in result.issues]
+
 
 class TestCleanWindowStall:
     """``profile.clean_window_stalled`` — the #121 detector's host half.
