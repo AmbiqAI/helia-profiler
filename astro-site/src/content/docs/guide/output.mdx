@@ -81,6 +81,11 @@ and microseconds. In Python, `ProfileResult.layers` is empty and
 `ProfileResult.total_cycles` is `None`; the measured model timing is in
 `result.pmu.meta.clean_infer_*`.
 
+A complete model-only capture reports the completed sample count, total
+cycles, average cycles and average microseconds. A planned heartbeat count
+cannot replace the completed count. Missing timing lines fail capture;
+average microseconds may round to zero, while cycle measurements stay positive.
+
 Model-only bundles omit `profile_results.csv`/`.json`, per-layer detailed
 CSVs and Model Explorer counter overlays, for either `output.format` choice.
 Compiler operator/placement tables remain compilation facts. The captured
