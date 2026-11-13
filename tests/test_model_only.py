@@ -143,6 +143,13 @@ def test_sub_microsecond_model_timing_retains_positive_cycle_measurement():
     assert result.meta.clean_infer_avg_cycles == 1000
 
 
+def test_planned_heartbeat_count_does_not_replace_completed_model_only_count():
+    lines = [line for line in _lines() if not line.startswith("HPX_CLEAN_INFER_COUNT=")]
+    lines.insert(1, "HPX_HEARTBEAT phase=clean_window_begin iters=10 est_ms=0")
+    with pytest.raises(CaptureError, match="clean-window timing"):
+        parse_firmware_output(lines)
+
+
 def test_model_only_stream_does_not_accept_an_empty_announced_pass():
     lines = _lines()
     lines[2] = "HPX_NUM_PRESETS=1"

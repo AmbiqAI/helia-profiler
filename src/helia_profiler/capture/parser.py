@@ -205,8 +205,13 @@ def parse_firmware_output(
     dcache = meta_kv.get(WireKey.DCACHE)
     if dcache not in (None, "on", "off"):
         raise CaptureError(f"Invalid HPX_DCACHE mode: {dcache!r}")
+    per_layer = _per_layer_capability(meta_kv)
+    clean_count = meta_kv.get(WireKey.CLEAN_INFER_COUNT)
+    # A heartbeat announces a plan; model-only timing requires completed samples.
+    if clean_count is None and per_layer is not False:
+        clean_count = meta_kv.get(_ANNOUNCED_CLEAN_ITERS)
     firmware_meta = FirmwareMeta(
-        per_layer_profiling=_per_layer_capability(meta_kv),
+        per_layer_profiling=per_layer,
         dcache=dcache,
         model_size=meta_kv.get(WireKey.MODEL_SIZE),
         arena_size=meta_kv.get(WireKey.ARENA_SIZE),
@@ -222,9 +227,7 @@ def parse_firmware_output(
         profiled_infer_count=meta_kv.get(WireKey.PROFILED_INFER_COUNT),
         profiled_infer_total_us=meta_kv.get(WireKey.PROFILED_INFER_TOTAL_US),
         profiled_infer_avg_us=meta_kv.get(WireKey.PROFILED_INFER_AVG_US),
-        clean_infer_count=meta_kv.get(
-            WireKey.CLEAN_INFER_COUNT, meta_kv.get(_ANNOUNCED_CLEAN_ITERS)
-        ),
+        clean_infer_count=clean_count,
         clean_infer_total_cycles=meta_kv.get(WireKey.CLEAN_INFER_TOTAL_CYCLES),
         clean_infer_avg_cycles=meta_kv.get(WireKey.CLEAN_INFER_AVG_CYCLES),
         clean_infer_avg_us=meta_kv.get(WireKey.CLEAN_INFER_AVG_US),
