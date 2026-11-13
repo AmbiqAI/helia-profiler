@@ -1,6 +1,6 @@
 # Issue codes
 
-Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 7 comparability codes, generated from the registry.
+Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 8 comparability codes, generated from the registry.
 
 ## Run-validity issues
 
@@ -44,6 +44,7 @@ Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 7
 | `result.incomplete` | blocking | A result bundle is not complete; no comparison is possible. |
 | `result.invalid` | blocking | A result is invalid and cannot be compared. |
 | `topology.layer_count_mismatch` | layer_blocking | Per-layer deltas omitted because layer counts differ. |
+| `topology.layer_profiling_unavailable` | layer_blocking | Per-layer deltas unavailable for a model-only capture. |
 | `topology.operation_sequence_mismatch` | layer_blocking | Per-layer deltas omitted because operation sequences differ. |
 
 ## Parameterized families
