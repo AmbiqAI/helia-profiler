@@ -8,7 +8,7 @@
   },
   "counts": {
     "issues": 27,
-    "comparability": 8,
+    "comparability": 9,
     "families": 3,
     "familyCodes": 30
   },
@@ -263,6 +263,12 @@
       "severity": "blocking",
       "description": "Model SHA-256 differs; run-level performance deltas are not comparable.",
       "metricGroup": null
+    },
+    {
+      "code": "metric.clean_timing_scope_mismatch",
+      "severity": "metric_blocking",
+      "description": "Clean model timing omitted because inference scope is unknown or differs.",
+      "metricGroup": "clean_timing"
     },
     {
       "code": "metric.power_integrity_invalid",

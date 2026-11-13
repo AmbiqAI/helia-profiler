@@ -1,6 +1,6 @@
 # Issue codes
 
-Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 8 comparability codes, generated from the registry.
+Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 9 comparability codes, generated from the registry.
 
 ## Run-validity issues
 
@@ -39,6 +39,7 @@ Every machine-readable diagnostic code hpx can emit: 27 run-validity codes and 8
 | Code | Severity | Description |
 | --- | --- | --- |
 | `identity.model_mismatch` | blocking | Model SHA-256 differs; run-level performance deltas are not comparable. |
+| `metric.clean_timing_scope_mismatch` | metric_blocking | Clean model timing omitted because inference scope is unknown or differs. |
 | `metric.power_integrity_invalid` | metric_blocking | Power metrics omitted because a power result's integrity is not valid. |
 | `result.degraded` | informative | A result is degraded; affected metrics should be interpreted cautiously. |
 | `result.incomplete` | blocking | A result bundle is not complete; no comparison is possible. |
