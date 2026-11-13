@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import ConfigDict, field_validator, model_validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -133,8 +133,8 @@ class ProfilingConfig:
     # Apollo5 family: every instrumented run starts from a poisoned pool and
     # cold PSRAM constants (each constant arena cleaned and invalidated), so a
     # late or missing copy shows in the outputs and constant reads reach the
-    # MSPI controller. The warm-ups and the clean window keep their warm
-    # cache; the capture says HPX_STREAM_EVIDENCE=1.
+    # MSPI controller. This extra maintenance applies to instrumented runs;
+    # the clean window follows profiling.dcache. Reports HPX_STREAM_EVIDENCE=1.
     stream_evidence: bool = False
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
@@ -142,6 +142,16 @@ class ProfilingConfig:
     # weights and arena both live in TCM. Code keeps running from MRAM, so
     # transports (RTT/USB/SWO) and printf remain available throughout the run.
     extreme_mode: bool = False
+
+    #: Data-cache policy for ordinary profiler firmware; off requires Apollo5.
+    dcache: Literal["on", "off"] = field(default="on", metadata={"omit_default": True})
+
+    @field_validator("dcache", mode="before")
+    @classmethod
+    def _normalize_dcache(cls, value: Any) -> Any:
+        if isinstance(value, bool):
+            return "on" if value else "off"
+        return value
 
     @field_validator("pmu_counters", mode="before")
     @classmethod

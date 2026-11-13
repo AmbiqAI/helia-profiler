@@ -317,6 +317,34 @@ def _matrix() -> list[_Render]:
     # Each entry flips one declarative condition; the census below asserts
     # that WIRE_CONDITIONS is exactly the set these renders exercise.
     renders += [
+        _Render(
+            f"apollo510|rtt|{engine}|dcache-off",
+            "apollo510",
+            "rtt",
+            engine,
+            overrides={"dcache": "off"},
+        )
+        for engine in _ENGINES
+    ]
+    renders += [
+        _Render(
+            f"apollo510|rtt|{engine}|power-dcache-off",
+            "apollo510",
+            "rtt",
+            engine,
+            power_only=True,
+            overrides={"dcache": "off"},
+        )
+        for engine in _POWER_ENGINES
+    ]
+    renders += [
+        _Render(
+            "apollo510|rtt|executorch|no-dcache",
+            "apollo510",
+            "rtt",
+            "executorch",
+            overrides={"has_dcache": False},
+        ),
         # psram_needed, both placements, both binaries.
         _Render(
             "ap510|rtt|litert|psram-arena",
@@ -657,6 +685,8 @@ def _attach_wait(v: dict) -> bool:
 #: ``WIRE_CONDITIONS`` — a condition invented in ``wire.py`` without a
 #: predicate here cannot slip through unchecked.
 _PREDICATES = {
+    "has_dcache and not power_only": lambda v: bool(v.get("has_dcache")) and not _power(v),
+    "dcache == off and not power_only": lambda v: v.get("dcache", "on") == "off" and not _power(v),
     "not power_only": lambda v: not _power(v),
     "not power_only and transport != usb_cdc": (
         lambda v: not _power(v) and v["transport"] != "usb_cdc"
@@ -1003,6 +1033,7 @@ def test_error_code_catalogue():
         "unsupported_op",
         "missing_ops",
         "alloc_tensors_failed",
+        "dcache_config",
         "psram_init_failed",
         "psram_info_failed",
         "bind_arena_failed",

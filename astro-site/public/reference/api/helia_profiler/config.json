@@ -323,6 +323,25 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L144"
               },
               "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.ProfilingConfig.dcache",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "dcache",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})",
+              "source": {
+                "line": 147,
+                "path": "src/helia_profiler/config/profiling.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L147"
+              },
+              "summary": ""
             }
           ],
           "name": "ProfilingConfig",

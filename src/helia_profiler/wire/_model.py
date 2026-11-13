@@ -214,6 +214,7 @@ class FirmwareErrorCode(StrEnum):
     UNSUPPORTED_OP = "unsupported_op"
     MISSING_OPS = "missing_ops"
     ALLOC_TENSORS_FAILED = "alloc_tensors_failed"
+    DCACHE_CONFIG = "dcache_config"
     PSRAM_INIT_FAILED = "psram_init_failed"
     PSRAM_INFO_FAILED = "psram_info_failed"
     BIND_ARENA_FAILED = "bind_arena_failed"
@@ -255,6 +256,7 @@ class WireKey(StrEnum):
     POWER_SYNC = "power_sync"
     SYNC_GPIO = "sync_gpio"
     SYSTEM_CLOCK_HZ = "system_clock_hz"
+    DCACHE = "dcache"
     MEASURED_CLOCK_HZ = "measured_clock_hz"
     BURST_AVAIL = "burst_avail"
     BURST_ENGAGED = "burst_engaged"
@@ -471,6 +473,8 @@ def _spec(*args, **kwargs) -> WireSpec:
 # appears here, and the census asserts the two sets match exactly — a typo
 # cannot silently become an unchecked condition.
 GATE_NOT_POWER_ONLY = "not power_only"
+GATE_DCACHE_METADATA = "has_dcache and not power_only"
+GATE_DCACHE_OFF = "dcache == off and not power_only"
 GATE_TRANSPORT_HAS_READY_PREAMBLE = "not power_only and transport != usb_cdc"
 GATE_RTT_FLUSH = "not power_only and transport == rtt"
 GATE_APOLLO3_BURST = "apollo3_burst"

@@ -194,6 +194,16 @@ extreme_mode: bool = False
 
 Source: `src/helia_profiler/config/profiling.py:144`
 
+### helia_profiler.ProfilingConfig.dcache
+
+`attribute` · `python`
+
+```python
+dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})
+```
+
+Source: `src/helia_profiler/config/profiling.py:147`
+
 ## helia_profiler.ClockSelection
 
 `class` · `python`

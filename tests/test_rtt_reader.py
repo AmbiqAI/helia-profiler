@@ -1716,10 +1716,14 @@ def test_capture_swo_retries_share_one_deadline(monkeypatch):
 
 
 def test_firmware_meta_keeps_positional_order():
-    from dataclasses import fields
+    from dataclasses import astuple, fields
 
     from helia_profiler.results.models import FirmwareMeta
 
     names = [f.name for f in fields(FirmwareMeta)]
     assert names.index("profiled_infer_count") == names.index("system_clock_hz") + 1
-    assert names[-1] == "measured_clock_hz"
+    assert names[-2:] == ["measured_clock_hz", "dcache"]
+    legacy_args = astuple(FirmwareMeta())[:-2] + (96_000_000,)
+    meta = FirmwareMeta(*legacy_args)
+    assert meta.measured_clock_hz == 96_000_000
+    assert meta.dcache is None

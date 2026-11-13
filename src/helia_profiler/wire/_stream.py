@@ -16,6 +16,7 @@ from ._model import (
     GATE_ATTACH_WAIT,
     GATE_BUSY_LOOP_PROBE,
     GATE_CLEAN_WINDOW_TRACE,
+    GATE_DCACHE_METADATA,
     GATE_HAS_ETHOS_U,
     GATE_NOT_POWER_ONLY,
     GATE_NOT_STIMER_WINDOW,
@@ -155,6 +156,17 @@ HANDSHAKE_SPECS: tuple[WireSpec, ...] = (
 
 
 START_HEADER_SPECS: tuple[WireSpec, ...] = (
+    _spec(
+        WireKey.DCACHE.wire,
+        WireKind.KEY_VALUE,
+        "Data-cache policy applied before warmup and measurement.",
+        WireConsumer.FIRMWARE_META,
+        WireCriticality.PROTOCOL,
+        key=WireKey.DCACHE,
+        condition=GATE_DCACHE_METADATA,
+        value_shape="on | off",
+        note="An off request requires a matching report; old on/default streams may omit it.",
+    ),
     _spec(
         WireKey.VERSION.wire,
         WireKind.KEY_VALUE,

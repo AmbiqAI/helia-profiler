@@ -135,7 +135,8 @@ class FirmwareMeta:
     profiled_infer_total_us: int | None = None
     profiled_infer_avg_us: int | None = None
     #: Clean end-to-end inference timing measured with per-layer
-    #: instrumentation disabled (warmed caches).  Cycles are DWT core cycles,
+    #: instrumentation disabled, under the configured data-cache policy.
+    #: Cycles are DWT core cycles,
     #: directly comparable to the per-layer ``cycles`` sum.
     clean_infer_count: int | None = None
     clean_infer_total_cycles: int | None = None
@@ -177,6 +178,8 @@ class FirmwareMeta:
     presets: tuple[str, ...] = ()
     #: Core clock (Hz) measured on-device against STIMER.
     measured_clock_hz: int | None = None
+    #: Data-cache policy reported by the firmware; absent in older streams.
+    dcache: str | None = None
 
     @property
     def reported_model_bytes(self) -> int | None:
@@ -211,10 +214,8 @@ class Conditions:
         weights_memory: The memory hpx placed the model's constants in, as a
             lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
             ``psram``); ``None`` when hpx set no placement rule for them.
-        weights_cache: Whether the weights are read through the cache. Every
-            run this release makes records ``on``; ``off`` and
-            ``emulated:<bytes>`` await the firmware work of
-            AmbiqAI/helia-profiler#648.
+        weights_cache: The reported data-cache policy, ``on`` or ``off``.
+            Missing cache metadata in older firmware retains the ``on`` baseline.
         external_memory_clock: The PSRAM interface clock in MHz; ``None``
             when the run used no PSRAM.
         application_load: What else the core ran during the capture; ``none``
