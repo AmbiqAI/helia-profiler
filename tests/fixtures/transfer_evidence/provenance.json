@@ -1,0 +1,7 @@
+{
+  "source": "artifacts/hpx/transfer-board-20261109/board-overlap/transcripts/a64-p96/raw.log",
+  "source_sha256": "c94711731ff325e67acaf5ce5fc60d3beecf4fc711b2c7effe73ac21c5928515",
+  "excerpt_sha256": "f98bca2ada69bdc9a10fc7f73341957eb146bbeb974ef85990ec3b93078be9d9",
+  "selection": "Unedited preset/iteration markers, CSV rows, and the three transfer evidence lines for iterations0and1 of both passes. Session/count metadata reduced to describe this excerpt; no timing summary retained.",
+  "source_context": "Board run4; a64-p96; source report board-overlap/RUN.md"
+}

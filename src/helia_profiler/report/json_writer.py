@@ -50,6 +50,9 @@ def _write_json(
         "overflow_detected": pmu.overflow_detected,
     }
 
+    if pmu.transfer_evidence:
+        data["transfer_evidence"] = [record.to_dict() for record in pmu.transfer_evidence]
+
     if power is not None:
         power_data = _power_detail_fields(power.summary)
         data["power"] = power_data

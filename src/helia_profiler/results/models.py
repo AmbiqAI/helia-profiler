@@ -26,6 +26,7 @@ from ..placement import MemoryRegion
 from ..platform.linker.model import LinkerVerification
 from ..platform.provenance import PlatformSnapshot
 from ..power.base import PowerResult
+from .transfer import TransferEvidence
 
 RUN_METADATA_SCHEMA = "hpx.run-metadata"
 RUN_METADATA_SCHEMA_VERSION = 3
@@ -294,6 +295,7 @@ class PmuResult:
     groups: dict[str, list[LayerResult]] = field(default_factory=dict)
     #: Exact model-only stream, retaining optional tensor digests and diagnostics.
     raw_output: tuple[str, ...] = ()
+    transfer_evidence: tuple[TransferEvidence, ...] = ()
 
 
 @dataclass

@@ -3,16 +3,217 @@
   "$id": "https://ambiqai.github.io/helia-profiler/schemas/profile-results/v1.json",
   "title": "heliaPROFILER profile results",
   "type": "object",
-  "required": ["schema", "schema_version", "metadata", "summary", "layers", "presets", "overflow_detected"],
+  "required": [
+    "schema",
+    "schema_version",
+    "metadata",
+    "summary",
+    "layers",
+    "presets",
+    "overflow_detected"
+  ],
   "properties": {
-    "schema": {"const": "hpx.profile-results"},
-    "schema_version": {"const": 1},
-    "metadata": {"type": "object", "additionalProperties": true},
-    "summary": {"type": "object", "additionalProperties": true},
-    "layers": {"type": "array", "items": {"type": "object"}},
-    "presets": {"type": "object", "additionalProperties": true},
-    "overflow_detected": {"type": "boolean"},
-    "power": {"type": "object", "additionalProperties": true}
+    "schema": {
+      "const": "hpx.profile-results"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "presets": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "overflow_detected": {
+      "type": "boolean"
+    },
+    "power": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "transfer_evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transfer_evidence"
+      }
+    }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "transfer_stats": {
+      "type": "object",
+      "required": [
+        "issues",
+        "waits",
+        "aborts",
+        "peak_in_flight",
+        "wait_checks_max",
+        "unsampled"
+      ],
+      "properties": {
+        "issues": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "waits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "aborts": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "peak_in_flight": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "wait_checks_max": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "unsampled": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        }
+      },
+      "additionalProperties": false
+    },
+    "transfer_activity": {
+      "type": "object",
+      "required": [
+        "dma_in_progress",
+        "reads_pending"
+      ],
+      "properties": {
+        "dma_in_progress": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "reads_pending": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "transfer_evidence": {
+      "type": "object",
+      "required": [
+        "preset",
+        "iteration"
+      ],
+      "properties": {
+        "preset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "stats": {
+          "$ref": "#/$defs/transfer_stats"
+        },
+        "overlap": {
+          "type": "object",
+          "required": [
+            "units",
+            "operators"
+          ],
+          "properties": {
+            "units": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/transfer_activity"
+              }
+            },
+            "operators": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/transfer_activity"
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "refills": {
+          "type": "object",
+          "required": [
+            "units",
+            "operators"
+          ],
+          "properties": {
+            "units": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            },
+            "operators": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "stats"
+          ]
+        },
+        {
+          "required": [
+            "overlap"
+          ]
+        },
+        {
+          "required": [
+            "refills"
+          ]
+        }
+      ]
+    }
+  }
 }

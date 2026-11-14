@@ -94,6 +94,14 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_csv(pmu, output_dir, analysis, aot_op_manifest=_aot_manifest(ctx))
         paths.append(p)
+        if pmu.transfer_evidence:
+            paths.append(
+                _write_json(
+                    pmu, ctx.power_result, ctx.run_metadata, output_dir, power_run=ctx.power_run
+                )
+            )
+        else:
+            (output_dir / "profile_results.json").unlink(missing_ok=True)
     elif fmt == "json":
         (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_json(
