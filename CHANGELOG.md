@@ -56,6 +56,23 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.0...v0.6.1) (2026-11-14)
+
+
+### Features
+
+* **build:** accept CMake options with module source overrides ([8897095](https://github.com/AmbiqAI/helia-profiler/commit/88970955869176e8a55271fb50aac97792dc23a8)), closes [#680](https://github.com/AmbiqAI/helia-profiler/issues/680)
+* **profiling:** add explicit data-cache control ([#688](https://github.com/AmbiqAI/helia-profiler/issues/688)) ([993db71](https://github.com/AmbiqAI/helia-profiler/commit/993db715f5fc9fd3b0010cbba3f80313048b03d3)), closes [#681](https://github.com/AmbiqAI/helia-profiler/issues/681)
+* **results:** retain per-run transfer evidence in profile bundles ([#691](https://github.com/AmbiqAI/helia-profiler/issues/691)) ([c5d2cba](https://github.com/AmbiqAI/helia-profiler/commit/c5d2cba58d49696eff4a3afed497996887a5c893)), closes [#684](https://github.com/AmbiqAI/helia-profiler/issues/684)
+* **zoo:** optional dashboard labels on private models ([#687](https://github.com/AmbiqAI/helia-profiler/issues/687)) ([86c0753](https://github.com/AmbiqAI/helia-profiler/commit/86c075332a208eff948b539e113b8fac0981bbf5))
+
+
+### Bug Fixes
+
+* **memory:** omit unavailable per-layer profiling storage ([#690](https://github.com/AmbiqAI/helia-profiler/issues/690)) ([8e9cdc9](https://github.com/AmbiqAI/helia-profiler/commit/8e9cdc9cfcf34b8dbc5d422cd62af814d46fa3df)), closes [#682](https://github.com/AmbiqAI/helia-profiler/issues/682)
+* **profiling:** support model-only static AOT captures ([#689](https://github.com/AmbiqAI/helia-profiler/issues/689)) ([9a0516f](https://github.com/AmbiqAI/helia-profiler/commit/9a0516fbdcd94fa545f6741450e8860d36b6b988)), closes [#682](https://github.com/AmbiqAI/helia-profiler/issues/682)
+* **validate:** skip heliaAOT cases whose constants overflow MRAM ([#683](https://github.com/AmbiqAI/helia-profiler/issues/683)) ([ca92ebc](https://github.com/AmbiqAI/helia-profiler/commit/ca92ebc0daa1c4e62a12adc669e58e39060cb92f))
+
 ## [0.6.0](https://github.com/AmbiqAI/helia-profiler/compare/v0.5.0...v0.6.0) (2026-11-10)
 
 
