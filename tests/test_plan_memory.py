@@ -637,9 +637,74 @@ class TestPlanMemoryOverflow:
 
 
 class TestHpxOwnedConsumers:
-    """#133 D1/D2: the consumers every firmware reserves that hpx
-    decides host-side. Sizes pin the frozen template-mirror tables so
-    drift is a reviewed edit."""
+    """HPX-owned consumers and their firmware storage budgets."""
+
+    @pytest.mark.parametrize("per_layer", [False, True])
+    @pytest.mark.parametrize("backend", [None, "ethos_u"])
+    def test_aot_profiling_storage_follows_prepared_capability(self, tmp_path, per_layer, backend):
+        ctx = _make_ctx(
+            tmp_path,
+            {
+                "engine": {"type": "helia-aot", "backend": backend},
+                "target": {"board": "atomiq110_fpga_turbo" if backend else "apollo510_evb"},
+            },
+        )
+        ctx.engine_artifacts = HeliaAotArtifacts(
+            engine_header="model_model.h",
+            aot_prefix="model",
+            aot_module_name="aot-model",
+            aot_cmake_target="nsx::aot_model",
+            helia_aot_version="0.0.0",
+            engine_backend=backend,
+            per_layer_profiling=per_layer,
+            memory_plan=MemoryPlan(engine=EngineType.HELIA_AOT),
+        )
+        PlanMemoryStage().run(ctx)
+        assert ctx.memory_plan is not None
+        consumers = {c.name: c.size for region in ctx.memory_plan.regions for c in region.consumers}
+        if per_layer:
+            assert consumers["pmu_layer_records"] == 81920
+            if backend:
+                assert consumers["npu_pmu_tables"] == 73728
+        else:
+            assert "pmu_layer_records" not in consumers
+            assert "npu_pmu_tables" not in consumers
+        assert consumers["rtt_buffers"] > 0
+        assert consumers["boot_stack"] == 16384
+
+    @pytest.mark.parametrize("per_layer,extra", [(False, -64), (False, 1), (True, -64)])
+    def test_model_only_fit_uses_real_consumers(self, tmp_path, per_layer, extra):
+        ctx = _make_ctx(tmp_path, {"engine": {"type": "helia-aot"}})
+        assert ctx.soc is not None
+        capacity = ctx.soc.memory.sram_kb * 1024
+        used = capacity + extra
+        ctx.engine_artifacts = HeliaAotArtifacts(
+            engine_header="model_model.h",
+            aot_prefix="model",
+            aot_module_name="aot-model",
+            aot_cmake_target="nsx::aot_model",
+            helia_aot_version="0.0.0",
+            per_layer_profiling=per_layer,
+            memory_plan=MemoryPlan(
+                engine=EngineType.HELIA_AOT,
+                regions=(
+                    MemoryRegionUsage(
+                        region=MemoryRegion.SRAM,
+                        capacity=capacity,
+                        used=used,
+                        consumers=(MemoryConsumer("model_arena", used, ConsumerKind.ARENA),),
+                    ),
+                ),
+            ),
+        )
+        if per_layer or extra > 0:
+            with pytest.raises(PlatformError):
+                PlanMemoryStage().run(ctx)
+        else:
+            PlanMemoryStage().run(ctx)
+            assert ctx.memory_plan is not None
+            sram = ctx.memory_plan.region(MemoryRegion.SRAM)
+            assert sram is not None and sram.used == used and sram.free == 64
 
     def test_record_size_table_is_the_frozen_contract(self):
         from helia_profiler.engines import EngineType

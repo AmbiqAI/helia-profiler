@@ -94,9 +94,7 @@ class PlanMemoryStage:
             weights_region,
         )
 
-        # 2. Build / select the memory plan, then append the hpx-owned
-        #    consumers every firmware reserves regardless of engine (#133)
-        #    so the overflow check sees them.
+        # Include HPX-owned firmware storage before checking capacity.
         plan = self._select_plan(ctx)
         plan = _add_hpx_owned_consumers(plan, ctx)
         plan = self._apply_capacities(plan, ctx)
@@ -478,7 +476,7 @@ def _stack_region(family: SocFamily) -> MemoryRegion:
 
 
 def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPlan:
-    """Append the engine-independent consumers hpx itself configures.
+    """Append the firmware consumers HPX itself configures.
 
     Additive and idempotent-by-name: a consumer name already present in
     the plan (e.g. a future engine-supplied records entry) is left alone.
@@ -488,6 +486,8 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
         return plan
     family = soc.family
     engine_type = ctx.config.engine.type
+    artifacts = ctx.engine_artifacts
+    per_layer_profiling = artifacts is None or artifacts.per_layer_profiling
 
     additions: list[tuple[MemoryRegion, MemoryConsumer]] = []
 
@@ -508,7 +508,6 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             sizes["fixture_ram"] = 8 * 4
         if engine_type is not EngineType.HELIA_AOT:
             sizes["fixture_memory"] = 8 * 4
-        artifacts = ctx.engine_artifacts
         if ctx.weights_region is Placement.PSRAM:
             from ..firmware.fixture import fixture_psram_payloads
 
@@ -572,7 +571,9 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
             )
         )
 
-    record_size = PMU_RECORD_SIZE_BYTES.get(engine_type) if fixture is None else None
+    record_size = (
+        PMU_RECORD_SIZE_BYTES.get(engine_type) if fixture is None and per_layer_profiling else None
+    )
     if record_size is not None:
         records_bytes = int(soc.pmu_max_ops) * record_size
         if engine_type in (EngineType.LITERT, EngineType.HELIA_RT):
@@ -601,8 +602,12 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     # NSX_MEM_SRAM_BSS (same has_ethos_u predicate as firmware/context.py;
     # the power binary excludes them). NB the plan describes the PROFILE
     # binary — same scope as pmu_layer_records above.
-    artifacts = ctx.engine_artifacts
-    if fixture is None and artifacts is not None and artifacts.resolved_backend == "ethos_u":
+    if (
+        fixture is None
+        and per_layer_profiling
+        and artifacts is not None
+        and artifacts.resolved_backend == "ethos_u"
+    ):
         additions.append(
             (
                 _nsx_mem_sram_bss_region(soc),
