@@ -18,7 +18,7 @@ A `results/` directory from [First profile](../../getting-started/first-profile/
 |---|---|---|---|
 | `result_manifest.json` | `hpx.result-manifest` v1 (`results/manifest.py`) | the bundle envelope: identity, validity, issues, provenance, comparability, and every artifact's path, media type, size and SHA-256 | always; written last |
 | `summary.json` | `hpx.run-summary` v22 (`results/run_summary.py`) | headline metrics and health signals; read this first | always |
-| `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | per-layer-capable profiles; one of the two per `output.format` |
+| `profile_results.csv` or `.json` | `hpx.profile-results` v1 for the JSON form (`report/contracts.py`); the CSV carries the semantic name without a published schema | one row per layer, one column per counter | per-layer-capable profiles; selected by `output.format`, with a companion JSON when transfer evidence is present |
 | `run_metadata.json` | `hpx.run-metadata` v3 (`report/contracts.py`) | the resolved configuration, platform, model, toolchain, build images | always |
 | `nsx.lock` | neuralSPOT-X lock file | the exact module lock the firmware was built from | always |
 | `aot_operator_manifest.json` | engine extension | the operators the AOT compiler emitted with tensor placement | `helia-aot` runs |
@@ -366,6 +366,34 @@ the attribution columns, with `metadata`, `summary`, `presets`,
 `overflow_detected` and `power` at the root, per
 `profile_results.schema.v1.json`. `aot_operator_manifest.json` keeps the
 per-operator provenance for either format.
+
+#### Transfer evidence
+
+When firmware emits transfer-provider evidence, `profile_results.json` also
+contains `transfer_evidence`: one record per instrumented iteration with received
+evidence, identified by `preset` and the firmware's `iteration` index. CSV-mode
+captures write this companion JSON too, and the result manifest binds it along
+with the CSV. Runs without these lines omit the block and keep their usual
+output format.
+
+| Record field | Meaning |
+|---|---|
+| `stats` | `issues`, `waits`, `aborts` and `unsampled` for that run; `peak_in_flight` and `wait_checks_max` are maxima since the provider was bound |
+| `overlap.units`, `overlap.operators` | maps keyed by transfer-unit ID and operator execution position; each value contains `dma_in_progress` and `reads_pending`, each true only if observed at both ends of its window |
+| `refills.units`, `refills.operators` | L1D cache-refill counts over unit-issue and operator-run windows; emitted only by a pass counting refills |
+
+An unreadable DMA flag is JSON `null`, distinct from a measured `false`.
+Missing fields or iterations mean unavailable evidence; they are never filled
+with zeros. Empty unit maps are valid for a module with no transfer units.
+These records are not averaged, and operator keys are execution positions,
+not original model indices. They describe the instrumented runs, not the clean
+timing or power window. Malformed or duplicate evidence lines fail capture and
+quote the offending line.
+
+The result manifest's SHA-256 for `profile_results.json` binds this evidence.
+`identity.observation_hash` keeps its existing PMU/device-timing basis and does
+not include these supplemental diagnostics: equal observation hashes can have
+different transfer evidence.
 
 ### 3. `run_metadata.json`
 

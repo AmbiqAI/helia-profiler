@@ -137,6 +137,8 @@ class WireConsumer(StrEnum):
 
     #: Named into ``FirmwareMeta`` (or ``PsramInfo``) by ``capture.parser``.
     FIRMWARE_META = "firmware_meta"
+    #: Per-run provider evidence retained by ``capture.transfer``.
+    TRANSFER_EVIDENCE = "transfer_evidence"
     #: Read by the transport/capture layer for framing, handshake or timing.
     TRANSPORT_CONTROL = "transport_control"
     #: Read by ``capture.power_terminal`` into the power envelope.

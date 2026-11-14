@@ -13,6 +13,7 @@ capture/parser.py
 capture/power_terminal.py
 capture/rtt_symbol.py
 capture/terminal_transport.py
+capture/transfer.py
 cli/__init__.py
 cli/analyze_cmd.py
 cli/app.py
@@ -266,6 +267,7 @@ results/models.py
 results/run_summary.py
 results/serde.py
 results/support_bundle.py
+results/transfer.py
 runs/__init__.py
 runs/compiled.py
 runs/contracts.py

@@ -62,8 +62,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         WireKind.KEY_VALUE,
         "L1D cache refills per transfer unit over its issue window, and per "
         "operator over its run window, in one instrumented run.",
-        WireConsumer.UNCONSUMED,
-        WireCriticality.DIAGNOSTIC,
+        WireConsumer.TRANSFER_EVIDENCE,
+        WireCriticality.METRIC,
         key=WireKey.TRANSFER_REFILLS,
         engines=AOT_ENGINES,
         condition=GATE_PMU_PROFILE,
@@ -79,8 +79,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         "Per transfer unit's issue and per operator's run in one instrumented "
         "run: whether the MSPI controller's DMA was in progress, and whether "
         "nsx-psram had reads pending, at both ends.",
-        WireConsumer.UNCONSUMED,
-        WireCriticality.DIAGNOSTIC,
+        WireConsumer.TRANSFER_EVIDENCE,
+        WireCriticality.METRIC,
         key=WireKey.TRANSFER_OVERLAP,
         engines=AOT_ENGINES,
         condition=GATE_LAYER_PROFILE,
@@ -93,8 +93,8 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         WireKey.TRANSFER_STATS.wire,
         WireKind.KEY_VALUE,
         "The transfer provider's counts for one instrumented run.",
-        WireConsumer.UNCONSUMED,
-        WireCriticality.DIAGNOSTIC,
+        WireConsumer.TRANSFER_EVIDENCE,
+        WireCriticality.METRIC,
         key=WireKey.TRANSFER_STATS,
         engines=AOT_ENGINES,
         condition=GATE_LAYER_PROFILE,

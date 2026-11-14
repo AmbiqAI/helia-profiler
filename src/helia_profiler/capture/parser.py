@@ -48,6 +48,7 @@ from ..wire import (
     HeartbeatPhase,
     WireKey,
 )
+from .transfer import TransferEvidenceParser
 
 log = logging.getLogger("hpx")
 
@@ -103,6 +104,7 @@ def parse_firmware_output(
     current_preset: _PresetData | None = None
     in_session = False
     saw_end = False
+    transfer = TransferEvidenceParser()
 
     for line in lines:
         line = line.strip()
@@ -114,6 +116,7 @@ def parse_firmware_output(
             continue
 
         if line == HPX_END_SENTINEL:
+            transfer.flush()
             if current_preset is not None:
                 current_preset.flush_iteration()
             saw_end = True
@@ -145,6 +148,9 @@ def parse_firmware_output(
                 meta_kv[_ANNOUNCED_CLEAN_ITERS] = int(m_iters.group(1))
             continue
 
+        if transfer.feed_line(line):
+            continue
+
         m = KEY_VALUE_RE.match(line)
         if m:
             key = m.group(1).lower()
@@ -156,6 +162,7 @@ def parse_firmware_output(
             if current_preset is not None:
                 current_preset.flush_iteration()
             preset_name = m.group(1)
+            transfer.start_preset(preset_name)
             if preset_name in presets:
                 raise CaptureError(
                     f"PMU pass {preset_name} appeared twice.",
@@ -167,6 +174,7 @@ def parse_firmware_output(
 
         m = HPX_ITER_SENTINEL_RE.match(line)
         if m:
+            transfer.start_iteration(int(m.group(1)))
             # Auto-create a default preset for legacy single-preset streams
             if current_preset is None:
                 current_preset = _PresetData()
@@ -307,6 +315,7 @@ def parse_firmware_output(
         overflow_detected=overflow_detected,
         groups=groups,
         raw_output=tuple(lines) if firmware_meta.per_layer_profiling is False else (),
+        transfer_evidence=tuple(transfer.records),
     )
 
 
