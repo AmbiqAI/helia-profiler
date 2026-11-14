@@ -73,6 +73,9 @@ def profile_run_identity(ctx: PipelineContext) -> RunIdentity:
 
 def _observation_hash(pmu: PmuResult) -> str:
     facts = measured_facts(pmu)
+    # Provider diagnostics are bound by their report artifact's digest;
+    # observation identity retains its PMU/device-timing basis.
+    facts.pop("transfer_evidence")
     # Diagnostic text is not a measurement. An unreported capability keeps the
     # existing layer-only observation basis.
     facts.pop("raw_output")

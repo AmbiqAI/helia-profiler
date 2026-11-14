@@ -390,6 +390,11 @@ not original model indices. They describe the instrumented runs, not the clean
 timing or power window. Malformed or duplicate evidence lines fail capture and
 quote the offending line.
 
+The result manifest's SHA-256 for `profile_results.json` binds this evidence.
+`identity.observation_hash` keeps its existing PMU/device-timing basis and does
+not include these supplemental diagnostics: equal observation hashes can have
+different transfer evidence.
+
 ### 3. `run_metadata.json`
 
 The provenance of the run, from `report/contracts.py`:

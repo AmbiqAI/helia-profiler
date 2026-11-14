@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from helia_profiler.capture.parser import parse_firmware_output
 from helia_profiler.config import load_config
 from helia_profiler.errors import CaptureError
 from helia_profiler.pipeline import PipelineContext
+from helia_profiler.profile_identity import _observation_hash
 from helia_profiler.report import write_report
 from helia_profiler.report.json_writer import _write_json
 from helia_profiler.results import RunMetadata, load_result_manifest
@@ -111,6 +113,9 @@ def test_partial_evidence_does_not_fabricate_other_fields(tmp_path):
         "HPX_TRANSFER_STATS=4294967296,2,3,4,5,6",
         "HPX_TRANSFER_STATS=1,2,no,4,5,6",
         "HPX_TRANSFER_STATS",
+        "HPX_TRANSFER_STATS 1,2,3,4,5,6",
+        "HPX_TRANSFER_OVERLAP:0:1/1;0:0/0",
+        "HPX_TRANSFER_REFILLS:0:2;0:3",
         "HPX_TRANSFER_OVERLAP=0:2/1;0:0/0",
         "HPX_TRANSFER_OVERLAP=0:x/x;0:0/0",
         "HPX_TRANSFER_OVERLAP=0:1/1,0:0/0;0:0/0",
@@ -146,8 +151,9 @@ def test_repeated_iteration_id_with_evidence_is_rejected():
     line = "HPX_TRANSFER_STATS=1,2,3,4,5,6"
     lines = _session(line)
     lines[-1:] = lines[2:]
-    with pytest.raises(CaptureError, match="iteration"):
+    with pytest.raises(CaptureError, match="iteration") as exc:
         parse_firmware_output(lines)
+    assert line in str(exc.value)
 
 
 def test_legacy_single_pass_uses_default_preset_identity():
@@ -161,6 +167,20 @@ def test_missing_iteration_evidence_is_not_carried_forward():
     lines[-1:] = [s.replace("ITER 0", "ITER 1") for s in _session()[2:]]
     records = parse_firmware_output(lines).transfer_evidence
     assert len(records) == 1 and records[0].iteration == 0
+
+
+def test_future_transfer_key_does_not_collide_with_known_records():
+    assert parse_firmware_output(_session("HPX_TRANSFER_STATS_V2=unknown")).transfer_evidence == ()
+
+
+def test_diagnostics_preserve_observation_basis_and_change_artifact_digest(tmp_path):
+    plain = parse_firmware_output(_session())
+    first = parse_firmware_output(_session("HPX_TRANSFER_STATS=1,2,3,4,5,6"))
+    second = parse_firmware_output(_session("HPX_TRANSFER_STATS=1,2,3,5,6,7"))
+    assert _observation_hash(first) == _observation_hash(second) == _observation_hash(plain)
+    a = _write_json(first, None, RunMetadata(), tmp_path).read_bytes()
+    b = _write_json(second, None, RunMetadata(), tmp_path).read_bytes()
+    assert hashlib.sha256(a).digest() != hashlib.sha256(b).digest()
 
 
 @pytest.mark.parametrize("output_format", ["csv", "json"])

@@ -17,6 +17,7 @@ from ..results.transfer import (
 from ..wire import WireKey
 
 _KEYS = (WireKey.TRANSFER_STATS, WireKey.TRANSFER_OVERLAP, WireKey.TRANSFER_REFILLS)
+_KEY_PATTERN = re.compile(r"^(HPX_TRANSFER_(?:STATS|OVERLAP|REFILLS))(?=\W|$)")
 _T = TypeVar("_T")
 
 
@@ -58,6 +59,7 @@ class TransferEvidenceParser:
         self._overlap: TransferOverlap | None = None
         self._refills: TransferRefills | None = None
         self._seen: set[tuple[str, int]] = set()
+        self._last_line: str | None = None
 
     def start_preset(self, name: str) -> None:
         self.flush()
@@ -75,7 +77,9 @@ class TransferEvidenceParser:
             assert self._preset is not None and self._iteration is not None
             identity = (self._preset, self._iteration)
             if identity in self._seen:
-                raise CaptureError(f"Duplicate transfer evidence for pass/iteration {identity!r}.")
+                raise CaptureError(
+                    f"Duplicate transfer evidence for pass/iteration {identity!r}: {self._last_line!r}."
+                )
             self._seen.add(identity)
             self.records.append(
                 TransferEvidence(*identity, self._stats, self._overlap, self._refills)
@@ -83,15 +87,18 @@ class TransferEvidenceParser:
         self._stats = None
         self._overlap = None
         self._refills = None
+        self._last_line = None
 
     def feed_line(self, line: str) -> bool:
-        token, separator, value = line.partition("=")
-        key = next((key for key in _KEYS if token == key.wire), None)
+        match = _KEY_PATTERN.match(line)
+        key = next((key for key in _KEYS if match and match.group(1) == key.wire), None)
         if key is None:
             return False
         try:
-            if not separator:
+            suffix = line[len(key.wire) :]
+            if not suffix.startswith("="):
                 raise ValueError("missing equals sign")
+            value = suffix[1:]
             if self._iteration is None:
                 raise ValueError("outside an instrumented iteration")
             if key == WireKey.TRANSFER_STATS:
@@ -115,4 +122,5 @@ class TransferEvidenceParser:
                 self._refills = TransferRefills(_indexed(units, _uint), _indexed(operators, _uint))
         except ValueError as exc:
             raise CaptureError(f"Invalid transfer evidence line {line!r}: {exc}.") from exc
+        self._last_line = line
         return True
