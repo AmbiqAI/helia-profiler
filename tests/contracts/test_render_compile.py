@@ -267,7 +267,16 @@ def _build_cases() -> list[_CompileCase]:
                 "update this harness's strip logic"
             )
             text = text[: -len(cc)]
-        cases.append(_CompileCase(case_id=f"census:{render.label}", text=text, vars=render.vars))
+        cases.append(
+            _CompileCase(
+                case_id=f"census:{render.label}",
+                text=text,
+                vars=render.vars,
+                headers=aot_transfer_headers()
+                if render.vars.get("transfer_diagnostics", "off") != "off"
+                else {},
+            )
+        )
 
     # Full resolver plan (mode="all"): every registration, max_ops sized to
     # match, so every Add* call the production plan can emit is compiled.
@@ -894,3 +903,15 @@ def test_schema_header_layouts(tmp_path, monkeypatch, layout, consumer):
         assert "schema_generated.h" in result.stderr
     else:
         assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("mode", ["timing", "overlap"])
+def test_transfer_diagnostics_refuse_a_missing_provider_header(tmp_path, mode):
+    case = next(
+        c for c in _build_cases() if c.case_id == f"apollo510|rtt|helia-aot|transfer|{mode}"
+    )
+    directory = _prepare_case_dir(case, tmp_path)
+    (directory / "fake_nsx_transfer.h").unlink()
+    result = _compile(directory, _part_define(case.vars))
+    assert result.returncode != 0
+    assert "profiling.transfer_diagnostics requires the emitted DMA provider" in result.stderr

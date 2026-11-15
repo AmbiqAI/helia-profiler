@@ -219,4 +219,4 @@ def test_yaml_unquoted_off_disables_diagnostics(tmp_path):
     path.write_text(
         "model:\n  path: m.tflite\nengine:\n  type: helia-aot\nprofiling:\n  transfer_diagnostics: off\n"
     )
-    assert load_config(path).profiling.transfer_diagnostics == "off"
+    assert load_config(path, {}).profiling.transfer_diagnostics == "off"
