@@ -227,7 +227,11 @@ _MATRIX: tuple[_HwCase, ...] = (
         "hpx_profiler",
         aot_arenas=True,
         aot_transfer=True,
-        aot_overrides=(("transfer_diagnostics", "trace"), ("transfer_trace_max_pieces", 4)),
+        aot_overrides=(
+            ("transfer_diagnostics", "trace"),
+            ("transfer_diagnostic_iterations", 1),
+            ("transfer_trace_max_pieces", 4),
+        ),
     ),
     _HwCase(
         "510-aot-transfer-probe",
