@@ -161,6 +161,13 @@ class TransferDiagnosticParser:
             raise ValueError("complete diagnostic contradicts run status or elapsed clock")
         trace = None
         if purpose == "trace":
+            if complete and (
+                self._stats.waits != dma
+                or self._stats.aborts != 0
+                or self._stats.unsampled != 0
+                or self._stats.peak_in_flight == 0
+            ):
+                raise ValueError("complete trace contradicts provider accounting")
             trace = self._trace.finish(
                 elapsed=elapsed, complete=complete, units=count, dma=dma, issues=self._stats.issues
             )
@@ -205,6 +212,10 @@ def validate_transfer_diagnostics(result: PmuResult, profiling: ProfilingConfig)
                 or record.trace.binding_epoch != index + 1
                 or record.trace.sequence_start != 0
                 or (record.complete and record.trace.operator_count != len(result.layers))
+                or (
+                    record.complete
+                    and (record.stats is None or record.stats.peak_in_flight > record.stats.issues)
+                )
             )
         )
         or (record.purpose != "trace" and record.trace is not None)

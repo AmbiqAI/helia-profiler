@@ -172,7 +172,11 @@ def test_released_observer_fact_enables_only_the_requested_trace(tmp_path, monke
         ),
     )
     assert isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
-    ctx.engine_artifacts = replace(ctx.engine_artifacts, aot_transfer_cmake_target="nsx::transfer")
+    ctx.engine_artifacts = replace(
+        ctx.engine_artifacts,
+        aot_transfer_cmake_target="nsx::transfer",
+        aot_op_manifest=[{"idx": 0, "id": 4, "op_type": "ADD"}],
+    )
     current = records.runtime("helia-aot", ctx.engine_artifacts.helia_aot_version)
     assert current is not None and not current.transfer_observer
     monkeypatch.setattr(records, "runtime", lambda *args: replace(current, transfer_observer=True))
@@ -317,3 +321,50 @@ def test_acceptance_sequence_cannot_reverse_nonoverlapping_issue_windows():
         "HPX_TRANSFER_TRACE_PIECE=0,0,64,0,35",
     ]
     assert _parse(delayed_first).transfer_diagnostics[0].complete
+
+
+@pytest.mark.parametrize(
+    "stats", ["1,0,0,1,0,0", "1,1,1,1,0,0", "1,1,0,1,0,1", "1,1,0,0,0,0", "1,1,0,2,0,0"]
+)
+def test_complete_trace_reconciles_provider_accounting(stats):
+    config = load_config(
+        None,
+        {
+            "model": {"path": "m.tflite"},
+            "engine": {"type": "helia-aot"},
+            "profiling": {"transfer_diagnostics": "trace", "transfer_trace_max_pieces": 2},
+        },
+    )
+    lines = [s.replace("STATS=1,1,0,1,0,0", "STATS=" + stats) for s in TRACE]
+    with pytest.raises(CaptureError):
+        validate_transfer_diagnostics(_parse(lines), config.profiling)
+    incomplete = _parse([s.replace("96000,0,1", "96000,0,0") for s in lines])
+    validate_transfer_diagnostics(incomplete, config.profiling)
+    assert not incomplete.transfer_diagnostics[0].complete
+
+
+@pytest.mark.parametrize("indices", [None, [4], [0, 0], [1, 0], [0, 2], list(range(10000))])
+def test_trace_refuses_a_manifest_outside_the_callback_contract(tmp_path, monkeypatch, indices):
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.errors import FirmwareError
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.runtime import records
+    from tests.test_model_only import _ctx
+
+    ctx = _ctx(tmp_path, per_layer=True)
+    ctx.config = replace(
+        ctx.config, profiling=replace(ctx.config.profiling, transfer_diagnostics="trace")
+    )
+    assert isinstance(ctx.engine_artifacts, HeliaAotArtifacts)
+    ctx.engine_artifacts = replace(
+        ctx.engine_artifacts,
+        aot_transfer_cmake_target="nsx::transfer",
+        aot_op_manifest=None
+        if indices is None
+        else [{"idx": index, "id": None, "op_type": "ADD"} for index in indices],
+    )
+    current = records.runtime("helia-aot", ctx.engine_artifacts.helia_aot_version)
+    assert current is not None
+    monkeypatch.setattr(records, "runtime", lambda *args: replace(current, transfer_observer=True))
+    with pytest.raises(FirmwareError, match="operator manifest"):
+        FirmwareRenderContext.from_pipeline_context(ctx)

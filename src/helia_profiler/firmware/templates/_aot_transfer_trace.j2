@@ -74,7 +74,7 @@ static void hpx_transfer_diagnostic_cb(int32_t op, {{ aot_prefix }}_operator_sta
     HpxTraceSpan *span = nullptr;
     bool start = false;
     if (state == {{ aot_prefix }}_op_state_run_started || state == {{ aot_prefix }}_op_state_run_finished) {
-        if (op < 0 || op >= kMaxLayers) { g_trace.valid = false; return; }
+        if (op < 0 || op >= {{ aot_op_manifest | length }} || op >= kMaxLayers) { g_trace.valid = false; return; }
         span = &g_trace.operators[op];
         start = state == {{ aot_prefix }}_op_state_run_started;
     } else {
@@ -129,7 +129,10 @@ static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint3
         if (op >= (uint32_t)kMaxLayers || !hpx_trace_span_valid(g_trace.operators[op], cycles)) complete = false;
     }
     const {{ aot_prefix }}_nsx_transfer_stats_t *stats = {{ aot_prefix }}_nsx_transfer_stats();
-    if (observed != stats->issues - g_transfer_stats_before.issues) complete = false;
+    const uint32_t issues = stats->issues - g_transfer_stats_before.issues;
+    if (observed != issues || stats->waits - g_transfer_stats_before.waits != waits ||
+        stats->aborts != g_transfer_stats_before.aborts || g_transfer_sample_failures != 0U ||
+        stats->peak_in_flight == 0U || stats->peak_in_flight > issues) complete = false;
     for (uint32_t i = 0; i < retained; ++i) {
         const HpxTracePiece &piece = g_trace.pieces[i];
         if (piece.status != 0 || piece.cycles > cycles) complete = false;

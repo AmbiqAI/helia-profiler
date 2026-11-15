@@ -48,9 +48,10 @@ int main() {
         state(u, fake_op_state_transfer_wait_started, 110U + 20U * u);
         state(u, fake_op_state_transfer_wait_finished, 120U + 20U * u);
     }
-    MUTATION
     provider_stats.issues = 3;
     provider_stats.waits = 3;
+    provider_stats.peak_in_flight = 3;
+    MUTATION
     g_trace_quiescent = QUIESCENT;
     if (g_trace_quiescent) __atomic_store_n(&g_trace.recording, 0U, __ATOMIC_RELEASE);
     hpx_transfer_diagnostic_report(0, 96000, 33, 0);
@@ -299,4 +300,29 @@ int main() {
 
 def test_pending_at_return_never_labels_a_trace_complete(tmp_path):
     record, _ = _run(tmp_path, mutation="g_transfer_power_clause = true;")
+    assert not record.complete
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "provider_stats.waits = 0;",
+        "provider_stats.aborts = 1;",
+        "g_transfer_sample_failures = 1;",
+        "provider_stats.peak_in_flight = 0;",
+        "provider_stats.peak_in_flight = 4;",
+    ],
+)
+def test_producer_never_labels_contradictory_accounting_complete(tmp_path, mutation):
+    record, _ = _run(tmp_path, mutation=mutation)
+    assert not record.complete
+
+
+@pytest.mark.parametrize("callback_id", [-1, 1, 4, 1000000])
+def test_unexpected_operator_callback_never_silently_qualifies(tmp_path, callback_id):
+    record, _ = _run(
+        tmp_path,
+        mutation=f"state({callback_id}, fake_op_state_run_started, 200); "
+        f"state({callback_id}, fake_op_state_run_finished, 210);",
+    )
     assert not record.complete

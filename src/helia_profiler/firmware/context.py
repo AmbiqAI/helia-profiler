@@ -304,6 +304,17 @@ class FirmwareRenderContext:
                     "Transfer traces require a recorded released AOT completion observer.",
                     hint="Use timing/overlap diagnostics until an observer-bearing runtime is adopted.",
                 )
+            manifest = artifacts.aot_op_manifest
+            # Table callback IDs are positions: github.com/AmbiqAI/helia-aot/blob/main/helia_aot/views.py.
+            if (
+                manifest is None
+                or len(manifest) > soc.pmu_max_ops
+                or any(op.get("idx") != index for index, op in enumerate(manifest))
+            ):
+                raise FirmwareError(
+                    "Transfer traces require a bounded operator manifest with consecutive "
+                    "execution positions matching AOT table callbacks.",
+                )
         if not artifacts.per_layer_profiling and config.profiling.stream_evidence:
             raise FirmwareError(
                 "profiling.stream_evidence requires per-layer callbacks.",
