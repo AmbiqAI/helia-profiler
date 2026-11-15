@@ -41,6 +41,7 @@ class TransferDiagnosticParser:
         self._overlap: TransferOverlap | None = None
         self._seen: set[tuple[str, int]] = set()
         self._trace = TransferTraceParser()
+        self._trace_bindings: set[int] = set()
 
     def finish(self) -> None:
         if self._header is not None:
@@ -158,6 +159,14 @@ class TransferDiagnosticParser:
             raise ValueError("missing overlap units")
         if complete and (status != 0 or elapsed == 0):
             raise ValueError("complete diagnostic contradicts run status or elapsed clock")
+        trace = None
+        if purpose == "trace":
+            trace = self._trace.finish(
+                elapsed=elapsed, complete=complete, units=count, dma=dma, issues=self._stats.issues
+            )
+            if trace.binding_epoch in self._trace_bindings:
+                raise ValueError("repeated trace binding epoch")
+            self._trace_bindings.add(trace.binding_epoch)
         self.records.append(
             TransferDiagnostic(
                 purpose,
@@ -170,15 +179,7 @@ class TransferDiagnosticParser:
                 tuple(self._units[index] for index in sorted(self._units)),
                 self._stats,
                 self._overlap,
-                self._trace.finish(
-                    elapsed=elapsed,
-                    complete=complete,
-                    units=count,
-                    dma=dma,
-                    issues=self._stats.issues,
-                )
-                if purpose == "trace"
-                else None,
+                trace,
             )
         )
         self._seen.add((purpose, iteration))
@@ -197,9 +198,15 @@ def validate_transfer_diagnostics(result: PmuResult, profiling: ProfilingConfig)
         or record.preparation != ("cold" if profiling.stream_evidence else "configured")
         or record.cpu_hz != result.meta.system_clock_hz
         or (
-            record.trace is not None
-            and record.trace.capacity != profiling.transfer_trace_max_pieces
+            record.purpose == "trace"
+            and (
+                record.trace is None
+                or record.trace.capacity != profiling.transfer_trace_max_pieces
+                or record.trace.binding_epoch != index + 1
+                or record.trace.sequence_start != 0
+            )
         )
+        or (record.purpose != "trace" and record.trace is not None)
         for index, record in enumerate(records)
     ):
         raise CaptureError(

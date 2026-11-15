@@ -117,30 +117,50 @@ class TransferTraceParser:
             ):
                 raise ValueError("complete trace contradicts clock, lifecycle or piece counts")
             kinds = {kind: [] for kind in ("issue", "wait", "operator")}
+            intervals: list[tuple[str, int, int, int]] = []
             for span in trace.spans:
                 kinds[span.kind].append(span.id)
+                start, end = span.start_cycles, span.end_cycles
                 if (
-                    span.start_cycles is None
-                    or span.end_cycles is None
-                    or not 0 <= span.start_cycles <= span.end_cycles <= elapsed
+                    start is None
+                    or end is None
+                    or not 0 <= start <= end <= elapsed
                     or span.status != 0
                 ):
                     raise ValueError(
                         "complete trace has unpaired, failed or out-of-span boundaries"
                     )
+                intervals.append((span.kind, span.id, start, end))
             if (
                 len(kinds["issue"]) != units
                 or len(kinds["wait"]) != dma
                 or len(kinds["operator"]) != trace.operator_count
             ):
                 raise ValueError("complete trace has missing boundaries")
+            ordered = sorted(intervals, key=lambda span: (span[2], span[3]))
+            if any(previous[3] > following[2] for previous, following in zip(ordered, ordered[1:])):
+                raise ValueError("complete trace overlaps sequential foreground calls")
+            operators = sorted((s for s in intervals if s[0] == "operator"), key=lambda s: s[1])
+            if any(
+                previous[3] > following[2] for previous, following in zip(operators, operators[1:])
+            ):
+                raise ValueError("complete trace reverses operator execution positions")
+            if any(
+                previous.cycles > following.cycles
+                for previous, following in zip(trace.completions, trace.completions[1:])
+            ):
+                raise ValueError("complete trace reverses completion notification time")
             offsets = sorted(
                 (p.sequence - trace.sequence_start) & 0xFFFFFFFF for p in trace.completions
             )
             if any(offset != index for index, offset in enumerate(offsets)):
                 raise ValueError("complete trace has missing piece sequences")
-            issue_spans = {s.id: s for s in trace.spans if s.kind == "issue"}
-            wait_spans = {s.id: s for s in trace.spans if s.kind == "wait"}
+            issue_spans = {s[1]: s for s in intervals if s[0] == "issue"}
+            wait_spans = {s[1]: s for s in intervals if s[0] == "wait"}
+            for unit, wait in wait_spans.items():
+                issue = issue_spans.get(unit)
+                if issue is None or issue[3] > wait[2]:
+                    raise ValueError("complete trace waits before unit issue returns")
             for piece in trace.completions:
                 issue = issue_spans.get(piece.ticket)
                 wait = wait_spans.get(piece.ticket)
@@ -149,9 +169,7 @@ class TransferTraceParser:
                     or piece.cycles > elapsed
                     or issue is None
                     or wait is None
-                    or issue.start_cycles is None
-                    or wait.end_cycles is None
-                    or not issue.start_cycles <= piece.cycles <= wait.end_cycles
+                    or not issue[2] <= piece.cycles <= wait[3]
                 ):
                     raise ValueError(
                         "complete trace has failed or causally inconsistent completion"

@@ -179,3 +179,68 @@ def test_released_observer_fact_enables_only_the_requested_trace(tmp_path, monke
     variables = FirmwareRenderContext.from_pipeline_context(ctx).to_template_vars()
     assert variables["transfer_diagnostics"] == "trace"
     assert variables["transfer_trace_max_pieces"] == 7
+
+
+def test_replayed_binding_cannot_become_a_second_qualified_iteration():
+    replay = [line.replace("BEGIN=trace,0,", "BEGIN=trace,1,") for line in TRACE]
+    with pytest.raises(CaptureError, match="repeated trace binding epoch"):
+        _parse([*TRACE, *replay])
+    fresh = [line.replace("TRACE_BEGIN=1,1,0,", "TRACE_BEGIN=1,2,0,") for line in replay]
+    result = _parse([*TRACE, *fresh])
+    config = load_config(
+        None,
+        {
+            "model": {"path": "m.tflite"},
+            "engine": {"type": "helia-aot"},
+            "profiling": {
+                "transfer_diagnostics": "trace",
+                "transfer_diagnostic_iterations": 2,
+                "transfer_trace_max_pieces": 2,
+            },
+        },
+    )
+    validate_transfer_diagnostics(result, config.profiling)
+    second = result.transfer_diagnostics[1]
+    corrupted = replace(second, trace=replace(second.trace, binding_epoch=1))
+    with pytest.raises(CaptureError):
+        validate_transfer_diagnostics(
+            replace(result, transfer_diagnostics=(result.transfer_diagnostics[0], corrupted)),
+            config.profiling,
+        )
+
+
+@pytest.mark.parametrize(
+    "extra, change",
+    [
+        (
+            ["HPX_TRANSFER_TRACE_SPAN=operator,1,30,45,0"],
+            ("TRACE_BEGIN=1,1,0,2,256,1", "TRACE_BEGIN=1,1,0,2,256,2"),
+        ),
+        (
+            ["HPX_TRANSFER_TRACE_SPAN=operator,1,11,19,0"],
+            ("TRACE_BEGIN=1,1,0,2,256,1", "TRACE_BEGIN=1,1,0,2,256,2"),
+        ),
+        ([], ("SPAN=wait,0,50,60,0", "SPAN=wait,0,6,60,0")),
+    ],
+)
+def test_impossible_foreground_chronology_is_not_qualified(extra, change):
+    lines = [line.replace(*change) for line in TRACE]
+    lines[5:5] = extra
+    with pytest.raises(CaptureError, match="sequential|execution|waits before"):
+        _parse(lines)
+    incomplete = [line.replace("96000,0,1", "96000,0,0") for line in lines]
+    assert not _parse(incomplete).transfer_diagnostics[0].complete
+
+
+def test_callbacks_cannot_arrive_backwards_in_time_but_may_share_a_cycle():
+    lines = [
+        line.replace("TRACE_END=1,0,1,1", "TRACE_END=2,0,1,1").replace(
+            "STATS=1,1,0,1,0,0", "STATS=2,1,0,1,0,0"
+        )
+        for line in TRACE
+    ]
+    lines.insert(6, "HPX_TRANSFER_TRACE_PIECE=1,0,64,0,4")
+    with pytest.raises(CaptureError, match="notification time"):
+        _parse(lines)
+    lines[6] = "HPX_TRANSFER_TRACE_PIECE=1,0,64,0,5"
+    assert _parse(lines).transfer_diagnostics[0].complete
