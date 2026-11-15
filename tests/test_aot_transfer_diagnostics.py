@@ -118,3 +118,23 @@ def test_timing_callback_has_no_pmu_or_observer_operations():
     loop = source[start : source.index("callback = model_operator_cb;", start)]
     assert "profiled_infer_count" not in loop
     assert "profiled_infer_cycles" not in loop
+
+
+@pytest.mark.parametrize("transport", ["rtt", "usb_cdc"])
+def test_diagnostic_transport_delivery_is_outside_the_clock_bracket(transport):
+    source = _render_aot(
+        transport=transport,
+        transfer_diagnostics="timing",
+        transfer_diagnostic_iterations=2,
+        clean_window_timer="stimer",
+    )
+    start = source.index("for (int diagnostic_iter")
+    loop = source[start : source.index("callback = model_operator_cb;", start)]
+    elapsed = loop.index("const uint32_t diagnostic_ticks")
+    report = loop.index("hpx_transfer_diagnostic_report(")
+    if transport == "rtt":
+        assert elapsed < loop.index("hpx_rtt_set_blocking();") < report
+        assert report < loop.index("hpx_rtt_set_nonblocking();")
+    else:
+        assert loop.index("usb_timer_pause();") < loop.index("diagnostic_start_tick")
+        assert elapsed < loop.index("usb_timer_resume();") < report

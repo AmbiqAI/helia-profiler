@@ -151,6 +151,11 @@ class ProfilingConfig:
     #: Data-cache policy for ordinary profiler firmware; off requires Apollo5.
     dcache: Literal["on", "off"] = field(default="on", metadata={"omit_default": True})
 
+    @field_validator("transfer_diagnostics", mode="before")
+    @classmethod
+    def _normalize_diagnostics(cls, value: Any) -> Any:
+        return "off" if value is False else value
+
     @field_validator("transfer_diagnostic_iterations", mode="before")
     @classmethod
     def _diagnostic_iterations(cls, value: Any) -> int:

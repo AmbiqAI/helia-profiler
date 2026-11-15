@@ -200,3 +200,23 @@ def test_live_capture_requires_requested_diagnostics(mismatch):
         result = replace(result, meta=replace(result.meta, system_clock_hz=250000000))
     with pytest.raises(CaptureError, match="do not match"):
         validate_transfer_diagnostics(result, config)
+
+
+def test_diagnostic_records_do_not_change_the_existing_observation_identity():
+    from helia_profiler.profile_identity import _observation_hash
+
+    plain = parse_firmware_output(_session())
+    observed = parse_firmware_output(_session(*_TIMING))
+    changed = replace(
+        observed,
+        transfer_diagnostics=(replace(observed.transfer_diagnostics[0], elapsed_cycles=123),),
+    )
+    assert _observation_hash(plain) == _observation_hash(observed) == _observation_hash(changed)
+
+
+def test_yaml_unquoted_off_disables_diagnostics(tmp_path):
+    path = tmp_path / "config.yaml"
+    path.write_text(
+        "model:\n  path: m.tflite\nengine:\n  type: helia-aot\nprofiling:\n  transfer_diagnostics: off\n"
+    )
+    assert load_config(path).profiling.transfer_diagnostics == "off"

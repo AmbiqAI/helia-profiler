@@ -602,14 +602,25 @@ hpx_aot_check_runs();{% endblock %}
 {% endfor %}{% endif %}
         hpx_transfer_run_start();
         hpx_transfer_diagnostic_reset();
+{% if transport == "usb_cdc" %}
+        usb_timer_pause();
+{% endif %}
         const uint32_t diagnostic_start_tick = hpx_stimer_ticks();
         const uint32_t diagnostic_start = DWT->CYCCNT;
         hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         const uint32_t diagnostic_cycles = DWT->CYCCNT - diagnostic_start;
         const uint32_t diagnostic_ticks = hpx_stimer_ticks() - diagnostic_start_tick;
         hpx_transfer_after_run();
+{% if transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% elif transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
         hpx_transfer_diagnostic_report(diagnostic_iter, diagnostic_cycles, diagnostic_ticks, hpx_aot_status);
         hpx_aot_check_runs();
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% endif %}
     }
     g_transfer_sampling = false;
     {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
