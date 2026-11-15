@@ -602,7 +602,16 @@ hpx_aot_check_runs();{% endblock %}
 {% endfor %}{% endif %}
         hpx_transfer_run_start();
         hpx_transfer_diagnostic_reset();
-{% if transport == "usb_cdc" %}
+        const uint32_t diagnostic_max_ms = SystemCoreClock > 0U
+            ? (uint32_t)(((uint64_t)UINT32_MAX * 1000U) / SystemCoreClock) : 0U;
+{% if transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% endif %}
+        hpx_printf("HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=%d max_ms=%lu\n",
+                   diagnostic_iter, (unsigned long)diagnostic_max_ms);
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% elif transport == "usb_cdc" %}
         usb_timer_pause();
 {% endif %}
         const uint32_t diagnostic_start_tick = hpx_stimer_ticks();

@@ -196,6 +196,12 @@ NPU backends are refused. The dedicated power binary runs no diagnostics.
   endpoints and do not establish continuous overlap. An unreadable DMA flag is
   `null`. This mode runs separately from direct timing.
 
+Before each invocation, firmware announces a bounded silence budget based on the
+configured CPU rate's full 32-bit cycle-counter span. The host holds its inactivity
+deadline across that run, with a delivery margin, while respecting the overall
+capture deadline. Reporting the diagnostic end releases the hold. No heartbeat is
+printed within the timed invocation.
+
 Diagnostic iterations follow the PMU passes and never enter their counts, layer
 averages or `HPX_PROFILED_INFER_*` values. Native JSON retains them under
 `transfer_diagnostics`; CSV bundles also include this JSON companion. Each record

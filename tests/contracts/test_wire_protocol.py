@@ -1138,6 +1138,7 @@ def test_every_error_code_carries_a_hint():
 def test_heartbeat_phase_catalogue():
     assert [phase.value for phase in HeartbeatPhase] == [
         "clean_window_begin",
+        "transfer_diagnostic_begin",
         "init",
         "allocate",
         "allocated",

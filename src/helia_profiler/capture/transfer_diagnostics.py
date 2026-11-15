@@ -139,7 +139,11 @@ class TransferDiagnosticParser:
                 or any(unit.wait_status not in (None, 0) for unit in self._units.values())
             ):
                 raise ValueError("complete timing contradicts observed calls")
-        elif self._overlap is None or set(self._overlap.units) != set(range(count)):
+        elif (
+            self._overlap is None
+            or len(self._overlap.units) != count
+            or any(unit >= count for unit in self._overlap.units)
+        ):
             raise ValueError("missing overlap units")
         if complete and (status != 0 or elapsed == 0):
             raise ValueError("complete diagnostic contradicts run status or elapsed clock")

@@ -34,6 +34,7 @@ from ..wire import (
     HPX_HEARTBEAT_PREFIX,
     HPX_START_SENTINEL,
     HeartbeatPhase,
+    WireKey,
 )
 
 log = logging.getLogger("hpx")
@@ -73,6 +74,7 @@ HEARTBEAT_TIMEOUT_S = 30
 
 #: Phase marker that precedes the silent clean-inference window.
 CLEAN_WINDOW_BEGIN_PHASE = f"phase={HeartbeatPhase.CLEAN_WINDOW_BEGIN}"
+TRANSFER_DIAGNOSTIC_BEGIN_PHASE = f"phase={HeartbeatPhase.TRANSFER_DIAGNOSTIC_BEGIN}"
 
 #: Multiplier applied to the firmware's est_ms so jitter / a slightly slower
 #: run than the warm estimate cannot trip the deadline.
@@ -96,26 +98,19 @@ WINDOW_BUDGET_CAP_S = 3600.0
 
 
 def window_budget_s(line: str) -> float | None:
-    """Return the deadline budget (seconds) for a clean-window announce.
+    """Return a bounded silence budget for a clean or transfer diagnostic window.
 
-    Parses a ``HPX_HEARTBEAT phase=clean_window_begin ... est_ms=<n>`` line
-    and returns ``est_ms / 1000 * WINDOW_BUDGET_SAFETY +
-    WINDOW_BUDGET_MARGIN_S``, capped at :data:`WINDOW_BUDGET_CAP_S`.
-
-    Returns ``None`` when *line* is not a clean-window announce or carries no
-    usable (> 0) estimate. Since #164/#170 every profile build announces a
-    real duration statement — a measured warm-inference estimate for infer
-    windows (both window modes), the compile-time ``window_target_ms`` for
-    busy-loop windows — so a zero here means a dedicated power binary's
-    announce (which no host ever reads) or a measurement that degraded at
-    runtime (DWT frozen through every warmup by a debugger-attach
-    transient); the caller then keeps its normal heartbeat behaviour.
+    Clean windows use their estimated duration with a safety factor. Diagnostic
+    windows declare the maximum DWT span, so need only the delivery margin.
+    Missing, malformed or nonpositive durations leave normal hang detection on.
     """
-    if CLEAN_WINDOW_BEGIN_PHASE not in line:
+    diagnostic = TRANSFER_DIAGNOSTIC_BEGIN_PHASE in line.split()
+    if not diagnostic and CLEAN_WINDOW_BEGIN_PHASE not in line:
         return None
+    field = "max_ms=" if diagnostic else "est_ms="
     est_ms: int | None = None
     for tok in line.split():
-        if tok.startswith("est_ms="):
+        if tok.startswith(field):
             try:
                 est_ms = int(tok.split("=", 1)[1])
             except ValueError:
@@ -123,7 +118,9 @@ def window_budget_s(line: str) -> float | None:
             break
     if est_ms is None or est_ms <= 0:
         return None
-    budget = est_ms / 1000.0 * WINDOW_BUDGET_SAFETY + WINDOW_BUDGET_MARGIN_S
+    budget = (
+        est_ms / 1000.0 * (1.0 if diagnostic else WINDOW_BUDGET_SAFETY) + WINDOW_BUDGET_MARGIN_S
+    )
     return min(budget, WINDOW_BUDGET_CAP_S)
 
 
@@ -176,6 +173,7 @@ def collect_lines(
     # (#170).  Held across iterations and re-applied on every reset; once
     # wall-clock passes it, it stops mattering on its own.
     window_deadline: float | None = None
+    diagnostic_window = False
     last_data_ts = start
     seen_start = False
 
@@ -232,6 +230,12 @@ def collect_lines(
                 if window_deadline is not None and window_deadline > hb_deadline:
                     hb_deadline = window_deadline
 
+                if diagnostic_window and line.startswith(
+                    f"{WireKey.TRANSFER_DIAGNOSTIC_END.wire}="
+                ):
+                    diagnostic_window = False
+                    window_deadline = None
+                    hb_deadline = line_ts + heartbeat_timeout_s
                 lines.append(line)
                 if on_line is not None:
                     on_line(line, line_ts)
@@ -239,19 +243,20 @@ def collect_lines(
                     log.info("%s heartbeat: %s", transport_name, line)
                     budget = window_budget_s(line)
                     if budget is not None:
-                        # One announce per capture (every render emits exactly
-                        # one clean_window_begin printf). A later one — none
-                        # exists today — would supersede the held FLOOR from
-                        # the next received byte onward; hb_deadline itself is
-                        # only ever raised, so a deadline already widened by
-                        # an earlier announce stands until data next arrives.
+                        diagnostic_window = TRANSFER_DIAGNOSTIC_BEGIN_PHASE in line.split()
                         window_deadline = line_ts + budget
-                        if window_deadline > hb_deadline:
+                        if diagnostic_window:
+                            hb_deadline = max(line_ts + heartbeat_timeout_s, window_deadline)
+                        elif window_deadline > hb_deadline:
                             hb_deadline = window_deadline
-                        if overall_deadline is not None and window_deadline > overall_deadline:
+                        if (
+                            not diagnostic_window
+                            and overall_deadline is not None
+                            and window_deadline > overall_deadline
+                        ):
                             overall_deadline = window_deadline
                         log.info(
-                            "%s: clean window announced (~%.0fs budget) — "
+                            "%s: silent window announced (~%.0fs budget) — "
                             "holding deadline through the silent measurement window",
                             transport_name,
                             budget,

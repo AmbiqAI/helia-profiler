@@ -183,17 +183,13 @@ POWER_BINARY_ENGINES: frozenset[EngineType] = frozenset(
 class HeartbeatPhase(StrEnum):
     """The ``phase=`` values of ``HPX_HEARTBEAT`` records.
 
-    Eight phases, not nine: TFLM's ``init`` record carries an extra ``t=0``
-    payload field the other engines omit, which is a payload variant of one
-    phase rather than a phase of its own.
-
-    :attr:`CLEAN_WINDOW_BEGIN` is the only protocol-critical member — the host
-    parses its ``iters=`` (fallback for ``HPX_CLEAN_INFER_COUNT`` on lossy
-    transports) and its ``est_ms=`` (widens the capture deadline across the
-    deliberately silent measurement window).
+    Silent-window announces are protocol-critical: the host uses their
+    budgets to hold its inactivity deadline without adding traffic during
+    measurement. The clean announce also supplies an iteration-count fallback.
     """
 
     CLEAN_WINDOW_BEGIN = "clean_window_begin"
+    TRANSFER_DIAGNOSTIC_BEGIN = "transfer_diagnostic_begin"
     INIT = "init"
     ALLOCATE = "allocate"
     ALLOCATED = "allocated"

@@ -220,3 +220,28 @@ def test_yaml_unquoted_off_disables_diagnostics(tmp_path):
         "model:\n  path: m.tflite\nengine:\n  type: helia-aot\nprofiling:\n  transfer_diagnostics: off\n"
     )
     assert load_config(path, {}).profiling.transfer_diagnostics == "off"
+
+
+def test_corrupt_declared_count_does_not_allocate_from_the_header(monkeypatch):
+    import helia_profiler.capture.transfer_diagnostics as diagnostics
+
+    def refuse_header_allocation(*args):
+        raise AssertionError(f"attempted allocation from declared count: {args}")
+
+    monkeypatch.setattr(diagnostics, "range", refuse_header_allocation, raising=False)
+    lines = [
+        "HPX_TRANSFER_DIAGNOSTIC_BEGIN=overlap,0,96000000,configured,4294967295,1",
+        "HPX_TRANSFER_DIAGNOSTIC_OVERLAP=0:1/1;",
+        "HPX_TRANSFER_DIAGNOSTIC_STATS=1,1,0,1,1,0",
+        "HPX_TRANSFER_DIAGNOSTIC_END=100,0,0",
+    ]
+    with pytest.raises(CaptureError, match="missing overlap units"):
+        parse_firmware_output(_session(*lines))
+
+
+def test_diagnostic_announce_does_not_become_clean_count_fallback():
+    baseline = parse_firmware_output(_session())
+    announced = parse_firmware_output(
+        _session("HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=3 max_ms=44739")
+    )
+    assert announced.meta == baseline.meta

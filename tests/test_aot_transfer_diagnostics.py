@@ -133,8 +133,26 @@ def test_diagnostic_transport_delivery_is_outside_the_clock_bracket(transport):
     elapsed = loop.index("const uint32_t diagnostic_ticks")
     report = loop.index("hpx_transfer_diagnostic_report(")
     if transport == "rtt":
-        assert elapsed < loop.index("hpx_rtt_set_blocking();") < report
-        assert report < loop.index("hpx_rtt_set_nonblocking();")
+        assert elapsed < loop.rindex("hpx_rtt_set_blocking();") < report
+        assert report < loop.rindex("hpx_rtt_set_nonblocking();")
     else:
         assert loop.index("usb_timer_pause();") < loop.index("diagnostic_start_tick")
         assert elapsed < loop.index("usb_timer_resume();") < report
+
+
+def test_diagnostic_silence_budget_is_announced_before_its_clock_bracket():
+    source = _render_aot(
+        transfer_diagnostics="timing",
+        transfer_diagnostic_iterations=2,
+        clean_window_timer="stimer",
+        transport="rtt",
+    )
+    start = source.index("for (int diagnostic_iter")
+    loop = source[start : source.index("callback = model_operator_cb;", start)]
+    announce = loop.index("HPX_HEARTBEAT phase=transfer_diagnostic_begin")
+    clock = loop.index("const uint32_t diagnostic_start_tick")
+    assert loop.index("hpx_rtt_set_blocking();") < announce
+    assert announce < loop.index("hpx_rtt_set_nonblocking();") < clock
+    assert "UINT32_MAX * 1000U) / SystemCoreClock" in loop
+    timed = loop[clock : loop.index("const uint32_t diagnostic_ticks")]
+    assert "hpx_printf" not in timed and "heartbeat" not in timed

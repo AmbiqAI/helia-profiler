@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from helia_profiler.transport.protocol import (
     WINDOW_BUDGET_CAP_S,
     WINDOW_BUDGET_MARGIN_S,
@@ -307,3 +309,112 @@ def test_no_announce_still_times_out_on_silence():
         poll_interval_s=0.01,
     )
     assert "--- HPX_END ---" not in lines
+
+
+@pytest.mark.parametrize("announce", [True, False])
+def test_silent_diagnostic_run_outlasts_heartbeat_only_with_budget(monkeypatch, announce):
+    from types import SimpleNamespace
+
+    import helia_profiler.transport.protocol as protocol
+
+    clock = [0.0]
+    events = iter(
+        [
+            (
+                0.0,
+                b"--- HPX_START ---\n"
+                + (
+                    b"HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms=5000\n"
+                    if announce
+                    else b""
+                ),
+            ),
+            (2.0, b""),
+            (2.1, b"HPX_TRANSFER_DIAGNOSTIC_END=100,0,1\n--- HPX_END ---\n"),
+        ]
+    )
+
+    def read():
+        clock[0], chunk = next(events)
+        return chunk
+
+    monkeypatch.setattr(
+        protocol, "time", SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda _: None)
+    )
+    lines = protocol.collect_lines(read, transport_name="TEST", heartbeat_timeout_s=1.0)
+    assert ("--- HPX_END ---" in lines) is announce
+
+
+def test_diagnostic_budget_respects_overall_capture_ceiling(monkeypatch):
+    from types import SimpleNamespace
+
+    import helia_profiler.transport.protocol as protocol
+
+    clock = [0.0]
+    events = iter(
+        [
+            (
+                0.0,
+                b"--- HPX_START ---\nHPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms=5000\n",
+            ),
+            (2.0, b""),
+            (2.1, b"--- HPX_END ---\n"),
+        ]
+    )
+
+    def read():
+        clock[0], chunk = next(events)
+        return chunk
+
+    monkeypatch.setattr(
+        protocol, "time", SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda _: None)
+    )
+    lines = protocol.collect_lines(
+        read, transport_name="TEST", heartbeat_timeout_s=1.0, overall_timeout_s=1.5
+    )
+    assert "--- HPX_END ---" not in lines
+
+
+def test_completed_diagnostic_releases_silence_hold(monkeypatch):
+    from types import SimpleNamespace
+
+    import helia_profiler.transport.protocol as protocol
+
+    clock = [0.0]
+    events = iter(
+        [
+            (
+                0.0,
+                b"--- HPX_START ---\nHPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms=5000\n",
+            ),
+            (0.1, b"HPX_TRANSFER_DIAGNOSTIC_END=100,0,1\n"),
+            (2.0, b""),
+            (2.1, b"--- HPX_END ---\n"),
+        ]
+    )
+
+    def read():
+        clock[0], chunk = next(events)
+        return chunk
+
+    monkeypatch.setattr(
+        protocol, "time", SimpleNamespace(monotonic=lambda: clock[0], sleep=lambda _: None)
+    )
+    lines = protocol.collect_lines(read, transport_name="TEST", heartbeat_timeout_s=1.0)
+    assert "--- HPX_END ---" not in lines
+
+
+def test_diagnostic_silence_budget_is_capped_and_requires_positive_maximum():
+    assert (
+        window_budget_s("HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms=5000")
+        == 5 + WINDOW_BUDGET_MARGIN_S
+    )
+    assert (
+        window_budget_s("HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms=999999999")
+        == WINDOW_BUDGET_CAP_S
+    )
+    for value in ("0", "-1", "no"):
+        assert (
+            window_budget_s(f"HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms={value}")
+            is None
+        )
