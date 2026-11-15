@@ -418,3 +418,15 @@ def test_diagnostic_silence_budget_is_capped_and_requires_positive_maximum():
             window_budget_s(f"HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=0 max_ms={value}")
             is None
         )
+
+
+@pytest.mark.parametrize(
+    ("phase", "field"),
+    [
+        ("clean_window_begin", "est_ms"),
+        ("transfer_diagnostic_begin", "max_ms"),
+    ],
+)
+def test_corrupt_large_announces_are_capped_before_float_conversion(phase, field):
+    line = f"HPX_HEARTBEAT phase={phase} {field}=" + "9" * 400
+    assert window_budget_s(line) == WINDOW_BUDGET_CAP_S

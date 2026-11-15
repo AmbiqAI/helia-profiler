@@ -118,9 +118,8 @@ def window_budget_s(line: str) -> float | None:
             break
     if est_ms is None or est_ms <= 0:
         return None
-    budget = (
-        est_ms / 1000.0 * (1.0 if diagnostic else WINDOW_BUDGET_SAFETY) + WINDOW_BUDGET_MARGIN_S
-    )
+    seconds = min(est_ms, int(WINDOW_BUDGET_CAP_S * 1000)) / 1000.0
+    budget = seconds * (1.0 if diagnostic else WINDOW_BUDGET_SAFETY) + WINDOW_BUDGET_MARGIN_S
     return min(budget, WINDOW_BUDGET_CAP_S)
 
 
