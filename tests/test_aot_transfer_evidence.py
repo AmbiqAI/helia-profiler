@@ -201,18 +201,24 @@ def _model_stub() -> str:
 
 
 def _build_and_run(
-    tmp_path: Path, source: str, main: str, *, extra_preamble: str = ""
+    tmp_path: Path,
+    source: str,
+    main: str,
+    *,
+    extra_preamble: str = "",
+    provider_header: str = _AOT_TRANSFER_STUB,
+    provider_source: str = _PROVIDER,
 ) -> subprocess.CompletedProcess[str]:
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("host C++ compiler required")
     (tmp_path / "fake_model.h").write_text(_model_stub())
-    (tmp_path / "fake_nsx_transfer.h").write_text(_AOT_TRANSFER_STUB)
+    (tmp_path / "fake_nsx_transfer.h").write_text(provider_header)
     program = (
         _PREAMBLE
         + extra_preamble
         + '#include "fake_nsx_transfer.h"\n'
-        + _PROVIDER
+        + provider_source
         + _globals(source)
         + main
     )

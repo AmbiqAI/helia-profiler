@@ -196,6 +196,35 @@ NPU backends are refused. The dedicated power binary runs no diagnostics.
   endpoints and do not establish continuous overlap. An unreadable DMA flag is
   `null`. This mode runs separately from direct timing.
 
+`trace` records a chronological diagnostic invocation using an optional completion
+observer from the emitted provider. It requires a released runtime record declaring
+`transfer_observer: true`; an unrecorded or older provider is refused. No current
+runtime record enables this mode. This release gate is separate from existing
+`timing` and `overlap` support.
+
+```yaml
+profiling:
+  transfer_diagnostics: trace
+  transfer_diagnostic_iterations: 1
+  transfer_trace_max_pieces: 256
+```
+
+The completion capacity accepts integers from 1 through 4096. Completion storage
+is fixed before the invocation; overflow retains the first records and reports
+loss, rather than overwriting them. Unit and operator boundaries use separate
+bounded storage. Native diagnostics include a versioned `hpx.transfer-trace`
+record with run-relative cycle offsets, binding epoch, piece sequence/ticket,
+byte counts, statuses, storage size, loss counts and clock/quiescence flags.
+Completion arrival order stays distinct from accepted-read sequence order.
+
+A completion event marks entry to the observer in the MSPI interrupt. It includes
+queue and interrupt-delivery effects; it does not establish physical bus finish,
+DMA-active intervals, exact per-piece submission latency or achieved bandwidth.
+Issue/wait and operator boundaries come from the same continuously running
+clock, in a separate PMU-free run. Observer storage stays live through recovery;
+a failed drain cannot qualify or reuse its records. Incomplete diagnostic data
+remains evidence for diagnosis, not a qualified chronological measurement.
+
 Before each invocation, firmware announces a bounded silence budget based on the
 configured CPU rate's full 32-bit cycle-counter span. The host holds its inactivity
 deadline across that run, with a delivery margin, while respecting the overall

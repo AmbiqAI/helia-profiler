@@ -219,6 +219,17 @@ _MATRIX: tuple[_HwCase, ...] = (
         aot_overrides=(("transfer_diagnostics", "overlap"), ("transfer_diagnostic_iterations", 2)),
     ),
     _HwCase(
+        "510-aot-transfer-trace",
+        "apollo510_evb-arm-none-eabi-gcc-helia-aot",
+        "apollo510_evb",
+        "apollo510",
+        "helia-aot",
+        "hpx_profiler",
+        aot_arenas=True,
+        aot_transfer=True,
+        aot_overrides=(("transfer_diagnostics", "trace"), ("transfer_trace_max_pieces", 4)),
+    ),
+    _HwCase(
         "510-aot-transfer-probe",
         "apollo510_evb-arm-none-eabi-gcc-helia-aot",
         "apollo510_evb",
@@ -592,7 +603,9 @@ def _prepare_case(case: _HwCase, workspace: _Workspace, tmp_path: Path) -> tuple
         # module, so the render's nsx-psram and cache calls meet the SDK's
         # real headers.
         if case.aot_transfer:
-            for name, content in aot_transfer_headers().items():
+            for name, content in aot_transfer_headers(
+                observer=dict(case.aot_overrides).get("transfer_diagnostics") == "trace"
+            ).items():
                 (scratch / name).write_text(content)
         else:
             (scratch / "fake_model.h").write_text(aot_model_stub(external_arenas=True))
@@ -829,6 +842,7 @@ def test_matrix_covers_every_engine_family():
         "510-aot-transfer-probe",
         "510-aot-transfer-timing",
         "510-aot-transfer-overlap",
+        "510-aot-transfer-trace",
         "510-aot-transfer-stream-evidence",
         "510-aot-profile-busy",
         "510-et-profile",
@@ -1291,6 +1305,7 @@ def test_transfer_legs_need_a_workspace_whose_psram_declares_the_accessors(
         "510-aot-transfer-probe",
         "510-aot-transfer-timing",
         "510-aot-transfer-overlap",
+        "510-aot-transfer-trace",
         "510-aot-transfer-stream-evidence",
     ],
 )

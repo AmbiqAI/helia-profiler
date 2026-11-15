@@ -69,6 +69,47 @@ class TransferUnitTiming:
 
 
 @dataclass(frozen=True)
+class TransferTraceSpan:
+    """One software call or operator interval, relative to its invocation origin."""
+
+    kind: str
+    id: int
+    start_cycles: int | None
+    end_cycles: int | None
+    status: int | None
+
+
+@dataclass(frozen=True)
+class TransferCompletion:
+    """A delivered completion notification, not a physical bus finish."""
+
+    sequence: int
+    ticket: int
+    byte_count: int
+    status: int
+    cycles: int
+
+
+@dataclass(frozen=True)
+class TransferTrace:
+    """Bounded chronological evidence from one PMU-free invocation."""
+
+    binding_epoch: int
+    sequence_start: int
+    capacity: int
+    storage_bytes: int
+    operator_count: int
+    observed_count: int
+    dropped_count: int
+    clock_valid: bool
+    quiescent: bool
+    spans: tuple[TransferTraceSpan, ...]
+    completions: tuple[TransferCompletion, ...]
+    schema: str = "hpx.transfer-trace"
+    schema_version: int = 1
+
+
+@dataclass(frozen=True)
 class TransferDiagnostic:
     """One independent diagnostic iteration, outside PMU presets and averages."""
 
@@ -82,6 +123,7 @@ class TransferDiagnostic:
     units: tuple[TransferUnitTiming, ...] = ()
     stats: TransferStats | None = None
     overlap: TransferOverlap | None = None
+    trace: TransferTrace | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {key: value for key, value in asdict(self).items() if value is not None}

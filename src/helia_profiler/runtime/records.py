@@ -73,6 +73,8 @@ class RuntimeRecord:
     #: The kernel library a prepared archive is built with, and the archive's sha256.
     kernels: RuntimeSource | None = None
     archive_sha256: str | None = None
+    #: The released emitted NSX provider supports a completion observer.
+    transfer_observer: bool = False
 
 
 @dataclass(frozen=True)
@@ -179,7 +181,12 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
     fields = _FIELDS | (
         _ARCHIVE_FIELDS if isinstance(raw, dict) and "archive" in raw else frozenset()
     )
+    if isinstance(raw, dict) and "transfer_observer" in raw:
+        fields = fields | {"transfer_observer"}
     record = _object(raw, fields, location)
+    observer = record.get("transfer_observer", False)
+    if type(observer) is not bool or (observer and record["name"] != "helia-aot"):
+        raise ConfigError(f"Runtime record {location} has an invalid transfer_observer fact")
     if record["schema"] != RUNTIME_SCHEMA:
         raise ConfigError(f"Runtime record {location} has schema {record['schema']!r}")
     if not isinstance(record["default"], bool):
@@ -234,6 +241,7 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
         qualified=tuple(qualified),
         kernels=kernels,
         archive_sha256=archive,
+        transfer_observer=observer,
     )
 
 

@@ -13,6 +13,7 @@ from ._model import (
     GATE_TRANSFER_OVERLAP,
     GATE_TRANSFER_PROBE,
     GATE_TRANSFER_TIMING,
+    GATE_TRANSFER_TRACE,
     WireConsumer,
     WireCriticality,
     WireKey,
@@ -22,6 +23,42 @@ from ._model import (
 )
 
 RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
+    *(
+        _spec(
+            key.wire,
+            WireKind.KEY_VALUE,
+            description,
+            WireConsumer.TRANSFER_EVIDENCE,
+            WireCriticality.METRIC,
+            key=key,
+            engines=AOT_ENGINES,
+            condition=GATE_TRANSFER_TRACE,
+            runtime_gate="transfer_diagnostics is trace; inside its standalone diagnostic frame",
+            value_shape=shape,
+        )
+        for key, description, shape in (
+            (
+                WireKey.TRANSFER_TRACE_BEGIN,
+                "Begin bounded chronological trace detail.",
+                "<version>,<binding_epoch>,<sequence_start>,<capacity>,<storage_bytes>,<operators>",
+            ),
+            (
+                WireKey.TRANSFER_TRACE_SPAN,
+                "One recorded software-call or operator interval.",
+                "<issue|wait|operator>,<id>,<start_cycles|x>,<end_cycles|x>,<status|x>",
+            ),
+            (
+                WireKey.TRANSFER_TRACE_PIECE,
+                "One delivered completion notification, not bus service time.",
+                "<sequence>,<ticket>,<bytes>,<status>,<cycles>",
+            ),
+            (
+                WireKey.TRANSFER_TRACE_END,
+                "End trace with explicit loss and qualification flags.",
+                "<observed>,<dropped>,<clock_valid:0|1>,<quiescent:0|1>",
+            ),
+        )
+    ),
     _spec(
         WireKey.TRANSFER_DIAGNOSTIC_BEGIN.wire,
         WireKind.KEY_VALUE,
@@ -31,7 +68,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.TRANSFER_DIAGNOSTIC_BEGIN,
         engines=AOT_ENGINES,
         condition=GATE_TRANSFER_DIAGNOSTIC,
-        runtime_gate="transfer_diagnostics is timing or overlap; the module emits a DMA provider",
+        runtime_gate="transfer_diagnostics is timing, overlap or trace; the module emits a DMA provider",
         value_shape="<purpose>,<iteration>,<cpu_hz>,<configured|cold>,<units>,<dma_units>",
     ),
     _spec(
@@ -57,7 +94,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.TRANSFER_DIAGNOSTIC_END,
         engines=AOT_ENGINES,
         condition=GATE_TRANSFER_DIAGNOSTIC,
-        runtime_gate="transfer_diagnostics is timing or overlap",
+        runtime_gate="transfer_diagnostics is timing, overlap or trace",
         value_shape="<elapsed_cycles>,<run_status>,<complete:0|1>",
     ),
     _spec(
@@ -69,7 +106,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.TRANSFER_DIAGNOSTIC_STATS,
         engines=AOT_ENGINES,
         condition=GATE_TRANSFER_DIAGNOSTIC,
-        runtime_gate="transfer_diagnostics is timing or overlap; inside its diagnostic frame",
+        runtime_gate="transfer_diagnostics is timing, overlap or trace; inside its diagnostic frame",
         value_shape="<issues>,<waits>,<aborts>,<peak_in_flight>,<wait_checks_max>,<unsampled>",
         note="Issues, waits and aborts are per run; peak and wait maxima are since binding.",
     ),

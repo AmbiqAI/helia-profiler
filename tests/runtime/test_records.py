@@ -390,3 +390,19 @@ def test_fixture_io_capabilities_ignore_qualification_records(monkeypatch, state
     spec.loader.exec_module(module)
     assert module.FIXTURE_CAPABILITIES == _fixture_build.FIXTURE_CAPABILITIES
     assert calls == []
+
+
+def test_observer_is_an_explicit_released_runtime_fact(tmp_path):
+    record = _record(name="helia-aot", transfer_observer=True)
+    (loaded,) = load_runtime_records(_write(tmp_path, record))
+    assert loaded.transfer_observer
+    current = runtime("helia-aot")
+    assert current is not None and not current.transfer_observer
+
+
+@pytest.mark.parametrize(
+    "name,value", [("helia-rt", True), ("helia-aot", 1), ("helia-aot", "true")]
+)
+def test_observer_fact_rejects_wrong_owner_or_type(tmp_path, name, value):
+    with pytest.raises(ConfigError, match="transfer_observer"):
+        load_runtime_records(_write(tmp_path, _record(name=name, transfer_observer=value)))

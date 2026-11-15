@@ -441,13 +441,17 @@ def _matrix() -> list[_Render]:
         ),
         *(
             _Render(
-                f"ap510|rtt|helia-aot|{mode}",
+                f"ap510|rtt|helia-aot|{'transfer-trace' if mode == 'trace' else mode}",
                 "apollo510",
                 "rtt",
                 "helia-aot",
-                overrides={"transfer_diagnostics": mode, "transfer_diagnostic_iterations": 2},
+                overrides={
+                    "transfer_diagnostics": mode,
+                    "transfer_diagnostic_iterations": 2,
+                    "transfer_trace_max_pieces": 4,
+                },
             )
-            for mode in ("timing", "overlap")
+            for mode in ("timing", "overlap", "trace")
         ),
         # The transfer timeout probe, which only a heliaAOT module with its
         # emitted provider can run.
@@ -764,6 +768,12 @@ _PREDICATES = {
     == "timing"
     and v.get("per_layer_profiling", True)
     and not _power(v),
+    "transfer_diagnostics == trace and per_layer_profiling and not power_only": lambda v: v.get(
+        "transfer_diagnostics"
+    )
+    == "trace"
+    and bool(v.get("per_layer_profiling", True))
+    and not v.get("power_only", False),
     "transfer_diagnostics == overlap and per_layer_profiling and not power_only": lambda v: v.get(
         "transfer_diagnostics"
     )

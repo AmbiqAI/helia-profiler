@@ -151,7 +151,11 @@ static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *opt
     }
 }
 {% if not power_only | default(false) and per_layer_profiling and transfer_diagnostics | default("off") != "off" %}
+{% if transfer_diagnostics == "trace" %}
+{% include "_aot_transfer_trace.j2" %}
+{% else %}
 {% include "_aot_transfer_diagnostics.j2" %}
+{% endif %}
 {% endif %}
 #endif
 
@@ -600,6 +604,9 @@ hpx_aot_check_runs();{% endblock %}
             (void)am_hal_cachectrl_dcache_invalidate(&range, true);
         }
 {% endfor %}{% endif %}
+{% if transfer_diagnostics == "trace" %}
+        hpx_transfer_trace_prepare();
+{% endif %}
         hpx_transfer_run_start();
         hpx_transfer_diagnostic_reset();
         const uint32_t diagnostic_max_ms = SystemCoreClock > 0U
@@ -616,9 +623,17 @@ hpx_aot_check_runs();{% endblock %}
 {% endif %}
         const uint32_t diagnostic_start_tick = hpx_stimer_ticks();
         const uint32_t diagnostic_start = DWT->CYCCNT;
+{% if transfer_diagnostics == "trace" %}
+        hpx_transfer_trace_start(diagnostic_start);
+{% endif %}
         hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         const uint32_t diagnostic_cycles = DWT->CYCCNT - diagnostic_start;
         const uint32_t diagnostic_ticks = hpx_stimer_ticks() - diagnostic_start_tick;
+{% if transfer_diagnostics == "trace" %}
+        const int32_t trace_cleanup = {{ aot_prefix }}_nsx_transfer_reset();
+        g_trace_quiescent = trace_cleanup == 0;
+        if (g_trace_quiescent) __atomic_store_n(&g_trace.recording, 0U, __ATOMIC_RELEASE);
+{% endif %}
         hpx_transfer_after_run();
 {% if transport == "rtt" %}
         hpx_rtt_set_blocking();
@@ -626,7 +641,13 @@ hpx_aot_check_runs();{% endblock %}
         usb_timer_resume();
 {% endif %}
         hpx_transfer_diagnostic_report(diagnostic_iter, diagnostic_cycles, diagnostic_ticks, hpx_aot_status);
+{% if transfer_diagnostics == "trace" %}
+        if (!g_trace_quiescent) hpx_transfer_bind_failed(trace_cleanup);
+{% endif %}
         hpx_aot_check_runs();
+{% if transfer_diagnostics == "trace" %}
+        hpx_transfer_bind(nullptr);
+{% endif %}
 {% if transport == "rtt" %}
         hpx_rtt_set_nonblocking();
 {% endif %}

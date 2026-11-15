@@ -256,6 +256,7 @@ class EngineContext:
     stream_evidence: bool = False
     transfer_diagnostics: str = "off"
     transfer_diagnostic_iterations: int = 1
+    transfer_trace_max_pieces: int = 256
 
 
 @dataclass(frozen=True)
@@ -292,6 +293,16 @@ class FirmwareRenderContext:
                     "Transfer diagnostics need an AOT table schedule with per-layer callbacks, "
                     "an emitted DMA provider and a supported CPU/STIMER target.",
                     hint="Use a supported CPU module or set profiling.transfer_diagnostics: off.",
+                )
+        if config.profiling.transfer_diagnostics == "trace":
+            from ..runtime.records import runtime
+
+            assert isinstance(artifacts, HeliaAotArtifacts)
+            record = runtime("helia-aot", artifacts.helia_aot_version)
+            if record is None or not record.transfer_observer:
+                raise FirmwareError(
+                    "Transfer traces require a recorded released AOT completion observer.",
+                    hint="Use timing/overlap diagnostics until an observer-bearing runtime is adopted.",
                 )
         if not artifacts.per_layer_profiling and config.profiling.stream_evidence:
             raise FirmwareError(
@@ -483,6 +494,7 @@ class FirmwareRenderContext:
                 stream_evidence=config.profiling.stream_evidence,
                 transfer_diagnostics=config.profiling.transfer_diagnostics,
                 transfer_diagnostic_iterations=config.profiling.transfer_diagnostic_iterations,
+                transfer_trace_max_pieces=config.profiling.transfer_trace_max_pieces,
             ),
         )
 
@@ -608,6 +620,7 @@ class FirmwareRenderContext:
             "stream_evidence": self.engine.stream_evidence,
             "transfer_diagnostics": self.engine.transfer_diagnostics,
             "transfer_diagnostic_iterations": self.engine.transfer_diagnostic_iterations,
+            "transfer_trace_max_pieces": self.engine.transfer_trace_max_pieces,
         }
 
 

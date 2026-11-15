@@ -1,0 +1,159 @@
+#ifdef HPX_AOT_TRANSFER
+{% include "_aot_transfer_clock.j2" %}
+struct HpxTraceSpan {
+    uint32_t start, end;
+    int32_t status;
+    uint32_t observed;
+};
+struct HpxTracePiece {
+    uint32_t sequence, ticket, bytes, status, cycles;
+};
+struct HpxTransferTrace {
+    HpxTraceSpan issues[{{ aot_prefix }}_num_transfer_units];
+    HpxTraceSpan waits[{{ aot_prefix }}_num_transfer_units];
+    HpxTraceSpan operators[kMaxLayers];
+    HpxTracePiece pieces[{{ transfer_trace_max_pieces }}];
+    uint32_t origin, observed, recording, observer_fault;
+    bool valid;
+};
+NSX_MEM_SRAM_BSS static HpxTransferTrace g_trace;
+static uint32_t g_trace_epoch;
+static bool g_trace_quiescent;
+static_assert(__atomic_always_lock_free(sizeof(uint32_t), nullptr), "trace publication requires lock-free words");
+
+static void hpx_transfer_completion(void *ctx, const {{ aot_prefix }}_nsx_transfer_piece_t *piece) {
+    const uint32_t now = DWT->CYCCNT;
+    HpxTransferTrace *trace = static_cast<HpxTransferTrace *>(ctx);
+    if (__atomic_load_n(&trace->recording, __ATOMIC_ACQUIRE) == 0U) {
+        __atomic_store_n(&trace->observer_fault, 1U, __ATOMIC_RELEASE);
+        return;
+    }
+    const uint32_t index = __atomic_load_n(&trace->observed, __ATOMIC_RELAXED);
+    if (index == UINT32_MAX) {
+        __atomic_store_n(&trace->observer_fault, 1U, __ATOMIC_RELEASE);
+        return;
+    }
+    if (index < {{ transfer_trace_max_pieces }}U) {
+        trace->pieces[index] = {piece->sequence, piece->ticket, piece->bytes, piece->status, now - trace->origin};
+    }
+    // One ISR producer publishes complete records; foreground never appends here.
+    __atomic_store_n(&trace->observed, index + 1U, __ATOMIC_RELEASE);
+}
+
+static void hpx_transfer_trace_prepare(void) {
+    if (__atomic_load_n(&g_trace.recording, __ATOMIC_ACQUIRE) != 0U) hpx_transfer_bind_failed(-1);
+    // The previous observer was detached after successful drain; no callback can reach this reset.
+    memset(&g_trace, 0, sizeof(g_trace));
+    g_trace.valid = true;
+    g_trace_quiescent = false;
+    {{ aot_prefix }}_nsx_transfer_options_t options{};
+    options.observe = hpx_transfer_completion;
+    options.observer_ctx = &g_trace;
+    hpx_transfer_bind(&options);
+    ++g_trace_epoch;
+    if (g_trace_epoch == 0U) hpx_transfer_bind_failed(-1);
+}
+
+static void hpx_transfer_diagnostic_reset(void) {
+    g_transfer_sampling = false;
+    g_transfer_sampled_layers = 0;
+{% if has_armv8m_pmu %}
+    g_transfer_refill_slot = -1;
+{% endif %}
+}
+
+static void hpx_transfer_trace_start(uint32_t origin) {
+    g_trace.origin = origin;
+    __atomic_store_n(&g_trace.recording, 1U, __ATOMIC_RELEASE);
+}
+
+static void hpx_transfer_diagnostic_cb(int32_t op, {{ aot_prefix }}_operator_state_t state,
+                                       int32_t status, void *user_data) {
+    (void)user_data;
+    const uint32_t now = DWT->CYCCNT - g_trace.origin;
+    HpxTraceSpan *span = nullptr;
+    bool start = false;
+    if (state == {{ aot_prefix }}_op_state_run_started || state == {{ aot_prefix }}_op_state_run_finished) {
+        if (op < 0 || op >= kMaxLayers) { g_trace.valid = false; return; }
+        span = &g_trace.operators[op];
+        start = state == {{ aot_prefix }}_op_state_run_started;
+    } else {
+        if (state != {{ aot_prefix }}_op_state_transfer_issue_started &&
+            state != {{ aot_prefix }}_op_state_transfer_issue_finished &&
+            state != {{ aot_prefix }}_op_state_transfer_wait_started &&
+            state != {{ aot_prefix }}_op_state_transfer_wait_finished) return;
+        if (op < 0 || op >= {{ aot_prefix }}_num_transfer_units) { g_trace.valid = false; return; }
+        const bool issue = state == {{ aot_prefix }}_op_state_transfer_issue_started ||
+                           state == {{ aot_prefix }}_op_state_transfer_issue_finished;
+        span = issue ? &g_trace.issues[op] : &g_trace.waits[op];
+        start = state == {{ aot_prefix }}_op_state_transfer_issue_started ||
+                state == {{ aot_prefix }}_op_state_transfer_wait_started;
+    }
+    const uint32_t bit = start ? 1U : 2U;
+    if ((span->observed & bit) != 0U || (!start && !(span->observed & 1U))) g_trace.valid = false;
+    span->observed |= bit;
+    if (start) span->start = now;
+    else { span->end = now; span->status = status; }
+}
+
+static bool hpx_trace_span_valid(const HpxTraceSpan &span, uint32_t elapsed) {
+    return span.observed == 3U && span.status == 0 && span.start <= span.end && span.end <= elapsed;
+}
+static void hpx_trace_print_span(const char *kind, int id, const HpxTraceSpan &span) {
+    hpx_printf("HPX_TRANSFER_TRACE_SPAN=%s,%d,", kind, id);
+    if (span.observed & 1U) hpx_printf("%lu,", (unsigned long)span.start);
+    else hpx_printf("x,");
+    if (span.observed & 2U) hpx_printf("%lu,%ld\n", (unsigned long)span.end, (long)span.status);
+    else hpx_printf("x,x\n");
+}
+
+static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint32_t ticks, int32_t status) {
+    const bool clock_valid = hpx_transfer_clock_valid(cycles, ticks);
+    const uint32_t observed = __atomic_load_n(&g_trace.observed, __ATOMIC_ACQUIRE);
+    // A failed drain leaves the context live. Publish no concurrently written piece payloads.
+    const uint32_t retained = !g_trace_quiescent ? 0U :
+        (observed < {{ transfer_trace_max_pieces }}U ? observed : {{ transfer_trace_max_pieces }}U);
+    bool complete = g_trace.valid && clock_valid && status == 0 && g_trace_quiescent &&
+        observed == retained && __atomic_load_n(&g_trace.observer_fault, __ATOMIC_ACQUIRE) == 0U;
+    uint32_t waits = 0;
+    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
+        if (!hpx_trace_span_valid(g_trace.issues[u], cycles)) complete = false;
+        if (g_trace.waits[u].observed) {
+            ++waits;
+            if (!hpx_trace_span_valid(g_trace.waits[u], cycles)) complete = false;
+        }
+    }
+    if (waits != {{ aot_prefix }}_num_dma_units) complete = false;
+    const uint32_t operators = {{ aot_op_manifest | length }}U;
+    for (uint32_t op = 0; op < operators; ++op) {
+        if (op >= (uint32_t)kMaxLayers || !hpx_trace_span_valid(g_trace.operators[op], cycles)) complete = false;
+    }
+    const {{ aot_prefix }}_nsx_transfer_stats_t *stats = {{ aot_prefix }}_nsx_transfer_stats();
+    if (observed != stats->issues - g_transfer_stats_before.issues) complete = false;
+    for (uint32_t i = 0; i < retained; ++i) {
+        const HpxTracePiece &piece = g_trace.pieces[i];
+        if (piece.status != 0 || piece.cycles > cycles) complete = false;
+    }
+    hpx_printf("HPX_TRANSFER_DIAGNOSTIC_BEGIN=trace,%d,%lu,{{ 'cold' if stream_evidence else 'configured' }},%u,%u\n",
+        iteration, (unsigned long)SystemCoreClock, (unsigned){{ aot_prefix }}_num_transfer_units, (unsigned){{ aot_prefix }}_num_dma_units);
+    // Each successful prepare binds anew, which restarts AOT's accepted-read sequence at zero.
+    hpx_printf("HPX_TRANSFER_TRACE_BEGIN=1,%lu,0,{{ transfer_trace_max_pieces }},%lu,%lu\n",
+        (unsigned long)g_trace_epoch, (unsigned long)(sizeof(g_trace) + sizeof(g_trace_epoch) + sizeof(g_trace_quiescent)), (unsigned long)operators);
+    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
+        hpx_trace_print_span("issue", u, g_trace.issues[u]);
+        if (g_trace.waits[u].observed) hpx_trace_print_span("wait", u, g_trace.waits[u]);
+    }
+    for (uint32_t op = 0; op < operators && op < (uint32_t)kMaxLayers; ++op) {
+        hpx_trace_print_span("operator", (int)op, g_trace.operators[op]);
+    }
+    for (uint32_t i = 0; i < retained; ++i) {
+        const HpxTracePiece &p = g_trace.pieces[i];
+        hpx_printf("HPX_TRANSFER_TRACE_PIECE=%lu,%lu,%lu,%lu,%lu\n", (unsigned long)p.sequence,
+            (unsigned long)p.ticket, (unsigned long)p.bytes, (unsigned long)p.status, (unsigned long)p.cycles);
+    }
+    hpx_printf("HPX_TRANSFER_TRACE_END=%lu,%lu,%u,%u\n", (unsigned long)observed,
+        (unsigned long)(observed - retained), (unsigned)clock_valid, (unsigned)g_trace_quiescent);
+    hpx_transfer_report(true);
+    hpx_printf("HPX_TRANSFER_DIAGNOSTIC_END=%lu,%ld,%u\n", (unsigned long)cycles, (long)status, (unsigned)complete);
+}
+#endif

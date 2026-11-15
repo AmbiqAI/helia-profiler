@@ -50,6 +50,13 @@ version; it can only validate the one already installed.
 the oldest heliaAOT record to the major after the newest (a 0.x record counts
 as major 1), and raises a clear `EngineError` outside that range.
 
+A heliaAOT runtime record may additionally declare `transfer_observer: true`
+when its released emitted NSX provider supports the optional completion hook.
+Absent means unavailable for chronological transfer traces. This fact does not
+qualify a target or change ordinary profiling; adoption still needs the runtime
+source/lock mirrors and the recorded qualification evidence. No current record
+declares it.
+
 ## Qualification states
 
 Each resolved run reports one state:
