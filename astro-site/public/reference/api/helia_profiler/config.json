@@ -316,7 +316,7 @@
               "params": [],
               "raises": [],
               "returns": [],
-              "signature": "transfer_diagnostics: Literal['off', 'timing', 'overlap'] = field(default='off', metadata={'omit_default': True})",
+              "signature": "transfer_diagnostics: Literal['off', 'timing', 'overlap', 'trace'] = field(default='off', metadata={'omit_default': True})",
               "source": {
                 "line": 140,
                 "path": "src/helia_profiler/config/profiling.py",
@@ -346,6 +346,25 @@
             {
               "description": "",
               "examples": [],
+              "id": "helia_profiler.ProfilingConfig.transfer_trace_max_pieces",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "transfer_trace_max_pieces",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "transfer_trace_max_pieces: int = field(default=256, metadata={'omit_default': True})",
+              "source": {
+                "line": 145,
+                "path": "src/helia_profiler/config/profiling.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L145"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
               "id": "helia_profiler.ProfilingConfig.extreme_mode",
               "kind": "attribute",
               "language": "python",
@@ -356,9 +375,9 @@
               "returns": [],
               "signature": "extreme_mode: bool = False",
               "source": {
-                "line": 149,
+                "line": 159,
                 "path": "src/helia_profiler/config/profiling.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L149"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L159"
               },
               "summary": ""
             },
@@ -375,9 +394,9 @@
               "returns": [],
               "signature": "dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})",
               "source": {
-                "line": 152,
+                "line": 162,
                 "path": "src/helia_profiler/config/profiling.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L152"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/config/profiling.py#L162"
               },
               "summary": ""
             }

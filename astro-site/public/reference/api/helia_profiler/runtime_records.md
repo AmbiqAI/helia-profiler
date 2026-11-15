@@ -168,6 +168,7 @@ RuntimeRecord(
     qualified: tuple[QualifiedTarget, ...],
     kernels: RuntimeSource | None = None,
     archive_sha256: str | None = None,
+    transfer_observer: bool = False,
 ) -> None
 ```
 
@@ -259,6 +260,16 @@ archive_sha256: str | None = None
 
 Source: `src/helia_profiler/runtime/records.py:75`
 
+### helia_profiler.RuntimeRecord.transfer_observer
+
+`attribute` · `python`
+
+```python
+transfer_observer: bool = False
+```
+
+Source: `src/helia_profiler/runtime/records.py:77`
+
 ## helia_profiler.Qualification
 
 `class` · `python`
@@ -273,7 +284,7 @@ The answer for one runtime version, precision and target, with the record it cam
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:78`
+Source: `src/helia_profiler/runtime/records.py:80`
 
 ### helia_profiler.Qualification.state
 
@@ -283,7 +294,7 @@ Source: `src/helia_profiler/runtime/records.py:78`
 state: RuntimeQualification
 ```
 
-Source: `src/helia_profiler/runtime/records.py:82`
+Source: `src/helia_profiler/runtime/records.py:84`
 
 ### helia_profiler.Qualification.reason
 
@@ -293,7 +304,7 @@ Source: `src/helia_profiler/runtime/records.py:82`
 reason: str | None
 ```
 
-Source: `src/helia_profiler/runtime/records.py:83`
+Source: `src/helia_profiler/runtime/records.py:85`
 
 ### helia_profiler.Qualification.record
 
@@ -303,7 +314,7 @@ Source: `src/helia_profiler/runtime/records.py:83`
 record: RuntimeRecord | None
 ```
 
-Source: `src/helia_profiler/runtime/records.py:84`
+Source: `src/helia_profiler/runtime/records.py:86`
 
 ## helia_profiler.runtimes
 
@@ -319,7 +330,7 @@ Every runtime record shipped with this heliaPROFILER, by name then version.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:87`
+Source: `src/helia_profiler/runtime/records.py:89`
 
 ## helia_profiler.qualification
 
@@ -342,4 +353,4 @@ it: this heliaPROFILER makes no claim about it.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:133`
+Source: `src/helia_profiler/runtime/records.py:135`
