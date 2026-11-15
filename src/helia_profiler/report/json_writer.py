@@ -52,6 +52,8 @@ def _write_json(
 
     if pmu.transfer_evidence:
         data["transfer_evidence"] = [record.to_dict() for record in pmu.transfer_evidence]
+    if pmu.transfer_diagnostics:
+        data["transfer_diagnostics"] = [record.to_dict() for record in pmu.transfer_diagnostics]
 
     if power is not None:
         power_data = _power_detail_fields(power.summary)

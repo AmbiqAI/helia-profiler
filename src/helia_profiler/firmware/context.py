@@ -254,6 +254,8 @@ class EngineContext:
     #: ``profiling.stream_evidence``; only for a heliaAOT module that binds a
     #: stream pool, on a part with an explicit D-cache.
     stream_evidence: bool = False
+    transfer_diagnostics: str = "off"
+    transfer_diagnostic_iterations: int = 1
 
 
 @dataclass(frozen=True)
@@ -277,6 +279,20 @@ class FirmwareRenderContext:
         soc = ctx.resolved_soc
         board = ctx.resolved_board
         artifacts = ctx.prepared_artifacts
+        if config.profiling.transfer_diagnostics != "off":
+            if (
+                not isinstance(artifacts, HeliaAotArtifacts)
+                or not artifacts.per_layer_profiling
+                or not config.profiling.per_layer
+                or artifacts.aot_transfer_cmake_target is None
+                or artifacts.resolved_backend == "ethos_u"
+                or soc.capabilities.clock.clean_window_timer != "stimer"
+            ):
+                raise FirmwareError(
+                    "Transfer diagnostics need an AOT table schedule with per-layer callbacks, "
+                    "an emitted DMA provider and a supported CPU/STIMER target.",
+                    hint="Use a supported CPU module or set profiling.transfer_diagnostics: off.",
+                )
         if not artifacts.per_layer_profiling and config.profiling.stream_evidence:
             raise FirmwareError(
                 "profiling.stream_evidence requires per-layer callbacks.",
@@ -465,6 +481,8 @@ class FirmwareRenderContext:
                 input_fill=config.profiling.input_fill.value,
                 transfer_timeout_probe=config.profiling.transfer_timeout_probe,
                 stream_evidence=config.profiling.stream_evidence,
+                transfer_diagnostics=config.profiling.transfer_diagnostics,
+                transfer_diagnostic_iterations=config.profiling.transfer_diagnostic_iterations,
             ),
         )
 
@@ -588,6 +606,8 @@ class FirmwareRenderContext:
             "input_fill": self.engine.input_fill,
             "transfer_timeout_probe": self.engine.transfer_timeout_probe,
             "stream_evidence": self.engine.stream_evidence,
+            "transfer_diagnostics": self.engine.transfer_diagnostics,
+            "transfer_diagnostic_iterations": self.engine.transfer_diagnostic_iterations,
         }
 
 

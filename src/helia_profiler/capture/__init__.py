@@ -63,6 +63,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
     and merged per-layer results.
     """
     from .parser import parse_firmware_output
+    from .transfer_diagnostics import validate_transfer_diagnostics
 
     transport = ctx.config.target.transport
 
@@ -144,6 +145,7 @@ def capture_pmu(ctx: PipelineContext) -> PmuResult:
         )
 
     result = parse_firmware_output(lines, aggregation=ctx.config.profiling.aggregation)
+    validate_transfer_diagnostics(result, ctx.config.profiling)
     if not result.layers and result.meta.per_layer_profiling is not False:
         raise CaptureError(
             f"No layer data parsed from firmware output ({len(lines)} lines).",

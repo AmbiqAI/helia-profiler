@@ -184,7 +184,8 @@ def test_diagnostics_preserve_observation_basis_and_change_artifact_digest(tmp_p
 
 
 @pytest.mark.parametrize("output_format", ["csv", "json"])
-def test_saved_bundle_contains_evidence_in_both_output_modes(tmp_path, output_format):
+@pytest.mark.parametrize("diagnostic", [False, True])
+def test_saved_bundle_contains_evidence_in_both_output_modes(tmp_path, output_format, diagnostic):
     config = load_config(
         None,
         {
@@ -197,14 +198,24 @@ def test_saved_bundle_contains_evidence_in_both_output_modes(tmp_path, output_fo
     ctx.run_metadata = RunMetadata(
         hpx_version="test", run_id="transfer-evidence", timestamp="2026-11-14T00:00:00Z"
     )
-    set_profile_result(ctx, parse_firmware_output(FIXTURE.read_text().splitlines()))
+    if diagnostic:
+        from tests.test_transfer_diagnostics import _TIMING
+
+        captured = parse_firmware_output(_session(*_TIMING))
+    else:
+        captured = parse_firmware_output(FIXTURE.read_text().splitlines())
+    set_profile_result(ctx, captured)
     lock = tmp_path / "source.lock"
     lock.write_text("schema_version: 4\ntargets: {}\n")
     ctx.dependency_lock_path = lock
     paths = write_report(ctx)
     doc = json.loads((tmp_path / "profile_results.json").read_text())
-    assert len(doc["transfer_evidence"]) == 4
-    assert doc["transfer_evidence"][0]["refills"]["units"]["0"] == 3
+    if diagnostic:
+        assert len(doc["transfer_diagnostics"]) == 1
+        assert "transfer_evidence" not in doc
+    else:
+        assert len(doc["transfer_evidence"]) == 4
+        assert doc["transfer_evidence"][0]["refills"]["units"]["0"] == 3
     assert (tmp_path / "profile_results.csv").exists() == (output_format == "csv")
     manifest = load_result_manifest(paths[-1], verify=True)
     artifact = next(a for a in manifest.artifacts if a.path == "profile_results.json")

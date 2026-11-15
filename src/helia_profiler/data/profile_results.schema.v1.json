@@ -49,6 +49,12 @@
       "items": {
         "$ref": "#/$defs/transfer_evidence"
       }
+    },
+    "transfer_diagnostics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transfer_diagnostic"
+      }
     }
   },
   "additionalProperties": true,
@@ -214,6 +220,145 @@
           ]
         }
       ]
+    },
+    "transfer_unit_timing": {
+      "type": "object",
+      "required": [
+        "unit",
+        "issue_cycles",
+        "issue_status",
+        "wait_cycles",
+        "wait_status"
+      ],
+      "properties": {
+        "unit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "issue_cycles": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "issue_status": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "wait_cycles": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "wait_status": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        }
+      },
+      "additionalProperties": false
+    },
+    "transfer_diagnostic": {
+      "type": "object",
+      "required": [
+        "purpose",
+        "iteration",
+        "cpu_hz",
+        "preparation",
+        "elapsed_cycles",
+        "run_status",
+        "complete",
+        "units",
+        "stats"
+      ],
+      "properties": {
+        "purpose": {
+          "enum": [
+            "timing",
+            "overlap"
+          ]
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "cpu_hz": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4294967295
+        },
+        "preparation": {
+          "enum": [
+            "configured",
+            "cold"
+          ]
+        },
+        "elapsed_cycles": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4294967295
+        },
+        "run_status": {
+          "type": "integer",
+          "minimum": -2147483648,
+          "maximum": 2147483647
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/transfer_unit_timing"
+          }
+        },
+        "stats": {
+          "$ref": "#/$defs/transfer_stats"
+        },
+        "overlap": {
+          "type": "object",
+          "required": [
+            "units",
+            "operators"
+          ],
+          "properties": {
+            "units": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/transfer_activity"
+              }
+            },
+            "operators": {
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/transfer_activity"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

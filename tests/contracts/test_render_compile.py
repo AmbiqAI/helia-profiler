@@ -397,6 +397,25 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
+    for mode in ("timing", "overlap"):
+        cases.append(
+            _CompileCase(
+                case_id=f"apollo510|rtt|helia-aot|transfer|{mode}",
+                text=_render(
+                    "apollo510",
+                    "rtt",
+                    "helia-aot",
+                    overrides={
+                        "arena_regions": transfer_regions,
+                        "transfer_diagnostics": mode,
+                        "transfer_diagnostic_iterations": 2,
+                    },
+                ),
+                vars=_common_kwargs("apollo510", "rtt"),
+                headers=aot_transfer_headers(),
+            )
+        )
+
     for power, probe in ((False, False), (True, False), (False, True)):
         cases.append(
             _CompileCase(

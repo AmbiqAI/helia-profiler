@@ -136,6 +136,11 @@ class ProfilingConfig:
     # MSPI controller. This extra maintenance applies to instrumented runs;
     # the clean window follows profiling.dcache. Reports HPX_STREAM_EVIDENCE=1.
     stream_evidence: bool = False
+    #: Separate transfer observation runs; ordinary PMU passes never poll DMA state.
+    transfer_diagnostics: Literal["off", "timing", "overlap"] = field(
+        default="off", metadata={"omit_default": True}
+    )
+    transfer_diagnostic_iterations: int = field(default=1, metadata={"omit_default": True})
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model
@@ -145,6 +150,15 @@ class ProfilingConfig:
 
     #: Data-cache policy for ordinary profiler firmware; off requires Apollo5.
     dcache: Literal["on", "off"] = field(default="on", metadata={"omit_default": True})
+
+    @field_validator("transfer_diagnostic_iterations", mode="before")
+    @classmethod
+    def _diagnostic_iterations(cls, value: Any) -> int:
+        if type(value) is not int or not 1 <= value <= 1000:
+            raise ValueError(
+                "transfer_diagnostic_iterations must be an integer between 1 and 1000."
+            )
+        return value
 
     @field_validator("dcache", mode="before")
     @classmethod

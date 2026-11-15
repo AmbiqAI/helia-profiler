@@ -168,6 +168,56 @@ hpx profile --config hpx.yml --board apollo510b_evb --iterations 50 --output-dir
     engines.
   - Without the setting, no capture is poisoned or invalidated.
 
+#### Transfer diagnostics
+
+Normal per-layer PMU capture does not poll DMA or pending-read status. To observe
+transfers, select one separate diagnostic mode for a table-schedule heliaAOT
+module with an emitted DMA provider on an Apollo5 CPU target:
+
+```yaml
+profiling:
+  transfer_diagnostics: timing
+  transfer_diagnostic_iterations: 2
+```
+
+The default mode is `off`; the iteration count defaults to 1 and accepts integers
+from 1 through 1000. Programmatically, use
+`Session().with_profiling(transfer_diagnostics="timing", transfer_diagnostic_iterations=2)`.
+Static schedules, disabled per-layer profiling, modules without the provider and
+NPU backends are refused. The dedicated power binary runs no diagnostics.
+
+- `timing` records each unit's issue and wait call duration with a continuous CPU
+  cycle counter. Its callback does no PMU reads, status polling, printing or
+  interrupt masking. These durations include call bookkeeping, interrupt service
+  and the observer itself; they are not physical DMA service time. An absent wait
+  is `null`, while an observed wait can take zero cycles.
+- `overlap` makes DMA and pending-read queries at both ends of unit issues and
+  operator runs. These queries perturb execution. Flags describe the sampled
+  endpoints and do not establish continuous overlap. An unreadable DMA flag is
+  `null`. This mode runs separately from direct timing.
+
+Diagnostic iterations follow the PMU passes and never enter their counts, layer
+averages or `HPX_PROFILED_INFER_*` values. Native JSON retains them under
+`transfer_diagnostics`; CSV bundles also include this JSON companion. Each record
+identifies purpose, iteration, configured CPU rate, preparation, elapsed cycles,
+run status and completeness. Provider issue/wait/abort counts are per run; its
+peak and wait-check maxima remain since binding. Older saved PMU transfer evidence
+remains readable.
+
+`complete: true` requires successful paired callbacks and a plausible CPU-cycle
+span against the independent STIMER clock (one tick of quantization and a 5% rate
+band). A stopped clock or an interval approaching a full 32-bit cycle-counter
+span cannot qualify. Incomplete records retain observations for diagnosis, not
+qualified durations. The CPU rate is configured/reported, not a measured rate.
+
+With `stream_evidence: true`, diagnostics use the same poisoned-pool/cold-constant
+preparation and record `cold`; otherwise they record `configured`. Compare runs
+only with matching input, plan, placement, clocks and preparation. A difference
+between clean and instrumented latency does not isolate sampling overhead.
+Timing storage is one fixed record per transfer unit, reused across iterations;
+this changes firmware memory use and can affect placement. Board qualification of
+the timing and observer effect remains necessary before using it for claims.
+
 #### Static heliaAOT schedules
 
 Select a static schedule through the heliaAOT configuration:

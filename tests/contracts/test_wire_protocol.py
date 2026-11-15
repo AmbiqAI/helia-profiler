@@ -439,6 +439,16 @@ def _matrix() -> list[_Render]:
             "helia-aot",
             overrides={"stream_evidence": True},
         ),
+        *(
+            _Render(
+                f"ap510|rtt|helia-aot|{mode}",
+                "apollo510",
+                "rtt",
+                "helia-aot",
+                overrides={"transfer_diagnostics": mode, "transfer_diagnostic_iterations": 2},
+            )
+            for mode in ("timing", "overlap")
+        ),
         # The transfer timeout probe, which only a heliaAOT module with its
         # emitted provider can run.
         _Render(
@@ -741,6 +751,24 @@ _PREDICATES = {
         "per_layer_profiling", True
     )
     and bool(v["has_armv8m_pmu"])
+    and not _power(v),
+    "transfer_diagnostics != off and per_layer_profiling and not power_only": lambda v: v.get(
+        "transfer_diagnostics", "off"
+    )
+    != "off"
+    and v.get("per_layer_profiling", True)
+    and not _power(v),
+    "transfer_diagnostics == timing and per_layer_profiling and not power_only": lambda v: v.get(
+        "transfer_diagnostics"
+    )
+    == "timing"
+    and v.get("per_layer_profiling", True)
+    and not _power(v),
+    "transfer_diagnostics == overlap and per_layer_profiling and not power_only": lambda v: v.get(
+        "transfer_diagnostics"
+    )
+    == "overlap"
+    and v.get("per_layer_profiling", True)
     and not _power(v),
     "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
