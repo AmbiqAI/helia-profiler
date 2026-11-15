@@ -54,40 +54,7 @@ static bool g_profiler_enabled = false;
 static const char* g_counter_names[kMaxEvents] = {};
 {% if not power_only | default(false) %}
 
-#ifdef HPX_AOT_TRANSFER
-// Per instrumented run, beside the layer records: for each transfer unit's
-// issue and each operator's run, whether the MSPI controller's DMA was in
-// progress (bit 0) and nsx-psram had reads pending (bit 1) at both ends; the
-// L1D refills over each unit's issue window; and a latch for the provider's
-// power clause.
-static uint8_t g_transfer_unit_overlap[{{ aot_prefix }}_num_transfer_units];
-NSX_MEM_SRAM_BSS static uint8_t g_transfer_op_overlap[kMaxLayers];
-{% if has_armv8m_pmu %}
-static uint32_t g_transfer_unit_refills[{{ aot_prefix }}_num_transfer_units];
-static int g_transfer_refill_slot = -1;
-{% endif %}
-static bool g_transfer_power_clause = false;
-static uint32_t g_transfer_sample_failures = 0;
-static {{ aot_prefix }}_nsx_transfer_stats_t g_transfer_stats_before;
-
-// One sample: bit 0 when the DMA-in-progress bit read set, bit 1 when
-// nsx-psram had reads pending, bit 2 when the bit could not be read, which is
-// no evidence either way.
-static uint8_t hpx_transfer_sample(void) {
-    bool dma = false;
-    const bool sampled = nsx_psram_dma_in_progress(&dma) == 0U;
-    if (!sampled) {
-        ++g_transfer_sample_failures;
-    }
-    return (uint8_t)((sampled ? (dma ? 1U : 0U) : 4U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
-}
-
-// Both ends: a flag holds only when set at both, and an end not sampled
-// leaves the DMA flag unknown.
-static inline uint8_t hpx_transfer_ends(uint8_t first, uint8_t last) {
-    return (uint8_t)((first & last & 3U) | ((first | last) & 4U));
-}
-#endif
+{% include "_aot_transfer_evidence.j2" %}
 {% endif %}
 
 // Heartbeat state — cheap counters/timestamps updated on each op finish so
@@ -215,11 +182,6 @@ static void model_operator_cb(
     // Transfer states arrive outside every operator's run window; for them
     // op is the unit id.
     if (state == {{ aot_prefix }}_op_state_transfer_wait_started) {
-        // A dma unit's pieces are in flight until this wait: deep sleep must
-        // be refused.
-        if ({{ aot_prefix }}_nsx_transfer_can_sleep()) {
-            g_transfer_power_clause = true;
-        }
         return;
     }
     if (state == {{ aot_prefix }}_op_state_transfer_issue_started ||
@@ -228,7 +190,6 @@ static void model_operator_cb(
             return;
         }
         if (state == {{ aot_prefix }}_op_state_transfer_issue_started) {
-            g_transfer_unit_overlap[op] = hpx_transfer_sample();
 {% if has_armv8m_pmu %}
             if (g_transfer_refill_slot >= 0) {
                 hpx_pmu_restart();
@@ -241,12 +202,8 @@ static void model_operator_cb(
                 g_transfer_unit_refills[op] = g_pmu_cfg.counter[g_transfer_refill_slot].counterValue;
             }
 {% endif %}
-            g_transfer_unit_overlap[op] = hpx_transfer_ends(g_transfer_unit_overlap[op], hpx_transfer_sample());
         }
         return;
-    }
-    if (state == {{ aot_prefix }}_op_state_run_started && g_num_layers < kMaxLayers) {
-        g_transfer_op_overlap[g_num_layers] = hpx_transfer_sample();
     }
 #endif
 {% endif %}
@@ -274,11 +231,6 @@ static void model_operator_cb(
         g_layers[idx].counters[0] = DWT->CYCCNT - g_op_start_cyccnt;
         g_layers[idx].overflow = false;
     {% endif %}
-{% if not power_only | default(false) %}
-#ifdef HPX_AOT_TRANSFER
-        g_transfer_op_overlap[idx] = hpx_transfer_ends(g_transfer_op_overlap[idx], hpx_transfer_sample());
-#endif
-{% endif %}
         // Heartbeat emission (inter-op gap, not contaminating a layer)
         ++g_hb_ops_since;
         const bool by_ops = (g_hb_every_ops > 0) &&

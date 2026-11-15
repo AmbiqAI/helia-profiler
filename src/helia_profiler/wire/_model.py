@@ -183,17 +183,13 @@ POWER_BINARY_ENGINES: frozenset[EngineType] = frozenset(
 class HeartbeatPhase(StrEnum):
     """The ``phase=`` values of ``HPX_HEARTBEAT`` records.
 
-    Eight phases, not nine: TFLM's ``init`` record carries an extra ``t=0``
-    payload field the other engines omit, which is a payload variant of one
-    phase rather than a phase of its own.
-
-    :attr:`CLEAN_WINDOW_BEGIN` is the only protocol-critical member — the host
-    parses its ``iters=`` (fallback for ``HPX_CLEAN_INFER_COUNT`` on lossy
-    transports) and its ``est_ms=`` (widens the capture deadline across the
-    deliberately silent measurement window).
+    Silent-window announces are protocol-critical: the host uses their
+    budgets to hold its inactivity deadline without adding traffic during
+    measurement. The clean announce also supplies an iteration-count fallback.
     """
 
     CLEAN_WINDOW_BEGIN = "clean_window_begin"
+    TRANSFER_DIAGNOSTIC_BEGIN = "transfer_diagnostic_begin"
     INIT = "init"
     ALLOCATE = "allocate"
     ALLOCATED = "allocated"
@@ -328,6 +324,11 @@ class WireKey(StrEnum):
     TRANSFER_REFILLS = "transfer_refills"
     TRANSFER_OVERLAP = "transfer_overlap"
     TRANSFER_STATS = "transfer_stats"
+    TRANSFER_DIAGNOSTIC_STATS = "transfer_diagnostic_stats"
+    TRANSFER_DIAGNOSTIC_OVERLAP = "transfer_diagnostic_overlap"
+    TRANSFER_DIAGNOSTIC_BEGIN = "transfer_diagnostic_begin"
+    TRANSFER_DIAGNOSTIC_END = "transfer_diagnostic_end"
+    TRANSFER_TIMING = "transfer_timing"
     TRANSFER_PROBE = "transfer_probe"
     TRANSFER_RECOVERY = "transfer_recovery"
     TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64 = "transfer_recovery_output_%d_fnv1a64"
@@ -512,3 +513,7 @@ GATE_POWER_INA228 = "power_only and power_monitor == ina228"
 GATE_PMU_PROFILE = "has_armv8m_pmu and per_layer_profiling and not power_only"
 GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
 GATE_STREAM_EVIDENCE = "stream_evidence"
+
+GATE_TRANSFER_DIAGNOSTIC = "transfer_diagnostics != off and per_layer_profiling and not power_only"
+GATE_TRANSFER_TIMING = "transfer_diagnostics == timing and per_layer_profiling and not power_only"
+GATE_TRANSFER_OVERLAP = "transfer_diagnostics == overlap and per_layer_profiling and not power_only"

@@ -1,0 +1,124 @@
+#ifdef HPX_AOT_TRANSFER
+// Per instrumented run, beside the layer records: for each transfer unit's
+// issue and each operator's run, whether the MSPI controller's DMA was in
+// progress (bit 0) and nsx-psram had reads pending (bit 1) at both ends; the
+// L1D refills over each unit's issue window; and a latch for the provider's
+// power clause.
+static uint8_t g_transfer_unit_overlap[{{ aot_prefix }}_num_transfer_units];
+NSX_MEM_SRAM_BSS static uint8_t g_transfer_op_overlap[kMaxLayers];
+{% if has_armv8m_pmu %}
+static uint32_t g_transfer_unit_refills[{{ aot_prefix }}_num_transfer_units];
+static int g_transfer_refill_slot = -1;
+{% endif %}
+static bool g_transfer_power_clause = false;
+static bool g_transfer_sampling = false;
+static int g_transfer_sampled_layers = 0;
+static uint32_t g_transfer_sample_failures = 0;
+static {{ aot_prefix }}_nsx_transfer_stats_t g_transfer_stats_before;
+
+// One sample: bit 0 when the DMA-in-progress bit read set, bit 1 when
+// nsx-psram had reads pending, bit 2 when the bit could not be read, which is
+// no evidence either way.
+static uint8_t hpx_transfer_sample(void) {
+    bool dma = false;
+    const bool sampled = nsx_psram_dma_in_progress(&dma) == 0U;
+    if (!sampled) {
+        ++g_transfer_sample_failures;
+    }
+    return (uint8_t)((sampled ? (dma ? 1U : 0U) : 4U) | ((nsx_psram_pending() > 0U) ? 2U : 0U));
+}
+
+// Both ends: a flag holds only when set at both, and an end not sampled
+// leaves the DMA flag unknown.
+static inline uint8_t hpx_transfer_ends(uint8_t first, uint8_t last) {
+    return (uint8_t)((first & last & 3U) | ((first | last) & 4U));
+}
+// Before each instrumented run: clears the run's evidence and notes the
+// provider's counters, which the report after the run turns into deltas.
+static void hpx_transfer_run_start(void) {
+    memset(g_transfer_unit_overlap, 0, sizeof(g_transfer_unit_overlap));
+    memset(g_transfer_op_overlap, 0, sizeof(g_transfer_op_overlap));
+    g_transfer_sample_failures = 0;
+{% if has_armv8m_pmu %}
+    memset(g_transfer_unit_refills, 0, sizeof(g_transfer_unit_refills));
+    g_transfer_refill_slot = -1;
+    for (int i = 0; i < g_num_counters; i++) {
+        if (g_pmu_cfg.events[i].enabled && g_pmu_cfg.events[i].eventId == ARM_PMU_L1D_CACHE_REFILL) {
+            g_transfer_refill_slot = i;
+        }
+    }
+{% endif %}
+    g_transfer_stats_before = *{{ aot_prefix }}_nsx_transfer_stats();
+}
+
+// The run has just returned, before anything is printed: the predicate must
+// allow sleep again.
+static void hpx_transfer_after_run(void) {
+    if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
+        g_transfer_power_clause = true;
+    }
+}
+
+// After each instrumented run's CSV, its evidence. Refills are printed only in a pass
+// that counts L1D refills: per unit over its issue window, per operator over
+// its run window (that operator's layer record). Overlap entries are
+// <id>:<DMA in progress at both ends: 1, 0, or x when an end was not
+// sampled>/<reads pending at both ends>. Stats are the run's issues, waits
+// and aborts, the provider's peak pieces in flight and most checks a wait used
+// since it was bound, and the run's unsampled DMA-in-progress reads.
+static void hpx_transfer_print_ends(const char *separator, int id, uint8_t ends) {
+    hpx_printf("%s%d:%c/%u", separator, id, (ends & 4U) ? 'x' : (char)('0' + (ends & 1U)),
+               (unsigned)((ends >> 1) & 1U));
+}
+
+static void hpx_transfer_report(bool diagnostic = false) {
+    (void)diagnostic;
+{% if has_armv8m_pmu %}
+    if (!g_transfer_sampling && g_transfer_refill_slot >= 0) {
+        hpx_printf("HPX_TRANSFER_REFILLS=");
+        for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
+            hpx_printf("%s%d:%lu", u ? "," : "", u, (unsigned long)g_transfer_unit_refills[u]);
+        }
+        hpx_printf(";");
+        for (int i = 0; i < g_num_layers; i++) {
+            hpx_printf("%s%d:%lu", i ? "," : "", i,
+                       (unsigned long)g_layers[i].counters[g_transfer_refill_slot]);
+        }
+        hpx_printf("\n");
+    }
+{% endif %}
+{% if transfer_diagnostics | default("off") == "overlap" %}
+    if (g_transfer_sampling) {
+        hpx_printf("HPX_TRANSFER_DIAGNOSTIC_OVERLAP=");
+        for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
+            hpx_transfer_print_ends(u ? "," : "", u, g_transfer_unit_overlap[u]);
+        }
+        hpx_printf(";");
+        for (int i = 0; i < g_transfer_sampled_layers; i++) {
+            hpx_transfer_print_ends(i ? "," : "", i, g_transfer_op_overlap[i]);
+        }
+        hpx_printf("\n");
+    }
+{% endif %}
+    const {{ aot_prefix }}_nsx_transfer_stats_t *after = {{ aot_prefix }}_nsx_transfer_stats();
+{% if transfer_diagnostics | default("off") != "off" %}
+    if (diagnostic) {
+        hpx_printf("HPX_TRANSFER_DIAGNOSTIC_STATS=%lu,%lu,%lu,%lu,%lu,%lu\n",
+               (unsigned long)(after->issues - g_transfer_stats_before.issues),
+               (unsigned long)(after->waits - g_transfer_stats_before.waits),
+               (unsigned long)(after->aborts - g_transfer_stats_before.aborts),
+               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max,
+               (unsigned long)g_transfer_sample_failures);
+    } else
+{% endif %}
+    {
+        hpx_printf("HPX_TRANSFER_STATS=%lu,%lu,%lu,%lu,%lu,%lu\n",
+               (unsigned long)(after->issues - g_transfer_stats_before.issues),
+               (unsigned long)(after->waits - g_transfer_stats_before.waits),
+               (unsigned long)(after->aborts - g_transfer_stats_before.aborts),
+               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max,
+               (unsigned long)g_transfer_sample_failures);
+    }
+}
+
+#endif

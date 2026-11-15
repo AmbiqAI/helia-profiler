@@ -655,6 +655,7 @@ PmuResult(
     groups: dict[str, list[LayerResult]] = dict(),
     raw_output: tuple[str, ...] = (),
     transfer_evidence: tuple[TransferEvidence, ...] = (),
+    transfer_diagnostics: tuple[TransferDiagnostic, ...] = (),
 ) -> None
 ```
 
@@ -736,6 +737,16 @@ transfer_evidence: tuple[TransferEvidence, ...] = ()
 
 Source: `src/helia_profiler/results/models.py:298`
 
+### helia_profiler.PmuResult.transfer_diagnostics
+
+`attribute` · `python`
+
+```python
+transfer_diagnostics: tuple[TransferDiagnostic, ...] = ()
+```
+
+Source: `src/helia_profiler/results/models.py:299`
+
 ## helia_profiler.ProfileResult
 
 `class` · `python`
@@ -766,7 +777,7 @@ This in-memory result does not define a saved-record schema.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:723`
+Source: `src/helia_profiler/results/models.py:724`
 
 ### helia_profiler.ProfileResult.pmu
 
@@ -776,7 +787,7 @@ Source: `src/helia_profiler/results/models.py:723`
 pmu: PmuResult
 ```
 
-Source: `src/helia_profiler/results/models.py:735`
+Source: `src/helia_profiler/results/models.py:736`
 
 ### helia_profiler.ProfileResult.power
 
@@ -786,7 +797,7 @@ Source: `src/helia_profiler/results/models.py:735`
 power: PowerResult | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:736`
+Source: `src/helia_profiler/results/models.py:737`
 
 ### helia_profiler.ProfileResult.power_observation
 
@@ -796,7 +807,7 @@ Source: `src/helia_profiler/results/models.py:736`
 power_observation: PowerObservation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:737`
+Source: `src/helia_profiler/results/models.py:738`
 
 ### helia_profiler.ProfileResult.power_terminal
 
@@ -806,7 +817,7 @@ Source: `src/helia_profiler/results/models.py:737`
 power_terminal: PowerTerminalRecord | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:738`
+Source: `src/helia_profiler/results/models.py:739`
 
 ### helia_profiler.ProfileResult.on_device_power
 
@@ -816,7 +827,7 @@ Source: `src/helia_profiler/results/models.py:738`
 on_device_power: OnDevicePowerSummary | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:739`
+Source: `src/helia_profiler/results/models.py:740`
 
 ### helia_profiler.ProfileResult.metadata
 
@@ -826,7 +837,7 @@ Source: `src/helia_profiler/results/models.py:739`
 metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
-Source: `src/helia_profiler/results/models.py:740`
+Source: `src/helia_profiler/results/models.py:741`
 
 ### helia_profiler.ProfileResult.report_paths
 
@@ -836,7 +847,7 @@ Source: `src/helia_profiler/results/models.py:740`
 report_paths: list[Path] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:741`
+Source: `src/helia_profiler/results/models.py:742`
 
 ### helia_profiler.ProfileResult.evaluation
 
@@ -846,7 +857,7 @@ Source: `src/helia_profiler/results/models.py:741`
 evaluation: RunEvaluation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:742`
+Source: `src/helia_profiler/results/models.py:743`
 
 ### helia_profiler.ProfileResult.layers
 
@@ -858,7 +869,7 @@ layers: list[LayerResult]
 
 Merged per-layer results across all PMU presets.
 
-Source: `src/helia_profiler/results/models.py:745`
+Source: `src/helia_profiler/results/models.py:746`
 
 ### helia_profiler.ProfileResult.total_cycles
 
@@ -868,7 +879,7 @@ Source: `src/helia_profiler/results/models.py:745`
 total_cycles: float | None
 ```
 
-Source: `src/helia_profiler/results/models.py:750`
+Source: `src/helia_profiler/results/models.py:751`
 
 ### helia_profiler.ProfileResult.layer_count
 
@@ -878,7 +889,7 @@ Source: `src/helia_profiler/results/models.py:750`
 layer_count: int
 ```
 
-Source: `src/helia_profiler/results/models.py:754`
+Source: `src/helia_profiler/results/models.py:755`
 
 ### helia_profiler.ProfileResult.overflow_detected
 
@@ -888,4 +899,4 @@ Source: `src/helia_profiler/results/models.py:754`
 overflow_detected: bool
 ```
 
-Source: `src/helia_profiler/results/models.py:758`
+Source: `src/helia_profiler/results/models.py:759`

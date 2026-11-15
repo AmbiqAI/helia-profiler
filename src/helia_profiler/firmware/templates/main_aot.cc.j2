@@ -54,6 +54,13 @@
 #include "nsx_psram.h"
 #define HPX_AOT_TRANSFER 1
 #endif
+{% if transfer_diagnostics | default("off") != "off" and not power_only | default(false) %}
+#ifndef HPX_AOT_TRANSFER
+#error "profiling.transfer_diagnostics requires the emitted DMA provider"
+#elif {{ aot_prefix }}_num_dma_units < 1
+#error "profiling.transfer_diagnostics requires at least one DMA unit"
+#endif
+{% endif %}
 {% if stream_evidence and pool_regions %}
 #ifndef {{ aot_prefix }}_num_dma_units
 #error "profiling.stream_evidence binds a stream pool, but the module does not declare {{ aot_prefix }}_num_dma_units"
@@ -143,78 +150,8 @@ static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *opt
         hpx_transfer_bind_failed(status);
     }
 }
-{% if not power_only | default(false) and per_layer_profiling %}
-
-// Before each instrumented run: clears the run's evidence and notes the
-// provider's counters, which the report after the run turns into deltas.
-static void hpx_transfer_run_start(void) {
-    memset(g_transfer_unit_overlap, 0, sizeof(g_transfer_unit_overlap));
-    memset(g_transfer_op_overlap, 0, sizeof(g_transfer_op_overlap));
-    g_transfer_sample_failures = 0;
-{% if has_armv8m_pmu %}
-    memset(g_transfer_unit_refills, 0, sizeof(g_transfer_unit_refills));
-    g_transfer_refill_slot = -1;
-    for (int i = 0; i < g_num_counters; i++) {
-        if (g_pmu_cfg.events[i].enabled && g_pmu_cfg.events[i].eventId == ARM_PMU_L1D_CACHE_REFILL) {
-            g_transfer_refill_slot = i;
-        }
-    }
-{% endif %}
-    g_transfer_stats_before = *{{ aot_prefix }}_nsx_transfer_stats();
-}
-
-// The run has just returned, before anything is printed: the predicate must
-// allow sleep again.
-static void hpx_transfer_after_run(void) {
-    if (!{{ aot_prefix }}_nsx_transfer_can_sleep()) {
-        g_transfer_power_clause = true;
-    }
-}
-
-// After each instrumented run's CSV, its evidence. Refills are printed only in a pass
-// that counts L1D refills: per unit over its issue window, per operator over
-// its run window (that operator's layer record). Overlap entries are
-// <id>:<DMA in progress at both ends: 1, 0, or x when an end was not
-// sampled>/<reads pending at both ends>. Stats are the run's issues, waits
-// and aborts, the provider's peak pieces in flight and most checks a wait used
-// since it was bound, and the run's unsampled DMA-in-progress reads.
-static void hpx_transfer_print_ends(const char *separator, int id, uint8_t ends) {
-    hpx_printf("%s%d:%c/%u", separator, id, (ends & 4U) ? 'x' : (char)('0' + (ends & 1U)),
-               (unsigned)((ends >> 1) & 1U));
-}
-
-static void hpx_transfer_report(void) {
-{% if has_armv8m_pmu %}
-    if (g_transfer_refill_slot >= 0) {
-        hpx_printf("HPX_TRANSFER_REFILLS=");
-        for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
-            hpx_printf("%s%d:%lu", u ? "," : "", u, (unsigned long)g_transfer_unit_refills[u]);
-        }
-        hpx_printf(";");
-        for (int i = 0; i < g_num_layers; i++) {
-            hpx_printf("%s%d:%lu", i ? "," : "", i,
-                       (unsigned long)g_layers[i].counters[g_transfer_refill_slot]);
-        }
-        hpx_printf("\n");
-    }
-{% endif %}
-    hpx_printf("HPX_TRANSFER_OVERLAP=");
-    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; u++) {
-        hpx_transfer_print_ends(u ? "," : "", u, g_transfer_unit_overlap[u]);
-    }
-    hpx_printf(";");
-    for (int i = 0; i < g_num_layers; i++) {
-        hpx_transfer_print_ends(i ? "," : "", i, g_transfer_op_overlap[i]);
-    }
-    hpx_printf("\n");
-    const {{ aot_prefix }}_nsx_transfer_stats_t *after = {{ aot_prefix }}_nsx_transfer_stats();
-    hpx_printf("HPX_TRANSFER_STATS=%lu,%lu,%lu,%lu,%lu,%lu\n",
-               (unsigned long)(after->issues - g_transfer_stats_before.issues),
-               (unsigned long)(after->waits - g_transfer_stats_before.waits),
-               (unsigned long)(after->aborts - g_transfer_stats_before.aborts),
-               (unsigned long)after->peak_in_flight, (unsigned long)after->wait_checks_max,
-               (unsigned long)g_transfer_sample_failures);
-}
+{% if not power_only | default(false) and per_layer_profiling and transfer_diagnostics | default("off") != "off" %}
+{% include "_aot_transfer_diagnostics.j2" %}
 {% endif %}
 #endif
 
@@ -650,6 +587,54 @@ hpx_aot_check_runs();{% endblock %}
 {%- endblock %}
 
 {% block engine_profiled_summary %}
+{% if per_layer_profiling and not power_only | default(false) and transfer_diagnostics | default("off") != "off" %}
+#ifdef HPX_AOT_TRANSFER
+    g_profiler_enabled = false;
+    {{ aot_prefix }}_model_ctx.callback = hpx_transfer_diagnostic_cb;
+    for (int diagnostic_iter = 0; diagnostic_iter < {{ transfer_diagnostic_iterations }}; ++diagnostic_iter) {
+{{ self.engine_reset_inputs() }}
+{% if stream_evidence %}{{ poison_pool("        ") }}
+{% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
+        {
+            am_hal_cachectrl_range_t range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
+            (void)am_hal_cachectrl_dcache_invalidate(&range, true);
+        }
+{% endfor %}{% endif %}
+        hpx_transfer_run_start();
+        hpx_transfer_diagnostic_reset();
+        const uint32_t diagnostic_max_ms = SystemCoreClock > 0U
+            ? (uint32_t)(((uint64_t)UINT32_MAX * 1000U) / SystemCoreClock) : 0U;
+{% if transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% endif %}
+        hpx_printf("HPX_HEARTBEAT phase=transfer_diagnostic_begin iter=%d max_ms=%lu\n",
+                   diagnostic_iter, (unsigned long)diagnostic_max_ms);
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% elif transport == "usb_cdc" %}
+        usb_timer_pause();
+{% endif %}
+        const uint32_t diagnostic_start_tick = hpx_stimer_ticks();
+        const uint32_t diagnostic_start = DWT->CYCCNT;
+        hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+        const uint32_t diagnostic_cycles = DWT->CYCCNT - diagnostic_start;
+        const uint32_t diagnostic_ticks = hpx_stimer_ticks() - diagnostic_start_tick;
+        hpx_transfer_after_run();
+{% if transport == "rtt" %}
+        hpx_rtt_set_blocking();
+{% elif transport == "usb_cdc" %}
+        usb_timer_resume();
+{% endif %}
+        hpx_transfer_diagnostic_report(diagnostic_iter, diagnostic_cycles, diagnostic_ticks, hpx_aot_status);
+        hpx_aot_check_runs();
+{% if transport == "rtt" %}
+        hpx_rtt_set_nonblocking();
+{% endif %}
+    }
+    g_transfer_sampling = false;
+    {{ aot_prefix }}_model_ctx.callback = model_operator_cb;
+#endif
+{% endif %}
 {% if not per_layer_profiling and not power_only | default(false) %}
     hpx_print_output_digests();
 {% endif %}

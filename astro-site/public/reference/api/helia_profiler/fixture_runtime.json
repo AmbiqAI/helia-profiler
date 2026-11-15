@@ -1081,9 +1081,9 @@
               "returns": [],
               "signature": "compiler: str = ''",
               "source": {
-                "line": 352,
+                "line": 353,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L352"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L353"
               },
               "summary": ""
             },
@@ -1100,9 +1100,9 @@
               "returns": [],
               "signature": "compiler_version: str = ''",
               "source": {
-                "line": 353,
+                "line": 354,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L353"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L354"
               },
               "summary": ""
             },
@@ -1119,9 +1119,9 @@
               "returns": [],
               "signature": "cmake_version: str = ''",
               "source": {
-                "line": 354,
+                "line": 355,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L354"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L355"
               },
               "summary": ""
             }
@@ -1132,9 +1132,9 @@
           "returns": [],
           "signature": "ToolchainInfo(compiler: str = '', compiler_version: str = '', cmake_version: str = '') -> None",
           "source": {
-            "line": 348,
+            "line": 349,
             "path": "src/helia_profiler/results/models.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L348"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L349"
           },
           "summary": "Build toolchain versions (populated by stage 4)."
         },
@@ -1158,9 +1158,9 @@
               "returns": [],
               "signature": "engine: EngineType",
               "source": {
-                "line": 559,
+                "line": 560,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L559"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L560"
               },
               "summary": ""
             },
@@ -1177,9 +1177,9 @@
               "returns": [],
               "signature": "regions: tuple[MemoryRegionUsage, ...] = ()",
               "source": {
-                "line": 560,
+                "line": 561,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L560"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L561"
               },
               "summary": ""
             },
@@ -1196,9 +1196,9 @@
               "returns": [],
               "signature": "model_weight_bytes: int = 0",
               "source": {
-                "line": 562,
+                "line": 563,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L562"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L563"
               },
               "summary": ""
             },
@@ -1215,9 +1215,9 @@
               "returns": [],
               "signature": "has_overflow: bool = False",
               "source": {
-                "line": 566,
+                "line": 567,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L566"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L567"
               },
               "summary": ""
             },
@@ -1234,9 +1234,9 @@
               "returns": [],
               "signature": "region(name: str | MemoryRegion) -> MemoryRegionUsage | None",
               "source": {
-                "line": 572,
+                "line": 573,
                 "path": "src/helia_profiler/results/models.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L572"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L573"
               },
               "summary": ""
             }
@@ -1247,9 +1247,9 @@
           "returns": [],
           "signature": "MemoryPlan(\n    engine: EngineType,\n    regions: tuple[MemoryRegionUsage, ...] = (),\n    model_weight_bytes: int = 0,\n    has_overflow: bool = False,\n) -> None",
           "source": {
-            "line": 549,
+            "line": 550,
             "path": "src/helia_profiler/results/models.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L549"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/results/models.py#L550"
           },
           "summary": "Engine-agnostic memory plan for a single profiling run."
         }

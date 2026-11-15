@@ -1,0 +1,125 @@
+#ifdef HPX_AOT_TRANSFER
+struct HpxTransferCallRecord {
+    uint32_t issue_start, issue_cycles, wait_start, wait_cycles;
+    int32_t issue_status, wait_status;
+    uint8_t observed;
+};
+NSX_MEM_SRAM_BSS static HpxTransferCallRecord g_transfer_calls[{{ aot_prefix }}_num_transfer_units];
+static bool g_transfer_diagnostic_valid;
+{% if transfer_diagnostics == "overlap" %}
+static bool g_transfer_operator_started;
+{% endif %}
+
+static void hpx_transfer_diagnostic_reset(void) {
+    memset(g_transfer_calls, 0, sizeof(g_transfer_calls));
+    g_transfer_diagnostic_valid = true;
+    g_transfer_sampling = {{ "true" if transfer_diagnostics == "overlap" else "false" }};
+    g_transfer_sampled_layers = 0;
+{% if transfer_diagnostics == "overlap" %}
+    g_transfer_operator_started = false;
+{% endif %}
+{% if has_armv8m_pmu %}
+    g_transfer_refill_slot = -1;
+{% endif %}
+}
+
+static void hpx_transfer_diagnostic_cb(int32_t op, {{ aot_prefix }}_operator_state_t state,
+                                       int32_t status, void *user_data) {
+    (void)user_data;
+{% if transfer_diagnostics == "overlap" %}
+    if (state == {{ aot_prefix }}_op_state_run_started) {
+        if (g_transfer_sampled_layers >= kMaxLayers) {
+            g_transfer_diagnostic_valid = false;
+            return;
+        }
+        if (g_transfer_operator_started) g_transfer_diagnostic_valid = false;
+        g_transfer_operator_started = true;
+        g_transfer_op_overlap[g_transfer_sampled_layers] = hpx_transfer_sample();
+        return;
+    }
+    if (state == {{ aot_prefix }}_op_state_run_finished) {
+        if (!g_transfer_operator_started) g_transfer_diagnostic_valid = false;
+        g_transfer_operator_started = false;
+        if (g_transfer_sampled_layers < kMaxLayers) {
+            int i = g_transfer_sampled_layers++;
+            g_transfer_op_overlap[i] = hpx_transfer_ends(g_transfer_op_overlap[i], hpx_transfer_sample());
+        }
+        return;
+    }
+{% endif %}
+    uint8_t bit = 0;
+    if (state == {{ aot_prefix }}_op_state_transfer_issue_started) bit = 1U;
+    else if (state == {{ aot_prefix }}_op_state_transfer_issue_finished) bit = 2U;
+    else if (state == {{ aot_prefix }}_op_state_transfer_wait_started) bit = 4U;
+    else if (state == {{ aot_prefix }}_op_state_transfer_wait_finished) bit = 8U;
+    else return;
+    if (op < 0 || op >= {{ aot_prefix }}_num_transfer_units) {
+        g_transfer_diagnostic_valid = false;
+        return;
+    }
+    HpxTransferCallRecord &record = g_transfer_calls[op];
+    if ((record.observed & bit) != 0U ||
+        (bit == 2U && !(record.observed & 1U)) ||
+        (bit == 8U && !(record.observed & 4U))) {
+        g_transfer_diagnostic_valid = false;
+    }
+    record.observed |= bit;
+    if (bit == 2U) record.issue_status = status;
+    if (bit == 8U) record.wait_status = status;
+{% if transfer_diagnostics == "timing" %}
+    const uint32_t now = DWT->CYCCNT;
+    if (bit == 1U) record.issue_start = now;
+    else if (bit == 2U) { record.issue_cycles = now - record.issue_start; }
+    else if (bit == 4U) record.wait_start = now;
+    else { record.wait_cycles = now - record.wait_start; }
+{% else %}
+    if (bit == 1U) g_transfer_unit_overlap[op] = hpx_transfer_sample();
+    else if (bit == 2U) {
+        g_transfer_unit_overlap[op] = hpx_transfer_ends(g_transfer_unit_overlap[op], hpx_transfer_sample());
+    } else if (bit == 4U && {{ aot_prefix }}_nsx_transfer_can_sleep()) {
+        g_transfer_power_clause = true;
+    }
+{% endif %}
+}
+
+static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint32_t ticks, int32_t status) {
+    // STIMER bounds the continuous DWT interval; PMU passes write DWT and cannot supply this clock.
+    const uint64_t low = (uint64_t)(ticks > 0U ? ticks - 1U : 0U) * SystemCoreClock;
+    const uint64_t high = ((uint64_t)ticks + 1U) * SystemCoreClock;
+    const uint64_t measured = (uint64_t)cycles * HPX_STIMER_HZ;
+    bool complete = g_transfer_diagnostic_valid && status == 0 && SystemCoreClock > 0U && cycles > 0U && ticks > 0U &&
+        high < (uint64_t)UINT32_MAX * HPX_STIMER_HZ &&
+        high * 105U < (uint64_t)UINT32_MAX * HPX_STIMER_HZ * 100U &&
+        measured * 100U >= low * 95U && measured * 100U <= high * 105U;
+{% if transfer_diagnostics == "overlap" %}
+    if (g_transfer_operator_started) complete = false;
+{% endif %}
+    uint32_t waits = 0;
+    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
+        const HpxTransferCallRecord &record = g_transfer_calls[u];
+        if ((record.observed & 3U) != 3U ||
+            ((record.observed & 12U) != 0U && (record.observed & 12U) != 12U)) complete = false;
+        if ((record.observed & 12U) == 12U) ++waits;
+        if (record.issue_status != 0 || record.wait_status != 0) complete = false;
+    }
+    if (waits != {{ aot_prefix }}_num_dma_units) complete = false;
+    hpx_printf("HPX_TRANSFER_DIAGNOSTIC_BEGIN={{ transfer_diagnostics }},%d,%lu,{{ 'cold' if stream_evidence else 'configured' }},%u,%u\n",
+               iteration, (unsigned long)SystemCoreClock,
+               (unsigned){{ aot_prefix }}_num_transfer_units, (unsigned){{ aot_prefix }}_num_dma_units);
+{% if transfer_diagnostics == "timing" %}
+    for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
+        const HpxTransferCallRecord &record = g_transfer_calls[u];
+        hpx_printf("HPX_TRANSFER_TIMING=%d,", u);
+        if ((record.observed & 3U) == 3U) {
+            hpx_printf("%lu,%ld,", (unsigned long)record.issue_cycles, (long)record.issue_status);
+        } else hpx_printf("x,x,");
+        if ((record.observed & 12U) == 12U) {
+            hpx_printf("%lu,%ld\n", (unsigned long)record.wait_cycles, (long)record.wait_status);
+        } else hpx_printf("x,x\n");
+    }
+{% endif %}
+    hpx_transfer_report(true);
+    hpx_printf("HPX_TRANSFER_DIAGNOSTIC_END=%lu,%ld,%u\n",
+               (unsigned long)cycles, (long)status, (unsigned)complete);
+}
+#endif

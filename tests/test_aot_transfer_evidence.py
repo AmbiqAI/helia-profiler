@@ -170,7 +170,7 @@ int main() {
     provider_last.driver_status = 0x1205U;
     provider_last.ticket = 2U;
     hpx_aot_check_runs();
-    hpx_printf("checked\n");
+    hpx_printf("checked queries=%d,%d\n", dma_reads, pending_reads);
     return 0;
 }
 """
@@ -200,13 +200,22 @@ def _model_stub() -> str:
     return stub
 
 
-def _build_and_run(tmp_path: Path, source: str, main: str) -> subprocess.CompletedProcess[str]:
+def _build_and_run(
+    tmp_path: Path, source: str, main: str, *, extra_preamble: str = ""
+) -> subprocess.CompletedProcess[str]:
     compiler = shutil.which("c++")
     if compiler is None:
         pytest.skip("host C++ compiler required")
     (tmp_path / "fake_model.h").write_text(_model_stub())
     (tmp_path / "fake_nsx_transfer.h").write_text(_AOT_TRANSFER_STUB)
-    program = _PREAMBLE + '#include "fake_nsx_transfer.h"\n' + _PROVIDER + _globals(source) + main
+    program = (
+        _PREAMBLE
+        + extra_preamble
+        + '#include "fake_nsx_transfer.h"\n'
+        + _PROVIDER
+        + _globals(source)
+        + main
+    )
     path = tmp_path / "evidence.cc"
     path.write_text(program, encoding="utf-8")
     executable = tmp_path / "evidence.exe"
@@ -247,16 +256,15 @@ def _run(
     return _build_and_run(tmp_path, source, main)
 
 
-def test_one_run_reports_refills_overlap_and_counts(tmp_path: Path):
+def test_pmu_run_reports_refills_and_counts_without_polling(tmp_path: Path):
     result = _run(
         tmp_path, event="ARM_PMU_L1D_CACHE_REFILL", wait_can_sleep=False, after_can_sleep=True
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.splitlines() == [
         "HPX_TRANSFER_REFILLS=0:5,1:108,2:3,3:0;0:42",
-        "HPX_TRANSFER_OVERLAP=0:1/1,1:0/0,2:x/1,3:0/0;0:1/0",
-        "HPX_TRANSFER_STATS=3,1,0,2,7,1",
-        "checked",
+        "HPX_TRANSFER_STATS=3,1,0,2,7,0",
+        "checked queries=0,0",
     ]
 
 
@@ -265,10 +273,11 @@ def test_a_pass_without_the_refill_event_prints_no_refills(tmp_path: Path):
     assert result.returncode == 0, result.stderr
     lines = result.stdout.splitlines()
     assert not any(line.startswith("HPX_TRANSFER_REFILLS=") for line in lines)
-    assert "HPX_TRANSFER_OVERLAP=0:1/1,1:0/0,2:x/1,3:0/0;0:1/0" in lines
+    assert not any("OVERLAP=" in line for line in lines)
+    assert lines[-1] == "checked queries=0,0"
 
 
-@pytest.mark.parametrize(("wait_can_sleep", "after_can_sleep"), [(True, True), (False, False)])
+@pytest.mark.parametrize(("wait_can_sleep", "after_can_sleep"), [(True, False), (False, False)])
 def test_a_broken_power_clause_stops_the_capture(tmp_path: Path, wait_can_sleep, after_can_sleep):
     result = _run(
         tmp_path,
@@ -615,29 +624,15 @@ def _callback(source: str) -> str:
     return source[start : source.index("\n}\n", start)]
 
 
-def test_evidence_samples_sit_outside_every_counter_window():
-    """Each operator's and unit's counters run from hpx_pmu_restart to
-    hpx_pmu_read_layer; the DMA samples are taken before the restart and after
-    the read, so no sample is counted."""
-    cb = _callback(_render_aot(transport="rtt", arena_regions=_PROBE_REGIONS))
-    issue = cb[cb.index("if (state == fake_op_state_transfer_issue_started) {") :]
-    issue_start, issue_finish = issue.split("} else {", 1)
-    assert issue_start.index("hpx_transfer_sample()") < issue_start.index("hpx_pmu_restart();")
-    assert (
-        issue_finish.index("hpx_pmu_read_layer(")
-        < issue_finish.index("g_transfer_unit_refills[op] =")
-        < issue_finish.index("hpx_transfer_sample()")
+@pytest.mark.parametrize("evidence", [False, True])
+def test_pmu_callback_never_queries_transfer_status(evidence):
+    cb = _callback(
+        _render_aot(transport="rtt", arena_regions=_PROBE_REGIONS, stream_evidence=evidence)
     )
-    run_sample = cb.index("g_transfer_op_overlap[g_num_layers] = hpx_transfer_sample();")
-    run_started = cb.index("if (state == fake_op_state_run_started) {")
-    assert run_sample < run_started < cb.index("hpx_pmu_restart();", run_started)
-    finished = cb.index("} else if (state == fake_op_state_run_finished) {")
-    assert (
-        finished
-        < cb.index("hpx_pmu_read_layer(", finished)
-        < cb.index("g_layers[idx].counters[i] = g_pmu_cfg.counter[i].counterValue;", finished)
-        < cb.index("hpx_transfer_ends(g_transfer_op_overlap[idx], hpx_transfer_sample())", finished)
-    )
+    assert "hpx_transfer_sample" not in cb
+    assert "nsx_psram_" not in cb
+    assert "transfer_can_sleep" not in cb
+    assert "hpx_pmu_read_layer" in cb
 
 
 def _probe_capture() -> list[str]:
@@ -695,7 +690,7 @@ def test_the_sleep_predicate_is_latched_as_the_run_returns():
         latch < source.index("--- HPX_ITER", latch) < source.index("profiler_print_csv();", latch)
     )
     assert latch < source.index("        hpx_transfer_report();", latch)
-    report = source[source.index("static void hpx_transfer_report(void) {") :]
+    report = source[source.index("static void hpx_transfer_report(bool diagnostic = false) {") :]
     report = report[: report.index("\n}\n")]
     assert "can_sleep" not in report
 

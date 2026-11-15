@@ -14,6 +14,7 @@ capture/power_terminal.py
 capture/rtt_symbol.py
 capture/terminal_transport.py
 capture/transfer.py
+capture/transfer_diagnostics.py
 cli/__init__.py
 cli/analyze_cmd.py
 cli/app.py
@@ -121,6 +122,8 @@ firmware/project.py
 firmware/render.py
 firmware/templates/CMakeLists.txt.j2
 firmware/templates/_aot_layer_profiler.j2
+firmware/templates/_aot_transfer_diagnostics.j2
+firmware/templates/_aot_transfer_evidence.j2
 firmware/templates/_ble_reset.j2
 firmware/templates/_busy_loop_calibration.j2
 firmware/templates/_cache_shims.j2

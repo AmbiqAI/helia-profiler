@@ -49,6 +49,7 @@ from ..wire import (
     WireKey,
 )
 from .transfer import TransferEvidenceParser
+from .transfer_diagnostics import TransferDiagnosticParser
 
 log = logging.getLogger("hpx")
 
@@ -105,6 +106,7 @@ def parse_firmware_output(
     in_session = False
     saw_end = False
     transfer = TransferEvidenceParser()
+    diagnostics = TransferDiagnosticParser()
 
     for line in lines:
         line = line.strip()
@@ -116,6 +118,7 @@ def parse_firmware_output(
             continue
 
         if line == HPX_END_SENTINEL:
+            diagnostics.finish()
             transfer.flush()
             if current_preset is not None:
                 current_preset.flush_iteration()
@@ -148,7 +151,7 @@ def parse_firmware_output(
                 meta_kv[_ANNOUNCED_CLEAN_ITERS] = int(m_iters.group(1))
             continue
 
-        if transfer.feed_line(line):
+        if diagnostics.feed_line(line) or transfer.feed_line(line):
             continue
 
         m = KEY_VALUE_RE.match(line)
@@ -316,6 +319,7 @@ def parse_firmware_output(
         groups=groups,
         raw_output=tuple(lines) if firmware_meta.per_layer_profiling is False else (),
         transfer_evidence=tuple(transfer.records),
+        transfer_diagnostics=tuple(diagnostics.records),
     )
 
 

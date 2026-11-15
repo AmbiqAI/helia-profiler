@@ -28,6 +28,7 @@ from ._model import (
     GATE_PSRAM_WEIGHTS_UPLOAD,
     GATE_RTT_FLUSH,
     GATE_STIMER_WINDOW,
+    GATE_TRANSFER_DIAGNOSTIC,
     GATE_TRANSPORT_HAS_READY_PREAMBLE,
     GATE_WEIGHTS_IN_PSRAM,
     HPX_END_SENTINEL,
@@ -867,6 +868,19 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
         value_shape="iters=<n> est_ms=<n>",
         note="The host widens its capture deadline from est_ms and keeps "
         "iters as a fallback for HPX_CLEAN_INFER_COUNT. " + EST_MS_GAP,
+    ),
+    _spec(
+        heartbeat_token(HeartbeatPhase.TRANSFER_DIAGNOSTIC_BEGIN),
+        WireKind.HEARTBEAT,
+        "Announces one silent diagnostic invocation before its clock bracket.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=AOT_ENGINES,
+        condition=GATE_TRANSFER_DIAGNOSTIC,
+        value_shape="iter=<n> max_ms=<n>",
+        note="max_ms is the configured CPU rate's full 32-bit DWT span, not a latency estimate. "
+        "The host holds its inactivity deadline with a bounded delivery margin, without "
+        "extending its overall capture deadline; the diagnostic end releases that hold.",
     ),
     _spec(
         heartbeat_token(HeartbeatPhase.INIT),

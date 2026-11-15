@@ -55,3 +55,33 @@ class TransferEvidence:
     def to_dict(self) -> dict[str, Any]:
         """Omit missing records while retaining unknown DMA flags as JSON null."""
         return {key: value for key, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True)
+class TransferUnitTiming:
+    """Observed call durations in CPU cycles; an absent call is not a zero wait."""
+
+    unit: int
+    issue_cycles: int | None
+    issue_status: int | None
+    wait_cycles: int | None
+    wait_status: int | None
+
+
+@dataclass(frozen=True)
+class TransferDiagnostic:
+    """One independent diagnostic iteration, outside PMU presets and averages."""
+
+    purpose: str
+    iteration: int
+    cpu_hz: int
+    preparation: str
+    elapsed_cycles: int
+    run_status: int
+    complete: bool
+    units: tuple[TransferUnitTiming, ...] = ()
+    stats: TransferStats | None = None
+    overlap: TransferOverlap | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {key: value for key, value in asdict(self).items() if value is not None}
