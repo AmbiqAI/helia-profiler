@@ -629,12 +629,12 @@ hpx_aot_check_runs();{% endblock %}
         hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         const uint32_t diagnostic_cycles = DWT->CYCCNT - diagnostic_start;
         const uint32_t diagnostic_ticks = hpx_stimer_ticks() - diagnostic_start_tick;
+        hpx_transfer_after_run();
 {% if transfer_diagnostics == "trace" %}
         const int32_t trace_cleanup = {{ aot_prefix }}_nsx_transfer_reset();
         g_trace_quiescent = trace_cleanup == 0;
         if (g_trace_quiescent) __atomic_store_n(&g_trace.recording, 0U, __ATOMIC_RELEASE);
 {% endif %}
-        hpx_transfer_after_run();
 {% if transport == "rtt" %}
         hpx_rtt_set_blocking();
 {% elif transport == "usb_cdc" %}

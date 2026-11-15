@@ -244,3 +244,76 @@ def test_callbacks_cannot_arrive_backwards_in_time_but_may_share_a_cycle():
         _parse(lines)
     lines[6] = "HPX_TRANSFER_TRACE_PIECE=1,0,64,0,5"
     assert _parse(lines).transfer_diagnostics[0].complete
+
+
+def test_complete_trace_operator_count_matches_captured_layers():
+    config = load_config(
+        None,
+        {
+            "model": {"path": "m.tflite"},
+            "engine": {"type": "helia-aot"},
+            "profiling": {"transfer_diagnostics": "trace", "transfer_trace_max_pieces": 2},
+        },
+    )
+    without_ops = [
+        s.replace("TRACE_BEGIN=1,1,0,2,256,1", "TRACE_BEGIN=1,1,0,2,256,0")
+        for s in TRACE
+        if "SPAN=operator" not in s
+    ]
+    result = _parse(without_ops)
+    with pytest.raises(CaptureError):
+        validate_transfer_diagnostics(result, config.profiling)
+    incomplete = _parse([s.replace("96000,0,1", "96000,0,0") for s in without_ops])
+    validate_transfer_diagnostics(incomplete, config.profiling)
+    assert not incomplete.transfer_diagnostics[0].complete
+
+
+TWO_UNITS = [
+    "HPX_TRANSFER_DIAGNOSTIC_BEGIN=trace,0,96000000,configured,2,2",
+    "HPX_TRANSFER_TRACE_BEGIN=1,1,0,2,512,1",
+    "HPX_TRANSFER_TRACE_SPAN=issue,0,1,10,0",
+    "HPX_TRANSFER_TRACE_SPAN=issue,1,11,20,0",
+    "HPX_TRANSFER_TRACE_SPAN=operator,0,21,30,0",
+    "HPX_TRANSFER_TRACE_SPAN=wait,0,40,50,0",
+    "HPX_TRANSFER_TRACE_SPAN=wait,1,51,60,0",
+    "HPX_TRANSFER_TRACE_PIECE=0,0,64,0,5",
+    "HPX_TRANSFER_TRACE_PIECE=1,1,64,0,15",
+    "HPX_TRANSFER_TRACE_END=2,0,1,1",
+    "HPX_TRANSFER_DIAGNOSTIC_STATS=2,2,0,2,0,0",
+    "HPX_TRANSFER_DIAGNOSTIC_END=96000,0,1",
+]
+
+
+def test_each_waited_dma_unit_needs_its_own_completion_evidence():
+    assert _parse(TWO_UNITS).transfer_diagnostics[0].complete
+    missing = [s.replace("PIECE=1,1,64,0,15", "PIECE=1,0,64,0,15") for s in TWO_UNITS]
+    with pytest.raises(CaptureError, match="waited DMA unit"):
+        _parse(missing)
+    assert (
+        not _parse([s.replace("96000,0,1", "96000,0,0") for s in missing])
+        .transfer_diagnostics[0]
+        .complete
+    )
+
+
+def test_acceptance_sequence_cannot_reverse_nonoverlapping_issue_windows():
+    impossible = [
+        s.replace("PIECE=0,0,64,0,5", "PIECE=1,0,64,0,5").replace(
+            "PIECE=1,1,64,0,15", "PIECE=0,1,64,0,15"
+        )
+        for s in TWO_UNITS
+    ]
+    with pytest.raises(CaptureError, match="sequence contradicts issue windows"):
+        _parse(impossible)
+    assert (
+        not _parse([s.replace("96000,0,1", "96000,0,0") for s in impossible])
+        .transfer_diagnostics[0]
+        .complete
+    )
+    delayed_first = list(TWO_UNITS)
+    # Notifications can be delivered out of accepted-read order.
+    delayed_first[7:9] = [
+        "HPX_TRANSFER_TRACE_PIECE=1,1,64,0,15",
+        "HPX_TRANSFER_TRACE_PIECE=0,0,64,0,35",
+    ]
+    assert _parse(delayed_first).transfer_diagnostics[0].complete

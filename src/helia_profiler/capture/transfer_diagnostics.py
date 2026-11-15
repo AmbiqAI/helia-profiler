@@ -204,6 +204,7 @@ def validate_transfer_diagnostics(result: PmuResult, profiling: ProfilingConfig)
                 or record.trace.capacity != profiling.transfer_trace_max_pieces
                 or record.trace.binding_epoch != index + 1
                 or record.trace.sequence_start != 0
+                or (record.complete and record.trace.operator_count != len(result.layers))
             )
         )
         or (record.purpose != "trace" and record.trace is not None)

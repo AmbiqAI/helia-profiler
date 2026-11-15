@@ -161,6 +161,8 @@ class TransferTraceParser:
                 issue = issue_spans.get(unit)
                 if issue is None or issue[3] > wait[2]:
                     raise ValueError("complete trace waits before unit issue returns")
+            if {piece.ticket for piece in trace.completions} != set(wait_spans):
+                raise ValueError("complete trace has no completion for a waited DMA unit")
             for piece in trace.completions:
                 issue = issue_spans.get(piece.ticket)
                 wait = wait_spans.get(piece.ticket)
@@ -174,4 +176,13 @@ class TransferTraceParser:
                     raise ValueError(
                         "complete trace has failed or causally inconsistent completion"
                     )
+            # Accepted sequences follow submission order: https://github.com/AmbiqAI/helia-aot/issues/1008.
+            earliest_acceptance = 0
+            for piece in sorted(
+                trace.completions, key=lambda p: (p.sequence - trace.sequence_start) & 0xFFFFFFFF
+            ):
+                issue = issue_spans[piece.ticket]
+                earliest_acceptance = max(earliest_acceptance, issue[2])
+                if earliest_acceptance > min(issue[3], piece.cycles):
+                    raise ValueError("complete trace sequence contradicts issue windows")
         return trace

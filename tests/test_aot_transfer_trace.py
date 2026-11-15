@@ -60,7 +60,7 @@ int main() {
 """
 
 
-def _execute(tmp_path, main, *, cap=4):
+def _execute(tmp_path, main, *, cap=4, provider_source=_PROVIDER_OBSERVER):
     preamble = "#define HPX_STIMER_HZ 32768U\nstatic uint32_t SystemCoreClock = 96000000U;\n"
     source = _render_aot(
         transfer_diagnostics="trace",
@@ -74,7 +74,7 @@ def _execute(tmp_path, main, *, cap=4):
         main,
         extra_preamble=preamble,
         provider_header=_AOT_TRANSFER_OBSERVER_STUB,
-        provider_source=_PROVIDER_OBSERVER,
+        provider_source=provider_source,
     )
 
 
@@ -257,3 +257,46 @@ int main() {
     )
     assert result.returncode == 3
     assert "observer=1 context=1 count=1" in result.stdout
+
+
+def test_actual_return_check_observes_pending_work_before_reset_can_hide_it(tmp_path):
+    source = _render_aot(
+        transfer_diagnostics="trace", transfer_diagnostic_iterations=1, clean_window_timer="stimer"
+    )
+    start = source.index("\n", source.index("const uint32_t diagnostic_ticks =")) + 1
+    end = source.index("hpx_rtt_set_blocking();", start)
+    cleanup = source[start:end]
+    provider = _PROVIDER_OBSERVER.replace(
+        "int32_t fake_nsx_transfer_reset(void) { return 0; }",
+        "int32_t fake_nsx_transfer_reset(void) { provider_can_sleep = true; return 0; }",
+    )
+    for faulty in [False, True]:
+        directory = tmp_path / ("faulty" if faulty else "correct")
+        directory.mkdir()
+        fragment = cleanup
+        if faulty:
+            fragment = (
+                fragment.replace("hpx_transfer_after_run();", "") + "\nhpx_transfer_after_run();\n"
+            )
+        result = _execute(
+            directory,
+            """
+int main() {
+    provider_can_sleep = false;
+"""
+            + fragment
+            + """
+    hpx_printf("latched=%u after_drain=%u\\n", g_transfer_power_clause, provider_can_sleep);
+    hpx_aot_status = 0;
+    hpx_aot_check_runs();
+}
+""",
+            provider_source=provider,
+        )
+        assert result.returncode == (0 if faulty else 3)
+        assert f"latched={0 if faulty else 1} after_drain=1" in result.stdout
+
+
+def test_pending_at_return_never_labels_a_trace_complete(tmp_path):
+    record, _ = _run(tmp_path, mutation="g_transfer_power_clause = true;")
+    assert not record.complete

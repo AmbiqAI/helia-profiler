@@ -113,7 +113,7 @@ static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint3
     // A failed drain leaves the context live. Publish no concurrently written piece payloads.
     const uint32_t retained = !g_trace_quiescent ? 0U :
         (observed < {{ transfer_trace_max_pieces }}U ? observed : {{ transfer_trace_max_pieces }}U);
-    bool complete = g_trace.valid && clock_valid && status == 0 && g_trace_quiescent &&
+    bool complete = g_trace.valid && !g_transfer_power_clause && clock_valid && status == 0 && g_trace_quiescent &&
         observed == retained && __atomic_load_n(&g_trace.observer_fault, __ATOMIC_ACQUIRE) == 0U;
     uint32_t waits = 0;
     for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
@@ -136,7 +136,7 @@ static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint3
     }
     hpx_printf("HPX_TRANSFER_DIAGNOSTIC_BEGIN=trace,%d,%lu,{{ 'cold' if stream_evidence else 'configured' }},%u,%u\n",
         iteration, (unsigned long)SystemCoreClock, (unsigned){{ aot_prefix }}_num_transfer_units, (unsigned){{ aot_prefix }}_num_dma_units);
-    // Each successful prepare binds anew, which restarts AOT's accepted-read sequence at zero.
+    // Bind restarts the sequence: https://github.com/AmbiqAI/helia-aot/issues/1008.
     hpx_printf("HPX_TRANSFER_TRACE_BEGIN=1,%lu,0,{{ transfer_trace_max_pieces }},%lu,%lu\n",
         (unsigned long)g_trace_epoch, (unsigned long)(sizeof(g_trace) + sizeof(g_trace_epoch) + sizeof(g_trace_quiescent)), (unsigned long)operators);
     for (int u = 0; u < {{ aot_prefix }}_num_transfer_units; ++u) {
