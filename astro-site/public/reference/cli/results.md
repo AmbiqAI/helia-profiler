@@ -10,7 +10,7 @@ hpx results COMMAND [ARGS]...
 
 Inspect and export verified profile bundles and saved run results.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 20.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 26.
 
 ## hpx results export
 
@@ -18,9 +18,9 @@ Defined in `src/helia_profiler/cli/results_cmd.py` line 20.
 hpx results export [OPTIONS] LOCATION
 ```
 
-Write a new portable JSON file; existing evidence is never overwritten.
+Write portable JSON or recorded transfer traces; existing files are never overwritten.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 70.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 76.
 
 ### Arguments
 
@@ -33,6 +33,7 @@ Defined in `src/helia_profiler/cli/results_cmd.py` line 70.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--output` | `Path` |  | Required. |
+| `--format` | `json \| perfetto` | json |  |
 
 ## hpx results inspect
 
@@ -42,7 +43,7 @@ hpx results inspect LOCATION
 
 Emit a structured inspection; a verified failed run is not corrupt evidence.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 25.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 31.
 
 ### Arguments
 
@@ -58,7 +59,7 @@ hpx results show LOCATION
 
 Emit the portable JSON view of a verified profile bundle or saved run result.
 
-Defined in `src/helia_profiler/cli/results_cmd.py` line 60.
+Defined in `src/helia_profiler/cli/results_cmd.py` line 66.
 
 ### Arguments
 
