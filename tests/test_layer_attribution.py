@@ -318,7 +318,7 @@ class TestConsumerPlumbing:
     def test_report_hands_a_manifestless_aot_run_an_empty_authoritative_manifest(
         self, tmp_path: Path
     ):
-        from helia_profiler.report import _aot_manifest
+        from helia_profiler.report.aot import _aot_manifest
 
         assert _aot_manifest(self._aot_ctx(tmp_path, None)) == []
         assert _aot_manifest(self._aot_ctx(tmp_path, [{"idx": 0, "id": 0}])) == [
@@ -328,7 +328,7 @@ class TestConsumerPlumbing:
     def test_report_hands_sequential_engines_no_manifest(self, tmp_path: Path):
         from helia_profiler.config import load_config
         from helia_profiler.pipeline import PipelineContext
-        from helia_profiler.report import _aot_manifest
+        from helia_profiler.report.aot import _aot_manifest
 
         model_file = tmp_path / "test.tflite"
         model_file.write_bytes(b"\x00")

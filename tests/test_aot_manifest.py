@@ -16,7 +16,7 @@ from helia_profiler.engines.helia_aot.manifest import (
     _extract_operator_manifest,
     _tensor_metadata,
 )
-from helia_profiler.report import _write_aot_manifest, _write_aot_memory_layers
+from helia_profiler.report.aot import _write_aot_manifest, _write_aot_memory_layers
 from tests import aot_views
 from tests.aot_views import PlacementView, RegionView, Result, TensorView, operator
 

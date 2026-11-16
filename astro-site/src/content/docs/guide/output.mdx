@@ -562,6 +562,55 @@ numerically or authenticate the result.
 `examples/results/run-api-synthetic/` holds a synthetic saved result and
 its `portable.json`.
 
+## Recorded transfer traces in Perfetto
+
+A `helia-aot` profile captured with `profiling.transfer_diagnostics: trace`
+contains invocation-relative operator and transfer-call intervals, plus piece
+completion notifications. Export that saved bundle without rebuilding or
+contacting a board:
+
+```bash
+hpx results export results/ --format perfetto --output transfer.perfetto.json
+```
+
+Open the new file in [Perfetto](https://ui.perfetto.dev/). Expand an iteration
+to see **Foreground calls** (operators and issue/wait calls), **Completion
+notifications** and **Trace warnings**. Each iteration has its own zero origin;
+groups do not share a wall clock. Ordinary PMU averages and clean timing are
+separate measurements and do not appear on this axis.
+
+The timestamps use the diagnostic's recorded CPU rate. Event arguments retain
+the exact cycle offsets, statuses, sequence/ticket identity, bytes and binding
+epoch; Perfetto imports the displayed time at nanosecond precision. A completion
+point records observer entry, including queue and interrupt effects. It does
+not measure physical bus completion, per-piece service time or bandwidth.
+
+Incomplete records carry a visible warning. Only observed boundaries are drawn;
+an unpaired endpoint is an instant, and missing intervals stay missing. Invalid
+clocks or contradictory known boundaries refuse export. A source bundle's failed
+or degraded status remains visible even when an individual trace is complete.
+
+The exporter rechecks the native manifest and JSON artifact, and preserves their
+hashes and recorded identity/conditions. Native trace v1 omits the wire header's
+total-unit and DMA-unit counts, so saved validation uses recorded slots and
+provider accounting; it cannot recover those missing declarations. Neither
+exporting nor opening a trace adds qualification to the source evidence.
+
+The focused Python helper is experimental:
+
+```python
+from helia_profiler.api import load_result
+from helia_profiler.report.perfetto import export_transfer_trace
+
+record = load_result("results/")
+export_transfer_trace(record, "transfer.perfetto.json")
+```
+
+Both paths create a new file and refuse an existing destination. Profiles
+without chronological diagnostics and model-only results are unsupported for
+this format. `hpx results export` continues to write portable JSON by default;
+`--format json` selects that same output explicitly.
+
 ## Expected output
 
 A bundle whose manifest verifies, whose summary says `valid`, and whose

@@ -35,19 +35,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..errors import ReportError
-from ..evaluation import evaluate_run
-from ..profile_identity import profile_run_identity
-from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
-from .aot import _aot_manifest, _write_aot_manifest, _write_aot_memory_layers, _write_aot_plan
-from .conditions import run_conditions
-from .csv_writer import _write_csv, _write_preset_csv
-from .json_writer import _write_json
-from .manifest import _write_result_manifest
-from .memory import _write_memory_breakdown
-from .metadata import _write_run_metadata
-from .model_explorer import _write_model_explorer_overlays
-from .power import _write_power_csv
-from .summary import _write_summary
 
 if TYPE_CHECKING:
     from ..pipeline import PipelineContext
@@ -59,6 +46,20 @@ __all__ = ["write_report"]
 
 def write_report(ctx: PipelineContext) -> list[Path]:
     """Generate all configured report outputs."""
+    from ..evaluation import evaluate_run
+    from ..profile_identity import profile_run_identity
+    from ..results.manifest import RESULT_PUBLICATION_INCOMPLETE
+    from .aot import _aot_manifest, _write_aot_manifest, _write_aot_memory_layers, _write_aot_plan
+    from .conditions import run_conditions
+    from .csv_writer import _write_csv, _write_preset_csv
+    from .json_writer import _write_json
+    from .manifest import _write_result_manifest
+    from .memory import _write_memory_breakdown
+    from .metadata import _write_run_metadata
+    from .model_explorer import _write_model_explorer_overlays
+    from .power import _write_power_csv
+    from .summary import _write_summary
+
     pmu = ctx.captured_pmu
 
     output_dir = ctx.config.output.dir.resolve()

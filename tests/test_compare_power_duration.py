@@ -13,7 +13,9 @@ from helia_profiler.evaluation.run_metrics import _METRIC_FIELDS, _compare_metri
 from helia_profiler.pipeline import PipelineContext
 from helia_profiler.power.base import GatedPowerWindow, PowerResult, PowerSummary
 from helia_profiler.power.metadata import MeasurementScope, PowerIntegrity, PowerMetadata
-from helia_profiler.report import _write_csv, _write_run_metadata, _write_summary
+from helia_profiler.report.csv_writer import _write_csv
+from helia_profiler.report.metadata import _write_run_metadata
+from helia_profiler.report.summary import _write_summary
 from helia_profiler.results import BinarySections, FirmwareMeta, LayerResult, PmuResult, TimingInfo
 from helia_profiler.results.serde import nested_get
 from tests.pipeline_context_helpers import set_power_result, set_profile_result

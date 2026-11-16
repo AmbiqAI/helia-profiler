@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +16,11 @@ results_app = typer.Typer(
     help="Inspect and export verified profile bundles and saved run results.", add_completion=False
 )
 app = results_app
+
+
+class _ExportFormat(StrEnum):
+    JSON = "json"
+    PERFETTO = "perfetto"
 
 
 @results_app.callback()
@@ -71,10 +77,17 @@ def show(location: Annotated[Path, typer.Argument()]) -> None:
 def export(
     location: Annotated[Path, typer.Argument()],
     output: Annotated[Path, typer.Option("--output")],
+    format: Annotated[_ExportFormat, typer.Option("--format")] = _ExportFormat.JSON,
 ) -> None:
-    """Write a new portable JSON file; existing evidence is never overwritten."""
+    """Write portable JSON or recorded transfer traces; existing files are never overwritten."""
     try:
-        export_result(load_result(location), output)
+        record = load_result(location)
+        if format is _ExportFormat.PERFETTO:
+            from ..report.perfetto import export_transfer_trace
+
+            export_transfer_trace(record, output)
+        else:
+            export_result(record, output)
     except (OSError, ResultReadError) as exc:
         typer.echo(json.dumps({"code": "export_failed", "message": str(exc)}), err=True)
         raise typer.Exit(1) from exc

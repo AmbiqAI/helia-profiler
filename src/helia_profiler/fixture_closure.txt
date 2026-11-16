@@ -252,6 +252,7 @@ readers/__init__.py
 readers/native.py
 readers/profile_view.py
 readers/run_view.py
+readers/transfer.py
 report/__init__.py
 report/aot.py
 report/conditions.py
@@ -262,6 +263,7 @@ report/manifest.py
 report/memory.py
 report/metadata.py
 report/model_explorer.py
+report/perfetto.py
 report/power.py
 report/summary.py
 results/__init__.py
@@ -275,6 +277,7 @@ results/run_summary.py
 results/serde.py
 results/support_bundle.py
 results/transfer.py
+results/transfer_validation.py
 runs/__init__.py
 runs/compiled.py
 runs/contracts.py
