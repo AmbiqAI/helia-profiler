@@ -15,7 +15,9 @@ from ..results.transfer import (
     TransferTraceSpan,
 )
 from ..results.transfer_validation import (
+    fresh_binding_peak_valid,
     validate_complete_trace,
+    validate_known_trace_causes,
     validate_trace_accounting,
     validate_trace_order,
 )
@@ -178,6 +180,8 @@ def _diagnostic(value: Any, clock: int, layer_ids: set[int]) -> TransferDiagnost
             raise ValueError("complete trace contradicts run status or recorded domains")
         # Native v1 does not retain the wire header's unit counts: these are observed slots.
         validate_trace_accounting(record.stats, len(waits))
+        if not fresh_binding_peak_valid(record.stats):
+            raise ValueError("complete trace contradicts fresh-binding provider accounting")
         validate_complete_trace(
             trace,
             elapsed=record.elapsed_cycles,
@@ -187,10 +191,13 @@ def _diagnostic(value: Any, clock: int, layer_ids: set[int]) -> TransferDiagnost
         )
     else:
         validate_trace_order(trace)
+        validate_known_trace_causes(trace)
     return record
 
 
-def decode_transfer_diagnostics(document: dict[str, Any]) -> tuple[TransferDiagnostic, ...]:
+def decode_transfer_diagnostics(
+    document: dict[str, Any], recorded_metadata: dict[str, Any]
+) -> tuple[TransferDiagnostic, ...]:
     """Decode the trace-bearing native table; integrity is the saved reader's responsibility."""
     try:
         values = _array(document.get("transfer_diagnostics", []))
@@ -204,9 +211,7 @@ def decode_transfer_diagnostics(document: dict[str, Any]) -> tuple[TransferDiagn
         if len(set(ids)) != len(ids):
             raise ValueError("duplicate recorded layer identity")
         records = tuple(_diagnostic(value, clock, set(ids)) for value in values)
-        profiling = _object(_object(document.get("metadata", {})).get("config", {})).get(
-            "profiling", {}
-        )
+        profiling = _object(recorded_metadata.get("config", {})).get("profiling", {})
         profiling = _object(profiling)
         if "transfer_diagnostics" in profiling and profiling["transfer_diagnostics"] != "trace":
             raise ValueError("trace differs from the recorded diagnostic mode")
@@ -268,10 +273,13 @@ def _read_transfer_traces(record: ProfileResultRecord | RunResultRecord) -> Tran
         or metadata.get("hpx_version") != fresh.manifest.hpx_version
     ):
         raise ResultReadError("identity_mismatch", "Profile table has a different run identity")
-    diagnostics = decode_transfer_diagnostics(data)
+    diagnostics = decode_transfer_diagnostics(data, fresh.metadata)
     clock = _object(data.get("summary")).get("system_clock_hz")
     firmware = fresh.metadata.get("firmware", {})
-    if isinstance(firmware, dict) and firmware.get("system_clock_hz", clock) != clock:
+    if (
+        isinstance(firmware, dict)
+        and _uint(firmware.get("system_clock_hz", clock), minimum=1) != clock
+    ):
         raise ResultReadError("identity_mismatch", "Profile table has a different firmware clock")
     layers = _array(data.get("layers"))
     if fresh.summary is not None and fresh.summary.layers != len(layers):

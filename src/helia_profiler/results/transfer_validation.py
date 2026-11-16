@@ -10,6 +10,10 @@ def validate_trace_accounting(stats: TransferStats, dma: int) -> None:
         raise ValueError("complete trace contradicts provider accounting")
 
 
+def fresh_binding_peak_valid(stats: TransferStats | None) -> bool:
+    return stats is not None and stats.peak_in_flight <= stats.issues
+
+
 def validate_complete_trace(
     trace: TransferTrace, *, elapsed: int, units: int, dma: int, issues: int
 ) -> None:
@@ -43,21 +47,16 @@ def validate_complete_trace(
     wait_spans = {s[1]: s for s in intervals if s[0] == "wait"}
     for unit, wait in wait_spans.items():
         issue = issue_spans.get(unit)
-        if issue is None or issue[3] > wait[2]:
+        if issue is None:
             raise ValueError("complete trace waits before unit issue returns")
     if {piece.ticket for piece in trace.completions} != set(wait_spans):
         raise ValueError("complete trace has no completion for a waited DMA unit")
     for piece in trace.completions:
         issue = issue_spans.get(piece.ticket)
         wait = wait_spans.get(piece.ticket)
-        if (
-            piece.status != 0
-            or piece.cycles > elapsed
-            or issue is None
-            or wait is None
-            or not issue[2] <= piece.cycles <= wait[3]
-        ):
+        if piece.status != 0 or piece.cycles > elapsed or issue is None or wait is None:
             raise ValueError("complete trace has failed or causally inconsistent completion")
+    validate_known_trace_causes(trace)
     # Accepted sequences follow submission order: https://github.com/AmbiqAI/helia-aot/issues/1008.
     earliest_acceptance = 0
     for piece in sorted(
@@ -86,3 +85,30 @@ def validate_trace_order(trace: TransferTrace) -> None:
         for previous, following in zip(trace.completions, trace.completions[1:])
     ):
         raise ValueError("complete trace reverses completion notification time")
+
+
+def validate_known_trace_causes(trace: TransferTrace) -> None:
+    issues = {s.id: s for s in trace.spans if s.kind == "issue"}
+    waits = {s.id: s for s in trace.spans if s.kind == "wait"}
+    for unit, wait in waits.items():
+        issue = issues.get(unit)
+        if (
+            issue is not None
+            and issue.end_cycles is not None
+            and wait.start_cycles is not None
+            and issue.end_cycles > wait.start_cycles
+        ):
+            raise ValueError("trace waits before unit issue returns")
+    for piece in trace.completions:
+        issue, wait = issues.get(piece.ticket), waits.get(piece.ticket)
+        if (
+            issue is not None
+            and issue.start_cycles is not None
+            and piece.cycles < issue.start_cycles
+        ) or (
+            wait is not None
+            and wait.status == 0
+            and wait.end_cycles is not None
+            and piece.cycles > wait.end_cycles
+        ):
+            raise ValueError("trace has causally inconsistent completion")

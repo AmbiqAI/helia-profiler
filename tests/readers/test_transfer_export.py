@@ -347,3 +347,86 @@ def test_exactly_one_json_table_while_csv_may_share_role(tmp_path, media):
             export_transfer_trace(profile(path), tmp_path / "absent.json")
     else:
         export_transfer_trace(profile(path), tmp_path / "out.json")
+
+
+@pytest.mark.parametrize("complete", [False, True])
+@pytest.mark.parametrize("cycles", [0, 61])
+def test_known_completion_causality_applies_to_partial_and_complete(tmp_path, complete, cycles):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = complete
+        r["trace"]["completions"][0]["cycles"] = cycles
+
+    edit_document(path, "layers.json", edit)
+    with pytest.raises(ResultReadError, match="causally inconsistent"):
+        export_transfer_trace(profile(path), tmp_path / "absent.json")
+
+
+def test_partial_wait_cannot_precede_its_known_issue(tmp_path):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = False
+        r["trace"].update(completions=[], observed_count=0)
+        r["trace"]["spans"][2].update(start_cycles=0, end_cycles=1)
+
+    edit_document(path, "layers.json", edit)
+    with pytest.raises(ResultReadError, match="waits before unit issue"):
+        export_transfer_trace(profile(path), tmp_path / "absent.json")
+
+
+def test_failed_wait_and_unknown_issue_endpoints_remain_inspectable(tmp_path):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r.update(complete=False, run_status=-1)
+        r["trace"]["spans"][2]["status"] = -1
+        r["trace"]["completions"][0]["cycles"] = 61
+
+    edit_document(path, "layers.json", edit)
+    export_transfer_trace(profile(path), tmp_path / "late-after-failed-wait.json")
+
+    def unknown(d):
+        r = d["transfer_diagnostics"][0]
+        r["trace"]["spans"][0].update(start_cycles=None, end_cycles=None, status=None)
+        r["trace"]["completions"][0]["cycles"] = 0
+
+    edit_document(path, "layers.json", unknown)
+    export_transfer_trace(profile(path), tmp_path / "unknown-issue.json")
+
+
+@pytest.mark.parametrize(
+    "profiling",
+    [
+        {"transfer_diagnostics": "off"},
+        {"transfer_diagnostic_iterations": 2},
+        {"transfer_trace_max_pieces": 3},
+        {"stream_evidence": True},
+    ],
+)
+def test_absent_embedded_config_does_not_disable_verified_config(tmp_path, profiling):
+    path = trace_bundle(tmp_path / "native")
+    edit_document(path, "run_metadata.json", lambda d: d.update(config={"profiling": profiling}))
+    with pytest.raises(ResultReadError, match="recorded"):
+        export_transfer_trace(profile(path), tmp_path / "absent.json")
+
+
+@pytest.mark.parametrize("complete", [False, True])
+def test_fresh_binding_peak_is_required_only_for_complete_admission(tmp_path, complete):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = complete
+        r["stats"]["peak_in_flight"] = 2
+
+    edit_document(path, "layers.json", edit)
+    if complete:
+        with pytest.raises(ResultReadError, match="accounting"):
+            export_transfer_trace(profile(path), tmp_path / "absent.json")
+    else:
+        export_transfer_trace(profile(path), tmp_path / "partial.json")

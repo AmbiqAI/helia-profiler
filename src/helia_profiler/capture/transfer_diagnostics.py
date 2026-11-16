@@ -12,7 +12,7 @@ from ..results.transfer import (
     TransferStats,
     TransferUnitTiming,
 )
-from ..results.transfer_validation import validate_trace_accounting
+from ..results.transfer_validation import fresh_binding_peak_valid, validate_trace_accounting
 from ..wire import HPX_ITER_SENTINEL_RE, HPX_PRESET_SENTINEL_RE, WireKey
 from .transfer import _activity, _indexed, _uint
 from .transfer_trace import TRACE_KEYS, TransferTraceParser
@@ -208,10 +208,7 @@ def validate_transfer_diagnostics(result: PmuResult, profiling: ProfilingConfig)
                 or record.trace.binding_epoch != index + 1
                 or record.trace.sequence_start != 0
                 or (record.complete and record.trace.operator_count != len(result.layers))
-                or (
-                    record.complete
-                    and (record.stats is None or record.stats.peak_in_flight > record.stats.issues)
-                )
+                or (record.complete and not fresh_binding_peak_valid(record.stats))
             )
         )
         or (record.purpose != "trace" and record.trace is not None)
