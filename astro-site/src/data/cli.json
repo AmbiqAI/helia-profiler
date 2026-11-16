@@ -60,7 +60,7 @@
       "run",
       "validate"
     ],
-    "options": 137,
+    "options": 138,
     "arguments": 16,
     "options_with_panel": 57,
     "panel_names": [
@@ -3524,7 +3524,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/results_cmd.py",
-          "line": 20
+          "line": 26
         },
         "arguments": [],
         "options": [],
@@ -3538,14 +3538,14 @@
             "name": "export",
             "kind": "command",
             "usage": "hpx results export [OPTIONS] LOCATION",
-            "short_help": "Write a new portable JSON file; existing evidence is never overwritten.",
-            "help": "Write a new portable JSON file; existing evidence is never overwritten.",
+            "short_help": "Write portable JSON or recorded transfer traces; existing files are never overwritten.",
+            "help": "Write portable JSON or recorded transfer traces; existing files are never overwritten.",
             "epilog": null,
             "deprecated": false,
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 70
+              "line": 76
             },
             "arguments": [
               {
@@ -3611,6 +3611,36 @@
                 "nargs": 1,
                 "hidden": false,
                 "envvar": []
+              },
+              {
+                "name": "format",
+                "kind": "option",
+                "declaration": "--format",
+                "opts": [
+                  "--format"
+                ],
+                "aliases": [],
+                "secondary_opts": [],
+                "metavar": null,
+                "type": {
+                  "name": "choice",
+                  "class": "TyperChoice",
+                  "choices": [
+                    "json",
+                    "perfetto"
+                  ]
+                },
+                "python_type": "_ExportFormat",
+                "default": "json",
+                "required": false,
+                "help": null,
+                "panel": null,
+                "is_flag": false,
+                "multiple": false,
+                "count": false,
+                "nargs": 1,
+                "hidden": false,
+                "envvar": []
               }
             ],
             "panels": []
@@ -3630,7 +3660,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 25
+              "line": 31
             },
             "arguments": [
               {
@@ -3683,7 +3713,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/results_cmd.py",
-              "line": 60
+              "line": 66
             },
             "arguments": [
               {

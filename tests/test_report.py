@@ -26,14 +26,11 @@ from helia_profiler.power.metadata import (
     PowerIntegrity,
     PowerMetadata,
 )
-from helia_profiler.report import (
-    _write_csv,
-    _write_json,
-    _write_run_metadata,
-    _write_summary,
-    write_report,
-)
-from helia_profiler.report.metadata import _metadata_to_dict
+from helia_profiler.report import write_report
+from helia_profiler.report.csv_writer import _write_csv
+from helia_profiler.report.json_writer import _write_json
+from helia_profiler.report.metadata import _metadata_to_dict, _write_run_metadata
+from helia_profiler.report.summary import _write_summary
 from helia_profiler.results import (
     EngineInfo,
     FirmwareMeta,
@@ -677,7 +674,7 @@ def test_write_report_invalidates_previous_manifest_before_writing(
     def fail_summary(*args, **kwargs):
         raise ReportError("forced report failure")
 
-    monkeypatch.setattr("helia_profiler.report._write_summary", fail_summary)
+    monkeypatch.setattr("helia_profiler.report.summary._write_summary", fail_summary)
 
     with pytest.raises(ReportError, match="forced report failure"):
         write_report(ctx)
@@ -993,7 +990,7 @@ def test_write_report_evaluates_the_run_exactly_once(
     """One RunEvaluation per publication -- the summary renders the
     same object the manifest records, so the two artifacts cannot disagree
     (and the evaluation is not silently computed twice)."""
-    import helia_profiler.report as report_pkg
+    import helia_profiler.evaluation as evaluation_pkg
     import helia_profiler.report.manifest as manifest_mod
     import helia_profiler.report.summary as summary_mod
     from helia_profiler.evaluation.validity import evaluate_run as real_evaluate
@@ -1028,7 +1025,7 @@ def test_write_report_evaluates_the_run_exactly_once(
         calls.append(1)
         return real_evaluate(inner_ctx)
 
-    monkeypatch.setattr(report_pkg, "evaluate_run", counting)
+    monkeypatch.setattr(evaluation_pkg, "evaluate_run", counting)
     monkeypatch.setattr(summary_mod, "evaluate_run", counting)
     monkeypatch.setattr(manifest_mod, "evaluate_run", counting)
 
@@ -1979,7 +1976,7 @@ def test_failed_republication_cannot_be_loaded_as_legacy(
         def fail(*args, **kwargs):
             raise ReportError("forced summary failure")
 
-        monkeypatch.setattr("helia_profiler.report._write_summary", fail)
+        monkeypatch.setattr("helia_profiler.report.summary._write_summary", fail)
     else:
         ctx.dependency_lock_path = None
     with pytest.raises(ReportError):

@@ -12,6 +12,7 @@ from ..results.transfer import (
     TransferStats,
     TransferUnitTiming,
 )
+from ..results.transfer_validation import validate_trace_accounting
 from ..wire import HPX_ITER_SENTINEL_RE, HPX_PRESET_SENTINEL_RE, WireKey
 from .transfer import _activity, _indexed, _uint
 from .transfer_trace import TRACE_KEYS, TransferTraceParser
@@ -161,13 +162,8 @@ class TransferDiagnosticParser:
             raise ValueError("complete diagnostic contradicts run status or elapsed clock")
         trace = None
         if purpose == "trace":
-            if complete and (
-                self._stats.waits != dma
-                or self._stats.aborts != 0
-                or self._stats.unsampled != 0
-                or self._stats.peak_in_flight == 0
-            ):
-                raise ValueError("complete trace contradicts provider accounting")
+            if complete:
+                validate_trace_accounting(self._stats, dma)
             trace = self._trace.finish(
                 elapsed=elapsed, complete=complete, units=count, dma=dma, issues=self._stats.issues
             )

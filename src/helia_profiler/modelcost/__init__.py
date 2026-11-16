@@ -14,6 +14,9 @@ boundary is contract-tested, and engine dispatch lives in
 :mod:`helia_profiler.evaluation.engine_analysis`.
 """
 
+from importlib import import_module
+from typing import TYPE_CHECKING, Any
+
 from .layer_attribution import (
     LayerAttribution,
     LayerAttributor,
@@ -31,7 +34,18 @@ from .model_analysis import (
     is_available,
     vela_accelerator_config,
 )
-from .softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
+
+if TYPE_CHECKING:
+    from .softmax_preflight import aot_softmax_verdict, scan_softmax_scaling
+
+
+def __getattr__(name: str) -> Any:
+    if name in {"aot_softmax_verdict", "scan_softmax_scaling"}:
+        value = getattr(import_module(".softmax_preflight", __name__), name)
+        globals()[name] = value
+        return value
+    raise AttributeError(name)
+
 
 __all__ = [
     "ETHOS_U_OP_NAME",
