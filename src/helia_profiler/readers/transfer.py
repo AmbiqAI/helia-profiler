@@ -17,9 +17,8 @@ from ..results.transfer import (
 from ..results.transfer_validation import (
     fresh_binding_peak_valid,
     validate_complete_trace,
-    validate_known_trace_causes,
     validate_trace_accounting,
-    validate_trace_order,
+    validate_trace_observations,
 )
 from .native import ProfileResultRecord, ResultReadError, _document, _schema, load_result
 
@@ -190,8 +189,7 @@ def _diagnostic(value: Any, clock: int, layer_ids: set[int]) -> TransferDiagnost
             issues=record.stats.issues,
         )
     else:
-        validate_trace_order(trace)
-        validate_known_trace_causes(trace)
+        validate_trace_observations(trace)
     return record
 
 

@@ -17,7 +17,7 @@ from helia_profiler.report.json_writer import _write_json
 from helia_profiler.report.perfetto import export_transfer_trace
 from helia_profiler.results import RunMetadata
 from tests.readers.test_records import bundle, edit_document, edit_manifest
-from tests.test_transfer_trace import TRACE, _parse
+from tests.test_transfer_trace import TRACE, TWO_UNITS, _parse
 
 
 def trace_bundle(root: Path, *, clock: int = 96_000_000) -> Path:
@@ -430,3 +430,79 @@ def test_fresh_binding_peak_is_required_only_for_complete_admission(tmp_path, co
             export_transfer_trace(profile(path), tmp_path / "absent.json")
     else:
         export_transfer_trace(profile(path), tmp_path / "partial.json")
+
+
+@pytest.mark.parametrize("endpoint", ["start", "end"])
+@pytest.mark.parametrize("cycles", [10, 20, 30, 40, 45])
+def test_unpaired_endpoints_constrain_known_foreground_intervals(tmp_path, endpoint, cycles):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = False
+        r["trace"]["spans"][0].update(
+            start_cycles=cycles if endpoint == "start" else None,
+            end_cycles=cycles if endpoint == "end" else None,
+            status=None if endpoint == "start" else 0,
+        )
+        r["trace"]["completions"][0]["cycles"] = 45
+
+    edit_document(path, "layers.json", edit)
+    if cycles == 30:
+        with pytest.raises(ResultReadError, match="overlaps sequential"):
+            export_transfer_trace(profile(path), tmp_path / "absent.json")
+    else:
+        result = json.loads(export_transfer_trace(profile(path), tmp_path / "out.json").read_text())
+        (endpoint_event,) = [e for e in result["traceEvents"] if e["name"].startswith("UNPAIRED")]
+        assert endpoint_event["ph"] == "I" and endpoint_event["args"]["cycles"] == cycles
+
+
+def test_partial_operator_positions_keep_their_known_order(tmp_path):
+    path = trace_bundle(tmp_path / "native")
+    edit_document(path, "summary.json", lambda d: d.update(layers=2))
+
+    def edit(d):
+        d["layers"].append({"id": 1, "op": "second"})
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = False
+        r["trace"]["operator_count"] = 2
+        r["trace"]["spans"][1].update(start_cycles=50, end_cycles=None, status=None)
+        r["trace"]["spans"].append(
+            {
+                "kind": "operator",
+                "id": 1,
+                "start_cycles": 40,
+                "end_cycles": 45,
+                "status": 0,
+            }
+        )
+
+    edit_document(path, "layers.json", edit)
+    with pytest.raises(ResultReadError, match="reverses operator"):
+        export_transfer_trace(profile(path), tmp_path / "absent.json")
+
+
+@pytest.mark.parametrize("contradictory", [False, True])
+@pytest.mark.parametrize("missing_issue_end", [False, True])
+def test_partial_acceptance_order_uses_available_bounds(tmp_path, contradictory, missing_issue_end):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = _parse(TWO_UNITS).transfer_diagnostics[0].to_dict()
+        r["complete"] = False
+        if contradictory:
+            pieces = [dict(p) for p in r["trace"]["completions"]]
+            pieces[0]["sequence"], pieces[1]["sequence"] = 1, 0
+            r["trace"]["completions"] = pieces
+        if missing_issue_end:
+            spans = [dict(s) for s in r["trace"]["spans"]]
+            spans[0].update(end_cycles=None, status=None)
+            r["trace"]["spans"] = spans
+        d["transfer_diagnostics"] = [r]
+
+    edit_document(path, "layers.json", edit)
+    if contradictory:
+        with pytest.raises(ResultReadError, match="sequence contradicts"):
+            export_transfer_trace(profile(path), tmp_path / "absent.json")
+    else:
+        export_transfer_trace(profile(path), tmp_path / "out.json")

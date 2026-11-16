@@ -39,7 +39,7 @@ def validate_complete_trace(
         or len(kinds["operator"]) != trace.operator_count
     ):
         raise ValueError("complete trace has missing boundaries")
-    validate_trace_order(trace)
+    validate_trace_observations(trace)
     offsets = sorted((p.sequence - trace.sequence_start) & 0xFFFFFFFF for p in trace.completions)
     if any(offset != index for index, offset in enumerate(offsets)):
         raise ValueError("complete trace has missing piece sequences")
@@ -56,35 +56,28 @@ def validate_complete_trace(
         wait = wait_spans.get(piece.ticket)
         if piece.status != 0 or piece.cycles > elapsed or issue is None or wait is None:
             raise ValueError("complete trace has failed or causally inconsistent completion")
-    validate_known_trace_causes(trace)
-    # Accepted sequences follow submission order: https://github.com/AmbiqAI/helia-aot/issues/1008.
-    earliest_acceptance = 0
-    for piece in sorted(
-        trace.completions, key=lambda p: (p.sequence - trace.sequence_start) & 0xFFFFFFFF
-    ):
-        issue = issue_spans[piece.ticket]
-        earliest_acceptance = max(earliest_acceptance, issue[2])
-        if earliest_acceptance > min(issue[3], piece.cycles):
-            raise ValueError("complete trace sequence contradicts issue windows")
 
 
-def validate_trace_order(trace: TransferTrace) -> None:
-    intervals = [
-        (s.kind, s.id, s.start_cycles, s.end_cycles)
-        for s in trace.spans
-        if s.start_cycles is not None and s.end_cycles is not None
-    ]
+def validate_trace_observations(trace: TransferTrace) -> None:
+    """Use known endpoints as constraints without supplying missing durations."""
+    intervals: list[tuple[str, int, int, int]] = []
+    for span in trace.spans:
+        bounds = [v for v in (span.start_cycles, span.end_cycles) if v is not None]
+        if bounds:
+            intervals.append((span.kind, span.id, min(bounds), max(bounds)))
     ordered = sorted(intervals, key=lambda span: (span[2], span[3]))
     if any(previous[3] > following[2] for previous, following in zip(ordered, ordered[1:])):
-        raise ValueError("complete trace overlaps sequential foreground calls")
+        raise ValueError("trace overlaps sequential foreground calls")
     operators = sorted((s for s in intervals if s[0] == "operator"), key=lambda s: s[1])
     if any(previous[3] > following[2] for previous, following in zip(operators, operators[1:])):
-        raise ValueError("complete trace reverses operator execution positions")
+        raise ValueError("trace reverses operator execution positions")
     if any(
         previous.cycles > following.cycles
         for previous, following in zip(trace.completions, trace.completions[1:])
     ):
-        raise ValueError("complete trace reverses completion notification time")
+        raise ValueError("trace reverses completion notification time")
+
+    validate_known_trace_causes(trace)
 
 
 def validate_known_trace_causes(trace: TransferTrace) -> None:
@@ -112,3 +105,17 @@ def validate_known_trace_causes(trace: TransferTrace) -> None:
             and piece.cycles > wait.end_cycles
         ):
             raise ValueError("trace has causally inconsistent completion")
+
+    # Accepted sequences follow submission order: https://github.com/AmbiqAI/helia-aot/issues/1008.
+    earliest_acceptance = 0
+    for piece in sorted(
+        trace.completions, key=lambda p: (p.sequence - trace.sequence_start) & 0xFFFFFFFF
+    ):
+        issue = issues.get(piece.ticket)
+        if issue is not None and issue.start_cycles is not None:
+            earliest_acceptance = max(earliest_acceptance, issue.start_cycles)
+        latest_acceptance = piece.cycles
+        if issue is not None and issue.end_cycles is not None:
+            latest_acceptance = min(latest_acceptance, issue.end_cycles)
+        if earliest_acceptance > latest_acceptance:
+            raise ValueError("trace sequence contradicts issue windows")
