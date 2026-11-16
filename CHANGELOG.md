@@ -56,6 +56,18 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.1...v0.6.2) (2026-11-16)
+
+
+### Features
+
+* **capture:** record bounded chronological transfer traces ([#695](https://github.com/AmbiqAI/helia-profiler/issues/695)) ([6c7715e](https://github.com/AmbiqAI/helia-profiler/commit/6c7715edd6a8454be0fb31cbf159ab950bd5edc9)), closes [#692](https://github.com/AmbiqAI/helia-profiler/issues/692) [#517](https://github.com/AmbiqAI/helia-profiler/issues/517)
+
+
+### Bug Fixes
+
+* **capture:** isolate transfer diagnostics from AOT PMU passes ([#693](https://github.com/AmbiqAI/helia-profiler/issues/693)) ([efa26b3](https://github.com/AmbiqAI/helia-profiler/commit/efa26b3acd4dc22104b201af48d8252c44ae81f3)), closes [#692](https://github.com/AmbiqAI/helia-profiler/issues/692)
+
 ## [0.6.1](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.0...v0.6.1) (2026-11-14)
 
 
