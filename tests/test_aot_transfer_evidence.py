@@ -363,9 +363,7 @@ _POOL_REGIONS = _PROBE_REGIONS
 
 
 def _probe_block(source: str) -> str:
-    start = source.index(
-        "#ifdef HPX_AOT_TRANSFER\n    {\n        static const fake_nsx_transfer_options_t"
-    )
+    start = source.index("#ifdef HPX_AOT_TRANSFER\n    {\n        fake_nsx_transfer_options_t")
     end = source.index("\n#endif\n", start) + len("\n#endif\n")
     return source[start:end]
 
@@ -510,7 +508,7 @@ def _two_pass_probe_render() -> str:
 def test_the_probe_is_one_extra_run_before_the_first_pass():
     source = _two_pass_probe_render()
     block = _probe_block(source)
-    assert source.count("hpx_probe_options") == 2  # declared and bound once
+    assert source.count("hpx_transfer_bind(&hpx_probe_options)") == 1
     assert source.count("HPX_TRANSFER_PROBE=") == 1
     first_pass = source.index('hpx_printf("\\n--- HPX_PRESET ')
     assert source.index(block) < first_pass
@@ -737,3 +735,34 @@ int main() {
     subprocess.run([compiler, "-std=gnu++17", str(path), "-o", str(executable)], check=True)
     result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
     assert result.stdout.strip() == "2 1 1"
+
+
+@pytest.mark.parametrize("observer", [False, True])
+def test_probe_options_zero_optional_provider_fields(tmp_path, observer):
+    from tests.contracts.fixture_compile_cases import _AOT_TRANSFER_OBSERVER_STUB
+
+    source = _render_aot(transfer_timeout_probe=True, arena_regions=_PROBE_REGIONS)
+    first = source.index("hpx_probe_options")
+    start = source.rfind("\n", 0, first) + 1
+    end = source.index("hpx_transfer_bind(&hpx_probe_options)", first)
+    declaration = source[start:end]
+    observer_check = (
+        "if (hpx_probe_options.observe != nullptr || hpx_probe_options.observer_ctx != nullptr) return 2;"
+        if observer
+        else ""
+    )
+    main = (
+        '#pragma GCC diagnostic push\n#pragma GCC diagnostic error "-Wmissing-field-initializers"\nint main() {\n'
+        + declaration.strip()
+        + "\n"
+        + observer_check
+        + "\n"
+        + "return hpx_probe_options.wait_checks == 1U && hpx_probe_options.drain_timeout_us == 0U ? 0 : 1;\n}\n#pragma GCC diagnostic pop\n"
+    )
+    result = _build_and_run(
+        tmp_path,
+        source,
+        main,
+        provider_header=_AOT_TRANSFER_OBSERVER_STUB if observer else _AOT_TRANSFER_STUB,
+    )
+    assert result.returncode == 0, result.stderr

@@ -198,9 +198,10 @@ NPU backends are refused. The dedicated power binary runs no diagnostics.
 
 `trace` records a chronological diagnostic invocation using an optional completion
 observer from the emitted provider. It requires a released runtime record declaring
-`transfer_observer: true`; an unrecorded or older provider is refused. No current
-runtime record enables this mode. This release gate is separate from existing
-`timing` and `overlap` support.
+`transfer_observer: true`; an unrecorded or older provider is refused. The
+[compatibility baseline](../../reference/compatibility-baseline/) lists the adopted
+observer release. This release gate is separate from existing `timing` and
+`overlap` support and does not establish board qualification.
 
 ```yaml
 profiling:

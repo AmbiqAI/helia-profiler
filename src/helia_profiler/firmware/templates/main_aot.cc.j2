@@ -451,7 +451,8 @@ hpx_aot_check_runs();{% endblock %}
 {% block engine_pass_preamble %}{% if transfer_timeout_probe %}
 #ifdef HPX_AOT_TRANSFER
     {
-        static const {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options = {1U, 0U};
+        {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options{};
+        hpx_probe_options.wait_checks = 1U;
         hpx_transfer_bind(&hpx_probe_options);{{ poison_pool("        ") }}
 {{ self.engine_reset_inputs() }}
         const int32_t probe = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
