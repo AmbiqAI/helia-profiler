@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .transfer import TransferStats, TransferTrace
+from .transfer import TransferStats, TransferTrace, TransferTraceSpan
 
 
 def validate_trace_accounting(stats: TransferStats, dma: int) -> None:
@@ -58,13 +58,18 @@ def validate_complete_trace(
             raise ValueError("complete trace has failed or causally inconsistent completion")
 
 
+def _observed_bounds(span: TransferTraceSpan) -> tuple[int, int] | None:
+    known = [v for v in (span.start_cycles, span.end_cycles) if v is not None]
+    return (min(known), max(known)) if known else None
+
+
 def validate_trace_observations(trace: TransferTrace) -> None:
     """Use known endpoints as constraints without supplying missing durations."""
     intervals: list[tuple[str, int, int, int]] = []
     for span in trace.spans:
-        bounds = [v for v in (span.start_cycles, span.end_cycles) if v is not None]
-        if bounds:
-            intervals.append((span.kind, span.id, min(bounds), max(bounds)))
+        bounds = _observed_bounds(span)
+        if bounds is not None:
+            intervals.append((span.kind, span.id, *bounds))
     ordered = sorted(intervals, key=lambda span: (span[2], span[3]))
     if any(previous[3] > following[2] for previous, following in zip(ordered, ordered[1:])):
         raise ValueError("trace overlaps sequential foreground calls")
@@ -85,11 +90,12 @@ def validate_known_trace_causes(trace: TransferTrace) -> None:
     waits = {s.id: s for s in trace.spans if s.kind == "wait"}
     for unit, wait in waits.items():
         issue = issues.get(unit)
+        issue_bounds = _observed_bounds(issue) if issue is not None else None
+        wait_bounds = _observed_bounds(wait)
         if (
-            issue is not None
-            and issue.end_cycles is not None
-            and wait.start_cycles is not None
-            and issue.end_cycles > wait.start_cycles
+            issue_bounds is not None
+            and wait_bounds is not None
+            and issue_bounds[1] > wait_bounds[0]
         ):
             raise ValueError("trace waits before unit issue returns")
     for piece in trace.completions:

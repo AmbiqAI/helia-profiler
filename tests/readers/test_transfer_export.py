@@ -506,3 +506,35 @@ def test_partial_acceptance_order_uses_available_bounds(tmp_path, contradictory,
             export_transfer_trace(profile(path), tmp_path / "absent.json")
     else:
         export_transfer_trace(profile(path), tmp_path / "out.json")
+
+
+@pytest.mark.parametrize("issue_mask", range(4))
+@pytest.mark.parametrize("wait_mask", range(4))
+@pytest.mark.parametrize("reversed_order", [False, True])
+def test_partial_issue_wait_order_for_every_endpoint_presence(
+    tmp_path, issue_mask, wait_mask, reversed_order
+):
+    path = trace_bundle(tmp_path / "native")
+
+    def edit(d):
+        r = d["transfer_diagnostics"][0]
+        r["complete"] = False
+        r["trace"].update(completions=[], observed_count=0)
+        issue_times, wait_times = ((50, 60), (10, 20)) if reversed_order else ((10, 20), (50, 60))
+        for span, mask, times in (
+            (r["trace"]["spans"][0], issue_mask, issue_times),
+            (r["trace"]["spans"][2], wait_mask, wait_times),
+        ):
+            span.update(
+                start_cycles=times[0] if mask & 1 else None,
+                end_cycles=times[1] if mask & 2 else None,
+                status=0 if mask & 2 else None,
+            )
+
+    edit_document(path, "layers.json", edit)
+    # Every known issue point is later than every known wait point in the reversed fixture.
+    if reversed_order and issue_mask and wait_mask:
+        with pytest.raises(ResultReadError, match="waits before unit issue"):
+            export_transfer_trace(profile(path), tmp_path / "absent.json")
+    else:
+        export_transfer_trace(profile(path), tmp_path / "out.json")
