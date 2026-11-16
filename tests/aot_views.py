@@ -68,6 +68,7 @@ class PlacementView:
     size: int
     source_memory: str
     staged: bool = False
+    unit: int | None = None
 
 
 @dataclass(frozen=True)

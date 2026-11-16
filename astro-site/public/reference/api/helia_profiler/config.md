@@ -189,7 +189,7 @@ Source: `src/helia_profiler/config/profiling.py:138`
 `attribute` · `python`
 
 ```python
-transfer_diagnostics: Literal['off', 'timing', 'overlap'] = field(default='off', metadata={'omit_default': True})
+transfer_diagnostics: Literal['off', 'timing', 'overlap', 'trace'] = field(default='off', metadata={'omit_default': True})
 ```
 
 Source: `src/helia_profiler/config/profiling.py:140`
@@ -204,6 +204,16 @@ transfer_diagnostic_iterations: int = field(default=1, metadata={'omit_default':
 
 Source: `src/helia_profiler/config/profiling.py:143`
 
+### helia_profiler.ProfilingConfig.transfer_trace_max_pieces
+
+`attribute` · `python`
+
+```python
+transfer_trace_max_pieces: int = field(default=256, metadata={'omit_default': True})
+```
+
+Source: `src/helia_profiler/config/profiling.py:145`
+
 ### helia_profiler.ProfilingConfig.extreme_mode
 
 `attribute` · `python`
@@ -212,7 +222,7 @@ Source: `src/helia_profiler/config/profiling.py:143`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:149`
+Source: `src/helia_profiler/config/profiling.py:159`
 
 ### helia_profiler.ProfilingConfig.dcache
 
@@ -222,7 +232,7 @@ Source: `src/helia_profiler/config/profiling.py:149`
 dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})
 ```
 
-Source: `src/helia_profiler/config/profiling.py:152`
+Source: `src/helia_profiler/config/profiling.py:162`
 
 ## helia_profiler.ClockSelection
 

@@ -272,7 +272,9 @@ def _build_cases() -> list[_CompileCase]:
                 case_id=f"census:{render.label}",
                 text=text,
                 vars=render.vars,
-                headers=aot_transfer_headers()
+                headers=aot_transfer_headers(
+                    observer=render.vars.get("transfer_diagnostics") == "trace"
+                )
                 if render.vars.get("transfer_diagnostics", "off") != "off"
                 else {},
             )
@@ -406,7 +408,7 @@ def _build_cases() -> list[_CompileCase]:
             )
         )
 
-    for mode in ("timing", "overlap"):
+    for mode in ("timing", "overlap", "trace"):
         cases.append(
             _CompileCase(
                 case_id=f"apollo510|rtt|helia-aot|transfer|{mode}",
@@ -418,10 +420,11 @@ def _build_cases() -> list[_CompileCase]:
                         "arena_regions": transfer_regions,
                         "transfer_diagnostics": mode,
                         "transfer_diagnostic_iterations": 2,
+                        "transfer_trace_max_pieces": 4,
                     },
                 ),
                 vars=_common_kwargs("apollo510", "rtt"),
-                headers=aot_transfer_headers(),
+                headers=aot_transfer_headers(observer=mode == "trace"),
             )
         )
 

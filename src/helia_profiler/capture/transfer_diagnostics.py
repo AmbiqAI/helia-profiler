@@ -14,6 +14,7 @@ from ..results.transfer import (
 )
 from ..wire import HPX_ITER_SENTINEL_RE, HPX_PRESET_SENTINEL_RE, WireKey
 from .transfer import _activity, _indexed, _uint
+from .transfer_trace import TRACE_KEYS, TransferTraceParser
 
 if TYPE_CHECKING:
     from ..config import ProfilingConfig
@@ -39,6 +40,8 @@ class TransferDiagnosticParser:
         self._stats: TransferStats | None = None
         self._overlap: TransferOverlap | None = None
         self._seen: set[tuple[str, int]] = set()
+        self._trace = TransferTraceParser()
+        self._trace_bindings: set[int] = set()
 
     def finish(self) -> None:
         if self._header is not None:
@@ -53,6 +56,7 @@ class TransferDiagnosticParser:
             WireKey.TRANSFER_DIAGNOSTIC_END.wire,
             WireKey.TRANSFER_TIMING.wire,
         }
+        markers.update(TRACE_KEYS)
         if key not in markers:
             if self._header is not None and (
                 HPX_ITER_SENTINEL_RE.match(line) or HPX_PRESET_SENTINEL_RE.match(line)
@@ -66,6 +70,10 @@ class TransferDiagnosticParser:
                 self._begin(value)
             elif self._header is None:
                 raise ValueError("outside a transfer diagnostic")
+            elif key in TRACE_KEYS:
+                if self._header[0] != "trace":
+                    raise ValueError("trace records in a non-trace diagnostic")
+                self._trace.feed(key, value, self._header[4])
             elif key == WireKey.TRANSFER_TIMING.wire:
                 fields = value.split(",")
                 if len(fields) != 5 or self._header[0] != "timing":
@@ -107,7 +115,10 @@ class TransferDiagnosticParser:
         if len(fields) != 6:
             raise ValueError("expected purpose, iteration, clock, preparation and unit counts")
         purpose, iteration, cpu, preparation, units, dma = fields
-        if purpose not in {"timing", "overlap"} or preparation not in {"configured", "cold"}:
+        if purpose not in {"timing", "overlap", "trace"} or preparation not in {
+            "configured",
+            "cold",
+        }:
             raise ValueError("unknown purpose or preparation")
         counts = tuple(_uint(item) for item in (iteration, cpu, units, dma))
         if counts[1] == 0 or counts[2] == 0 or not 0 < counts[3] <= counts[2]:
@@ -118,6 +129,7 @@ class TransferDiagnosticParser:
         self._units = {}
         self._stats = None
         self._overlap = None
+        self._trace = TransferTraceParser()
 
     def _end(self, value: str) -> None:
         assert self._header is not None
@@ -139,7 +151,7 @@ class TransferDiagnosticParser:
                 or any(unit.wait_status not in (None, 0) for unit in self._units.values())
             ):
                 raise ValueError("complete timing contradicts observed calls")
-        elif (
+        elif purpose == "overlap" and (
             self._overlap is None
             or len(self._overlap.units) != count
             or any(unit >= count for unit in self._overlap.units)
@@ -147,6 +159,21 @@ class TransferDiagnosticParser:
             raise ValueError("missing overlap units")
         if complete and (status != 0 or elapsed == 0):
             raise ValueError("complete diagnostic contradicts run status or elapsed clock")
+        trace = None
+        if purpose == "trace":
+            if complete and (
+                self._stats.waits != dma
+                or self._stats.aborts != 0
+                or self._stats.unsampled != 0
+                or self._stats.peak_in_flight == 0
+            ):
+                raise ValueError("complete trace contradicts provider accounting")
+            trace = self._trace.finish(
+                elapsed=elapsed, complete=complete, units=count, dma=dma, issues=self._stats.issues
+            )
+            if trace.binding_epoch in self._trace_bindings:
+                raise ValueError("repeated trace binding epoch")
+            self._trace_bindings.add(trace.binding_epoch)
         self.records.append(
             TransferDiagnostic(
                 purpose,
@@ -159,6 +186,7 @@ class TransferDiagnosticParser:
                 tuple(self._units[index] for index in sorted(self._units)),
                 self._stats,
                 self._overlap,
+                trace,
             )
         )
         self._seen.add((purpose, iteration))
@@ -176,6 +204,21 @@ def validate_transfer_diagnostics(result: PmuResult, profiling: ProfilingConfig)
         or record.iteration != index
         or record.preparation != ("cold" if profiling.stream_evidence else "configured")
         or record.cpu_hz != result.meta.system_clock_hz
+        or (
+            record.purpose == "trace"
+            and (
+                record.trace is None
+                or record.trace.capacity != profiling.transfer_trace_max_pieces
+                or record.trace.binding_epoch != index + 1
+                or record.trace.sequence_start != 0
+                or (record.complete and record.trace.operator_count != len(result.layers))
+                or (
+                    record.complete
+                    and (record.stats is None or record.stats.peak_in_flight > record.stats.issues)
+                )
+            )
+        )
+        or (record.purpose != "trace" and record.trace is not None)
         for index, record in enumerate(records)
     ):
         raise CaptureError(

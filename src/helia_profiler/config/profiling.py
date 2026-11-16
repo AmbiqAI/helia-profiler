@@ -137,10 +137,20 @@ class ProfilingConfig:
     # the clean window follows profiling.dcache. Reports HPX_STREAM_EVIDENCE=1.
     stream_evidence: bool = False
     #: Separate transfer observation runs; ordinary PMU passes never poll DMA state.
-    transfer_diagnostics: Literal["off", "timing", "overlap"] = field(
+    transfer_diagnostics: Literal["off", "timing", "overlap", "trace"] = field(
         default="off", metadata={"omit_default": True}
     )
     transfer_diagnostic_iterations: int = field(default=1, metadata={"omit_default": True})
+    #: Maximum piece completion records retained per traced invocation.
+    transfer_trace_max_pieces: int = field(default=256, metadata={"omit_default": True})
+
+    @field_validator("transfer_trace_max_pieces", mode="before")
+    @classmethod
+    def _trace_capacity(cls, value: Any) -> int:
+        if type(value) is not int or not 1 <= value <= 4096:
+            raise ValueError("transfer_trace_max_pieces must be an integer between 1 and 4096.")
+        return value
+
     # Extreme benchmarking mode: power down memory regions the model does not
     # use to lower the energy floor.  Powers down the shared SSRAM array and
     # collapses MRAM to a single bank (NVM0 only).  Only safe when the model

@@ -1,4 +1,5 @@
 #ifdef HPX_AOT_TRANSFER
+{% include "_aot_transfer_clock.j2" %}
 struct HpxTransferCallRecord {
     uint32_t issue_start, issue_cycles, wait_start, wait_cycles;
     int32_t issue_status, wait_status;
@@ -83,14 +84,7 @@ static void hpx_transfer_diagnostic_cb(int32_t op, {{ aot_prefix }}_operator_sta
 }
 
 static void hpx_transfer_diagnostic_report(int iteration, uint32_t cycles, uint32_t ticks, int32_t status) {
-    // STIMER bounds the continuous DWT interval; PMU passes write DWT and cannot supply this clock.
-    const uint64_t low = (uint64_t)(ticks > 0U ? ticks - 1U : 0U) * SystemCoreClock;
-    const uint64_t high = ((uint64_t)ticks + 1U) * SystemCoreClock;
-    const uint64_t measured = (uint64_t)cycles * HPX_STIMER_HZ;
-    bool complete = g_transfer_diagnostic_valid && status == 0 && SystemCoreClock > 0U && cycles > 0U && ticks > 0U &&
-        high < (uint64_t)UINT32_MAX * HPX_STIMER_HZ &&
-        high * 105U < (uint64_t)UINT32_MAX * HPX_STIMER_HZ * 100U &&
-        measured * 100U >= low * 95U && measured * 100U <= high * 105U;
+    bool complete = g_transfer_diagnostic_valid && status == 0 && hpx_transfer_clock_valid(cycles, ticks);
 {% if transfer_diagnostics == "overlap" %}
     if (g_transfer_operator_started) complete = false;
 {% endif %}

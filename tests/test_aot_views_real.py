@@ -133,3 +133,80 @@ def test_prepared_profiling_capability_matches_the_emitted_callback(tmp_path, sc
     assert artifacts.per_layer_profiling is (schedule == "table")
     assert ("ctx->callback(" in source) is artifacts.per_layer_profiling
     assert artifacts.aot_op_manifest
+
+
+def test_released_dma_provider_enables_trace_rendering(tmp_path):
+    from dataclasses import replace
+    from importlib.metadata import version
+
+    from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.firmware.render import _jinja_env
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.runtime.records import runtime
+    from helia_profiler.stages.resolve_platform import ResolvePlatformStage
+
+    record = runtime("helia-aot", version("helia-aot"))
+    if record is None or not record.transfer_observer:
+        pytest.skip("installed runtime has no recorded completion observer")
+    args = {
+        "module": {"type": "nsx", "schedule": "table"},
+        "memory": {
+            "allocate_arenas": False,
+            "tensors": [
+                {"type": "constant", "attributes": {"memory": "PSRAM", "residency": "stream"}}
+            ],
+            "stream_pool": {"memory": "dtcm", "bytes": 65536},
+        },
+    }
+    config = Session.from_dict(
+        {
+            "model": {"path": str(KWS), "arena_location": "tcm", "weights_location": "psram"},
+            "target": {"board": BOARD},
+            "profiling": {"transfer_diagnostics": "trace"},
+            "engine": {"type": "helia-aot", "config": {"aot_args": args}},
+        }
+    ).resolve()
+    adapter = HeliaAOTAdapter()
+    adapter.prepare(config, tmp_path / "direct")
+    plan = json.loads((tmp_path / "direct/aot_output/hpx_model/hpx_plan.json").read_text())
+    weight = max(
+        (t for t in plan["tensors"] if t["requested"] == "stream"), key=lambda t: t["bytes"]
+    )
+    plan["schedule"] = {
+        "source": "plan",
+        "units": [
+            {
+                "id": 0,
+                "tensors": [weight["id"]],
+                "pool_offset": 0,
+                "issue_after": None,
+                "engine": "dma",
+            }
+        ],
+    }
+    plan_path = tmp_path / "dma-plan.json"
+    plan_path.write_text(json.dumps(plan))
+    config = replace(
+        config,
+        engine=replace(
+            config.engine, config={"aot_args": {**args, "optimization": {"plan": str(plan_path)}}}
+        ),
+    )
+    artifacts = adapter.prepare(config, tmp_path / "dma")
+    assert artifacts.helia_aot_version == record.version
+    assert artifacts.aot_transfer_cmake_target is not None
+    assert artifacts.aot_op_manifest and [op["idx"] for op in artifacts.aot_op_manifest] == list(
+        range(13)
+    )
+    header = (tmp_path / "dma/aot_output/hpx_model/includes-api/hpx_nsx_transfer.h").read_text()
+    assert "hpx_nsx_transfer_observer_fn observe;" in header
+    ctx = PipelineContext(config=config, work_dir=tmp_path / "dma")
+    ResolvePlatformStage().run(ctx)
+    ctx.engine_artifacts = artifacts
+    variables = FirmwareRenderContext.from_pipeline_context(
+        ctx, arena_regions=artifacts.aot_arena_regions
+    ).to_template_vars()
+    source = _jinja_env.get_template("main_aot.cc.j2").render(**variables)
+    assert "options.observe = hpx_transfer_completion;" in source
+    assert "hpx_transfer_completion" in source

@@ -400,6 +400,18 @@ const fake_nsx_transfer_stats_t *fake_nsx_transfer_stats(void);
 """
 
 
+_AOT_TRANSFER_OBSERVER_STUB = _AOT_TRANSFER_STUB.replace(
+    "typedef struct {\n    uint32_t wait_checks;",
+    "typedef struct { uint32_t sequence, ticket, bytes, status; } fake_nsx_transfer_piece_t;\n"
+    "typedef void (*fake_nsx_transfer_observer_fn)(void *, const fake_nsx_transfer_piece_t *);\n"
+    "typedef struct {\n    uint32_t wait_checks;",
+).replace(
+    "    uint32_t drain_timeout_us;\n} fake_nsx_transfer_options_t;",
+    "    uint32_t drain_timeout_us;\n    fake_nsx_transfer_observer_fn observe;\n"
+    "    void *observer_ctx;\n} fake_nsx_transfer_options_t;",
+)
+
+
 def aot_model_stub(*, external_arenas: bool, transfer: bool = False) -> str:
     """Mode-correct generated API stand-in shared by the compile gates."""
     stub = _AOT_MODEL_STUB
@@ -411,9 +423,9 @@ def aot_model_stub(*, external_arenas: bool, transfer: bool = False) -> str:
     return stub
 
 
-def aot_transfer_headers() -> dict[str, str]:
+def aot_transfer_headers(*, observer: bool = False) -> dict[str, str]:
     """The headers of a module that emitted its transfer provider."""
     return {
         "fake_model.h": aot_model_stub(external_arenas=True, transfer=True),
-        "fake_nsx_transfer.h": _AOT_TRANSFER_STUB,
+        "fake_nsx_transfer.h": _AOT_TRANSFER_OBSERVER_STUB if observer else _AOT_TRANSFER_STUB,
     }

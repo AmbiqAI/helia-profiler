@@ -15,6 +15,7 @@ capture/rtt_symbol.py
 capture/terminal_transport.py
 capture/transfer.py
 capture/transfer_diagnostics.py
+capture/transfer_trace.py
 cli/__init__.py
 cli/analyze_cmd.py
 cli/app.py
@@ -65,6 +66,7 @@ data/run_metadata.schema.v3.json
 data/run_summary.schema.v1.json
 data/runtimes/executorch/0.1.0.json
 data/runtimes/helia-aot/0.33.0.json
+data/runtimes/helia-aot/1.7.0.json
 data/runtimes/helia-rt/1.21.3.json
 data/runtimes/helia-rt/2.1.0.json
 data/runtimes/helia-rt/2.2.0.json
@@ -122,8 +124,10 @@ firmware/project.py
 firmware/render.py
 firmware/templates/CMakeLists.txt.j2
 firmware/templates/_aot_layer_profiler.j2
+firmware/templates/_aot_transfer_clock.j2
 firmware/templates/_aot_transfer_diagnostics.j2
 firmware/templates/_aot_transfer_evidence.j2
+firmware/templates/_aot_transfer_trace.j2
 firmware/templates/_ble_reset.j2
 firmware/templates/_busy_loop_calibration.j2
 firmware/templates/_cache_shims.j2

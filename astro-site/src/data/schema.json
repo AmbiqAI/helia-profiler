@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 114,
-    "schemaProperties": 114,
+    "declaredFields": 115,
+    "schemaProperties": 115,
     "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -493,7 +493,7 @@
           "name": "profiling",
           "pythonType": "ProfilingConfig",
           "required": false,
-          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, transfer_diagnostics='off', transfer_diagnostic_iterations=1, extreme_mode=False, dcache='on')",
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, transfer_diagnostics='off', transfer_diagnostic_iterations=1, transfer_trace_max_pieces=256, extreme_mode=False, dcache='on')",
           "defaultFromFactory": true
         },
         {
@@ -684,7 +684,7 @@
         },
         {
           "name": "transfer_diagnostics",
-          "pythonType": "Literal['off', 'timing', 'overlap']",
+          "pythonType": "Literal['off', 'timing', 'overlap', 'trace']",
           "required": false,
           "default": "off",
           "defaultFromFactory": false
@@ -694,6 +694,13 @@
           "pythonType": "int",
           "required": false,
           "default": 1,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "transfer_trace_max_pieces",
+          "pythonType": "int",
+          "required": false,
+          "default": 256,
           "defaultFromFactory": false
         },
         {
@@ -922,8 +929,8 @@
         "reachableFromRoot": true
       },
       "ProfilingConfig": {
-        "declared": 19,
-        "inSchema": 19,
+        "declared": 20,
+        "inSchema": 20,
         "reachableFromRoot": true
       },
       "PsramConfig": {
@@ -2254,7 +2261,8 @@
           "enum": [
             "off",
             "timing",
-            "overlap"
+            "overlap",
+            "trace"
           ],
           "title": "Transfer Diagnostics",
           "type": "string"
@@ -2262,6 +2270,11 @@
         "transfer_diagnostic_iterations": {
           "default": 1,
           "title": "Transfer Diagnostic Iterations",
+          "type": "integer"
+        },
+        "transfer_trace_max_pieces": {
+          "default": 256,
+          "title": "Transfer Trace Max Pieces",
           "type": "integer"
         },
         "extreme_mode": {

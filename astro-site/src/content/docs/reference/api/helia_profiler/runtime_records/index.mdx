@@ -222,7 +222,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   name={"RuntimeRecord"}
   kind={"class"}
   language={"python"}
-  signature={"RuntimeRecord(\n    name: str,\n    version: str,\n    default: bool,\n    source: RuntimeSource,\n    precisions: Mapping[str, str | None],\n    qualified: tuple[QualifiedTarget, ...],\n    kernels: RuntimeSource | None = None,\n    archive_sha256: str | None = None,\n) -> None"}
+  signature={"RuntimeRecord(\n    name: str,\n    version: str,\n    default: bool,\n    source: RuntimeSource,\n    precisions: Mapping[str, str | None],\n    qualified: tuple[QualifiedTarget, ...],\n    kernels: RuntimeSource | None = None,\n    archive_sha256: str | None = None,\n    transfer_observer: bool = False,\n) -> None"}
   level={2}
   summary={"One runtime version: its source, supported precisions and qualified targets."}
   source={{"path":"src/helia_profiler/runtime/records.py","line":62,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L62"}}
@@ -346,6 +346,20 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
   </RefSymbol>
 
+  <RefSymbol
+    id={"helia_profiler.RuntimeRecord.transfer_observer"}
+    name={"transfer_observer"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"transfer_observer: bool = False"}
+    level={3}
+    source={{"path":"src/helia_profiler/runtime/records.py","line":77,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L77"}}
+  >
+
+
+
+  </RefSymbol>
+
 </RefSymbol>
 
 <RefSymbol
@@ -356,7 +370,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"Qualification(state: RuntimeQualification, reason: str | None, record: RuntimeRecord | None) -> None"}
   level={2}
   summary={"The answer for one runtime version, precision and target, with the record it came from."}
-  source={{"path":"src/helia_profiler/runtime/records.py","line":78,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L78"}}
+  source={{"path":"src/helia_profiler/runtime/records.py","line":80,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L80"}}
 >
 
   `dataclass`
@@ -372,7 +386,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"state: RuntimeQualification"}
     level={3}
-    source={{"path":"src/helia_profiler/runtime/records.py","line":82,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L82"}}
+    source={{"path":"src/helia_profiler/runtime/records.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L84"}}
   >
 
 
@@ -386,7 +400,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"reason: str | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runtime/records.py","line":83,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L83"}}
+    source={{"path":"src/helia_profiler/runtime/records.py","line":85,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L85"}}
   >
 
 
@@ -400,7 +414,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     language={"python"}
     signature={"record: RuntimeRecord | None"}
     level={3}
-    source={{"path":"src/helia_profiler/runtime/records.py","line":84,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L84"}}
+    source={{"path":"src/helia_profiler/runtime/records.py","line":86,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L86"}}
   >
 
 
@@ -417,7 +431,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"runtimes() -> tuple[RuntimeRecord, ...]"}
   level={2}
   summary={"Every runtime record shipped with this heliaPROFILER, by name then version."}
-  source={{"path":"src/helia_profiler/runtime/records.py","line":87,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L87"}}
+  source={{"path":"src/helia_profiler/runtime/records.py","line":89,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L89"}}
 >
 
   `cached`
@@ -436,7 +450,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
   signature={"qualification(name: str, version: str | None = None, *, board: str, clock: str, precision: str) -> Qualification"}
   level={2}
   summary={"Whether name at version is qualified for precision on board at clock."}
-  source={{"path":"src/helia_profiler/runtime/records.py","line":133,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L133"}}
+  source={{"path":"src/helia_profiler/runtime/records.py","line":135,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L135"}}
 >
 
   Whether ``name`` at ``version`` is qualified for ``precision`` on ``board`` at ``clock``.
