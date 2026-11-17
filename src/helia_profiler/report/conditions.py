@@ -13,6 +13,7 @@ from ..engines.helia_aot.compile import (
     placement_memory_type,
     user_wildcard_kinds,
 )
+from ..errors import EngineError
 from ..placement import Placement
 from ..platform import get_soc_for_board
 from ..results.models import Conditions
@@ -34,12 +35,21 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
     elif meta.system_clock_hz:
         cpu_hz = meta.system_clock_hz
     return Conditions(
-        target=aot_target_name(ctx.config),
+        target=_target_name(ctx),
         cpu_hz=cpu_hz,
         weights_memory=_weights_memory(ctx),
         weights_cache=meta.dcache or "on",
         external_memory_clock=_external_memory_clock_mhz(ctx),
     )
+
+
+def _target_name(ctx: PipelineContext) -> str:
+    if ctx.config.engine.type is not EngineType.HELIA_AOT:
+        return aot_target_name(ctx.config)
+    artifacts = ctx.engine_artifacts
+    if not isinstance(artifacts, HeliaAotArtifacts) or not artifacts.aot_platform_name:
+        raise EngineError("AOT capture conditions require the prepared compiler target")
+    return artifacts.aot_platform_name
 
 
 def _weights_memory(ctx: PipelineContext) -> str | None:

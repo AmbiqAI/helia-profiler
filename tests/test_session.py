@@ -235,6 +235,7 @@ def test_session_analyze_uses_resolved_engine_and_board() -> None:
         Path("model.tflite"),
         engine=hpx.EngineType.HELIA_AOT,
         board="apollo510_evb",
+        config=session.resolve(),
     )
 
 

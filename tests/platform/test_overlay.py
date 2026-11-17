@@ -237,11 +237,14 @@ def test_direct_config_cannot_silently_ignore_an_overlay_path(tmp_path):
         replace(cfg, platform_registry=build_platform_registry())
 
 
-def test_aot_native_route_still_requires_explicit_supported_override(tmp_path):
+def test_older_aot_native_route_refuses_without_explicit_supported_override(tmp_path, monkeypatch):
     from helia_profiler.engines.helia_aot.compile import _resolve_aot_platform
 
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_aot.target.installed_version", lambda: "0.33.0"
+    )
     cfg = _config(_overlay(tmp_path), tmp_path)
-    with pytest.raises(EngineError, match="platform mapping"):
+    with pytest.raises(EngineError, match="catalog-platform contract"):
         _resolve_aot_platform(cfg)
     cfg = replace(cfg, engine=replace(cfg.engine, config={"platform_name": "apollo510_evb"}))
     assert _resolve_aot_platform(cfg) == "apollo510_evb"

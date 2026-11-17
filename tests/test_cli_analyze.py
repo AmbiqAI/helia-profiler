@@ -40,7 +40,7 @@ TRANSFORMED = ModelAnalysis(
 def calls(monkeypatch: pytest.MonkeyPatch) -> list[str]:
     seen: list[str] = []
 
-    def fake_analyze_for_engine(model_path, *, engine, board):
+    def fake_analyze_for_engine(model_path, *, engine, board, config=None):
         seen.append(engine)
         return TRANSFORMED if engine == "helia-aot" else ORIGINAL
 

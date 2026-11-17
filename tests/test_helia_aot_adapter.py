@@ -19,10 +19,10 @@ from helia_profiler.engines.base import EngineSource, HeliaAotArtifacts
 from helia_profiler.engines.ethos_u import NSX_NPU_MODULE, NSX_NPU_PROJECT
 from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter, _build_extra_modules
 from helia_profiler.engines.helia_aot.compile import (
-    _BOARD_TO_AOT_PLATFORM,
     _merged_aot_args,
     _resolve_aot_platform,
 )
+from helia_profiler.engines.helia_aot.target import _BOARD_TO_AOT_PLATFORM
 from helia_profiler.errors import ConfigError, EngineError
 from helia_profiler.placement import Placement
 from helia_profiler.results import NsxModuleRef
@@ -49,7 +49,10 @@ class TestBoardMap:
     def test_atomiq110_maps_to_atomiq110(self):
         assert _BOARD_TO_AOT_PLATFORM["atomiq110_fpga_turbo"] == "atomiq110"
 
-    def test_resolve_platform_for_atomiq110(self):
+    def test_resolve_platform_for_atomiq110(self, monkeypatch):
+        monkeypatch.setattr(
+            "helia_profiler.engines.helia_aot.target.installed_version", lambda: "0.33.0"
+        )
         assert _resolve_aot_platform(_cfg()) == "atomiq110"
 
 
@@ -226,14 +229,16 @@ def _prepare(
 def _fake_converter(monkeypatch, result=None, source=None, *, compiler_hook=None) -> None:
     from helia_profiler.engines.helia_aot import adapter as adapter_mod
 
-    def fake_run_aot_compiler(config, output_dir, module_name, *_args):
+    def fake_run_aot_compiler(config, output_dir, module_name, *_args, **_kwargs):
         (output_dir / module_name).mkdir(parents=True)
         if compiler_hook is not None:
             compiler_hook(config, output_dir)
         return Result() if result is None else result
 
     monkeypatch.setattr(adapter_mod, "_check_helia_aot_version", lambda **_: "0.0.0")
-    monkeypatch.setattr(adapter_mod, "_resolve_aot_platform", lambda _c: "apollo510_evb")
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_aot.target.installed_version", lambda: "0.33.0"
+    )
     monkeypatch.setattr(adapter_mod, "_run_aot_compiler", fake_run_aot_compiler)
     monkeypatch.setattr(adapter_mod, "analyze_model", lambda _path: source)
     monkeypatch.setattr(adapter_mod, "_validate_pragmas", lambda *_a: None)

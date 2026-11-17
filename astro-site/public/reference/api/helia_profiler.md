@@ -618,7 +618,7 @@ compare(
 
 Compare two completed profiles and optionally write diff artifacts.
 
-Source: `src/helia_profiler/session.py:257`
+Source: `src/helia_profiler/session.py:259`
 
 ### helia_profiler.Session.doctor
 
@@ -633,7 +633,7 @@ Return structured host dependency checks.
 Set *include_versions* to also compare installed tool and package
 versions against the HPX compatibility baseline.
 
-Source: `src/helia_profiler/session.py:285`
+Source: `src/helia_profiler/session.py:287`
 
 ### helia_profiler.Session.show
 
@@ -645,7 +645,7 @@ show(value: Any, *, console: Console | None = None) -> Any
 
 Pretty-print a typed interactive value and return it unchanged.
 
-Source: `src/helia_profiler/session.py:301`
+Source: `src/helia_profiler/session.py:303`
 
 ### helia_profiler.Session.boards
 
@@ -657,7 +657,7 @@ boards() -> tuple[BoardDef, ...]
 
 Return boards visible to this session's platform registry.
 
-Source: `src/helia_profiler/session.py:307`
+Source: `src/helia_profiler/session.py:309`
 
 ### helia_profiler.Session.engines
 
@@ -669,7 +669,7 @@ engines() -> tuple[EngineType, ...]
 
 Return supported inference engine identifiers.
 
-Source: `src/helia_profiler/session.py:314`
+Source: `src/helia_profiler/session.py:316`
 
 ### helia_profiler.Session.counter_groups
 
@@ -681,7 +681,7 @@ counter_groups() -> tuple[str, ...]
 
 Return registered PMU counter group names.
 
-Source: `src/helia_profiler/session.py:320`
+Source: `src/helia_profiler/session.py:322`
 
 ### helia_profiler.Session.counters
 
@@ -693,7 +693,7 @@ counters(group: str | None = None) -> tuple[PmuCounter, ...]
 
 Return registered PMU counters, optionally filtered by group.
 
-Source: `src/helia_profiler/session.py:326`
+Source: `src/helia_profiler/session.py:328`
 
 ### helia_profiler.Session.probes
 
@@ -705,7 +705,7 @@ probes() -> tuple[JLinkProbe, ...]
 
 Return connected J-Link probes.
 
-Source: `src/helia_profiler/session.py:332`
+Source: `src/helia_profiler/session.py:334`
 
 ### helia_profiler.Session.inspect_probes
 
@@ -717,7 +717,7 @@ inspect_probes(board: str | None = None) -> tuple[JLinkProbeMatch, ...]
 
 Inspect the target core visible through each connected probe.
 
-Source: `src/helia_profiler/session.py:338`
+Source: `src/helia_profiler/session.py:340`
 
 ### helia_profiler.Session.match_probe
 
@@ -729,7 +729,7 @@ match_probe(board: str | None = None, *, serial: str | None = None) -> str
 
 Resolve the J-Link serial matching a board target.
 
-Source: `src/helia_profiler/session.py:349`
+Source: `src/helia_profiler/session.py:351`
 
 ### helia_profiler.Session.ports
 
@@ -741,7 +741,7 @@ ports(*, include_all: bool = False) -> tuple[SerialPortInfo, ...]
 
 Return host serial ports relevant to HPX transports.
 
-Source: `src/helia_profiler/session.py:367`
+Source: `src/helia_profiler/session.py:369`
 
 ### helia_profiler.Session.reset
 
@@ -753,4 +753,4 @@ reset(board: str | None = None, *, serial: str | None = None, kind: Literal['deb
 
 Reset the configured target through its J-Link probe.
 
-Source: `src/helia_profiler/session.py:373`
+Source: `src/helia_profiler/session.py:375`

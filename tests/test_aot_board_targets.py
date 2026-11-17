@@ -57,6 +57,9 @@ def _config(board: str, override: str | None = None):
 def analysis_boundary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Replace the external compiler boundary, retaining the HPX consumer."""
     compiler = Mock()
+    monkeypatch.setattr(
+        "helia_profiler.engines.helia_aot.target.installed_version", lambda: "0.33.0"
+    )
     for name, attributes in {
         "helia_aot": {"AotConverter": compiler, "ConvertArgs": SimpleNamespace},
         "helia_aot.defines": {"ModuleType": StrEnum("ModuleType", {"NSX": "nsx"})},
@@ -87,9 +90,10 @@ def test_compile_and_analysis_targets(board, target, analysis_boundary, caplog):
         if target is None:
             with pytest.raises(EngineError, match="No heliaAOT platform mapping"):
                 _resolve_aot_platform(_config(board))
-            compiler.return_value.convert.side_effect = ValueError("Unknown platform")
-            with pytest.raises(EngineError, match="Unknown platform"):
+            with pytest.raises(EngineError, match="No heliaAOT platform mapping"):
                 engine_analysis.analyze_for_engine(model, engine="helia-aot", board=board)
+            assert not compiler.called
+            return
         else:
             assert _resolve_aot_platform(_config(board)) == target
             assert (

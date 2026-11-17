@@ -14,5 +14,6 @@
     "a16w8": "supported"
   },
   "qualified": [],
-  "transfer_observer": true
+  "transfer_observer": true,
+  "catalog_platform_schema": 1
 }

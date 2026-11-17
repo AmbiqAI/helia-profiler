@@ -44,6 +44,7 @@ def _ctx(tmp_path, *, fmt="csv", per_layer=False):
         extra={"output": {"dir": str(tmp_path / "bundle"), "format": fmt, "detailed": True}},
     )
     ctx.engine_artifacts = HeliaAotArtifacts(
+        aot_platform_name="apollo510_evb",
         engine_header="fake_model.h",
         aot_prefix="fake",
         aot_module_name="fake_module",

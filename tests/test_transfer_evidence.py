@@ -195,6 +195,16 @@ def test_saved_bundle_contains_evidence_in_both_output_modes(tmp_path, output_fo
         },
     )
     ctx = PipelineContext(config=config, work_dir=tmp_path)
+    from helia_profiler.engines.base import HeliaAotArtifacts
+
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="hpx_model.h",
+        aot_prefix="hpx",
+        aot_module_name="hpx_model",
+        aot_cmake_target="nsx::hpx_model",
+        helia_aot_version="0.33.0",
+        aot_platform_name="apollo510_evb",
+    )
     ctx.run_metadata = RunMetadata(
         hpx_version="test", run_id="transfer-evidence", timestamp="2026-11-14T00:00:00Z"
     )

@@ -91,6 +91,7 @@ engines/helia_aot/__init__.py
 engines/helia_aot/adapter.py
 engines/helia_aot/compile.py
 engines/helia_aot/manifest.py
+engines/helia_aot/target.py
 engines/helia_rt/__init__.py
 engines/helia_rt/adapter.py
 engines/helia_rt/artifacts.py

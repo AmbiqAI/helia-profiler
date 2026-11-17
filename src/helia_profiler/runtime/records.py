@@ -75,6 +75,8 @@ class RuntimeRecord:
     archive_sha256: str | None = None
     #: The released emitted NSX provider supports a completion observer.
     transfer_observer: bool = False
+    #: Provisional compiler-platform record schema supported by this release minor.
+    catalog_platform_schema: int | None = None
 
 
 @dataclass(frozen=True)
@@ -183,10 +185,17 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
     )
     if isinstance(raw, dict) and "transfer_observer" in raw:
         fields = fields | {"transfer_observer"}
+    if isinstance(raw, dict) and "catalog_platform_schema" in raw:
+        fields = fields | {"catalog_platform_schema"}
     record = _object(raw, fields, location)
     observer = record.get("transfer_observer", False)
     if type(observer) is not bool or (observer and record["name"] != "helia-aot"):
         raise ConfigError(f"Runtime record {location} has an invalid transfer_observer fact")
+    platform_schema = record.get("catalog_platform_schema")
+    if "catalog_platform_schema" in record and (
+        type(platform_schema) is not int or platform_schema < 1 or record["name"] != "helia-aot"
+    ):
+        raise ConfigError(f"Runtime record {location} has an invalid catalog_platform_schema fact")
     if record["schema"] != RUNTIME_SCHEMA:
         raise ConfigError(f"Runtime record {location} has schema {record['schema']!r}")
     if not isinstance(record["default"], bool):
@@ -242,6 +251,7 @@ def _parse_record(raw: Any, location: str) -> RuntimeRecord:
         kernels=kernels,
         archive_sha256=archive,
         transfer_observer=observer,
+        catalog_platform_schema=platform_schema,
     )
 
 

@@ -67,6 +67,20 @@ def test_shipped_records_name_engines_targets_and_one_default_each() -> None:
             assert target.board in boards and target.clock in clocks
 
 
+@pytest.mark.parametrize("value", [True, None, "1", 0, -1])
+def test_catalog_platform_schema_requires_a_positive_integer(tmp_path, value):
+    raw = _record(name="helia-aot", catalog_platform_schema=value)
+    with pytest.raises(ConfigError, match="catalog_platform_schema"):
+        load_runtime_records(_write(tmp_path, raw))
+
+
+def test_catalog_platform_schema_is_an_aot_contract(tmp_path):
+    with pytest.raises(ConfigError, match="catalog_platform_schema"):
+        load_runtime_records(_write(tmp_path, _record(catalog_platform_schema=1)))
+    record = runtime("helia-aot")
+    assert record is not None and record.catalog_platform_schema == 1
+
+
 def test_hardware_workflow_uses_default_executorch_commit() -> None:
     workflow_path = (
         Path(__file__).resolve().parents[2] / ".github/workflows/hardware-validation.yml"

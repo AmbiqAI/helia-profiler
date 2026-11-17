@@ -10,6 +10,7 @@ import pytest
 
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.errors import EngineError
 from helia_profiler.evaluation.comparability import assess_comparability
 from helia_profiler.evaluation.compare import RunArtifacts
 from helia_profiler.placement import Placement
@@ -107,6 +108,7 @@ def _aot_artifacts(
     *,
     aot_memory_intent_json: str = "{}",
     report_files: tuple[Path, ...] = (),
+    target_name: str = "apollo510_evb",
 ) -> HeliaAotArtifacts:
     return HeliaAotArtifacts(
         engine_type=EngineType.HELIA_AOT,
@@ -115,6 +117,7 @@ def _aot_artifacts(
         aot_module_name="hpx_model",
         aot_cmake_target="nsx::hpx_model",
         helia_aot_version="0.33.0",
+        aot_platform_name=target_name,
         aot_memory_intent_json=aot_memory_intent_json,
         report_files=report_files,
     )
@@ -129,7 +132,7 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
             "model": {"weights_location": "mram"},
         },
     )
-    ctx.engine_artifacts = _aot_artifacts(tmp_path)
+    ctx.engine_artifacts = _aot_artifacts(tmp_path, target_name="x")
     assert run_conditions(ctx).target == "x"
     assert run_conditions(ctx).weights_memory == "mram"
 
@@ -146,6 +149,13 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     specific = {"tensors": [{"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}}]}
     ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(specific))
     assert run_conditions(ctx).weights_memory == "mram"
+
+
+def test_aot_conditions_require_prepared_target_evidence(tmp_path):
+    ctx = _ctx(tmp_path, engine="helia-aot")
+    ctx.engine_artifacts = dataclasses.replace(_aot_artifacts(tmp_path), aot_platform_name=None)
+    with pytest.raises(EngineError, match="prepared compiler target"):
+        run_conditions(ctx)
 
 
 def test_aot_weights_memory_is_the_constant_rule_the_compiler_received(tmp_path: Path) -> None:

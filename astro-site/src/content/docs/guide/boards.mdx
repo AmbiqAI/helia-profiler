@@ -236,9 +236,41 @@ raise `ConfigError`; use an explicit HPX custom declaration where appropriate.
 Every projected overlay target is custom, including compositions of builtin
 leaves and selecting a builtin through an explicit overlay. It does not inherit
 builtin linker-source qualification, strict compiled receipts or fixed-fixture
-admission. heliaAOT still needs an explicit supported
-`engine.config.platform_name` for a new board name; this does not establish
-physical equivalence or automatically forward the overlay to the compiler.
+admission.
+
+With a recorded catalog-capable heliaAOT runtime, hpx passes the frozen target,
+boot, add-ons and overlay to the compiler's catalog projection. A native overlay
+board needs no separate compiler alias. The compiler derives capabilities and
+memory budgets; hpx still checks the emitted placement against its SDK/linker
+windows. Physical capacity is not a promise that all of it is free for an application.
+
+An explicit `engine.config.platform_name`, or a nonempty compiler
+`aot_args.platform` mapping without `facts: catalog`, retains the named
+registered/custom route. That compiler target is recorded separately from the
+physical HPX selection; an override does not establish equivalence. Older
+ordinary runtimes keep their named route. A catalog-dependent request on a
+runtime without a recorded experimental contract fails with an explanation.
+An unvalidated future minor is not assumed compatible.
+
+Explicit catalog restrictions use heliaAOT's existing fields, for example:
+
+```yaml
+engine:
+  type: helia-aot
+  config:
+    aot_args:
+      platform:
+        facts: catalog
+        reserve:
+          dtcm: 16384
+```
+
+Reservations are bytes subtracted once by the compiler and retained beside the
+derived size. No implicit stack or heap reservation is added. The retained
+`<prefix>_platform.json` records compiler policy and budgets; the conversion's own
+plan must agree before hpx accepts it. `Session.analyze()` uses the session's
+full resolved target and compiler settings. A standalone board-only analysis
+has no overlay context unless its caller supplies the optional resolved config.
 
 Resolution freezes the facts and file digest. Saved `FrozenRun` readers use
 retained facts even if the file changes or disappears. Fresh execution from the

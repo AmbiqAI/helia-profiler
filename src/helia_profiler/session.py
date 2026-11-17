@@ -245,6 +245,7 @@ class Session:
 
     def analyze(self, model: str | Path | None = None) -> ModelAnalysis:
         """Analyze the configured model without building or flashing firmware."""
+        from .engines import EngineType
         from .evaluation import analyze_for_engine
 
         config = self.resolve(model)
@@ -252,6 +253,7 @@ class Session:
             config.model.path,
             engine=config.engine.type,
             board=config.target.board,
+            **({"config": config} if config.engine.type is EngineType.HELIA_AOT else {}),
         )
 
     def compare(

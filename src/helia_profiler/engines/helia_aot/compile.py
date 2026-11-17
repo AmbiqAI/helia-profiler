@@ -1,13 +1,7 @@
-"""Board → heliaAOT platform mapping and AOT compiler invocation.
+"""Compiler invocation, explicit tensor placement and effective configuration.
 
-heliaAOT has its own platform registry (apollo3p_evb, apollo4p_evb,
-apollo510_evb, …). The profiler board names are close but not always
-identical; this module maps profiler boards onto AOT platform names, derives
-per-kind (constant/persistent/scratch) tensor placement rulesets from the
-profiler's memory-placement config, invokes the heliaAOT Python API to
-compile a ``.tflite`` model into an NSX module, validates the generated
-memory-placement pragmas, and enforces the installed ``helia-aot`` package's
-minimum-supported version.
+Target requests and catalog admission belong to :mod:`.target`; this module
+applies those requests to conversion and configuration identity.
 """
 
 from __future__ import annotations
@@ -19,6 +13,7 @@ import logging
 import math
 import re
 from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +33,14 @@ from ...placement import Placement, placement_capacities, resolve_fastest_fit_pl
 from ...platform import SocDef, get_soc_for_board
 from ...runtime.records import RuntimeRecord, runtimes
 from ..semver import parse_semver
+from .target import (
+    CompilerTarget,
+    aot_platform_for_board,
+    compiler_record,
+    resolve_target,
+    select_target,
+    verify_conversion,
+)
 
 log = logging.getLogger("hpx")
 
@@ -81,21 +84,6 @@ _jinja_env = jinja2.Environment(
     undefined=jinja2.StrictUndefined,
 )
 
-_BOARD_TO_AOT_PLATFORM: dict[str, str] = {
-    "apollo3p_evb": "apollo3p_evb",
-    "apollo4p_evb": "apollo4p_evb",
-    "apollo4p_blue_kbr_evb": "apollo4p_blue_kbr_evb",
-    "apollo4p_blue_kxr_evb": "apollo4p_blue_kxr_evb",
-    "apollo4l_evb": "apollo4l_evb",
-    "apollo4l_blue_evb": "apollo4l_blue_evb",
-    "apollo510_evb": "apollo510_evb",
-    "apollo510b_evb": "apollo510b_evb",
-    "atomiq110_fpga_turbo": "atomiq110",  # Atomiq110 FPGA (M55 + Ethos-U85-256)
-    "apollo5b_evb": "apollo510_evb",
-    "apollo330mP_evb": "apollo330mp_evb",
-    "apollo510dL_evb": "apollo510l_evb",
-}
-_LEGACY_AOT_ALIASES = frozenset({"apollo5b_evb", "atomiq110_fpga_turbo"})
 
 # Expected memory-placement macro suffixes emitted by heliaAOT's
 # MemoryType.to_qualifiers().  Used to validate pragma consistency.
@@ -115,56 +103,24 @@ _EXPECTED_PRAGMA_SUFFIXES = (
 )
 
 
-def aot_platform_for_board(board: str) -> str | None:
-    """Return the mapped AOT target, warning for legacy compatibility aliases."""
-    aot_platform = _BOARD_TO_AOT_PLATFORM.get(board)
-    if board in _LEGACY_AOT_ALIASES:
-        log.warning(
-            "Board '%s' has no exact heliaAOT platform — using '%s'. "
-            "Memory sizes and capabilities may differ.  "
-            "Set engine.config.platform_name to override.",
-            board,
-            aot_platform,
-        )
-    return aot_platform
-
-
 def aot_target_name(config: ProfileConfig) -> str:
-    """heliaAOT's name for the configured board, for the recorded conditions.
+    """Configured compiler selection, or another engine's board comparison label.
 
-    A heliaAOT run names the platform it compiled for, override included.
-    Any other engine names the board's mapped platform, or the board itself
-    when heliaAOT has no name for it, so every run records a target.
+    Capture conditions use the target retained during preparation.
     """
     if config.engine.type is EngineType.HELIA_AOT:
         return _resolve_aot_platform(config)
-    return _BOARD_TO_AOT_PLATFORM.get(config.target.board, config.target.board)
+    return aot_platform_for_board(config.target.board, warn=False) or config.target.board
+
+
+def _compiler_target(config: ProfileConfig, args: dict[str, Any] | None = None) -> CompilerTarget:
+    values = _merged_aot_args(config) if args is None else args
+    return select_target(config, values.get("platform"))
 
 
 def _resolve_aot_platform(config: ProfileConfig) -> str:
-    """Map the profiler's target board to a heliaAOT platform name.
-
-    Resolution order:
-    1. Explicit ``engine.config.platform_name`` override.
-    2. Built-in ``_BOARD_TO_AOT_PLATFORM`` mapping.
-    3. Raise ``EngineError`` with guidance.
-    """
-    explicit = config.engine.config.get("platform_name")
-    if explicit:
-        log.info("Using explicit AOT platform override: %s", explicit)
-        return str(explicit)
-
-    board = config.target.board
-    aot_platform = aot_platform_for_board(board)
-
-    if aot_platform is None:
-        known = ", ".join(sorted(_BOARD_TO_AOT_PLATFORM))
-        raise EngineError(
-            f"No heliaAOT platform mapping for board '{board}'",
-            hint=(f"Set engine.config.platform_name explicitly, or use a supported board: {known}"),
-        )
-
-    return aot_platform
+    """The compiler selection, retaining explicit named compatibility choices."""
+    return _compiler_target(config).name
 
 
 # heliaAOT splits the model into three AIR tensor kinds — ``constant``
@@ -312,6 +268,16 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
     return base_data
 
 
+def _compiler_config(config: ProfileConfig, args: dict[str, Any]) -> ProfileConfig:
+    """Retain merged file/inline settings for one compiler operation."""
+    return replace(
+        config,
+        engine=replace(
+            config.engine, config_path=None, config={**config.engine.config, "aot_args": args}
+        ),
+    )
+
+
 #: The ``ConversionResult`` views hpx attributes layers and plans arenas from.
 _VIEW_FIELDS = ("operators", "tensors", "regions", "placements")
 
@@ -361,6 +327,8 @@ def _run_aot_compiler(
     prefix: str,
     aot_platform: str,
     aot_args: dict[str, Any] | None = None,
+    *,
+    target: CompilerTarget | None = None,
 ) -> Any:
     """Run heliaAOT via its Python API and return its ``ConversionResult``.
 
@@ -382,12 +350,27 @@ def _run_aot_compiler(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    request_config = (
+        config
+        if target is not None
+        else replace(
+            config,
+            engine=replace(
+                config.engine, config={**config.engine.config, "platform_name": aot_platform}
+            ),
+        )
+    )
+
     if aot_args is None:
-        aot_args = effective_aot_args(config)
+        aot_args = effective_aot_args(request_config)
+    target = target or _compiler_target(request_config, aot_args)
+    if aot_platform != target.name:
+        raise EngineError("Compiler name differs from its selected target request")
 
     # Build ConvertArgs — profiler mandatory fields always win
     try:
-        convert_args = ConvertArgs(**aot_args)
+        values: dict[str, Any] = {**aot_args, "platform": target.options()}
+        convert_args = ConvertArgs(**values)
     except Exception as exc:
         raise EngineError(
             f"Failed to build heliaAOT ConvertArgs: {exc}",
@@ -399,7 +382,7 @@ def _run_aot_compiler(
     convert_args.module.name = module_name
     convert_args.module.prefix = prefix
     convert_args.module.type = ModuleType("nsx")
-    convert_args.platform.name = aot_platform
+    target = resolve_target(target, convert_args.platform) if target.record_json is None else target
     convert_args.force = True
     convert_args.result_views = True
 
@@ -413,11 +396,18 @@ def _run_aot_compiler(
     log.debug("ConvertArgs: %s", convert_args)
 
     try:
+        target.verify_source()
         result = convert_with_views(AotConverter(config=convert_args))
     except EngineError:
         raise
     except Exception as exc:
         raise _compile_failure(exc) from exc
+
+    verify_conversion(target, result)
+    if target.record_json is not None:
+        (output_dir / f"{prefix}_platform.json").write_text(
+            target.record_json + "\n", encoding="utf-8"
+        )
 
     module_dir = output_dir / module_name
     if not module_dir.is_dir():
@@ -434,7 +424,9 @@ def _run_aot_compiler(
     return result
 
 
-def effective_aot_args(config: ProfileConfig) -> dict[str, Any]:
+def effective_aot_args(
+    config: ProfileConfig, *, target: CompilerTarget | None = None
+) -> dict[str, Any]:
     """The ``ConvertArgs`` data heliaAOT receives: the merged config with hpx's rulesets.
 
     Pins the three AIR tensor kinds (constant/persistent/scratch) onto the
@@ -442,10 +434,13 @@ def effective_aot_args(config: ProfileConfig) -> dict[str, Any]:
     user-supplied wildcard for a kind replaces the profiler's coarse rule;
     this is important for constants because the coarse rule may also carry a
     ``constant_destination_memory`` staging attribute. The fields the
-    profiler forces on the built ``ConvertArgs`` (model, module, platform)
-    are not in the mapping.
+    Model and module paths are forced when converting. The selected compiler
+    platform is included when using catalog projection or explicit settings.
     """
     aot_args = _merged_aot_args(config)
+    target = target or _compiler_target(config, aot_args)
+    if target.schema is not None or "platform" in aot_args:
+        aot_args["platform"] = target.options()
     profiler_rulesets = _resolve_aot_tensor_rulesets(
         config, get_soc_for_board(config.target.board, registry=config.platform_registry)
     )
@@ -482,6 +477,7 @@ def without_knob_values(
     module_name: str | None = None,
     prefix: str | None = None,
     aot_platform: str | None = None,
+    target: CompilerTarget | None = None,
 ) -> dict[str, Any]:
     """heliaAOT arguments as the compiler reads them, less knob values and run-only fields.
 
@@ -516,7 +512,12 @@ def without_knob_values(
             hint="Install helia-aot: pip install 'helia-profiler[aot]' or pip install helia-aot",
         ) from exc
     try:
-        convert_args = ConvertArgs(**aot_args)
+        if target is not None and aot_platform is not None and aot_platform != target.name:
+            raise EngineError("Normalized compiler name differs from its selected target request")
+        values: Mapping[str, Any] = (
+            {**aot_args, "platform": target.options()} if target is not None else aot_args
+        )
+        convert_args = ConvertArgs(**values)
     except Exception as exc:
         raise EngineError(
             f"Failed to build heliaAOT ConvertArgs: {exc}", hint=_AOT_ARGS_HINT
@@ -531,6 +532,15 @@ def without_knob_values(
         convert_args.force = True
         convert_args.result_views = True
     data: dict[str, Any] = convert_args.model_dump(mode="json")
+    if getattr(convert_args.platform, "facts", None) == "catalog":
+        if target is not None:
+            target = (
+                resolve_target(target, convert_args.platform)
+                if target.record_json is None
+                else target
+            )
+            target.verify_source()
+            data["compiler_platform"] = target.record()
     knobs = {spec.name for spec in KNOBS}
     for path in _RUN_ONLY_AOT_FIELDS:
         _remove(data, path)
@@ -646,7 +656,12 @@ def _remove(data: dict[str, Any], path: tuple[str, ...]) -> None:
 
 
 def effective_config_digest(
-    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+    aot_args: Mapping[str, Any],
+    *,
+    module_name: str,
+    prefix: str,
+    aot_platform: str,
+    target: CompilerTarget | None = None,
 ) -> tuple[str, tuple[str, ...]]:
     """The sha256 of what the compiler received, less the knob values, and the keys it covers.
 
@@ -662,8 +677,12 @@ def effective_config_digest(
         EngineError: as :func:`without_knob_values` raises it.
     """
     data = without_knob_values(
-        aot_args, module_name=module_name, prefix=prefix, aot_platform=aot_platform
+        aot_args, module_name=module_name, prefix=prefix, aot_platform=aot_platform, target=target
     )
+    if target is None and data.get("platform", {}).get("facts") == "catalog":
+        from helia_aot import ConvertArgs
+
+        data["compiler_platform"] = compiler_record(ConvertArgs(platform=data["platform"]).platform)
     canonical = json.dumps(
         data, sort_keys=True, separators=(",", ":"), default=str, allow_nan=False
     )
@@ -715,7 +734,12 @@ def without_constant_placement(aot_args: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def effective_config_pairing_digest(
-    aot_args: Mapping[str, Any], *, module_name: str, prefix: str, aot_platform: str
+    aot_args: Mapping[str, Any],
+    *,
+    module_name: str,
+    prefix: str,
+    aot_platform: str,
+    target: CompilerTarget | None = None,
 ) -> tuple[str, tuple[str, ...]]:
     """:func:`effective_config_digest` of the arguments less the constants' placement.
 
@@ -730,6 +754,7 @@ def effective_config_pairing_digest(
         module_name=module_name,
         prefix=prefix,
         aot_platform=aot_platform,
+        target=target,
     )
 
 

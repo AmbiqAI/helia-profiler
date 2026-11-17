@@ -169,6 +169,7 @@ RuntimeRecord(
     kernels: RuntimeSource | None = None,
     archive_sha256: str | None = None,
     transfer_observer: bool = False,
+    catalog_platform_schema: int | None = None,
 ) -> None
 ```
 
@@ -270,6 +271,16 @@ transfer_observer: bool = False
 
 Source: `src/helia_profiler/runtime/records.py:77`
 
+### helia_profiler.RuntimeRecord.catalog_platform_schema
+
+`attribute` · `python`
+
+```python
+catalog_platform_schema: int | None = None
+```
+
+Source: `src/helia_profiler/runtime/records.py:79`
+
 ## helia_profiler.Qualification
 
 `class` · `python`
@@ -284,7 +295,7 @@ The answer for one runtime version, precision and target, with the record it cam
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:80`
+Source: `src/helia_profiler/runtime/records.py:82`
 
 ### helia_profiler.Qualification.state
 
@@ -294,7 +305,7 @@ Source: `src/helia_profiler/runtime/records.py:80`
 state: RuntimeQualification
 ```
 
-Source: `src/helia_profiler/runtime/records.py:84`
+Source: `src/helia_profiler/runtime/records.py:86`
 
 ### helia_profiler.Qualification.reason
 
@@ -304,7 +315,7 @@ Source: `src/helia_profiler/runtime/records.py:84`
 reason: str | None
 ```
 
-Source: `src/helia_profiler/runtime/records.py:85`
+Source: `src/helia_profiler/runtime/records.py:87`
 
 ### helia_profiler.Qualification.record
 
@@ -314,7 +325,7 @@ Source: `src/helia_profiler/runtime/records.py:85`
 record: RuntimeRecord | None
 ```
 
-Source: `src/helia_profiler/runtime/records.py:86`
+Source: `src/helia_profiler/runtime/records.py:88`
 
 ## helia_profiler.runtimes
 
@@ -330,7 +341,7 @@ Every runtime record shipped with this heliaPROFILER, by name then version.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:89`
+Source: `src/helia_profiler/runtime/records.py:91`
 
 ## helia_profiler.qualification
 
@@ -353,4 +364,4 @@ it: this heliaPROFILER makes no claim about it.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runtime/records.py:135`
+Source: `src/helia_profiler/runtime/records.py:137`
