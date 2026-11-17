@@ -62,7 +62,12 @@ release pull requests from Conventional Commits.
 ### Features
 
 * **aot:** adopt canonical catalog compiler targets ([#699](https://github.com/AmbiqAI/helia-profiler/issues/699)) ([2e4d1e2](https://github.com/AmbiqAI/helia-profiler/commit/2e4d1e22704c8aac6dc42f405276f36220fce848)), closes [#664](https://github.com/AmbiqAI/helia-profiler/issues/664)
-* **report:** export saved transfer traces to Perfetto ([#697](https://github.com/AmbiqAI/helia-profiler/issues/697)) ([a9639f2](https://github.com/AmbiqAI/helia-profiler/commit/a9639f2b36ebfd2485df452aeda3b472dd25e758)), closes [#517](https://github.com/AmbiqAI/helia-profiler/issues/517) [#692](https://github.com/AmbiqAI/helia-profiler/issues/692)
+* **report:** export saved transfer traces to Perfetto ([#697](https://github.com/AmbiqAI/helia-profiler/issues/697)) ([a9639f2](https://github.com/AmbiqAI/helia-profiler/commit/a9639f2b36ebfd2485df452aeda3b472dd25e758)), closes [#692](https://github.com/AmbiqAI/helia-profiler/issues/692); refs [#517](https://github.com/AmbiqAI/helia-profiler/issues/517) (broader visualization work remains open)
+
+### Compatibility notes
+
+* Catalog-backed AOT preparation now derives compiler capabilities and memory budgets from the selected catalog target, including boot, add-ons and overlays. Plans can differ from older registered defaults. Explicit named compiler overrides and older ordinary runtime routes remain available; unsupported experimental catalog contracts fail with guidance. SDK/linker fit checks remain profiler-owned.
+* Perfetto export reads saved transfer evidence offline. Completion notification timestamps do not establish physical bus service or achieved bandwidth; incomplete observations remain marked incomplete.
 
 ## [0.6.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.1...v0.6.2) (2026-11-16)
 
