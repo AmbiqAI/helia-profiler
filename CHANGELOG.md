@@ -56,6 +56,14 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.2...v0.6.3) (2026-11-17)
+
+
+### Features
+
+* **aot:** adopt canonical catalog compiler targets ([#699](https://github.com/AmbiqAI/helia-profiler/issues/699)) ([2e4d1e2](https://github.com/AmbiqAI/helia-profiler/commit/2e4d1e22704c8aac6dc42f405276f36220fce848)), closes [#664](https://github.com/AmbiqAI/helia-profiler/issues/664)
+* **report:** export saved transfer traces to Perfetto ([#697](https://github.com/AmbiqAI/helia-profiler/issues/697)) ([a9639f2](https://github.com/AmbiqAI/helia-profiler/commit/a9639f2b36ebfd2485df452aeda3b472dd25e758)), closes [#517](https://github.com/AmbiqAI/helia-profiler/issues/517) [#692](https://github.com/AmbiqAI/helia-profiler/issues/692)
+
 ## [0.6.2](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.1...v0.6.2) (2026-11-16)
 
 
