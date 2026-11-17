@@ -1,7 +1,7 @@
 """heliaAOT engine adapter package.
 
-``HeliaAOTAdapter`` lives in :mod:`.adapter`; board/platform mapping and AOT
-compiler invocation live in :mod:`.compile`; operator-manifest and
+``HeliaAOTAdapter`` lives in :mod:`.adapter`; compiler target selection lives
+in :mod:`.target`, invocation in :mod:`.compile`; operator-manifest and
 memory-plan extraction live in :mod:`.manifest`.
 
 ns-cmsis-nn resolution is NOT here: three engines need it (heliaAOT, heliaRT

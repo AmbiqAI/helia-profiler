@@ -11,11 +11,11 @@ from typing import Any
 import pytest
 
 from helia_profiler.engines.base import HeliaAotArtifacts
-from helia_profiler.engines.helia_aot.compile import _BOARD_TO_AOT_PLATFORM
 from helia_profiler.engines.helia_aot.manifest import (
     _extract_operator_manifest,
     _tensor_metadata,
 )
+from helia_profiler.engines.helia_aot.target import _BOARD_TO_AOT_PLATFORM
 from helia_profiler.report.aot import _write_aot_manifest, _write_aot_memory_layers
 from tests import aot_views
 from tests.aot_views import PlacementView, RegionView, Result, TensorView, operator

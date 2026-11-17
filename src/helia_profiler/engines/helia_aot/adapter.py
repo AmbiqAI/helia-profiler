@@ -38,8 +38,8 @@ from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
     _check_helia_aot_version,
+    _compiler_target,
     _merged_aot_args,
-    _resolve_aot_platform,
     _run_aot_compiler,
     _validate_pragmas,
     _write_attributes_header,
@@ -49,6 +49,7 @@ from .compile import (
     without_knob_values,
 )
 from .manifest import _extract_arena_regions, _extract_memory_plan, _extract_operator_manifest
+from .target import resolve_target
 
 log = logging.getLogger("hpx")
 
@@ -149,19 +150,19 @@ def _check_input_fill(config: ProfileConfig, result: Any) -> None:
         )
 
 
-def _report_names(prefix: str) -> tuple[str, str]:
-    return f"{prefix}_plan.json", f"{prefix}_report.json"
+def _report_names(prefix: str) -> tuple[str, ...]:
+    return f"{prefix}_plan.json", f"{prefix}_report.json", f"{prefix}_platform.json"
 
 
 def _clear_reports(output_dir: Path, prefix: str) -> None:
-    """Drop plan and report files an earlier conversion left, so a build pins only its own."""
+    """Drop earlier conversion evidence, so a build pins only its own."""
     for name in _report_names(prefix):
         for stale in output_dir.rglob(name):
             stale.unlink()
 
 
 def _report_files(output_dir: Path, prefix: str) -> tuple[Path, ...]:
-    """The plan and report JSON this conversion wrote, when the installed heliaAOT writes them."""
+    """This conversion's plan, report and validated compiler-platform record."""
     found: list[Path] = []
     for name in _report_names(prefix):
         matches = sorted(output_dir.rglob(name))
@@ -328,9 +329,9 @@ class HeliaAOTAdapter:
         aot_version = _check_helia_aot_version(
             allow_unsupported_version=config.engine.allow_unsupported_version
         )
-        aot_platform = _resolve_aot_platform(config)
-
         aot_args = _merged_aot_args(config)
+        target = resolve_target(_compiler_target(config, aot_args))
+        aot_platform = target.name
         memory_intent_json = json.dumps(aot_args["memory"], sort_keys=True)
         compiler_config = _dc_replace(
             config,
@@ -345,7 +346,7 @@ class HeliaAOTAdapter:
             _user_tensor_rules(aot_args)
         )
 
-        compiler_args = effective_aot_args(compiler_config)
+        compiler_args = effective_aot_args(compiler_config, target=target)
         schedule = without_knob_values(compiler_args)["module"]["schedule"]
         if schedule not in {"table", "static"}:
             raise EngineError(f"Unknown heliaAOT profiling capability for schedule {schedule!r}")
@@ -354,12 +355,14 @@ class HeliaAOTAdapter:
             module_name=module_name,
             prefix=prefix,
             aot_platform=aot_platform,
+            target=target,
         )
         effective_config_pairing_sha256, _ = effective_config_pairing_digest(
             compiler_args,
             module_name=module_name,
             prefix=prefix,
             aot_platform=aot_platform,
+            target=target,
         )
 
         aot_output_dir = work_dir / "aot_output"
@@ -372,6 +375,7 @@ class HeliaAOTAdapter:
             prefix,
             aot_platform,
             compiler_args,
+            target=target,
         )
 
         _check_input_fill(config, result)

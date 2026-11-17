@@ -1280,6 +1280,7 @@ def test_the_compiler_configuration_a_file_supplies_is_part_of_the_setup(tmp_pat
     sram_digest, keys = _digest(sram)
     assert sram_digest != _digest(dtcm)[0]
     assert keys == (
+        "compiler_platform",
         "documentation",
         "force",
         "memory",
@@ -1883,11 +1884,10 @@ def test_a_constant_rule_heliaaot_refuses_is_refused_by_both_digests() -> None:
 
     odd = _tensors({"type": "constant", "attributes": "zz"})
     assert without_constant_placement(odd) == odd
-    names = {"module_name": "m", "prefix": "p", "aot_platform": "x"}
     with pytest.raises(EngineError, match="Failed to build heliaAOT ConvertArgs") as ordinary:
-        effective_config_digest(odd, **names)
+        effective_config_digest(odd, module_name="m", prefix="p", aot_platform="x")
     with pytest.raises(EngineError, match="Failed to build heliaAOT ConvertArgs") as pairing:
-        effective_config_pairing_digest(odd, **names)
+        effective_config_pairing_digest(odd, module_name="m", prefix="p", aot_platform="x")
     assert str(pairing.value) == str(ordinary.value)
     assert pairing.value.hint == ordinary.value.hint
 
