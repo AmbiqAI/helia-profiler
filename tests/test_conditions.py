@@ -107,6 +107,7 @@ def _aot_artifacts(
     *,
     aot_memory_intent_json: str = "{}",
     report_files: tuple[Path, ...] = (),
+    target_name: str = "apollo510_evb",
 ) -> HeliaAotArtifacts:
     return HeliaAotArtifacts(
         engine_type=EngineType.HELIA_AOT,
@@ -115,6 +116,7 @@ def _aot_artifacts(
         aot_module_name="hpx_model",
         aot_cmake_target="nsx::hpx_model",
         helia_aot_version="0.33.0",
+        aot_platform_name=target_name,
         aot_memory_intent_json=aot_memory_intent_json,
         report_files=report_files,
     )
@@ -129,7 +131,7 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
             "model": {"weights_location": "mram"},
         },
     )
-    ctx.engine_artifacts = _aot_artifacts(tmp_path)
+    ctx.engine_artifacts = _aot_artifacts(tmp_path, target_name="x")
     assert run_conditions(ctx).target == "x"
     assert run_conditions(ctx).weights_memory == "mram"
 

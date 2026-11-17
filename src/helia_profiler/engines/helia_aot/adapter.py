@@ -38,6 +38,7 @@ from .compile import (
     _DEFAULT_MODULE_NAME,
     _DEFAULT_PREFIX,
     _check_helia_aot_version,
+    _compiler_config,
     _compiler_target,
     _merged_aot_args,
     _run_aot_compiler,
@@ -333,14 +334,7 @@ class HeliaAOTAdapter:
         target = resolve_target(_compiler_target(config, aot_args))
         aot_platform = target.name
         memory_intent_json = json.dumps(aot_args["memory"], sort_keys=True)
-        compiler_config = _dc_replace(
-            config,
-            engine=_dc_replace(
-                config.engine,
-                config_path=None,
-                config={**config.engine.config, "aot_args": aot_args},
-            ),
-        )
+        compiler_config = _compiler_config(config, aot_args)
         allocate_arenas = not _external_arena_mode(aot_args)
         user_memory_config = config.engine.config_path is not None or bool(
             _user_tensor_rules(aot_args)
@@ -432,6 +426,7 @@ class HeliaAOTAdapter:
             aot_cmake_target=f"nsx::{cmake_name}",
             aot_transfer_cmake_target=_transfer_cmake_target(aot_module_dir, prefix, cmake_name),
             helia_aot_version=aot_version,
+            aot_platform_name=aot_platform,
             aot_allocate_arenas=allocate_arenas,
             aot_user_memory_config=user_memory_config,
             aot_effective_config_sha256=effective_config_sha256,

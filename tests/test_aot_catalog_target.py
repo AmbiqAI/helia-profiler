@@ -344,3 +344,38 @@ def test_analysis_context_mismatch_refuses():
     cfg = config()
     with pytest.raises(ConfigError, match="Analysis arguments differ"):
         analyze_for_engine(cfg.model.path, engine="helia-aot", board="apollo510b_evb", config=cfg)
+
+
+@pytest.mark.parametrize("remove", [False, True])
+def test_report_retains_prepared_target_after_compiler_yaml_changes(tmp_path, remove):
+    from helia_profiler.engines.helia_aot.adapter import HeliaAOTAdapter
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.report.conditions import run_conditions
+    from helia_profiler.results import FirmwareMeta, PmuResult
+    from tests.pipeline_context_helpers import set_profile_result
+
+    path = tmp_path / "compiler.yaml"
+    path.write_text("{}\n")
+    cfg = load_config(
+        None,
+        {
+            "model": {"path": str(config().model.path)},
+            "target": {"board": "atomiq110_fpga_turbo"},
+            "engine": {"type": "helia-aot", "config_path": str(path)},
+        },
+    )
+    ctx = PipelineContext(config=cfg, work_dir=tmp_path / "work")
+    ctx.engine_artifacts = HeliaAOTAdapter().prepare(cfg, ctx.work_dir)
+    set_profile_result(ctx, PmuResult(meta=FirmwareMeta()))
+    if remove:
+        path.unlink()
+    else:
+        path.write_text("platform: {facts: registered}\n")
+    assert run_conditions(ctx).target == "atomiq110_fpga_turbo"
+
+
+def test_explicit_catalog_override_works_for_sdk_only_physical_target():
+    target = resolved(
+        config("apollo5b_evb", platform={"facts": "catalog"}, override="apollo510_evb")
+    )
+    assert target.record()["target"] == "apollo510_evb"

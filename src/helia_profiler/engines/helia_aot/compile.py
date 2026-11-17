@@ -104,11 +104,9 @@ _EXPECTED_PRAGMA_SUFFIXES = (
 
 
 def aot_target_name(config: ProfileConfig) -> str:
-    """heliaAOT's name for the configured board, for the recorded conditions.
+    """Configured compiler selection, or another engine's board comparison label.
 
-    A heliaAOT run names the platform it compiled for, override included.
-    Any other engine names the board's mapped platform, or the board itself
-    when heliaAOT has no name for it, so every run records a target.
+    Capture conditions use the target retained during preparation.
     """
     if config.engine.type is EngineType.HELIA_AOT:
         return _resolve_aot_platform(config)
@@ -268,6 +266,16 @@ def _merged_aot_args(config: ProfileConfig) -> dict[str, Any]:
         _deep_merge(base_data, copy.deepcopy(extra))
     _prepare_aot_memory_config(base_data)
     return base_data
+
+
+def _compiler_config(config: ProfileConfig, args: dict[str, Any]) -> ProfileConfig:
+    """Retain merged file/inline settings for one compiler operation."""
+    return replace(
+        config,
+        engine=replace(
+            config.engine, config_path=None, config={**config.engine.config, "aot_args": args}
+        ),
+    )
 
 
 #: The ``ConversionResult`` views hpx attributes layers and plans arenas from.

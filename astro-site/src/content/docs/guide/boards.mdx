@@ -267,7 +267,7 @@ engine:
 
 Reservations are bytes subtracted once by the compiler and retained beside the
 derived size. No implicit stack or heap reservation is added. The retained
-`hpx_platform.json` records compiler policy and budgets; the conversion's own
+`<prefix>_platform.json` records compiler policy and budgets; the conversion's own
 plan must agree before hpx accepts it. `Session.analyze()` uses the session's
 full resolved target and compiler settings. A standalone board-only analysis
 has no overlay context unless its caller supplies the optional resolved config.

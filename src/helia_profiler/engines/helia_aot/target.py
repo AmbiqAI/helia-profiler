@@ -151,7 +151,10 @@ def select_target(config: ProfileConfig, options: object) -> CompilerTarget:
         )
     if supported.catalog_platform_schema != 1:
         raise EngineError("Unsupported heliaAOT catalog-platform record schema")
-    if not faithful or selection is None or selection.catalog is None:
+    frozen_catalog = (
+        selection.catalog if selection is not None else None
+    ) or config.platform_registry.catalog
+    if frozen_catalog is None or (not faithful and not override):
         raise EngineError("The HPX target has no frozen catalog selection for compiler projection")
 
     overlay = config.platform_registry.overlay_source
@@ -161,6 +164,7 @@ def select_target(config: ProfileConfig, options: object) -> CompilerTarget:
         raise EngineError("Use target.platform_overlay to freeze the compiler's catalog source")
     name = str(override or config.target.board)
     if not override:
+        assert selection is not None
         for key, expected in (("boot", selection.boot), ("addons", list(selection.addons))):
             if key in values and values[key] != expected:
                 raise EngineError(f"Compiler platform.{key} differs from the frozen HPX target")
@@ -179,7 +183,7 @@ def select_target(config: ProfileConfig, options: object) -> CompilerTarget:
         if overlay is not None:
             catalog = load_overlay(overlay.path, base=catalog)
         provenance = catalog_provenance(catalog)
-        if provenance != selection.catalog:
+        if provenance != frozen_catalog:
             raise EngineError("Compiler catalog differs from the frozen HPX source")
         chosen = catalog.resolve(name, boot=values.get("boot"), addons=values.get("addons", []))
         requires_overlay = False
@@ -191,7 +195,8 @@ def select_target(config: ProfileConfig, options: object) -> CompilerTarget:
             except PlatformError:
                 requires_overlay = True
         if not override and (
-            chosen.id != selection.target_id
+            selection is None
+            or chosen.id != selection.target_id
             or chosen.cores()[0].id != selection.core
             or (chosen.implementation.id if chosen.implementation else None)
             != selection.implementation

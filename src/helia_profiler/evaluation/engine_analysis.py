@@ -67,6 +67,7 @@ def analyze_for_engine(
     import tempfile
 
     from ..engines.helia_aot.compile import (
+        _compiler_config,
         _compiler_target,
         _merged_aot_args,
         aot_platform_for_board,
@@ -92,7 +93,9 @@ def analyze_for_engine(
                     "engine": {"type": "helia-aot"},
                 },
             )
-    target = _compiler_target(config, _merged_aot_args(config)) if config is not None else None
+    if config is not None:
+        config = _compiler_config(config, _merged_aot_args(config))
+    target = _compiler_target(config) if config is not None else None
     args = effective_aot_args(config, target=target) if config is not None else {}
 
     try:
