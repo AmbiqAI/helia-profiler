@@ -440,13 +440,32 @@
                 "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L77"
               },
               "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.RuntimeRecord.catalog_platform_schema",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "catalog_platform_schema",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "catalog_platform_schema: int | None = None",
+              "source": {
+                "line": 79,
+                "path": "src/helia_profiler/runtime/records.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L79"
+              },
+              "summary": ""
             }
           ],
           "name": "RuntimeRecord",
           "params": [],
           "raises": [],
           "returns": [],
-          "signature": "RuntimeRecord(\n    name: str,\n    version: str,\n    default: bool,\n    source: RuntimeSource,\n    precisions: Mapping[str, str | None],\n    qualified: tuple[QualifiedTarget, ...],\n    kernels: RuntimeSource | None = None,\n    archive_sha256: str | None = None,\n    transfer_observer: bool = False,\n) -> None",
+          "signature": "RuntimeRecord(\n    name: str,\n    version: str,\n    default: bool,\n    source: RuntimeSource,\n    precisions: Mapping[str, str | None],\n    qualified: tuple[QualifiedTarget, ...],\n    kernels: RuntimeSource | None = None,\n    archive_sha256: str | None = None,\n    transfer_observer: bool = False,\n    catalog_platform_schema: int | None = None,\n) -> None",
           "source": {
             "line": 62,
             "path": "src/helia_profiler/runtime/records.py",
@@ -474,9 +493,9 @@
               "returns": [],
               "signature": "state: RuntimeQualification",
               "source": {
-                "line": 84,
+                "line": 86,
                 "path": "src/helia_profiler/runtime/records.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L84"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L86"
               },
               "summary": ""
             },
@@ -493,9 +512,9 @@
               "returns": [],
               "signature": "reason: str | None",
               "source": {
-                "line": 85,
+                "line": 87,
                 "path": "src/helia_profiler/runtime/records.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L85"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L87"
               },
               "summary": ""
             },
@@ -512,9 +531,9 @@
               "returns": [],
               "signature": "record: RuntimeRecord | None",
               "source": {
-                "line": 86,
+                "line": 88,
                 "path": "src/helia_profiler/runtime/records.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L86"
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L88"
               },
               "summary": ""
             }
@@ -525,9 +544,9 @@
           "returns": [],
           "signature": "Qualification(state: RuntimeQualification, reason: str | None, record: RuntimeRecord | None) -> None",
           "source": {
-            "line": 80,
+            "line": 82,
             "path": "src/helia_profiler/runtime/records.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L80"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L82"
           },
           "summary": "The answer for one runtime version, precision and target, with the record it came from."
         },
@@ -544,9 +563,9 @@
           "returns": [],
           "signature": "runtimes() -> tuple[RuntimeRecord, ...]",
           "source": {
-            "line": 89,
+            "line": 91,
             "path": "src/helia_profiler/runtime/records.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L89"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L91"
           },
           "summary": "Every runtime record shipped with this heliaPROFILER, by name then version."
         },
@@ -563,9 +582,9 @@
           "returns": [],
           "signature": "qualification(name: str, version: str | None = None, *, board: str, clock: str, precision: str) -> Qualification",
           "source": {
-            "line": 135,
+            "line": 137,
             "path": "src/helia_profiler/runtime/records.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L135"
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/runtime/records.py#L137"
           },
           "summary": "Whether name at version is qualified for precision on board at clock."
         }
