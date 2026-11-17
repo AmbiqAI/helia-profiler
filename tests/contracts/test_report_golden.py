@@ -450,6 +450,7 @@ def _make_aot_ctx(tmp_path: Path) -> PipelineContext:
         engine="helia-aot",
     )
     ctx.engine_artifacts = HeliaAotArtifacts(
+        aot_platform_name="apollo510_evb",
         engine_type=EngineType.HELIA_AOT,
         engine_header="model_model.h",
         aot_prefix="model",

@@ -10,6 +10,7 @@ import pytest
 
 from helia_profiler.engines import EngineType
 from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.errors import EngineError
 from helia_profiler.evaluation.comparability import assess_comparability
 from helia_profiler.evaluation.compare import RunArtifacts
 from helia_profiler.placement import Placement
@@ -148,6 +149,13 @@ def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     specific = {"tensors": [{"type": "constant", "id": "0:w", "attributes": {"memory": "sram"}}]}
     ctx.engine_artifacts = _aot_artifacts(tmp_path, aot_memory_intent_json=json.dumps(specific))
     assert run_conditions(ctx).weights_memory == "mram"
+
+
+def test_aot_conditions_require_prepared_target_evidence(tmp_path):
+    ctx = _ctx(tmp_path, engine="helia-aot")
+    ctx.engine_artifacts = dataclasses.replace(_aot_artifacts(tmp_path), aot_platform_name=None)
+    with pytest.raises(EngineError, match="prepared compiler target"):
+        run_conditions(ctx)
 
 
 def test_aot_weights_memory_is_the_constant_rule_the_compiler_received(tmp_path: Path) -> None:
