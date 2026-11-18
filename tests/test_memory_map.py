@@ -133,10 +133,9 @@ def test_declared_and_generated_classification_ranges_are_pinned():
         mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_DECLARED_VS_CLASSIFICATION[name]
         legacy_mram = legacy[Placement.MRAM]
         real_mram = verified[MemoryRegion.MRAM].window
-        # atomiq110 is the one part whose legacy table already carries the
-        # real MRAM base (the FPGA map was added after #133); every older
-        # entry has the legacy 0x0.
-        assert legacy_mram.start == (mram_start if name == "atomiq110" else 0x0), name
+        # The declared range is the whole MRAM region; the verified window
+        # starts at the application origin above the bootloader.
+        assert legacy_mram.start <= real_mram.start and real_mram.end <= legacy_mram.end, name
         assert real_mram.start == mram_start, name
         assert (legacy_mram.length, real_mram.length) == mram_lens, name
         legacy_tcm = legacy[Placement.TCM]

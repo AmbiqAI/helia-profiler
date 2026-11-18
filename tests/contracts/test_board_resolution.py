@@ -70,7 +70,7 @@ def test_memory_ranges_resolve_from_board_metadata(board):
     assert Placement.MRAM in ranges
     for placement, mrange in ranges.items():
         assert mrange.length > 0, f"{board.name} {placement} has zero length"
-        # Start is a physical base address; MRAM is XIP at 0x0 so allow >= 0.
+        # Start is a physical base address; Apollo3/4 MRAM is XIP at 0x0 so allow >= 0.
         assert mrange.start >= 0
 
 
