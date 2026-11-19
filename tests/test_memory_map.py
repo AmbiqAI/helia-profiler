@@ -110,15 +110,55 @@ def test_apollo510_windows_are_the_linker_script_values():
 
 # Declared placement ranges and script classification apertures are distinct views.
 _EXPECTED_DECLARED_VS_CLASSIFICATION = {
-    #  name         real MRAM    (legacy, verified) lengths for MRAM / TCM / SRAM
-    "apollo3p": (0x0000C000, (2_097_152, 2_048_000), (65_536, 65_536), (720_896, 720_896)),
-    "apollo4p": (0x00018000, (2_097_152, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
-    "apollo4l": (0x00018000, (2_097_152, 1_998_848), (393_216, 393_216), (1_048_576, 1_048_576)),
-    "apollo510": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
-    "apollo510b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
-    "apollo5b": (0x00410000, (4_194_304, 4_128_768), (524_288, 524_288), (3_145_728, 3_145_728)),
-    "apollo330P": (0x00410000, (2_097_152, 2_031_616), (262_144, 262_144), (1_835_008, 1_835_008)),
-    "atomiq110": (0x22000000, (4_194_304, 4_194_304), (524_288, 524_288), (3_145_728, 3_145_728)),
+    # name: (legacy, verified) MRAM starts, then (legacy, verified) MRAM / TCM / SRAM lengths
+    "apollo3p": (
+        (0x00000000, 0x0000C000),
+        (2_097_152, 2_048_000),
+        (65_536, 65_536),
+        (720_896, 720_896),
+    ),
+    "apollo4p": (
+        (0x00000000, 0x00018000),
+        (2_097_152, 1_998_848),
+        (393_216, 393_216),
+        (1_048_576, 1_048_576),
+    ),
+    "apollo4l": (
+        (0x00000000, 0x00018000),
+        (2_097_152, 1_998_848),
+        (393_216, 393_216),
+        (1_048_576, 1_048_576),
+    ),
+    "apollo510": (
+        (0x00400000, 0x00410000),
+        (4_194_304, 4_128_768),
+        (524_288, 524_288),
+        (3_145_728, 3_145_728),
+    ),
+    "apollo510b": (
+        (0x00400000, 0x00410000),
+        (4_194_304, 4_128_768),
+        (524_288, 524_288),
+        (3_145_728, 3_145_728),
+    ),
+    "apollo5b": (
+        (0x00400000, 0x00410000),
+        (4_194_304, 4_128_768),
+        (524_288, 524_288),
+        (3_145_728, 3_145_728),
+    ),
+    "apollo330P": (
+        (0x00400000, 0x00410000),
+        (2_097_152, 2_031_616),
+        (262_144, 262_144),
+        (1_835_008, 1_835_008),
+    ),
+    "atomiq110": (
+        (0x22000000, 0x22000000),
+        (4_194_304, 4_194_304),
+        (524_288, 524_288),
+        (3_145_728, 3_145_728),
+    ),
 }
 _EXPECTED_DECLARED_VS_CLASSIFICATION["apollo510L"] = _EXPECTED_DECLARED_VS_CLASSIFICATION[
     "apollo330P"
@@ -130,13 +170,13 @@ def test_declared_and_generated_classification_ranges_are_pinned():
         soc = get_soc(name)
         legacy = soc_placement_ranges(soc)
         verified = {w.region: w for w in linked_memory_map(soc)}
-        mram_start, mram_lens, tcm_lens, sram_lens = _EXPECTED_DECLARED_VS_CLASSIFICATION[name]
+        mram_starts, mram_lens, tcm_lens, sram_lens = _EXPECTED_DECLARED_VS_CLASSIFICATION[name]
         legacy_mram = legacy[Placement.MRAM]
         real_mram = verified[MemoryRegion.MRAM].window
         # The declared range is the whole MRAM region; the verified window
         # starts at the application origin above the bootloader.
         assert legacy_mram.start <= real_mram.start and real_mram.end <= legacy_mram.end, name
-        assert real_mram.start == mram_start, name
+        assert (legacy_mram.start, real_mram.start) == mram_starts, name
         assert (legacy_mram.length, real_mram.length) == mram_lens, name
         legacy_tcm = legacy[Placement.TCM]
         real_dtcm = verified[MemoryRegion.DTCM].window
