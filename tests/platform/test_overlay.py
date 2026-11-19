@@ -85,6 +85,26 @@ def test_board_and_soc_lineages_are_resolved_independently(tmp_path):
     assert snapshot.expected_linker is None
 
 
+def test_unrecorded_overlay_dcache_uses_family_default(tmp_path):
+    core = {
+        "id": "cm55_0",
+        "role": "application",
+        "core": "cortex-m55",
+        "clock_domain": "cpu",
+        "programmable_by": "customer",
+        "options": {"fpu": "fpv5-sp-d16", "mve": "fp"},
+    }
+    path = _overlay(
+        tmp_path,
+        socs={"lab_chip": {"based_on": "apollo510", "cores": [core]}},
+        parts={"lab_part": {"based_on": "AP510NFA-CBR", "soc": "lab_chip"}},
+        boards={"lab": {"based_on": "apollo510_evb", "part": "lab_part"}},
+    )
+    soc = config_platform(_config(path, tmp_path)).soc
+    assert soc.catalog_has_dcache is None
+    assert soc.capabilities.memory.has_dcache is True
+
+
 def test_overlay_composition_with_builtin_leaves_is_still_custom(tmp_path):
     path = _overlay(tmp_path, compositions={"lab": {"board": "apollo3p_evb", "addons": ["cygnus"]}})
     snapshot = config_platform(_config(path, tmp_path))

@@ -184,6 +184,8 @@ def _soc(
         itcm_kb=size("itcm"),
         psram_kb=_external_kib(target),
     )
+    # The catalog's 0 states no D-cache; None means unrecorded, so the family default applies.
+    dcache_kb = target.core_options.dcache_kb
     soc = SocDef(
         name=name,
         family=policy.family,
@@ -211,7 +213,7 @@ def _soc(
         npu=target.npu.npu.accelerator_config if target.npu else None,
         catalog_target_id=target.id,
         catalog_app_flash_load_addr=target.flash_load_address(),
-        catalog_has_dcache=bool(target.core_options.dcache_kb),
+        catalog_has_dcache=None if dcache_kb is None else dcache_kb > 0,
         origin=SocOrigin.CUSTOM if custom else SocOrigin.BUILTIN,
         registered_name=None if custom else name,
         memory_bases_like=policy_name if custom else None,

@@ -60,10 +60,10 @@ def render(partial, **values):
     [
         ("apollo330P", "AM_HAL_PWRCTRL_SRAM_1P75M", True, True, 48, True),
         ("apollo510L", "AM_HAL_PWRCTRL_SRAM_1P75M", True, True, 48, True),
-        ("apollo3p", "AM_HAL_PWRCTRL_SRAM_3M", False, False, 48, False),
+        ("apollo3p", "AM_HAL_PWRCTRL_SRAM_3M", False, False, 48, None),
         ("atomiq110", "AM_HAL_PWRCTRL_SRAM_3M", False, False, 48, True),
-        ("apollo4l", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, False),
-        ("apollo4p", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, False),
+        ("apollo4l", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, None),
+        ("apollo4p", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, None),
         ("apollo510", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, True),
         ("apollo510b", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, True),
         ("apollo5b", "AM_HAL_PWRCTRL_SRAM_3M", True, False, None, None),
@@ -121,11 +121,11 @@ def test_swo_uses_inherited_trace_policy_instead_of_cpu(tmp_path, base, cpu_mhz)
     "base,family,core,mve,cache",
     [
         ("apollo510", "ap4", "cortex-m4", False, True),
-        ("apollo3p", "ap5", "cortex-m55", True, False),
+        ("apollo3p", "ap5", "cortex-m55", True, None),
         ("apollo5b", "ap4", "cortex-m4", False, None),
     ],
 )
-def test_known_cache_fact_wins_over_explicit_family_fallback(
+def test_known_cache_fact_wins_and_unrecorded_uses_family_fallback(
     tmp_path, base, family, core, mve, cache
 ):
     cfg = config(
