@@ -268,8 +268,8 @@ _FAMILY_MEMORY_BASES: dict[SocFamily, dict[Placement, int]] = {
     },
     SocFamily.AP5: {
         Placement.TCM: 0x20000000,  # DTCM
-        Placement.SRAM: 0x20080000,  # SSRAM (right after 512 KB DTCM)
-        Placement.MRAM: 0x00000000,  # MRAM (XIP)
+        Placement.SRAM: 0x20080000,  # SSRAM
+        Placement.MRAM: 0x00400000,  # MRAM (XIP)
         Placement.PSRAM: 0x60000000,
     },
 }
