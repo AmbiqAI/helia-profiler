@@ -269,6 +269,9 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         engines=AOT_ENGINES,
         condition=GATE_SWEEP_EVIDENCE,
         value_shape="<cycles>,<provider error>,cold|warm|unknown",
+        note="Zero cycles means STIMER could not validate the DWT interval. "
+        "The provider retains its last error until a successful bind; a nonzero "
+        "status does not count failures.",
     ),
     _spec(
         WireKey.STREAM_EVIDENCE.wire,

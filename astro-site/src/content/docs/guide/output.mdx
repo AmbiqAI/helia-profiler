@@ -696,5 +696,5 @@ The command exits unsuccessfully if any candidate failed.
 Reuse the output directory to consult its measurement cache. Pass
 `--remeasure PLAN_SHA256` to take a fresh measurement for one plan under the
 current conditions. Instrumented inference cycles and output identity refer
-to the same timed runs. Clean-window energy belongs to a different interval
-and is reported as unavailable in the measurement.
+to the same timed runs. When enabled, separately measured clean-window energy is reported as
+`clean_window_energy_uj`. The instrumented measurement leaves `energy_uj` null.

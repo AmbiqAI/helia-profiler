@@ -1,3 +1,6 @@
+import hashlib
+import json
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -22,12 +25,16 @@ def test_sweep_records_build_failure_and_continues(tmp_path, monkeypatch):
     )
     plans = [tmp_path / name for name in ("a.json", "b.json")]
     for plan in plans:
-        plan.write_text(plan.stem)
+        plan.write_text(
+            json.dumps(
+                {"name": plan.stem, "model": {"sha256": hashlib.sha256(b"model").hexdigest()}}
+            )
+        )
     seen = []
-    monkeypatch.setattr(module, "hpx_cache_root", lambda: tmp_path)
+    monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
 
     def measure(config, plan, digest, root, attempt, references, force):
-        seen.append(plan.read_text())
+        seen.append(json.loads(plan.read_text())["name"])
         if len(seen) == 1:
             raise ConfigError("fixture compile failed")
         return module.SweepRow(digest, "measured")
@@ -49,3 +56,26 @@ def test_sweep_cli_requires_reference():
     )
     assert result.exit_code == 2
     assert "reference-digest" in result.output
+
+
+def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
+    path = tmp_path / "measurement.json"
+    record = dict(
+        plan_sha256="A",
+        converted_plan_sha256="C",
+        cache_key="K",
+        output_identical=True,
+        dma_failures=0,
+        cycles=102,
+        pool_bytes=100,
+        energy_uj=None,
+    )
+    path.write_text(json.dumps(record))
+    entry = tmp_path / "entry.json"
+    entry.write_text(
+        json.dumps({"key": "K", "path": path.name, "sha256": module._sha(path.read_bytes())})
+    )
+    assert module._read_cache(entry, tmp_path, "K", "A", "C") is not None
+    assert module._read_cache(entry, tmp_path, "K", "B", "C") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "D") is None
+    assert module._read_cache(entry, tmp_path, "L", "A", "C") is None

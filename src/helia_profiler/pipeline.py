@@ -11,6 +11,7 @@ import logging
 import shutil
 import uuid
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -275,7 +276,14 @@ class PipelineContext:
         reported = result.meta.dcache
         if reported not in (None, "on", "off"):
             raise CaptureError(f"Invalid firmware data-cache mode: {reported!r}")
-        if (reported or "on") != self.config.profiling.dcache:
+        expected_cache = self.config.profiling.dcache
+        if (
+            self.config.profiling.sweep_evidence
+            and self.soc
+            and not self.soc.capabilities.memory.has_dcache
+        ):
+            expected_cache = "off"
+        if (reported or "on") != expected_cache:
             raise CaptureError(
                 "Firmware data-cache mode does not match profiling.dcache.",
                 hint="Rebuild and flash the profile firmware with the requested cache setting.",
@@ -445,10 +453,11 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
-        self.run_stages(ctx)
+        with ExitStack() as locks:
+            self.run_stages(ctx, locks=locks)
         return ctx
 
-    def run_stages(self, ctx: PipelineContext) -> None:
+    def run_stages(self, ctx: PipelineContext, *, locks: ExitStack | None = None) -> None:
         """Run this sequence on a prepared context in a caller-owned workspace."""
         total_stages = len(self._stages)
         for stage_index, stage in enumerate(self._stages, start=1):
@@ -461,6 +470,10 @@ class PipelineRunner:
             log.info("[start] %s", stage.name)
             if self._observer is not None:
                 self._observer.stage_start(stage.name, stage_index, total_stages)
+            if locks is not None and stage.name == "flash_firmware" and ctx.effective_jlink_serial:
+                from .target.probe.reservation import reserve_probe
+
+                locks.enter_context(reserve_probe(ctx.effective_jlink_serial))
             try:
                 stage.run(ctx)
             except KeyboardInterrupt:

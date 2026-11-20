@@ -39,14 +39,24 @@ def _field(lines: Sequence[str], name: str) -> str:
 class _TimedRun:
     cycles: int
     preparation: str
+    output_identical: bool
 
 
-def _timed_run(lines: list[str], reference_outputs: tuple[str, ...]) -> _TimedRun:
+@dataclass(frozen=True)
+class _Timing:
+    cycles: float
+    regime: str | None
+    output_identical: bool
+
+
+def _timed_run(lines: list[str], reference_outputs: tuple[str, ...], sample: str) -> _TimedRun:
     match = _EVIDENCE.fullmatch(_field(lines, WireKey.AOT_RUN_EVIDENCE.wire))
     if not match or not 0 < int(match[1]) < 2**32:
         raise ValueError("Missing or invalid timed inference cycles or transfer evidence")
     if int(match[2]):
-        raise ValueError(f"DMA provider reported error {match[2]}")
+        raise ValueError(
+            f"{sample}: DMA provider last-error status {match[2]}; transfer failure count unavailable"
+        )
     outputs = []
     for line in lines:
         if line.startswith("HPX_OUTPUT_") and "_FNV1A64=" in line:
@@ -54,14 +64,12 @@ def _timed_run(lines: list[str], reference_outputs: tuple[str, ...]) -> _TimedRu
             if not digest or int(digest[1]) != len(outputs):
                 raise ValueError("Missing, malformed or duplicate timed output digest")
             outputs.append(digest[2])
-    if tuple(outputs) != reference_outputs:
-        raise ValueError("Timed output digests differ from the reference or are incomplete")
-    return _TimedRun(int(match[1]), match[3])
+    if len(outputs) != len(reference_outputs):
+        raise ValueError(f"{sample}: incomplete timed output digests")
+    return _TimedRun(int(match[1]), match[3], tuple(outputs) == reference_outputs)
 
 
-def _timing(
-    raw: str, reference_outputs: tuple[str, ...], cache: object
-) -> tuple[float, str | None]:
+def _timing(raw: str, reference_outputs: tuple[str, ...], cache: object) -> _Timing:
     lines = [line.strip() for line in raw.splitlines()]
     if lines.count(HPX_START_SENTINEL) != 1 or lines.count(HPX_END_SENTINEL) != 1:
         raise ValueError("Expected a single completed capture")
@@ -94,7 +102,9 @@ def _timing(
         if len(boundaries) != iterations:
             raise ValueError("Incomplete model-only timed samples")
         for start, end in zip(boundaries, [*boundaries[1:], len(lines)], strict=True):
-            runs.append(_timed_run(lines[start:end], reference_outputs))
+            runs.append(
+                _timed_run(lines[start:end], reference_outputs, f"Model-only sample {len(runs)}")
+            )
     for idx, start in enumerate(starts):
         if lines[start] != f"--- HPX_PRESET {presets[idx]} ---":
             raise ValueError("Timed pass order disagrees with announced presets")
@@ -106,13 +116,21 @@ def _timing(
             if section[pos] != f"--- HPX_ITER {iteration} ---":
                 raise ValueError("Missing or duplicate timed iteration")
             end = frames[iteration + 1] if iteration + 1 < len(frames) else len(section)
-            runs.append(_timed_run(section[pos:end], reference_outputs))
+            runs.append(
+                _timed_run(
+                    section[pos:end], reference_outputs, f"{presets[idx]} sample {iteration}"
+                )
+            )
     if not runs or len(runs) != int(_field(lines, WireKey.PROFILED_INFER_COUNT.wire)):
         raise ValueError("Instrumented inference count disagrees with evidence")
     regimes = {run.preparation for run in runs}
     if cache == "on" and regimes not in ({"warm"}, {"cold"}):
         raise ValueError("Cache preparation unknown or inconsistent across timed runs")
-    return sum(run.cycles for run in runs) / len(runs), regimes.pop() if cache == "on" else None
+    return _Timing(
+        sum(run.cycles for run in runs) / len(runs),
+        regimes.pop() if cache == "on" else None,
+        all(run.output_identical for run in runs),
+    )
 
 
 def admit_measurement(
@@ -150,22 +168,22 @@ def admit_measurement(
         raw = (bundle / capture.path).read_bytes()
         if hashlib.sha256(raw).hexdigest() != capture.sha256:
             raise ValueError("Firmware output does not match the manifest")
-        cycles, regime = _timing(raw.decode(), reference_outputs, conditions["weights_cache"])
+        timing = _timing(raw.decode(), reference_outputs, conditions["weights_cache"])
     except (HpxError, OSError) as exc:
         raise ValueError(str(exc)) from exc
-    if cache_regime is not None and cache_regime != regime:
+    if cache_regime is not None and cache_regime != timing.regime:
         raise ValueError(
-            f"Observed cache regime {regime!r} differs from requested {cache_regime!r}"
+            f"Observed cache regime {timing.regime!r} differs from requested {cache_regime!r}"
         )
-    if regime is not None:
-        conditions["cache_regime"] = regime
+    if timing.regime is not None:
+        conditions["cache_regime"] = timing.regime
     return {
         "schema_version": 1,
         "plan_sha256": plan_sha256,
         "conditions": conditions,
-        "cycles": cycles,
+        "cycles": timing.cycles,
         "energy_uj": None,
-        "output_identical": True,
+        "output_identical": timing.output_identical,
         "dma_failures": 0,
         "per_operator": per_operator,
     }

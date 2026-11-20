@@ -312,6 +312,8 @@ stages/report.py
 stages/resolve_platform.py
 stages/resolve_probe.py
 stages/verify_placement.py
+sweep.py
+sweep_evidence.py
 target/__init__.py
 target/lifecycle.py
 target/probe/__init__.py

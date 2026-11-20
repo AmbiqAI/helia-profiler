@@ -482,7 +482,7 @@ def _spec(*args, **kwargs) -> WireSpec:
 # appears here, and the census asserts the two sets match exactly — a typo
 # cannot silently become an unchecked condition.
 GATE_NOT_POWER_ONLY = "not power_only"
-GATE_DCACHE_METADATA = "has_dcache and not power_only"
+GATE_DCACHE_METADATA = "(has_dcache or sweep_evidence) and not power_only"
 GATE_MODEL_ONLY = "not per_layer_profiling and not power_only"
 GATE_LAYER_PROFILE = "per_layer_profiling and not power_only"
 GATE_LAYER_CALLBACKS = "per_layer_profiling"

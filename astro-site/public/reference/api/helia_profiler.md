@@ -256,7 +256,7 @@ User-meaningful progress within a pipeline stage.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/pipeline.py:57`
+Source: `src/helia_profiler/pipeline.py:58`
 
 ### helia_profiler.ProgressUpdate.message
 
@@ -266,7 +266,7 @@ Source: `src/helia_profiler/pipeline.py:57`
 message: str
 ```
 
-Source: `src/helia_profiler/pipeline.py:61`
+Source: `src/helia_profiler/pipeline.py:62`
 
 ### helia_profiler.ProgressUpdate.kind
 
@@ -276,7 +276,7 @@ Source: `src/helia_profiler/pipeline.py:61`
 kind: Literal['status', 'checkpoint'] = 'status'
 ```
 
-Source: `src/helia_profiler/pipeline.py:62`
+Source: `src/helia_profiler/pipeline.py:63`
 
 ### helia_profiler.ProgressUpdate.completed
 
@@ -286,7 +286,7 @@ Source: `src/helia_profiler/pipeline.py:62`
 completed: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:63`
+Source: `src/helia_profiler/pipeline.py:64`
 
 ### helia_profiler.ProgressUpdate.total
 
@@ -296,7 +296,7 @@ Source: `src/helia_profiler/pipeline.py:63`
 total: int | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:64`
+Source: `src/helia_profiler/pipeline.py:65`
 
 ### helia_profiler.ProgressUpdate.unit
 
@@ -306,7 +306,7 @@ Source: `src/helia_profiler/pipeline.py:64`
 unit: str | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:65`
+Source: `src/helia_profiler/pipeline.py:66`
 
 ### helia_profiler.ProgressUpdate.eta_s
 
@@ -316,7 +316,7 @@ Source: `src/helia_profiler/pipeline.py:65`
 eta_s: float | None = None
 ```
 
-Source: `src/helia_profiler/pipeline.py:66`
+Source: `src/helia_profiler/pipeline.py:67`
 
 ### helia_profiler.ProgressUpdate.min_verbosity
 
@@ -326,7 +326,7 @@ Source: `src/helia_profiler/pipeline.py:66`
 min_verbosity: int = 0
 ```
 
-Source: `src/helia_profiler/pipeline.py:67`
+Source: `src/helia_profiler/pipeline.py:68`
 
 ## helia_profiler.Session
 

@@ -96,7 +96,7 @@
 #include "am_mcu_apollo.h"
 {% endif %}
 {% endif %}
-{% if ((window_timer == "stimer") or (power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)))) and not apollo3_burst and not has_armv8m_pmu %}
+{% if ((window_timer == "stimer") or (sweep_evidence | default(false) and not power_only | default(false)) or (power_only | default(false) and (broad_peripheral_shutdown | default(false) or crypto_otp_shutdown | default(false)))) and not apollo3_burst and not has_armv8m_pmu %}
 // STIMER window timing (_stimer_init.j2), the broad peripheral power-down
 // (_peripheral_power_down.j2) and the crypto-otp shutdown
 // (_crypto_otp_shutdown.j2) all need register definitions from the same
@@ -141,7 +141,7 @@
 
 {% include "_dwt_init.j2" %}
 
-{% if window_timer == "stimer" %}
+{% if window_timer == "stimer" or (sweep_evidence | default(false) and not power_only | default(false)) %}
 {% include "_stimer_init.j2" %}
 {% endif %}
 

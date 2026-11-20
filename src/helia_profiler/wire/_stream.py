@@ -184,7 +184,8 @@ START_HEADER_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.DCACHE,
         condition=GATE_DCACHE_METADATA,
         value_shape="on | off",
-        note="An off request requires a matching report; old on/default streams may omit it.",
+        note="An off request requires a matching report. Sweep firmware also reports off "
+        "on targets without a CPU data cache. Older on/default streams may omit the field.",
     ),
     _spec(
         WireKey.VERSION.wire,

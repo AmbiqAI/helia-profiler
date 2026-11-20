@@ -1,5 +1,5 @@
 #ifdef HPX_AOT_TRANSFER
-{% include "_aot_transfer_clock.j2" %}
+{% if not sweep_evidence | default(false) %}{% include "_aot_transfer_clock.j2" %}{% endif %}
 struct HpxTraceSpan {
     uint32_t start, end;
     int32_t status;
