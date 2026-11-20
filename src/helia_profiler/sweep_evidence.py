@@ -12,6 +12,7 @@ from .calibration import read_bundle
 from .calibration.table import _conditions, _model_sha256, _plan, _require_usable_cycles
 from .errors import HpxError
 from .evaluation.compare import load_run_artifacts
+from .results import RunStatus
 from .results.manifest import load_result_manifest
 from .wire import (
     HPX_END_SENTINEL,
@@ -128,12 +129,8 @@ def admit_measurement(
         raise ValueError("Expected a lowercase 16-digit FNV-1a digest for every output")
     try:
         manifest = load_result_manifest(bundle / "result_manifest.json")
-        capture = next((a for a in manifest.artifacts if a.path == "firmware_output.txt"), None)
-        if capture is None:
-            raise ValueError("No manifest-declared instrumented firmware output")
-        raw = (bundle / capture.path).read_bytes()
-        if hashlib.sha256(raw).hexdigest() != capture.sha256:
-            raise ValueError("Firmware output does not match the manifest")
+        if manifest.status != RunStatus.COMPLETE:
+            raise ValueError("Sweep measurement requires a completed capture")
         if manifest.bundle_type == "profile-model-only":
             run = load_run_artifacts(bundle)
             name = str(run.path)
@@ -147,6 +144,12 @@ def admit_measurement(
             source = read_bundle(bundle)
             conditions = dict(source.conditions)
             per_operator = {sample.operator: sample.cycles for sample in source.samples}
+        capture = next((a for a in manifest.artifacts if a.path == "firmware_output.txt"), None)
+        if capture is None:
+            raise ValueError("No manifest-declared instrumented firmware output")
+        raw = (bundle / capture.path).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != capture.sha256:
+            raise ValueError("Firmware output does not match the manifest")
         cycles, regime = _timing(raw.decode(), reference_outputs, conditions["weights_cache"])
     except (HpxError, OSError) as exc:
         raise ValueError(str(exc)) from exc

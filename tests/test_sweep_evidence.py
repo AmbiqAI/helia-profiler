@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from helia_profiler.results import load_result_manifest
 from helia_profiler.sweep_evidence import _timing, admit_measurement
 from tests.calibration_bundles import bundle
 from tests.result_bundles import publish_manifest
@@ -70,7 +73,7 @@ def test_no_regime_for_disabled_cache():
     assert _timing(_RAW.replace("DCACHE=on", "DCACHE=off"), _REFERENCES, "off") == (103, None)
 
 
-def test_static_samples_are_timed_and_checked_without_operator_callbacks():
+def test_static_samples_are_timed_and_checked_without_operator_callbacks(tmp_path: Path):
     static = _RAW.replace("HPX_NUM_PRESETS=1", "HPX_NUM_PRESETS=0").replace(
         "HPX_PRESETS=Cache", "HPX_PRESETS=\nHPX_PER_LAYER_PROFILING=0"
     )
@@ -83,3 +86,22 @@ def test_static_samples_are_timed_and_checked_without_operator_callbacks():
     assert _timing(static, _REFERENCES, "on") == (103, "warm")
     with pytest.raises(ValueError):
         _timing(static.replace(_REFERENCES[0], "bad", 1), _REFERENCES, "on")
+    run = bundle(tmp_path / "model-only", cycles={})
+    (run / "profile_results.csv").unlink()
+    summary_path = run / "summary.json"
+    summary = json.loads(summary_path.read_text())
+    summary["per_layer_profiling"] = False
+    summary["total_cycles"] = None
+    summary_path.write_text(json.dumps(summary))
+    (run / "firmware_output.txt").write_text(static)
+    path = publish_manifest(run)
+    manifest = load_result_manifest(path)
+    names = {"summary.json": "hpx.summary", "run_metadata.json": "hpx.run-metadata"}
+    artifacts = tuple(
+        replace(item, name=names[item.path], optional=False) if item.path in names else item
+        for item in manifest.artifacts
+    )
+    replace(manifest, bundle_type="profile-model-only", artifacts=artifacts).write(path)
+    result = admit_measurement(run, plan_sha256="e" * 64, reference_outputs=_REFERENCES)
+    assert result["cycles"] == 103
+    assert result["per_operator"] == {}
