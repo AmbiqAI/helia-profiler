@@ -23,7 +23,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 280.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--settle-seconds` | `float` | 60 | Bound on each wait for the board to start and to finish, in seconds (more than 0, at most 300) |
-| `--evidence-dir` | `Path \| None` |  | New directory inside DIR for the capture's evidence and its saved result.json (default: DIR/evidence-<N>) |
+| `--evidence-dir` | `Optional[Path]` |  | New directory inside DIR for the capture's evidence and its saved result.json (default: DIR/evidence-<N>) |
 | `--verbose, -v` | `int` | 0 | Increase verbosity |
 
 ### output verification
@@ -32,7 +32,7 @@ Defined in `src/helia_profiler/cli/run_app.py` line 280.
 | --- | --- | --- | --- |
 | `--expect` | `host-litert \| none` |  | Reference outputs: host-litert runs the model on the host (default), none skips verification |
 | `--tolerance` | `float` | 0 | Largest accepted absolute error per element, in stored units |
-| `--reference` | `list[Path] \| None` |  | Reference bytes for one output; repeat once per output, in model order. Replaces --expect. Repeatable. |
+| `--reference` | `Optional[list[Path]]` |  | Reference bytes for one output; repeat once per output, in model order. Replaces --expect. Repeatable. |
 
 ### target hardware
 

@@ -17,7 +17,7 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 100.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--models` | `str` |  | Comma-separated model IDs (default: all). See `hpx validate --list`. |
-| `--models-file` | `Path \| None` |  | YAML registry of custom validation models and comparison groups. |
+| `--models-file` | `Optional[Path]` |  | YAML registry of custom validation models and comparison groups. |
 | `--model-paths` | `str` |  | Comma-separated .tflite paths for an ad hoc comparison. |
 | `--comparison-group` | `str` | custom | Shared decision group for models supplied through --model-paths. |
 | `--model-arena-size` | `int` | 524288 | Arena size in bytes for models supplied through --model-paths. |
@@ -38,7 +38,7 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 100.
 | `--output-dir` | `Path` | results/validation | Where to write per-case artifacts + summary report (default: ./results/validation). |
 | `--timeout` | `float` | 900 | Per-case timeout in seconds (default: 900). |
 | `-k, -k` | `str` |  | Pytest keyword expression — filter cases by substring match (e.g. 'kws-aot'). |
-| `--junit-xml` | `Path \| None` |  | Emit JUnit-XML report at this path (for CI consumption). |
+| `--junit-xml` | `Optional[Path]` |  | Emit JUnit-XML report at this path (for CI consumption). |
 | `--list` | `bool` | false | List matching cases and exit without running. |
 | `--verbose, -v` | `int` | 0 |  |
 

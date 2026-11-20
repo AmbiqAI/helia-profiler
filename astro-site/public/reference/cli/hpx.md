@@ -16,6 +16,6 @@ Defined in `src/helia_profiler/cli/app.py` line 50.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--version` | `bool \| None` |  | show program's version number and exit |
+| `--version` | `Optional[bool]` |  | show program's version number and exit |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

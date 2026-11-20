@@ -106,7 +106,7 @@
           "name": "boolean",
           "class": "BoolParamType"
         },
-        "python_type": "bool | None",
+        "python_type": "Optional[bool]",
         "default": null,
         "required": false,
         "help": "show program's version number and exit",
@@ -191,7 +191,7 @@
                 "executorch"
               ]
             },
-            "python_type": "EngineType | None",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph.",
@@ -282,7 +282,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Write output to file",
@@ -443,7 +443,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "list[Path] | None",
+            "python_type": "Optional[list[Path]]",
             "default": null,
             "required": false,
             "help": "Raw bytes for one model input; repeat once per input, in model order (default: zero-filled inputs)",
@@ -534,7 +534,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "The plan's model, when it is no longer at the path the plan records",
@@ -565,7 +565,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Firmware build directory inside OUT (default: OUT/work); the saved build records its files relative to OUT",
@@ -912,7 +912,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Write comparison artifacts to this directory",
@@ -943,7 +943,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Versioned JSON comparison profile for regression verdicts",
@@ -1073,7 +1073,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Write a sanitized support-bundle archive to this file or directory instead of printing the toolchain table",
@@ -1104,7 +1104,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Prepared profiler_app directory (or its nsx.lock/hpx-dependencies.json, or the parent fingerprint workspace) to include exact dependency lock provenance in the bundle",
@@ -1135,7 +1135,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead",
@@ -1161,7 +1161,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Toolchain to check (default: arm-none-eabi-gcc)",
@@ -1193,7 +1193,7 @@
                 "uart"
               ]
             },
-            "python_type": "Transport | None",
+            "python_type": "Optional[Transport]",
             "default": null,
             "required": false,
             "help": "Transport to check (default: rtt)",
@@ -1225,7 +1225,7 @@
                 "executorch"
               ]
             },
-            "python_type": "EngineType | None",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Engine to check (default: helia-rt)",
@@ -1374,7 +1374,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Path to .tflite or .pte model file",
@@ -1444,7 +1444,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "YAML config file (hpx.yml)",
@@ -1505,7 +1505,7 @@
                 "executorch"
               ]
             },
-            "python_type": "EngineType | None",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Inference engine (default: helia-rt)",
@@ -1531,7 +1531,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Kernel backend (engine.backend). Run builds need helia for helia-rt and cmsis_nn for litert.",
@@ -1562,7 +1562,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Engine-specific YAML config",
@@ -1588,7 +1588,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Tensor arena size in bytes",
@@ -1619,7 +1619,7 @@
                 "psram"
               ]
             },
-            "python_type": "helia_profiler.cli.choices._ArenaLocation | None",
+            "python_type": "Optional[helia_profiler.cli.choices._ArenaLocation]",
             "default": null,
             "required": false,
             "help": "Tensor arena placement. Omit to let the engine and memory planner choose.",
@@ -1651,7 +1651,7 @@
                 "psram"
               ]
             },
-            "python_type": "Placement | None",
+            "python_type": "Optional[Placement]",
             "default": null,
             "required": false,
             "help": "Model weights placement. Omit to let the engine and memory planner choose.",
@@ -1681,7 +1681,7 @@
                 "cm55"
               ]
             },
-            "python_type": "helia_profiler.cli.choices._CoreOverride | None",
+            "python_type": "Optional[helia_profiler.cli.choices._CoreOverride]",
             "default": null,
             "required": false,
             "help": "Select the core library in an explicit heliaRT prebuilt distribution.",
@@ -1707,7 +1707,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Target board (default: apollo510_evb)",
@@ -1733,7 +1733,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Toolchain (default: arm-none-eabi-gcc; run builds use atfe)",
@@ -1759,7 +1759,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "CPU clock speed (board-specific, e.g. 'lp'/'hp'; run builds use lp)",
@@ -1785,7 +1785,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Timed iterations (default: 100)",
@@ -1811,7 +1811,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Warmup iterations (default: 5)",
@@ -1987,7 +1987,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Joulescope serial number to select when multiple are connected",
@@ -2055,7 +2055,7 @@
                   "name": "str",
                   "class": "StringParamType"
                 },
-                "python_type": "str | None",
+                "python_type": "Optional[str]",
                 "default": null,
                 "required": false,
                 "help": "Inspect each probe against this board's J-Link device string",
@@ -2181,7 +2181,7 @@
                   "name": "str",
                   "class": "StringParamType"
                 },
-                "python_type": "str | None",
+                "python_type": "Optional[str]",
                 "default": null,
                 "required": false,
                 "help": "Optional requested serial to validate against the selected board",
@@ -2260,7 +2260,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Path to .tflite or .pte model file",
@@ -2293,7 +2293,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "YAML config file (hpx.yml)",
@@ -2354,7 +2354,7 @@
                 "executorch"
               ]
             },
-            "python_type": "EngineType | None",
+            "python_type": "Optional[EngineType]",
             "default": null,
             "required": false,
             "help": "Inference engine (default: helia-rt)",
@@ -2385,7 +2385,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Engine-specific YAML config",
@@ -2411,7 +2411,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Tensor arena size in bytes",
@@ -2442,7 +2442,7 @@
                 "psram"
               ]
             },
-            "python_type": "helia_profiler.cli.choices._ArenaLocation | None",
+            "python_type": "Optional[helia_profiler.cli.choices._ArenaLocation]",
             "default": null,
             "required": false,
             "help": "Tensor arena placement. helia-rt: places the single runtime tensor arena. helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
@@ -2474,7 +2474,7 @@
                 "psram"
               ]
             },
-            "python_type": "Placement | None",
+            "python_type": "Optional[Placement]",
             "default": null,
             "required": false,
             "help": "Model weights placement. helia-rt: places the model flatbuffer (psram requires J-Link upload via the RTT transport). helia-aot: use engine.config.aot_args.memory.tensors instead. Omit to let the engine and memory planner choose.",
@@ -2504,7 +2504,7 @@
                 "cm55"
               ]
             },
-            "python_type": "helia_profiler.cli.choices._CoreOverride | None",
+            "python_type": "Optional[helia_profiler.cli.choices._CoreOverride]",
             "default": null,
             "required": false,
             "help": "Select the core library in an explicit heliaRT prebuilt distribution. Unsupported for registry and local source builds.",
@@ -2530,7 +2530,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Target board (default: apollo510_evb)",
@@ -2556,7 +2556,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Toolchain (default: arm-none-eabi-gcc)",
@@ -2582,7 +2582,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "J-Link probe serial number (default: auto-detect)",
@@ -2614,7 +2614,7 @@
                 "uart"
               ]
             },
-            "python_type": "Transport | None",
+            "python_type": "Optional[Transport]",
             "default": null,
             "required": false,
             "help": "Data transport (default: rtt). RTT is recommended for lossless capture.",
@@ -2640,7 +2640,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Explicit USB CDC device path for --transport usb_cdc (for example /dev/ttyACM1).",
@@ -2666,7 +2666,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "SEGGER RTT up-buffer size for generated RTT firmware. If too small, non-blocking writes during timed inference may be dropped, while blocking CSV/HPX_END writes may stall long enough to hit host timeouts. If omitted, hpx uses a toolchain-aware default.",
@@ -2692,7 +2692,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "CPU clock speed for generated firmware (board-specific, e.g. 'lp'/'hp'). Default: the board's lowest-power tier.",
@@ -2796,7 +2796,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "NSX channel for module resolution (default: the board's registered channel).",
@@ -2822,7 +2822,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "list[str] | None",
+            "python_type": "Optional[list[str]]",
             "default": null,
             "required": false,
             "help": "Override an NSX module's source. Repeatable. Engine-owned nsx-helia-rt/nsx-cmsis-nn use engine.config instead. Keys: path (local dir), ref (owning project Git tag/SHA). Examples: --nsx-module nsx-core:path=/my/nsx-core --nsx-module nsx-cmsis-core:ref=feat/new-cmsis --nsx-module nsx-gpio:ref=actual-project-tag",
@@ -2848,7 +2848,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "CMake compiler launcher to cache compiles (e.g. sccache, ccache). 'auto' (default) uses sccache/ccache if installed; a name or path requires it to be found. Overrides build.compiler_launcher; the HPX_COMPILER_LAUNCHER env var overrides both.",
@@ -2900,7 +2900,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "list[str] | None",
+            "python_type": "Optional[list[str]]",
             "default": null,
             "required": false,
             "help": "PMU counter selection per compute unit. Repeatable. Format: GROUP:SELECT where GROUP is a supported group for the target SoC (for example cpu/mve/memory on Cortex-M55) and SELECT is 'default', 'all', or comma-separated counter names. Examples: --pmu-counters cpu:default --pmu-counters mve:all, --pmu-counters mve:ARM_PMU_MVE_INST_RETIRED,ARM_PMU_MVE_STALL",
@@ -2928,7 +2928,7 @@
               "name": "boolean",
               "class": "BoolParamType"
             },
-            "python_type": "bool | None",
+            "python_type": "Optional[bool]",
             "default": null,
             "required": false,
             "help": "Per-layer breakdown (default)",
@@ -2954,7 +2954,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Inference iterations (default: 100)",
@@ -2980,7 +2980,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Warmup iterations (default: 5)",
@@ -3011,7 +3011,7 @@
                 "trimmed"
               ]
             },
-            "python_type": "Aggregation | None",
+            "python_type": "Optional[Aggregation]",
             "default": null,
             "required": false,
             "help": "How per-layer counters are aggregated across iterations (default: median). 'median' rejects corrupted iterations; 'trimmed' drops extremes then means; 'mean' is the raw average.",
@@ -3067,7 +3067,7 @@
                 "joulescope"
               ]
             },
-            "python_type": "helia_profiler.cli.app._PowerDriver | None",
+            "python_type": "Optional[helia_profiler.cli.app._PowerDriver]",
             "default": null,
             "required": false,
             "help": "Power driver (default: joulescope = auto-detect JS110/JS220/JS320)",
@@ -3097,7 +3097,7 @@
                 "internal"
               ]
             },
-            "python_type": "PowerMode | None",
+            "python_type": "Optional[PowerMode]",
             "default": null,
             "required": false,
             "help": "Power mode (default: external)",
@@ -3123,7 +3123,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "Upper bound on the power capture, in seconds; a gated capture raises it to fit the planned window, and it does not set the window length (default: auto-tuned from profile timing)",
@@ -3153,7 +3153,7 @@
                 "shared"
               ]
             },
-            "python_type": "PowerFirmware | None",
+            "python_type": "Optional[PowerFirmware]",
             "default": null,
             "required": false,
             "help": "Which binary is on target during power capture (default: dedicated). 'dedicated' flashes the transport-free hpx_profiler_power image to avoid SWO/UART/RTT/USB current contamination (measured on AP510 EVBs); 'shared' reuses the already-flashed transport binary.",
@@ -3187,7 +3187,7 @@
                 "debug_reset+swpoi_reset"
               ]
             },
-            "python_type": "ResetStrategy | None",
+            "python_type": "Optional[ResetStrategy]",
             "default": null,
             "required": false,
             "help": "Reset strategy before power capture (default: auto). Use explicit values only for board bring-up or controlled experiments.",
@@ -3213,7 +3213,7 @@
               "name": "int",
               "class": "IntParamType"
             },
-            "python_type": "int | None",
+            "python_type": "Optional[int]",
             "default": null,
             "required": false,
             "help": "GPIO pin for external power sync (default: per-board; 10 only for boards without a registered override)",
@@ -3292,7 +3292,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "str | None",
+            "python_type": "Optional[str]",
             "default": null,
             "required": false,
             "help": "Power instrument serial number to disambiguate when multiple devices are connected (e.g. Joulescope serial '004204'). Alias: --js-serial.",
@@ -3323,7 +3323,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Results output directory",
@@ -3353,7 +3353,7 @@
                 "json"
               ]
             },
-            "python_type": "helia_profiler.cli.app._OutputFormat | None",
+            "python_type": "Optional[helia_profiler.cli.app._OutputFormat]",
             "default": null,
             "required": false,
             "help": "Output format",
@@ -3462,7 +3462,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Working directory for generated firmware",
@@ -3874,7 +3874,7 @@
                 "none"
               ]
             },
-            "python_type": "helia_profiler.cli.run_app._Expect | None",
+            "python_type": "Optional[helia_profiler.cli.run_app._Expect]",
             "default": null,
             "required": false,
             "help": "Reference outputs: host-litert runs the model on the host (default), none skips verification",
@@ -3932,7 +3932,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "list[Path] | None",
+            "python_type": "Optional[list[Path]]",
             "default": null,
             "required": false,
             "help": "Reference bytes for one output; repeat once per output, in model order. Replaces --expect.",
@@ -3990,7 +3990,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "New directory inside DIR for the capture's evidence and its saved result.json (default: DIR/evidence-<N>)",
@@ -4136,7 +4136,7 @@
                   "name": "str",
                   "class": "StringParamType"
                 },
-                "python_type": "str | None",
+                "python_type": "Optional[str]",
                 "default": null,
                 "required": false,
                 "help": "Runtime version",
@@ -4210,7 +4210,7 @@
                   "name": "str",
                   "class": "StringParamType"
                 },
-                "python_type": "str | None",
+                "python_type": "Optional[str]",
                 "default": null,
                 "required": false,
                 "help": "Runtime version",
@@ -4380,7 +4380,7 @@
               "name": "str",
               "class": "StringParamType"
             },
-            "python_type": "list[str] | None",
+            "python_type": "Optional[list[str]]",
             "default": null,
             "required": false,
             "help": "Recapture this plan SHA-256.",
@@ -4474,7 +4474,7 @@
                   "name": "str",
                   "class": "StringParamType"
                 },
-                "python_type": "str | None",
+                "python_type": "Optional[str]",
                 "default": null,
                 "required": false,
                 "help": "J-Link probe serial number",
@@ -4584,7 +4584,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "YAML registry of custom validation models and comparison groups.",
@@ -4934,7 +4934,7 @@
                 "complete"
               ]
             },
-            "python_type": "helia_profiler.cli.validation_app._ValidateSuite | None",
+            "python_type": "Optional[helia_profiler.cli.validation_app._ValidateSuite]",
             "default": null,
             "required": false,
             "help": "Preset suite. 'smoke' defaults unset axes to models=kws, engines=helia-rt, toolchains=arm-none-eabi-gcc, interfaces=rtt, memories=auto. 'models-rt' and 'models-aot' default unset axes to all MLPerf Tiny models, Apollo510 + Apollo330mP, gcc + atfe, rtt, auto memory, and the selected engine. 'complete' runs the same axes for helia-rt, helia-aot, LiteRT/CMSIS-NN, and both ExecuTorch CMSIS-NN providers. Explicit axis flags always win.",
@@ -5154,7 +5154,7 @@
               "readable": true,
               "writable": false
             },
-            "python_type": "Path | None",
+            "python_type": "Optional[Path]",
             "default": null,
             "required": false,
             "help": "Emit JUnit-XML report at this path (for CI consumption).",
