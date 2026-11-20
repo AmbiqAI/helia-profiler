@@ -521,13 +521,19 @@ def read_bundle(path: Path) -> CalibrationSource:
             or an operator type.
         ReportError: when the bundle is not a verified, current result bundle.
     """
-    run = load_run_artifacts(path)
+    return _read_bundle(load_run_artifacts(path))
+
+
+def _read_bundle(
+    run: RunArtifacts, plan: dict[str, Any] | None = None, *, converted_memory: str | None = None
+) -> CalibrationSource:
     source = str(run.path)
     _require_usable_cycles(run, source)
-    conditions = _conditions(run, source)
+    conditions = _conditions(run, source, converted_memory=converted_memory)
     model_sha256 = _model_sha256(run, source)
     setup = _setup(run, source)
-    plan = _plan(run, source)
+    if plan is None:
+        plan = _plan(run, source)
     plan_sha256 = nested_get(plan, "model", "sha256")
     subgraph = nested_get(plan, "model", "subgraph")
     if not isinstance(plan_sha256, str) or not _is_subgraph(subgraph):
@@ -715,10 +721,14 @@ def _require_usable_cycles(run: RunArtifacts, source: str) -> None:
         )
 
 
-def _conditions(run: RunArtifacts, source: str) -> Mapping[str, Any]:
+def _conditions(
+    run: RunArtifacts, source: str, *, converted_memory: str | None = None
+) -> Mapping[str, Any]:
     recorded = run.summary.get("conditions")
     if not isinstance(recorded, dict):
         raise CalibrationError(f"Bundle {source} records no conditions.")
+    if converted_memory is not None and recorded.get("weights_memory") is None:
+        recorded = {**recorded, "weights_memory": converted_memory}
     refusal = _conditions_refusal(recorded)
     if refusal == _UNPLACED:
         raise CalibrationError(

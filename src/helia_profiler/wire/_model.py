@@ -196,6 +196,7 @@ class HeartbeatPhase(StrEnum):
     MODEL_INIT_DONE = "model_init_done"
     INFER = "infer"
     WARMUP_DONE = "warmup_done"
+    MODEL_ONLY_WARMUP = "model_only_warmup"
     FLUSHING = "flushing"
 
 
@@ -517,6 +518,7 @@ GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
 GATE_PMU_PROFILE = "has_armv8m_pmu and per_layer_profiling and not power_only"
 GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
+GATE_MODEL_ONLY_SWEEP = "sweep_evidence and not per_layer_profiling and not power_only"
 GATE_SWEEP_EVIDENCE = "sweep_evidence and not power_only"
 GATE_STREAM_EVIDENCE = "stream_evidence"
 

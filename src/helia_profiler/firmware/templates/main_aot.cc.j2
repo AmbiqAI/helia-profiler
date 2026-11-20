@@ -695,18 +695,21 @@ hpx_aot_check_runs();{% endblock %}
     for (int w = 0; w < {{ warmup }}; ++w) {
 {{ self.engine_reset_inputs() }}
         {{ self.engine_invoke() }}
+        hpx_printf("HPX_HEARTBEAT phase=model_only_warmup iter=%d\n", w);
     }
     hpx_aot_check_runs();
     for (int i = 0; i < {{ iterations }}; ++i) {
 {{ self.engine_reset_inputs() }}
-        const uint32_t sweep_start = hpx_stimer_ticks();
+{% if transport == "usb_cdc" %}        usb_timer_pause();
+{% endif %}        const uint32_t sweep_start = hpx_stimer_ticks();
         const uint32_t start = DWT->CYCCNT;
-        {{ self.engine_invoke() }}
+        hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
         const uint32_t cycles = DWT->CYCCNT - start;
         const uint32_t sweep_ticks = hpx_stimer_ticks() - sweep_start;
+{% if transport == "usb_cdc" %}        usb_timer_resume();
+{% endif %}        hpx_aot_check_runs();
         profiled_infer_cycles += cycles;
         ++profiled_infer_count;
-        hpx_aot_check_runs();
 {% if transport == "rtt" %}        hpx_rtt_set_blocking();
 {% endif %}        hpx_sweep_report(cycles, sweep_ticks, sweep_clock_ready, true);
         hpx_print_output_digests();

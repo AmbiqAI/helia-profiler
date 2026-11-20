@@ -7,13 +7,19 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from .calibration import read_bundle
-from .calibration.table import _conditions, _model_sha256, _plan, _require_usable_cycles
+from .calibration.table import (
+    _conditions,
+    _is_subgraph,
+    _model_sha256,
+    _plan,
+    _read_bundle,
+    _require_usable_cycles,
+)
 from .errors import HpxError
 from .evaluation.compare import load_run_artifacts
 from .results import RunStatus
-from .results.manifest import load_result_manifest
 from .wire import (
     HPX_END_SENTINEL,
     HPX_ERROR_PREFIX,
@@ -133,6 +139,39 @@ def _timing(raw: str, reference_outputs: tuple[str, ...], cache: object) -> _Tim
     )
 
 
+def _converted_weights_memory(plan: dict[str, Any]) -> str:
+    """Resolve the one weights memory represented by the compiled constant storage roots."""
+    tensors = plan.get("tensors")
+    if not isinstance(tensors, list) or not tensors:
+        raise ValueError("Converted plan has no constant placement evidence for weights_memory")
+    memories = set()
+    for tensor in tensors:
+        if not isinstance(tensor, dict) or tensor.get("residency") not in (
+            "direct",
+            "stream",
+            "pin",
+        ):
+            raise ValueError("Converted plan has an unknown constant residency")
+        # A pinned constant is read from its destination after model initialization.
+        field = "destination_memory" if tensor["residency"] == "pin" else "memory"
+        memory = tensor.get(field)
+        if not isinstance(memory, str) or memory.lower() not in {
+            "dtcm",
+            "itcm",
+            "sram",
+            "mram",
+            "psram",
+            "nor",
+        }:
+            raise ValueError(f"Converted plan has an unknown constant {field}: {memory!r}")
+        memories.add(memory.lower())
+    if len(memories) != 1:
+        raise ValueError(
+            f"Converted plan has mixed weights memories: {', '.join(sorted(memories))}"
+        )
+    return memories.pop()
+
+
 def admit_measurement(
     bundle: Path,
     *,
@@ -146,20 +185,31 @@ def admit_measurement(
     if not reference_outputs or not all(_DIGEST.fullmatch(value) for value in reference_outputs):
         raise ValueError("Expected a lowercase 16-digit FNV-1a digest for every output")
     try:
-        manifest = load_result_manifest(bundle / "result_manifest.json")
-        if manifest.status != RunStatus.COMPLETE:
+        run = load_run_artifacts(bundle)
+        manifest = run.manifest
+        if manifest is None or manifest.status != RunStatus.COMPLETE:
             raise ValueError("Sweep measurement requires a completed capture")
+        name = str(run.path)
+        plan = _plan(run, name)
+        recorded = run.summary.get("conditions")
+        memory = None
+        if isinstance(recorded, dict) and recorded.get("weights_memory") is None:
+            memory = _converted_weights_memory(plan)
         if manifest.bundle_type == "profile-model-only":
-            run = load_run_artifacts(bundle)
-            name = str(run.path)
             _require_usable_cycles(run, name)
-            conditions = dict(_conditions(run, name))
-            model = _plan(run, name).get("model")
-            if not isinstance(model, dict) or model.get("sha256") != _model_sha256(run, name):
-                raise ValueError("Model-only capture differs from its converted plan")
+            conditions = dict(_conditions(run, name, converted_memory=memory))
+            model = plan.get("model")
+            if (
+                not isinstance(model, dict)
+                or model.get("sha256") != _model_sha256(run, name)
+                or not _is_subgraph(model.get("subgraph"))
+            ):
+                raise ValueError(
+                    "Model-only capture differs from its converted plan or lacks a subgraph"
+                )
             per_operator = {}
         else:
-            source = read_bundle(bundle)
+            source = _read_bundle(run, plan, converted_memory=memory)
             conditions = dict(source.conditions)
             per_operator = {sample.operator: sample.cycles for sample in source.samples}
         capture = next((a for a in manifest.artifacts if a.path == "firmware_output.txt"), None)

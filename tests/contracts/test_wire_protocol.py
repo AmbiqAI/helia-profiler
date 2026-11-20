@@ -784,6 +784,9 @@ _PREDICATES = {
     == "overlap"
     and v.get("per_layer_profiling", True)
     and not _power(v),
+    "sweep_evidence and not per_layer_profiling and not power_only": lambda v: (
+        bool(v.get("sweep_evidence")) and not v.get("per_layer_profiling", True) and not _power(v)
+    ),
     "sweep_evidence and not power_only": lambda v: bool(v.get("sweep_evidence")) and not _power(v),
     "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
@@ -1160,6 +1163,7 @@ def test_heartbeat_phase_catalogue():
         "model_init_done",
         "infer",
         "warmup_done",
+        "model_only_warmup",
         "flushing",
     ]
     assert {spec.token for spec in WIRE_REGISTRY.values() if spec.kind is WireKind.HEARTBEAT} == {

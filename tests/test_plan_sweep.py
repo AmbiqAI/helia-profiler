@@ -213,3 +213,61 @@ def test_sweep_rejects_falsey_nonmapping_optimization(tmp_path, invalid):
     plan.write_text("{}")
     with pytest.raises(ConfigError, match="optimization settings must be a mapping"):
         module.sweep(config, [plan], tmp_path / "out", reference_outputs=("0" * 16,))
+
+
+def test_failed_remeasurement_preserves_last_successful_receipt(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    plan = tmp_path / "candidate_plan.json"
+    plan.write_text(
+        json.dumps(
+            {"model": {"sha256": module._sha(model.read_bytes())}, "schedule": {"pool": None}}
+        )
+    )
+    digest = module._sha(plan.read_bytes())
+    config = load_config(
+        None,
+        {
+            "model": {"path": model},
+            "engine": {"type": "helia-aot", "config": {"aot_args": {"optimization": {}}}},
+        },
+    )
+    ctx = SimpleNamespace(
+        engine_artifacts=SimpleNamespace(report_files=[plan]),
+        profile_run=SimpleNamespace(firmware=SimpleNamespace(binary_path=model)),
+        run_evaluation=SimpleNamespace(validity=module.ResultValidity.VALID),
+        resolved_jlink_serial="123",
+    )
+    monkeypatch.setattr(module.PipelineRunner, "run", lambda self, config: ctx)
+    captures = []
+
+    def capture(self, ctx):
+        captures.append(ctx)
+        if len(captures) > 1:
+            raise ValueError("capture interrupted")
+
+    monkeypatch.setattr(module.PipelineRunner, "run_stages", capture)
+    monkeypatch.setattr(
+        module,
+        "admit_measurement",
+        lambda *args, **kwargs: {
+            "plan_sha256": digest,
+            "cycles": 100,
+            "dma_failures": 0,
+            "energy_uj": None,
+            "output_identical": True,
+        },
+    )
+
+    def run(name, force):
+        return module._measure(config, plan, digest, tmp_path, tmp_path / name, ("0" * 16,), force)
+
+    initial = run("first", False)
+    assert initial.status == "measured"
+    assert run("failed", True).status == "failed"
+    reused = run("reuse", False)
+    assert reused.status == "cached"
+    assert reused.measurement == initial.measurement
+    assert len(captures) == 2

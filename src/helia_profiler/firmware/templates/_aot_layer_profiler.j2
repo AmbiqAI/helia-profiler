@@ -13,7 +13,29 @@ struct HpxLayerRecord {
 
 {% if has_armv8m_pmu %}
 static nsx_pmu_config_t g_pmu_cfg;
-{% include "_pmu_read.j2" %}
+{% if sweep_evidence | default(false) %}
+static bool g_sweep_pmu_ready;
+
+// NSX configures each 32-bit event in adjacent low/CHAIN registers. Its
+// read and reset helpers also reset the cycle counter used by the sweep.
+static inline void hpx_pmu_restart(void) {
+    ARM_PMU_EVCNTR_ALL_Reset();
+    ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
+}
+
+static inline bool hpx_pmu_read_layer(nsx_pmu_config_t *cfg, int num_counters) {
+    const uint32_t events = (1U << (2 * num_counters)) - 1U;
+    ARM_PMU_CNTR_Disable(events);
+    const uint32_t overflow = ARM_PMU_Get_CNTR_OVS();
+    for (int i = 0; i < num_counters; ++i) {
+        const uint32_t low = ARM_PMU_Get_EVCNTR(2 * i);
+        const uint32_t high = ARM_PMU_Get_EVCNTR(2 * i + 1);
+        cfg->counter[i].counterValue = (high << 16) | low;
+    }
+    ARM_PMU_CNTR_Enable(events);
+    return !g_sweep_pmu_ready || (overflow & events & 0xAAAAAAAAU) != 0U;
+}
+{% else %}{% include "_pmu_read.j2" %}
 
 // Restarts the event counters; DWT->CYCCNT, which times the run, keeps counting.
 static inline void hpx_pmu_restart(void) {
@@ -24,7 +46,7 @@ static inline void hpx_pmu_restart(void) {
     ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
 #endif
 }
-{% else %}
+{% endif %}{% else %}
 static uint32_t g_op_start_cyccnt = 0;
 {% endif %}
 {% if not power_only | default(false) %}
@@ -118,7 +140,7 @@ static void profiler_init_custom(const uint32_t event_ids[], int num_events) {
         nsx_pmu_event_create(&g_pmu_cfg.events[i], event_ids[i],
                             NSX_PMU_EVENT_COUNTER_SIZE_32);
     }
-    nsx_pmu_init(&g_pmu_cfg);
+    {% if sweep_evidence | default(false) %}g_sweep_pmu_ready = nsx_pmu_init(&g_pmu_cfg) == NSX_STATUS_SUCCESS;{% else %}nsx_pmu_init(&g_pmu_cfg);{% endif %}
     g_num_counters = n;
 }
 {% else %}

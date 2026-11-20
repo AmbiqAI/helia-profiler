@@ -156,9 +156,7 @@ def _measure(
         candidate, model_hash, digest, converted_sha, image, ctx.resolved_jlink_serial, references
     )
     entry = root / "cache" / (key + ".json")
-    if force:
-        entry.unlink(missing_ok=True)
-    elif not config.power.enabled and entry.is_file():
+    if not force and not config.power.enabled and entry.is_file():
         cached = _read_cache(entry, root, key, digest, converted_sha)
         if cached is not None:
             return cached

@@ -183,6 +183,7 @@ Token-then-payload lines. The space after the token defeats the key/value regex,
 | `HPX_HEARTBEAT phase=model_init_done` | helia-aot | `always` | `diagnostic` | `diagnostic` | heliaAOT model_init() returned successfully. |
 | `HPX_HEARTBEAT phase=infer` | all | `always` (executorch, helia-rt, litert); `per_layer_profiling` (helia-aot); runtime: heartbeat cadence reached (ops or elapsed time) | `diagnostic` | `diagnostic` | Progress inside an instrumented inference, between operators. Value: `pass=<n> iter=<n> layer=<n>`. Three emit sites, one format: TFLM's profiler class, heliaAOT's operator callback, ExecuTorch's end_operator hook. TFLM's lives in hpx_pmu_profiler.cc, not main.cc. |
 | `HPX_HEARTBEAT phase=warmup_done` | all | `not power_only` (executorch, helia-rt, litert); `per_layer_profiling and not power_only` (helia-aot) | `diagnostic` | `diagnostic` | One pass finished its warmup iterations. Value: `pass=<n>`. |
+| `HPX_HEARTBEAT phase=model_only_warmup` | helia-aot | `sweep_evidence and not per_layer_profiling and not power_only` | `diagnostic` | `diagnostic` | A model-only sweep completed one warmup inference. Value: `iter=<n>`. |
 | `HPX_HEARTBEAT phase=flushing` | all | `not power_only and transport == rtt` | `diagnostic` | `diagnostic` | Draining the RTT buffer before the end sentinel. Refreshes the host inactivity timer while the drain runs. |
 
 ## Error codes
@@ -264,7 +265,7 @@ The per-layer rows between two iteration sentinels carry no `HPX_` token of thei
 
 ## Heartbeat phases
 
-The complete phase vocabulary — see the table above for which engines emit which, and when: `clean_window_begin`, `transfer_diagnostic_begin`, `init`, `allocate`, `allocated`, `model_init_done`, `infer`, `warmup_done`, `flushing`.
+The complete phase vocabulary — see the table above for which engines emit which, and when: `clean_window_begin`, `transfer_diagnostic_begin`, `init`, `allocate`, `allocated`, `model_init_done`, `infer`, `warmup_done`, `model_only_warmup`, `flushing`.
 
 ## Documented gaps
 
