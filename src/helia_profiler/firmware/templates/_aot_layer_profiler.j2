@@ -23,18 +23,7 @@ static inline void hpx_pmu_restart(void) {
     ARM_PMU_Set_CNTR_OVS(0xFFFFFFFFU);
 }
 
-static inline bool hpx_pmu_read_layer(nsx_pmu_config_t *cfg, int num_counters) {
-    const uint32_t events = (1U << (2 * num_counters)) - 1U;
-    ARM_PMU_CNTR_Disable(events);
-    const uint32_t overflow = ARM_PMU_Get_CNTR_OVS();
-    for (int i = 0; i < num_counters; ++i) {
-        const uint32_t low = ARM_PMU_Get_EVCNTR(2 * i);
-        const uint32_t high = ARM_PMU_Get_EVCNTR(2 * i + 1);
-        cfg->counter[i].counterValue = (high << 16) | low;
-    }
-    ARM_PMU_CNTR_Enable(events);
-    return !g_sweep_pmu_ready || (overflow & events & 0xAAAAAAAAU) != 0U;
-}
+{% set preserve_inference_clock = true %}{% include "_pmu_read.j2" %}
 {% else %}{% include "_pmu_read.j2" %}
 
 // Restarts the event counters; DWT->CYCCNT, which times the run, keeps counting.
