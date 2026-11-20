@@ -16,26 +16,26 @@ Defined in `src/helia_profiler/cli/run_app.py` line 95.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `model` | `Optional[Path]` |  | Path to .tflite or .pte model file |
+| `model` | `Path \| None` |  | Path to .tflite or .pte model file |
 
 ### Options
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--output, -o` | `Path` |  | Where to write the plan (JSON) Required. |
-| `--config, -c` | `Optional[Path]` |  | YAML config file (hpx.yml) |
+| `--config, -c` | `Path \| None` |  | YAML config file (hpx.yml) |
 | `--verbose, -v` | `int` | 0 | Increase verbosity |
-| `--iterations` | `Optional[int]` |  | Timed iterations (default: 100) |
-| `--warmup` | `Optional[int]` |  | Warmup iterations (default: 5) |
+| `--iterations` | `int \| None` |  | Timed iterations (default: 100) |
+| `--warmup` | `int \| None` |  | Warmup iterations (default: 5) |
 
 ### engine
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Inference engine (default: helia-rt) |
-| `--backend` | `Optional[str]` |  | Kernel backend (engine.backend). Run builds need helia for helia-rt and cmsis_nn for litert. |
-| `--engine-config` | `Optional[Path]` |  | Engine-specific YAML config |
-| `--arena-size` | `Optional[int]` |  | Tensor arena size in bytes |
+| `--backend` | `str \| None` |  | Kernel backend (engine.backend). Run builds need helia for helia-rt and cmsis_nn for litert. |
+| `--engine-config` | `Path \| None` |  | Engine-specific YAML config |
+| `--arena-size` | `int \| None` |  | Tensor arena size in bytes |
 | `--arena-location` | `tcm \| sram \| psram` |  | Tensor arena placement. Omit to let the engine and memory planner choose. |
 | `--weights-location` | `tcm \| sram \| mram \| psram` |  | Model weights placement. Omit to let the engine and memory planner choose. |
 | `--core-override` | `cm4 \| cm55` |  | Select the core library in an explicit heliaRT prebuilt distribution. |
@@ -44,9 +44,9 @@ Defined in `src/helia_profiler/cli/run_app.py` line 95.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--board` | `Optional[str]` |  | Target board (default: apollo510_evb) |
-| `--toolchain` | `Optional[str]` |  | Toolchain (default: arm-none-eabi-gcc; run builds use atfe) |
-| `--cpu-clock` | `Optional[str]` |  | CPU clock speed (board-specific, e.g. 'lp'/'hp'; run builds use lp) |
+| `--board` | `str \| None` |  | Target board (default: apollo510_evb) |
+| `--toolchain` | `str \| None` |  | Toolchain (default: arm-none-eabi-gcc; run builds use atfe) |
+| `--cpu-clock` | `str \| None` |  | CPU clock speed (board-specific, e.g. 'lp'/'hp'; run builds use lp) |
 
 ### Examples
 

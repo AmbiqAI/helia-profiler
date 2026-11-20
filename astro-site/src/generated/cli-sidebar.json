@@ -71,6 +71,10 @@
         "slug": "reference/cli/runtimes"
       },
       {
+        "label": "hpx sweep",
+        "slug": "reference/cli/sweep"
+      },
+      {
         "label": "hpx target",
         "slug": "reference/cli/target"
       },

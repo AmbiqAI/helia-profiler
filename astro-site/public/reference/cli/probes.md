@@ -26,7 +26,7 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 149.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--board` | `Optional[str]` |  | Inspect each probe against this board's J-Link device string |
+| `--board` | `str \| None` |  | Inspect each probe against this board's J-Link device string |
 | `--inspect` | `bool` | false | Inspect target cores. Requires --board. |
 | `--json` | `bool` | false | Emit machine-readable JSON |
 
@@ -45,7 +45,7 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 167.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--board` | `str` |  | Target board ID Required. |
-| `--jlink-serial` | `Optional[str]` |  | Optional requested serial to validate against the selected board |
+| `--jlink-serial` | `str \| None` |  | Optional requested serial to validate against the selected board |
 | `--json` | `bool` | false | Emit machine-readable JSON |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

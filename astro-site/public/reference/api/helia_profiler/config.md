@@ -184,6 +184,16 @@ stream_evidence: bool = False
 
 Source: `src/helia_profiler/config/profiling.py:138`
 
+### helia_profiler.ProfilingConfig.sweep_evidence
+
+`attribute` · `python`
+
+```python
+sweep_evidence: bool = field(default=False, metadata={'omit_default': True})
+```
+
+Source: `src/helia_profiler/config/profiling.py:140`
+
 ### helia_profiler.ProfilingConfig.transfer_diagnostics
 
 `attribute` · `python`
@@ -192,7 +202,7 @@ Source: `src/helia_profiler/config/profiling.py:138`
 transfer_diagnostics: Literal['off', 'timing', 'overlap', 'trace'] = field(default='off', metadata={'omit_default': True})
 ```
 
-Source: `src/helia_profiler/config/profiling.py:140`
+Source: `src/helia_profiler/config/profiling.py:142`
 
 ### helia_profiler.ProfilingConfig.transfer_diagnostic_iterations
 
@@ -202,7 +212,7 @@ Source: `src/helia_profiler/config/profiling.py:140`
 transfer_diagnostic_iterations: int = field(default=1, metadata={'omit_default': True})
 ```
 
-Source: `src/helia_profiler/config/profiling.py:143`
+Source: `src/helia_profiler/config/profiling.py:145`
 
 ### helia_profiler.ProfilingConfig.transfer_trace_max_pieces
 
@@ -212,7 +222,7 @@ Source: `src/helia_profiler/config/profiling.py:143`
 transfer_trace_max_pieces: int = field(default=256, metadata={'omit_default': True})
 ```
 
-Source: `src/helia_profiler/config/profiling.py:145`
+Source: `src/helia_profiler/config/profiling.py:147`
 
 ### helia_profiler.ProfilingConfig.extreme_mode
 
@@ -222,7 +232,7 @@ Source: `src/helia_profiler/config/profiling.py:145`
 extreme_mode: bool = False
 ```
 
-Source: `src/helia_profiler/config/profiling.py:159`
+Source: `src/helia_profiler/config/profiling.py:161`
 
 ### helia_profiler.ProfilingConfig.dcache
 
@@ -232,7 +242,7 @@ Source: `src/helia_profiler/config/profiling.py:159`
 dcache: Literal['on', 'off'] = field(default='on', metadata={'omit_default': True})
 ```
 
-Source: `src/helia_profiler/config/profiling.py:162`
+Source: `src/helia_profiler/config/profiling.py:164`
 
 ## helia_profiler.ClockSelection
 
@@ -1088,4 +1098,4 @@ derived property rather than a helper each caller re-implements,
 because the rule spans two config sections and every caller (firmware
 render, power planner) must agree on the same effective value (#136).
 
-Source: `src/helia_profiler/config/__init__.py:666`
+Source: `src/helia_profiler/config/__init__.py:667`

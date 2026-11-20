@@ -592,7 +592,10 @@ def test_the_stream_evidence_block_runs_what_it_says(tmp_path: Path):
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 typedef struct { uint32_t ui32StartAddr; uint32_t ui32Size; } am_hal_cachectrl_range_t;
+#define hpx_printf std::printf
+[[noreturn]] static void hpx_park() { std::abort(); }
 static am_hal_cachectrl_range_t invalidated[4];
 static int invalidations = 0;
 static uint32_t am_hal_cachectrl_dcache_invalidate(am_hal_cachectrl_range_t *range, bool clean) {

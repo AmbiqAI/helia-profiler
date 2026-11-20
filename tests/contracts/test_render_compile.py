@@ -401,6 +401,7 @@ def _build_cases() -> list[_CompileCase]:
                         "arena_regions": transfer_regions,
                         "transfer_timeout_probe": probe,
                         "stream_evidence": evidence,
+                        "sweep_evidence": not power_only,
                     },
                 ),
                 vars=_common_kwargs(soc, transport),
@@ -440,6 +441,7 @@ def _build_cases() -> list[_CompileCase]:
                     overrides={
                         "arena_regions": transfer_regions,
                         "per_layer_profiling": False,
+                        "sweep_evidence": True,
                         "pmu_passes": [],
                         "pmu_pass_names": [],
                         "transfer_timeout_probe": probe,

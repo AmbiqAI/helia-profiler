@@ -445,6 +445,11 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
+        self.run_stages(ctx)
+        return ctx
+
+    def run_stages(self, ctx: PipelineContext) -> None:
+        """Run this sequence on a prepared context in a caller-owned workspace."""
         total_stages = len(self._stages)
         for stage_index, stage in enumerate(self._stages, start=1):
             if stage.should_skip(ctx):
@@ -474,8 +479,6 @@ class PipelineRunner:
 
         if self._observer is not None:
             self._observer.pipeline_done()
-
-        return ctx
 
 
 def _cache_work_key(config: ProfileConfig) -> str:

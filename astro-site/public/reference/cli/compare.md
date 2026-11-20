@@ -23,8 +23,8 @@ Defined in `src/helia_profiler/cli/app.py` line 611.
 
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
-| `--output-dir` | `Optional[Path]` |  | Write comparison artifacts to this directory |
-| `--profile` | `Optional[Path]` |  | Versioned JSON comparison profile for regression verdicts |
+| `--output-dir` | `Path \| None` |  | Write comparison artifacts to this directory |
+| `--profile` | `Path \| None` |  | Versioned JSON comparison profile for regression verdicts |
 | `--validation` | `bool` | false | Compare portable validation bundles instead of profile runs |
 | `--top-layers` | `int` | 10 | Number of layer deltas to show in terminal output (default: 10) |
 

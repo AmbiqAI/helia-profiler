@@ -37,7 +37,7 @@ Defined in `src/helia_profiler/cli/app.py` line 731.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | `str` |  | Runtime name, e.g. helia-rt Required. |
-| `version` | `Optional[str]` |  | Runtime version |
+| `version` | `str \| None` |  | Runtime version |
 
 ## hpx runtimes show
 
@@ -54,6 +54,6 @@ Defined in `src/helia_profiler/cli/app.py` line 721.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `name` | `str` |  | Runtime name, e.g. helia-rt Required. |
-| `version` | `Optional[str]` |  | Runtime version |
+| `version` | `str \| None` |  | Runtime version |
 
 Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__` with typer 0.27.3 and click 8.3.3.

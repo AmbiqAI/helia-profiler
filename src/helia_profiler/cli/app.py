@@ -744,3 +744,39 @@ app.add_typer(runtimes_app, name="runtimes")
 
 
 __all__ = ["app"]
+
+
+@app.command("sweep")
+def sweep_command(
+    plans: Annotated[list[Path], typer.Argument(help="Ordered heliaAOT candidate plans.")],
+    config: Annotated[Path, typer.Option("--config", exists=True, dir_okay=False)],
+    output: Annotated[
+        Path, typer.Option("--output", help="Sweep artifacts and measurement cache.")
+    ],
+    reference: Annotated[
+        list[str], typer.Option("--reference-digest", help="FNV1a64 per output, in tensor order.")
+    ],
+    remeasure: Annotated[
+        Optional[list[str]], typer.Option("--remeasure", help="Recapture this plan SHA-256.")
+    ] = None,
+) -> None:
+    """Measure plan candidates on the selected board."""
+    from ..config import load_config
+    from ..errors import HpxError
+    from ..sweep import sweep
+
+    try:
+        rows = sweep(
+            load_config(config, {}),
+            plans,
+            output,
+            reference_outputs=tuple(reference),
+            remeasure=tuple(remeasure or ()),
+        )
+    except (HpxError, ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1) from exc
+    for row in rows:
+        typer.echo(f"{row.plan_sha256} {row.status} {row.error or row.measurement}")
+    if any(row.status == "failed" for row in rows):
+        raise typer.Exit(1)

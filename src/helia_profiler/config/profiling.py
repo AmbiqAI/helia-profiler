@@ -136,6 +136,8 @@ class ProfilingConfig:
     # MSPI controller. This extra maintenance applies to instrumented runs;
     # the clean window follows profiling.dcache. Reports HPX_STREAM_EVIDENCE=1.
     stream_evidence: bool = False
+    #: Record whole-inference timing, provider status and output digests for each sweep sample.
+    sweep_evidence: bool = field(default=False, metadata={"omit_default": True})
     #: Separate transfer observation runs; ordinary PMU passes never poll DMA state.
     transfer_diagnostics: Literal["off", "timing", "overlap", "trace"] = field(
         default="off", metadata={"omit_default": True}

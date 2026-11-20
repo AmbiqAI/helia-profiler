@@ -25,7 +25,7 @@ Defined in `src/helia_profiler/cli/app.py` line 532.
 | `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Analyze as this engine would execute it. Default (no flag) uses the raw tflite graph. 'helia-aot' runs AOT compilation and analyzes the transformed graph. 'helia-rt' analyzes the original tflite graph. |
 | `--compare` | `bool` | false | Show side-by-side comparison of original vs engine-transformed graph |
 | `--format` | `table \| csv \| json` | table | Output format (default: table) |
-| `--output, -o` | `Optional[Path]` |  | Write output to file |
+| `--output, -o` | `Path \| None` |  | Write output to file |
 | `--board` | `str` | apollo510_evb | Target board for AOT compilation (default: apollo510_evb) |
 
 ### Examples

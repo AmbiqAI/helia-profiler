@@ -17,7 +17,7 @@ Defined in `src/helia_profiler/cli/validation_app.py` line 64.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--driver` | `joulescope` | joulescope | Power driver that holds the target rail on (JS110/JS220/JS320 auto-detected) |
-| `--power-serial` | `Optional[str]` |  | Joulescope serial number to select when multiple are connected |
+| `--power-serial` | `str \| None` |  | Joulescope serial number to select when multiple are connected |
 
 ### Examples
 

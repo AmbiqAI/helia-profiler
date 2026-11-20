@@ -8,8 +8,8 @@
   },
   "counts": {
     "classes": 15,
-    "declaredFields": 115,
-    "schemaProperties": 115,
+    "declaredFields": 116,
+    "schemaProperties": 116,
     "enums": 5,
     "unreachableFromRoot": [
       "MonitorBoardPreset"
@@ -493,7 +493,7 @@
           "name": "profiling",
           "pythonType": "ProfilingConfig",
           "required": false,
-          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, transfer_diagnostics='off', transfer_diagnostic_iterations=1, transfer_trace_max_pieces=256, extreme_mode=False, dcache='on')",
+          "default": "ProfilingConfig(pmu_counters={'cpu': 'default'}, per_layer=True, iterations=100, warmup=5, window_mode=<WindowMode.AUTO: 'auto'>, window_target_ms=1000, window_min=10, window_max=500000, clean_window_probe=<CleanWindowProbe.INFER: 'infer'>, clean_window_trace=False, force_shared_sram=False, aggregation=<Aggregation.MEDIAN: 'median'>, input_fill=<InputFill.ZERO: 'zero'>, transfer_timeout_probe=False, stream_evidence=False, sweep_evidence=False, transfer_diagnostics='off', transfer_diagnostic_iterations=1, transfer_trace_max_pieces=256, extreme_mode=False, dcache='on')",
           "defaultFromFactory": true
         },
         {
@@ -677,6 +677,13 @@
         },
         {
           "name": "stream_evidence",
+          "pythonType": "bool",
+          "required": false,
+          "default": false,
+          "defaultFromFactory": false
+        },
+        {
+          "name": "sweep_evidence",
           "pythonType": "bool",
           "required": false,
           "default": false,
@@ -929,8 +936,8 @@
         "reachableFromRoot": true
       },
       "ProfilingConfig": {
-        "declared": 20,
-        "inSchema": 20,
+        "declared": 21,
+        "inSchema": 21,
         "reachableFromRoot": true
       },
       "PsramConfig": {
@@ -2254,6 +2261,11 @@
         "stream_evidence": {
           "default": false,
           "title": "Stream Evidence",
+          "type": "boolean"
+        },
+        "sweep_evidence": {
+          "default": false,
+          "title": "Sweep Evidence",
           "type": "boolean"
         },
         "transfer_diagnostics": {

@@ -9,6 +9,7 @@ from ._model import (
     GATE_NOT_POWER_ONLY,
     GATE_PMU_PROFILE,
     GATE_STREAM_EVIDENCE,
+    GATE_SWEEP_EVIDENCE,
     GATE_TRANSFER_DIAGNOSTIC,
     GATE_TRANSFER_OVERLAP,
     GATE_TRANSFER_PROBE,
@@ -257,6 +258,17 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
         note="Once, after HPX_TRANSFER_RECOVERY: equal to the reference capture's "
         "output digests when the recovery run read the right bytes. Never printed "
         "as HPX_OUTPUT_<i>_FNV1A64, so no counted run's digest is confused with it.",
+    ),
+    _spec(
+        WireKey.AOT_RUN_EVIDENCE.wire,
+        WireKind.KEY_VALUE,
+        "Instrumented inference cycles, DMA provider error (zero without a provider), and cache preparation.",
+        WireConsumer.DIAGNOSTIC,
+        WireCriticality.METRIC,
+        key=WireKey.AOT_RUN_EVIDENCE,
+        engines=AOT_ENGINES,
+        condition=GATE_SWEEP_EVIDENCE,
+        value_shape="<cycles>,<provider error>,cold|warm|unknown",
     ),
     _spec(
         WireKey.STREAM_EVIDENCE.wire,

@@ -78,6 +78,13 @@ def write_report(ctx: PipelineContext) -> list[Path]:
     detailed = ctx.config.output.detailed
     analysis = ctx.model_analysis
 
+    raw = output_dir / "firmware_output.txt"
+    if pmu.raw_output:
+        raw.write_text("\n".join(pmu.raw_output) + "\n", encoding="utf-8")
+        paths.append(raw)
+    else:
+        raw.unlink(missing_ok=True)
+
     if pmu.meta.per_layer_profiling is False:
         for pattern in (
             "profile_results.csv",
@@ -87,12 +94,7 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         ):
             for stale in output_dir.glob(pattern):
                 stale.unlink()
-        if pmu.raw_output:
-            raw = output_dir / "firmware_output.txt"
-            raw.write_text("\n".join(pmu.raw_output) + "\n", encoding="utf-8")
-            paths.append(raw)
     elif fmt == "csv":
-        (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_csv(pmu, output_dir, analysis, aot_op_manifest=_aot_manifest(ctx))
         paths.append(p)
         if pmu.transfer_evidence or pmu.transfer_diagnostics:
@@ -104,7 +106,6 @@ def write_report(ctx: PipelineContext) -> list[Path]:
         else:
             (output_dir / "profile_results.json").unlink(missing_ok=True)
     elif fmt == "json":
-        (output_dir / "firmware_output.txt").unlink(missing_ok=True)
         p = _write_json(
             pmu,
             ctx.power_result,

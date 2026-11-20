@@ -17,10 +17,10 @@ Defined in `src/helia_profiler/cli/inspect_app.py` line 42.
 | Name | Type | Default | Description |
 | --- | --- | --- | --- |
 | `--json` | `bool` | false | Emit machine-readable JSON |
-| `--bundle` | `Optional[Path]` |  | Write a sanitized support-bundle archive to this file or directory instead of printing the toolchain table |
-| `--workspace` | `Optional[Path]` |  | Prepared profiler_app directory (or its nsx.lock/hpx-dependencies.json, or the parent fingerprint workspace) to include exact dependency lock provenance in the bundle |
-| `--config` | `Optional[Path]` |  | YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead |
-| `--toolchain` | `Optional[str]` |  | Toolchain to check (default: arm-none-eabi-gcc) |
+| `--bundle` | `Path \| None` |  | Write a sanitized support-bundle archive to this file or directory instead of printing the toolchain table |
+| `--workspace` | `Path \| None` |  | Prepared profiler_app directory (or its nsx.lock/hpx-dependencies.json, or the parent fingerprint workspace) to include exact dependency lock provenance in the bundle |
+| `--config` | `Path \| None` |  | YAML config whose target and engine select the checks; with --bundle, a sanitized snapshot of it is included instead |
+| `--toolchain` | `str \| None` |  | Toolchain to check (default: arm-none-eabi-gcc) |
 | `--transport` | `rtt \| usb_cdc \| swo \| uart` |  | Transport to check (default: rtt) |
 | `--engine` | `litert \| helia-rt \| helia-aot \| executorch` |  | Engine to check (default: helia-rt) |
 | `--no-probes` | `bool` | false | Skip live J-Link probe enumeration in --bundle |

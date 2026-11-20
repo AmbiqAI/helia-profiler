@@ -325,6 +325,7 @@ def _matrix() -> list[_Render]:
                     power_only=power,
                     overrides={
                         "per_layer_profiling": False,
+                        "sweep_evidence": True,
                         "pmu_passes": [],
                         "pmu_pass_names": [],
                         "has_ethos_u": npu,
@@ -437,7 +438,7 @@ def _matrix() -> list[_Render]:
             "apollo510",
             "rtt",
             "helia-aot",
-            overrides={"stream_evidence": True},
+            overrides={"stream_evidence": True, "sweep_evidence": True},
         ),
         *(
             _Render(
@@ -780,6 +781,7 @@ _PREDICATES = {
     == "overlap"
     and v.get("per_layer_profiling", True)
     and not _power(v),
+    "sweep_evidence and not power_only": lambda v: bool(v.get("sweep_evidence")) and not _power(v),
     "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
         lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)
