@@ -16,6 +16,7 @@ from ._files import read_json, write_bytes_atomically, write_text_atomically
 from ._version import __version__
 from .config import ProfileConfig
 from .engines import EngineType
+from .engines.helia_aot.compile import _merged_aot_args
 from .errors import ConfigError, HpxError
 from .firmware.workload import AOT_CLEAN_WORKLOAD
 from .pipeline import PipelineRunner
@@ -90,6 +91,34 @@ def _read_cache(entry: Path, root: Path, key: str, digest: str, converted: str) 
         return None
 
 
+def _measurement_key(
+    config: ProfileConfig,
+    model_hash: str,
+    digest: str,
+    converted_sha: str,
+    image: str,
+    serial: str | None,
+    references: tuple[str, ...],
+) -> str:
+    return _sha(
+        json.dumps(
+            [
+                __version__,
+                model_hash,
+                digest,
+                converted_sha,
+                image,
+                serial,
+                references,
+                config.target.board,
+                config.target.psram.clock_hz,
+                asdict(config.profiling),
+            ],
+            sort_keys=True,
+        ).encode()
+    )
+
+
 def _measure(
     config: ProfileConfig,
     plan: Path,
@@ -129,21 +158,8 @@ def _measure(
     if model_hash != _sha(config.model.path.read_bytes()):
         raise ValueError("Converted plan and requested model differ")
     image = _sha(ctx.profile_run.firmware.binary_path.read_bytes())
-    key = _sha(
-        json.dumps(
-            [
-                __version__,
-                model_hash,
-                digest,
-                converted_sha,
-                image,
-                ctx.resolved_jlink_serial,
-                references,
-                config.target.board,
-                config.target.psram.clock_hz,
-                config.profiling.dcache,
-            ]
-        ).encode()
+    key = _measurement_key(
+        candidate, model_hash, digest, converted_sha, image, ctx.resolved_jlink_serial, references
     )
     entry = root / "cache" / (key + ".json")
     if force:
@@ -184,8 +200,9 @@ def _measure(
     return _completed(digest, "measured", converted_sha, saved.relative_to(root), measurement)
 
 
-def _validate_plan(path: Path, model_sha: str) -> None:
+def _validate_plan(path: Path, model_sha: str, model_options: Any) -> None:
     try:
+        from helia_aot import ConvertArgs
         from helia_aot.aot.plan_input import read_plan_input
         from helia_aot.errors import InvalidConfigError
     except ImportError as exc:
@@ -194,8 +211,16 @@ def _validate_plan(path: Path, model_sha: str) -> None:
         candidate = read_plan_input(path)
     except InvalidConfigError as exc:
         raise ValueError(str(exc)) from exc
+    try:
+        subgraph = ConvertArgs.model_validate({"model": model_options}).model.subgraph
+    except ValueError as exc:
+        raise ConfigError(f"Invalid heliaAOT model configuration: {exc}") from exc
     if candidate.model.sha256 != model_sha:
         raise ValueError("Candidate plan targets a different model")
+    if candidate.model.subgraph != subgraph:
+        raise ValueError(
+            f"Candidate plan targets subgraph {candidate.model.subgraph}, expected {subgraph}"
+        )
 
 
 def sweep(
@@ -225,13 +250,14 @@ def sweep(
             "Candidate identities must be unique and contain every requested remeasurement"
         )
     model_sha = _sha(config.model.path.read_bytes())
+    model_options = _merged_aot_args(config).get("model", {})
     invalid: dict[str, str] = {}
     root = root.resolve()
     for digest, (data, _) in zip(hashes, candidates, strict=True):
         plan = root / "plans" / (digest + ".json")
         write_bytes_atomically(plan, data)
         try:
-            _validate_plan(plan, model_sha)
+            _validate_plan(plan, model_sha, model_options)
         except ValueError as exc:
             invalid[digest] = str(exc)
     session = root / "runs" / uuid4().hex

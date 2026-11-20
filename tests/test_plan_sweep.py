@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from helia_profiler import sweep as module
@@ -34,7 +35,7 @@ def test_sweep_records_build_failure_and_continues(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
 
     validated = []
-    monkeypatch.setattr(module, "_validate_plan", lambda path, _: validated.append(path))
+    monkeypatch.setattr(module, "_validate_plan", lambda path, *_: validated.append(path))
 
     def measure(config, plan, digest, root, attempt, references, force):
         assert len(validated) == len(plans)
@@ -59,7 +60,7 @@ def test_sweep_cli_requires_reference():
         app, ["sweep", "plan.json", "--output", "out", "--config", str(Path(__file__))]
     )
     assert result.exit_code == 2
-    assert "reference-digest" in result.output
+    assert "reference-digest" in unstyle(result.output)
 
 
 def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
@@ -135,3 +136,62 @@ def test_interruption_preserves_completed_index(tmp_path, monkeypatch):
     assert [(row["plan_sha256"], row["status"]) for row in rows] == [
         (module._sha(b"one"), "measured")
     ]
+
+
+def test_cache_identity_includes_host_aggregation(tmp_path):
+    from dataclasses import replace
+
+    from helia_profiler.vocab import Aggregation
+
+    config = load_config(None, {"model": {"path": tmp_path / "model.tflite"}})
+    mean = replace(config, profiling=replace(config.profiling, aggregation=Aggregation.MEAN))
+
+    def key(cfg):
+        return module._measurement_key(
+            cfg, "model", "requested", "converted", "firmware", "123", ("0" * 16,)
+        )
+
+    assert key(config) != key(mean)
+
+
+@pytest.mark.parametrize(
+    ("file_subgraph", "inline_subgraph", "expected"),
+    [(None, None, 0), (1, None, 1), (1, "2", 2)],
+)
+def test_prevalidation_matches_configured_subgraph(
+    tmp_path, monkeypatch, file_subgraph, inline_subgraph, expected
+):
+    pytest.importorskip("helia_aot")
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    engine = {"type": "helia-aot"}
+    if file_subgraph is not None:
+        compiler_config = tmp_path / "convert.yaml"
+        compiler_config.write_text(f"model:\n  subgraph: {file_subgraph}\n")
+        engine["config_path"] = str(compiler_config)
+    if inline_subgraph is not None:
+        engine["config"] = {"aot_args": {"model": {"subgraph": inline_subgraph}}}
+    config = load_config(
+        None, {"model": {"path": model}, "engine": engine, "target": {"jlink_serial": "123"}}
+    )
+    fixture = Path(__file__).parent / "fixtures/calibration/kws_int8_kernel_generic_plan.json"
+    candidate = json.loads(fixture.read_text())
+    candidate["model"]["sha256"] = module._sha(model.read_bytes())
+    paths = []
+    for index in [expected, expected + 1]:
+        candidate["model"]["subgraph"] = index
+        path = tmp_path / f"candidate-{index}.json"
+        path.write_text(json.dumps(candidate))
+        paths.append(path)
+    measured = []
+
+    def measure(config, plan, digest, root, attempt, references, force):
+        measured.append(json.loads(plan.read_text())["model"]["subgraph"])
+        return module.SweepRow(digest, "measured")
+
+    monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
+    monkeypatch.setattr(module, "_measure", measure)
+    rows = module.sweep(config, paths, tmp_path / "out", reference_outputs=("0" * 16,))
+    assert measured == [expected]
+    assert [row.status for row in rows] == ["measured", "failed"]
+    assert rows[1].error is not None and f"expected {expected}" in rows[1].error
