@@ -120,7 +120,12 @@ def _measure(
     converted_bytes = converted.read_bytes()
     converted_sha = _sha(converted_bytes)
     conversion = read_json(converted_bytes, label="converted plan")
-    model_hash = conversion["model"]["sha256"]
+    try:
+        model_hash = conversion["model"]["sha256"]
+        pool = conversion["schedule"]["pool"]
+        pool_bytes = 0 if pool is None else pool["bytes"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError(f"Invalid model or schedule in converted plan: {exc}") from exc
     if model_hash != _sha(config.model.path.read_bytes()):
         raise ValueError("Converted plan and requested model differ")
     image = _sha(ctx.profile_run.firmware.binary_path.read_bytes())
@@ -164,7 +169,7 @@ def _measure(
             measurement["clean_window_energy_uj"] = power.energy_per_inference_uj
     measurement["cache_key"] = key
     measurement["converted_plan_sha256"] = converted_sha
-    measurement["pool_bytes"] = (conversion["schedule"]["pool"] or {"bytes": 0})["bytes"]
+    measurement["pool_bytes"] = pool_bytes
     saved = attempt / "measurement.json"
     _write(saved, measurement)
     relative = str(saved.relative_to(root))
@@ -177,6 +182,20 @@ def _measure(
     if not config.power.enabled:
         _write(entry, {"key": key, "path": relative, "sha256": _sha(saved.read_bytes())})
     return _completed(digest, "measured", converted_sha, saved.relative_to(root), measurement)
+
+
+def _validate_plan(path: Path, model_sha: str) -> None:
+    try:
+        from helia_aot.aot.plan_input import read_plan_input
+        from helia_aot.errors import InvalidConfigError
+    except ImportError as exc:
+        raise ConfigError("Install the heliaAOT extra to validate sweep plans") from exc
+    try:
+        candidate = read_plan_input(path)
+    except InvalidConfigError as exc:
+        raise ValueError(str(exc)) from exc
+    if candidate.model.sha256 != model_sha:
+        raise ValueError("Candidate plan targets a different model")
 
 
 def sweep(
@@ -207,23 +226,20 @@ def sweep(
         )
     model_sha = _sha(config.model.path.read_bytes())
     invalid: dict[str, str] = {}
+    root = root.resolve()
     for digest, (data, _) in zip(hashes, candidates, strict=True):
+        plan = root / "plans" / (digest + ".json")
+        write_bytes_atomically(plan, data)
         try:
-            content = read_json(data, label="candidate plan")
-            if not isinstance(content, dict) or not isinstance(content.get("model"), dict):
-                raise ValueError("Missing plan model identity")
-            if content["model"].get("sha256") != model_sha:
-                raise ValueError("Candidate plan targets a different model")
+            _validate_plan(plan, model_sha)
         except ValueError as exc:
             invalid[digest] = str(exc)
-    root = root.resolve()
     session = root / "runs" / uuid4().hex
     rows: list[SweepRow] = []
     with reserve_probe(serial), file_mutex(root / ".sweep.lock"):
-        for digest, (data, source) in zip(hashes, candidates, strict=True):
+        for digest, (_, source) in zip(hashes, candidates, strict=True):
             attempt = session / digest
             plan = root / "plans" / (digest + ".json")
-            write_bytes_atomically(plan, data)
             try:
                 if digest in invalid:
                     raise ValueError(invalid[digest])

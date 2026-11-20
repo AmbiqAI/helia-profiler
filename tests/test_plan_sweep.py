@@ -33,7 +33,11 @@ def test_sweep_records_build_failure_and_continues(tmp_path, monkeypatch):
     seen = []
     monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
 
+    validated = []
+    monkeypatch.setattr(module, "_validate_plan", lambda path, _: validated.append(path))
+
     def measure(config, plan, digest, root, attempt, references, force):
+        assert len(validated) == len(plans)
         seen.append(json.loads(plan.read_text())["name"])
         if len(seen) == 1:
             raise ConfigError("fixture compile failed")
@@ -79,3 +83,55 @@ def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
     assert module._read_cache(entry, tmp_path, "K", "B", "C") is None
     assert module._read_cache(entry, tmp_path, "K", "A", "D") is None
     assert module._read_cache(entry, tmp_path, "L", "A", "C") is None
+
+
+def test_incomplete_plan_with_matching_digest_is_rejected_before_capture(tmp_path, monkeypatch):
+    pytest.importorskip("helia_aot")
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    config = load_config(
+        None,
+        {
+            "model": {"path": model},
+            "engine": {"type": "helia-aot"},
+            "target": {"jlink_serial": "123"},
+        },
+    )
+    plan = tmp_path / "incomplete.json"
+    plan.write_text(json.dumps({"model": {"sha256": module._sha(model.read_bytes())}}))
+    monkeypatch.setattr(module, "_measure", lambda *args: pytest.fail("invalid plan reached build"))
+    rows = module.sweep(config, [plan], tmp_path / "out", reference_outputs=("0" * 16,))
+    assert rows[0].status == "failed"
+    assert "schema" in (rows[0].error or "").lower()
+
+
+def test_interruption_preserves_completed_index(tmp_path, monkeypatch):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    config = load_config(
+        None,
+        {
+            "model": {"path": model},
+            "engine": {"type": "helia-aot"},
+            "target": {"jlink_serial": "123"},
+        },
+    )
+    plans = [tmp_path / name for name in ("one.json", "two.json")]
+    for plan in plans:
+        plan.write_text(plan.stem)
+    monkeypatch.setattr(module, "_validate_plan", lambda *_: None)
+    monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
+
+    def measure(config, plan, digest, root, attempt, references, force):
+        if plan.read_text() == "two":
+            raise KeyboardInterrupt()
+        return module.SweepRow(digest, "measured")
+
+    monkeypatch.setattr(module, "_measure", measure)
+    with pytest.raises(KeyboardInterrupt):
+        module.sweep(config, plans, tmp_path / "out", reference_outputs=("0" * 16,))
+    (index,) = (tmp_path / "out/runs").glob("*/sweep.json")
+    rows = json.loads(index.read_text())
+    assert [(row["plan_sha256"], row["status"]) for row in rows] == [
+        (module._sha(b"one"), "measured")
+    ]

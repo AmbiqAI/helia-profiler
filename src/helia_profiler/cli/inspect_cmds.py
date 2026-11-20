@@ -289,6 +289,7 @@ def _cmd_target_reset(*, board: str, jlink_serial: str | None = None, kind: str 
     from ..console import HpxConsole
     from ..errors import HpxError
     from ..target.probe.jlink import reset_target, reset_target_poi
+    from ..target.probe.reservation import reserve_probe
 
     try:
         from ..platform import get_soc_for_board
@@ -299,10 +300,9 @@ def _cmd_target_reset(*, board: str, jlink_serial: str | None = None, kind: str 
         sys.exit(2)
 
     try:
-        if kind == "swpoi":
-            reset_target_poi(device=soc.jlink_device, jlink_serial=jlink_serial)
-        else:
-            reset_target(device=soc.jlink_device, jlink_serial=jlink_serial)
+        with reserve_probe(jlink_serial):
+            reset = reset_target_poi if kind == "swpoi" else reset_target
+            reset(device=soc.jlink_device, jlink_serial=jlink_serial)
     except HpxError as exc:
         HpxConsole().print_error(exc)
         sys.exit(1)

@@ -320,6 +320,7 @@ target/probe/__init__.py
 target/probe/base.py
 target/probe/flash.py
 target/probe/jlink.py
+target/probe/reservation.py
 transport/__init__.py
 transport/base.py
 transport/firmware_errors.py

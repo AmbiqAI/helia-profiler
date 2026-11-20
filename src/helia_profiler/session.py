@@ -382,13 +382,15 @@ class Session:
         """Reset the configured target through its J-Link probe."""
         from .platform import get_soc_for_board
         from .target.probe.jlink import reset_target, reset_target_poi
+        from .target.probe.reservation import reserve_probe
 
         if kind not in ("debug", "swpoi"):
             raise ConfigError("reset kind must be 'debug' or 'swpoi'")
         config = self._utility_config(board=board, serial=serial)
         soc = get_soc_for_board(config.target.board, registry=config.platform_registry)
         reset = reset_target_poi if kind == "swpoi" else reset_target
-        reset(device=soc.jlink_device, jlink_serial=config.target.jlink_serial)
+        with reserve_probe(config.target.jlink_serial):
+            reset(device=soc.jlink_device, jlink_serial=config.target.jlink_serial)
 
     def _utility_config(
         self,

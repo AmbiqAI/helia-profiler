@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from contextlib import contextmanager
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 
@@ -149,6 +150,41 @@ def _make_config(tmp_path: Path):
 
 
 class TestPipelineRunner:
+    def test_profile_reserves_before_workspace_and_power(self, tmp_path, monkeypatch):
+        events = []
+
+        @contextmanager
+        def reserve(serial):
+            events.append("probe")
+            yield
+            events.append("release probe")
+
+        @contextmanager
+        def workspace(path):
+            events.append("workspace")
+            yield
+            events.append("release workspace")
+
+        monkeypatch.setattr("helia_profiler.target.probe.reservation.reserve_probe", reserve)
+        monkeypatch.setattr("helia_profiler.pipeline.file_mutex", workspace)
+        runner = PipelineRunner(
+            [
+                RecordingStage("ensure_board_powered", events),
+                RecordingStage("resolve_jlink_probe", events),
+                RecordingStage("flash_firmware", events),
+            ]
+        )
+        runner.run(_make_config(tmp_path))
+        assert events == [
+            "probe",
+            "workspace",
+            "ensure_board_powered",
+            "resolve_jlink_probe",
+            "flash_firmware",
+            "release workspace",
+            "release probe",
+        ]
+
     def test_empty_pipeline(self, tmp_path: Path):
         config = _make_config(tmp_path)
         runner = PipelineRunner([])

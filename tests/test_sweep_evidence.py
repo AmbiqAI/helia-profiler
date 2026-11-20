@@ -143,8 +143,12 @@ static uint32_t SystemCoreClock = 96000000U;
         helper
         + """
 int main() {
-    hpx_sweep_report(96000U, 33U, true);
-    hpx_sweep_report(96000U, 1466050U, true);
+    hpx_sweep_report(96000U, 33U, true, true);
+    hpx_sweep_report(96000U, 1466050U, true, true);
+    hpx_sweep_report(1000U, 0U, true, true);
+    hpx_sweep_report(1000U, 0U, false, true);
+    hpx_sweep_report(96000U, 0U, true, true);
+    hpx_sweep_report(0U, 0U, true, true);
 }
 """
     )
@@ -153,5 +157,6 @@ int main() {
     exe = tmp_path / "clock.exe"
     subprocess.run([compiler, str(cpp), "-o", str(exe)], check=True)
     output = subprocess.check_output([str(exe)], text=True).splitlines()
-    assert output[0].startswith("HPX_AOT_RUN_EVIDENCE=96000,0,")
-    assert output[1].startswith("HPX_AOT_RUN_EVIDENCE=0,0,")
+    assert [line.split(",")[:2] for line in output] == [
+        [f"HPX_AOT_RUN_EVIDENCE={cycles}", "0"] for cycles in (96000, 0, 1000, 0, 0, 0)
+    ]

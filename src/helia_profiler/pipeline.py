@@ -11,7 +11,7 @@ import logging
 import shutil
 import uuid
 from collections.abc import Callable
-from contextlib import ExitStack
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -418,7 +418,13 @@ class PipelineRunner:
     def run(self, config: ProfileConfig) -> PipelineContext:
         work_dir = _resolve_work_dir(config)
         lock_path = work_dir / ".hpx-run.lock"
-        with file_mutex(lock_path):
+        from .target.probe.reservation import reserve_probe
+
+        uses_probe = any(
+            stage.name in ("resolve_jlink_probe", "flash_firmware") for stage in self._stages
+        )
+        reservation = reserve_probe(config.target.jlink_serial) if uses_probe else nullcontext()
+        with reservation, file_mutex(lock_path):
             if config.clean and config.work_dir is None:
                 # Preserve the lock inode so waiting runs retain the same mutex.
                 for child in work_dir.iterdir():
@@ -453,11 +459,10 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
-        with ExitStack() as locks:
-            self.run_stages(ctx, locks=locks)
+        self.run_stages(ctx)
         return ctx
 
-    def run_stages(self, ctx: PipelineContext, *, locks: ExitStack | None = None) -> None:
+    def run_stages(self, ctx: PipelineContext) -> None:
         """Run this sequence on a prepared context in a caller-owned workspace."""
         total_stages = len(self._stages)
         for stage_index, stage in enumerate(self._stages, start=1):
@@ -470,10 +475,6 @@ class PipelineRunner:
             log.info("[start] %s", stage.name)
             if self._observer is not None:
                 self._observer.stage_start(stage.name, stage_index, total_stages)
-            if locks is not None and stage.name == "flash_firmware" and ctx.effective_jlink_serial:
-                from .target.probe.reservation import reserve_probe
-
-                locks.enter_context(reserve_probe(ctx.effective_jlink_serial))
             try:
                 stage.run(ctx)
             except KeyboardInterrupt:
