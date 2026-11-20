@@ -56,6 +56,19 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.3...v0.6.4) (2026-11-20)
+
+
+### Features
+
+* sweep heliaAOT candidate plans on one target ([#707](https://github.com/AmbiqAI/helia-profiler/issues/707)) ([6000a92](https://github.com/AmbiqAI/helia-profiler/commit/6000a925f5126dcd1badf39f6c73f354fc9edfb4)), closes [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+
+
+### Bug Fixes
+
+* **platform:** correct the Apollo5 MRAM placement base ([#703](https://github.com/AmbiqAI/helia-profiler/issues/703)) ([18bf3c6](https://github.com/AmbiqAI/helia-profiler/commit/18bf3c60b8056abc5db227899af23437a5af9f6f))
+* **platform:** treat an unrecorded catalog D-cache size as unknown ([#704](https://github.com/AmbiqAI/helia-profiler/issues/704)) ([6b89c8b](https://github.com/AmbiqAI/helia-profiler/commit/6b89c8ba6e8893db509f3687a72e238e4b249164))
+
 ## [0.6.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.2...v0.6.3) (2026-11-17)
 
 
