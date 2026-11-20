@@ -195,3 +195,21 @@ def test_prevalidation_matches_configured_subgraph(
     assert measured == [expected]
     assert [row.status for row in rows] == ["measured", "failed"]
     assert rows[1].error is not None and f"expected {expected}" in rows[1].error
+
+
+@pytest.mark.parametrize("invalid", [False, [], "", 0])
+def test_sweep_rejects_falsey_nonmapping_optimization(tmp_path, invalid):
+    model = tmp_path / "model.tflite"
+    model.write_bytes(b"model")
+    config = load_config(
+        None,
+        {
+            "model": {"path": model},
+            "target": {"jlink_serial": "123"},
+            "engine": {"type": "helia-aot", "config": {"aot_args": {"optimization": invalid}}},
+        },
+    )
+    plan = tmp_path / "plan.json"
+    plan.write_text("{}")
+    with pytest.raises(ConfigError, match="optimization settings must be a mapping"):
+        module.sweep(config, [plan], tmp_path / "out", reference_outputs=("0" * 16,))

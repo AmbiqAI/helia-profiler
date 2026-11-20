@@ -16,7 +16,7 @@ from ._files import read_json, write_bytes_atomically, write_text_atomically
 from ._version import __version__
 from .config import ProfileConfig
 from .engines import EngineType
-from .engines.helia_aot.compile import _merged_aot_args
+from .engines.helia_aot.compile import _compiler_config, _merged_aot_args
 from .errors import ConfigError, HpxError
 from .firmware.workload import AOT_CLEAN_WORKLOAD
 from .pipeline import PipelineRunner
@@ -128,16 +128,10 @@ def _measure(
     references: tuple[str, ...],
     force: bool,
 ) -> SweepRow:
-    args = config.engine.config.get("aot_args") or {}
-    if not isinstance(args, dict):
-        raise ConfigError("engine.config.aot_args must be a mapping")
-    optimization = args.get("optimization") or {}
-    if not isinstance(optimization, dict):
-        raise ConfigError("heliaAOT optimization settings must be a mapping")
-    args = {**args, "optimization": {**optimization, "plan": str(plan)}}
+    args = config.engine.config["aot_args"]
+    args = {**args, "optimization": {**args["optimization"], "plan": str(plan)}}
     candidate = replace(
-        config,
-        engine=replace(config.engine, config={**config.engine.config, "aot_args": args}),
+        _compiler_config(config, args),
         profiling=replace(config.profiling, sweep_evidence=True),
         work_dir=root / "build" / digest,
         output=replace(config.output, dir=attempt),
@@ -250,7 +244,16 @@ def sweep(
             "Candidate identities must be unique and contain every requested remeasurement"
         )
     model_sha = _sha(config.model.path.read_bytes())
-    model_options = _merged_aot_args(config).get("model", {})
+    inline = config.engine.config.get("aot_args")
+    if inline is not None and not isinstance(inline, dict):
+        raise ConfigError("engine.config.aot_args must be a mapping")
+    args = _merged_aot_args(config)
+    optimization = args.get("optimization")
+    if optimization is not None and not isinstance(optimization, dict):
+        raise ConfigError("heliaAOT optimization settings must be a mapping")
+    args["optimization"] = {} if optimization is None else optimization
+    config = _compiler_config(config, args)
+    model_options = args.get("model", {})
     invalid: dict[str, str] = {}
     root = root.resolve()
     for digest, (data, _) in zip(hashes, candidates, strict=True):
