@@ -86,6 +86,16 @@
 {%- endif %}{% endfor %}{% endif %}
 {%- endblock %}
 
+{% set constant_regions = arena_regions | selectattr("role", "equalto", "constant") | list %}
+{% set psram_constants = constant_regions | selectattr("placement", "equalto", "psram") | list %}
+{% if stream_evidence and psram_constants and psram_constants == constant_regions %}
+{% set cache_preparation = "cold" %}
+{% elif not stream_evidence and warmup > 0 %}
+{% set cache_preparation = "warm" %}
+{% else %}
+{% set cache_preparation = "unknown" %}
+{% endif %}
+
 {% block engine_globals %}
 {% if per_layer_profiling %}
 {% include "_aot_layer_profiler.j2" %}
@@ -122,7 +132,20 @@ static uint64_t hpx_fnv1a64(const void *data, size_t size) {
     return hash;
 }
 
-static void hpx_print_output_digests(void) {
+{% if sweep_evidence | default(false) %}
+{% include "_aot_transfer_clock.j2" %}
+static void hpx_sweep_report(uint32_t cycles, uint32_t ticks, bool clock_ready, bool prepared) {
+    if (!clock_ready || !hpx_transfer_clock_valid(cycles, ticks, true)) cycles = 0U;
+#ifdef HPX_AOT_TRANSFER
+    const int32_t transfer_error = {{ aot_prefix }}_nsx_transfer_last()->error;
+#else
+    const int32_t transfer_error = 0;
+#endif
+    hpx_printf("HPX_AOT_RUN_EVIDENCE=%lu,%ld,%s\n", (unsigned long)cycles, (long)transfer_error,
+               prepared ? "{{ cache_preparation }}" : "unknown");
+}
+
+{% endif %}static void hpx_print_output_digests(void) {
     for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {
         hpx_printf("HPX_OUTPUT_%d_FNV1A64=%016llx\n", i,
                    (unsigned long long)hpx_fnv1a64({{ aot_prefix }}_model_ctx.outputs[i].data,
@@ -448,7 +471,9 @@ hpx_aot_check_runs();{% endblock %}
    default budget is bound again, and model_init and one more run (the pool
    poisoned again) show the module recovered. Any other probe failure, or a
    failed recovery step, fails the capture like a failed loop. #}
-{% block engine_pass_preamble %}{% if transfer_timeout_probe %}
+{% block engine_pass_preamble %}{% if sweep_evidence | default(false) %}
+    const bool sweep_clock_ready = hpx_stimer_init() != 0U;
+{% endif %}{% if transfer_timeout_probe %}
 #ifdef HPX_AOT_TRANSFER
     {
         {{ aot_prefix }}_nsx_transfer_options_t hpx_probe_options{};
@@ -503,7 +528,8 @@ hpx_aot_check_runs();{% endblock %}
 {% endif %}{{ super() }}{% endblock %}
 
 {% block engine_profiled_run_done %}
-#ifdef HPX_AOT_TRANSFER
+{% if sweep_evidence | default(false) %}        const uint32_t sweep_ticks = hpx_stimer_ticks() - sweep_start;
+{% endif %}#ifdef HPX_AOT_TRANSFER
         hpx_transfer_after_run();
         // A broken power clause ends the loop like a failed run: DMA may still
         // own the pool, so no later poison or run follows it.
@@ -556,7 +582,9 @@ hpx_aot_check_runs();{% endblock %}
 {% if pass.group == "ethos_npu" %}
         hpx_npu_clear();
 {% endif %}
-        g_hb_pass = {{ loop.index0 }};
+{% if sweep_evidence | default(false) %}        const uint64_t cycles_before = profiled_infer_cycles;
+        bool prepared = true;
+{% endif %}        g_hb_pass = {{ loop.index0 }};
         g_hb_iter = iter;
         g_hb_last_cyc = DWT->CYCCNT;
         g_hb_ops_since = 0;
@@ -570,9 +598,13 @@ hpx_aot_check_runs();{% endblock %}
 {% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
         {
             am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
-            (void)am_hal_cachectrl_dcache_invalidate(&hpx_range, true);
-        }
-{% endfor %}{% endif %}
+{% if sweep_evidence | default(false) %}            if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U) {
+                prepared = false;
+            }
+{% else %}            (void)am_hal_cachectrl_dcache_invalidate(&hpx_range, true);
+{% endif %}        }
+{% endfor %}{% endif %}{% if sweep_evidence | default(false) %}
+        const uint32_t sweep_start = hpx_stimer_ticks();{% endif %}
 {%- endblock %}
 
 {% block engine_print_csv %}        if (g_layer_capacity_exceeded) {
@@ -588,7 +620,8 @@ hpx_aot_check_runs();{% endblock %}
 #ifdef HPX_AOT_TRANSFER
         hpx_transfer_report();
 #endif
-        hpx_print_output_digests();
+{% if sweep_evidence | default(false) %}        hpx_sweep_report((uint32_t)(profiled_infer_cycles - cycles_before), sweep_ticks, sweep_clock_ready, prepared);
+{% endif %}        hpx_print_output_digests();
 {%- endblock %}
 
 {% block engine_profiled_summary %}
@@ -658,8 +691,33 @@ hpx_aot_check_runs();{% endblock %}
 #endif
 {% endif %}
 {% if not per_layer_profiling and not power_only | default(false) %}
-    hpx_print_output_digests();
-{% endif %}
+{% if sweep_evidence | default(false) %}
+    for (int w = 0; w < {{ warmup }}; ++w) {
+{{ self.engine_reset_inputs() }}
+        {{ self.engine_invoke() }}
+        hpx_printf("HPX_HEARTBEAT phase=model_only_warmup iter=%d\n", w);
+    }
+    hpx_aot_check_runs();
+    for (int i = 0; i < {{ iterations }}; ++i) {
+{{ self.engine_reset_inputs() }}
+{% if transport == "usb_cdc" %}        usb_timer_pause();
+{% endif %}        const uint32_t sweep_start = hpx_stimer_ticks();
+        const uint32_t start = DWT->CYCCNT;
+        hpx_aot_status = {{ aot_prefix }}_model_run(&{{ aot_prefix }}_model_ctx);
+        const uint32_t cycles = DWT->CYCCNT - start;
+        const uint32_t sweep_ticks = hpx_stimer_ticks() - sweep_start;
+{% if transport == "usb_cdc" %}        usb_timer_resume();
+{% endif %}        hpx_aot_check_runs();
+        profiled_infer_cycles += cycles;
+        ++profiled_infer_count;
+{% if transport == "rtt" %}        hpx_rtt_set_blocking();
+{% endif %}        hpx_sweep_report(cycles, sweep_ticks, sweep_clock_ready, true);
+        hpx_print_output_digests();
+{% if transport == "rtt" %}        hpx_rtt_set_nonblocking();
+{% endif %}    }
+    hpx_aot_check_runs();
+{% else %}    hpx_print_output_digests();
+{% endif %}{% endif %}
 {% if has_ethos_u | default(false) and per_layer_profiling %}
     // Passes are done; leave NPU PMU tracking disabled rather than armed on
     // whatever group happened to run last.

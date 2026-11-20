@@ -11,6 +11,7 @@ import logging
 import shutil
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -275,7 +276,14 @@ class PipelineContext:
         reported = result.meta.dcache
         if reported not in (None, "on", "off"):
             raise CaptureError(f"Invalid firmware data-cache mode: {reported!r}")
-        if (reported or "on") != self.config.profiling.dcache:
+        expected_cache = self.config.profiling.dcache
+        if (
+            self.config.profiling.sweep_evidence
+            and self.soc
+            and not self.soc.capabilities.memory.has_dcache
+        ):
+            expected_cache = "off"
+        if (reported or "on") != expected_cache:
             raise CaptureError(
                 "Firmware data-cache mode does not match profiling.dcache.",
                 hint="Rebuild and flash the profile firmware with the requested cache setting.",
@@ -410,7 +418,13 @@ class PipelineRunner:
     def run(self, config: ProfileConfig) -> PipelineContext:
         work_dir = _resolve_work_dir(config)
         lock_path = work_dir / ".hpx-run.lock"
-        with file_mutex(lock_path):
+        from .target.probe.reservation import reserve_probe
+
+        uses_probe = any(
+            stage.name in ("resolve_jlink_probe", "flash_firmware") for stage in self._stages
+        )
+        reservation = reserve_probe(config.target.jlink_serial) if uses_probe else nullcontext()
+        with reservation, file_mutex(lock_path):
             if config.clean and config.work_dir is None:
                 # Preserve the lock inode so waiting runs retain the same mutex.
                 for child in work_dir.iterdir():
@@ -445,6 +459,11 @@ class PipelineRunner:
         ctx.run_metadata.config_snapshot = serialize_config(config)
         ctx.run_metadata.compatibility = config.compatibility
 
+        self.run_stages(ctx)
+        return ctx
+
+    def run_stages(self, ctx: PipelineContext) -> None:
+        """Run this sequence on a prepared context in a caller-owned workspace."""
         total_stages = len(self._stages)
         for stage_index, stage in enumerate(self._stages, start=1):
             if stage.should_skip(ctx):
@@ -474,8 +493,6 @@ class PipelineRunner:
 
         if self._observer is not None:
             self._observer.pipeline_done()
-
-        return ctx
 
 
 def _cache_work_key(config: ProfileConfig) -> str:

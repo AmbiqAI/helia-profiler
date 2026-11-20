@@ -254,6 +254,7 @@ class EngineContext:
     #: ``profiling.stream_evidence``; only for a heliaAOT module that binds a
     #: stream pool, on a part with an explicit D-cache.
     stream_evidence: bool = False
+    sweep_evidence: bool = False
     transfer_diagnostics: str = "off"
     transfer_diagnostic_iterations: int = 1
     transfer_trace_max_pieces: int = 256
@@ -503,6 +504,7 @@ class FirmwareRenderContext:
                 input_fill=config.profiling.input_fill.value,
                 transfer_timeout_probe=config.profiling.transfer_timeout_probe,
                 stream_evidence=config.profiling.stream_evidence,
+                sweep_evidence=config.profiling.sweep_evidence,
                 transfer_diagnostics=config.profiling.transfer_diagnostics,
                 transfer_diagnostic_iterations=config.profiling.transfer_diagnostic_iterations,
                 transfer_trace_max_pieces=config.profiling.transfer_trace_max_pieces,
@@ -629,6 +631,7 @@ class FirmwareRenderContext:
             "input_fill": self.engine.input_fill,
             "transfer_timeout_probe": self.engine.transfer_timeout_probe,
             "stream_evidence": self.engine.stream_evidence,
+            "sweep_evidence": self.engine.sweep_evidence,
             "transfer_diagnostics": self.engine.transfer_diagnostics,
             "transfer_diagnostic_iterations": self.engine.transfer_diagnostic_iterations,
             "transfer_trace_max_pieces": self.engine.transfer_trace_max_pieces,

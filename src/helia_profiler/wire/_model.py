@@ -196,6 +196,7 @@ class HeartbeatPhase(StrEnum):
     MODEL_INIT_DONE = "model_init_done"
     INFER = "infer"
     WARMUP_DONE = "warmup_done"
+    MODEL_ONLY_WARMUP = "model_only_warmup"
     FLUSHING = "flushing"
 
 
@@ -336,6 +337,7 @@ class WireKey(StrEnum):
     TRANSFER_PROBE = "transfer_probe"
     TRANSFER_RECOVERY = "transfer_recovery"
     TRANSFER_RECOVERY_OUTPUT_INDEXED_FNV1A64 = "transfer_recovery_output_%d_fnv1a64"
+    AOT_RUN_EVIDENCE = "aot_run_evidence"
     STREAM_EVIDENCE = "stream_evidence"
     INPUT_FILL = "input_fill"
 
@@ -481,7 +483,7 @@ def _spec(*args, **kwargs) -> WireSpec:
 # appears here, and the census asserts the two sets match exactly — a typo
 # cannot silently become an unchecked condition.
 GATE_NOT_POWER_ONLY = "not power_only"
-GATE_DCACHE_METADATA = "has_dcache and not power_only"
+GATE_DCACHE_METADATA = "(has_dcache or sweep_evidence) and not power_only"
 GATE_MODEL_ONLY = "not per_layer_profiling and not power_only"
 GATE_LAYER_PROFILE = "per_layer_profiling and not power_only"
 GATE_LAYER_CALLBACKS = "per_layer_profiling"
@@ -516,6 +518,8 @@ GATE_POWER_ONLY = "power_only"
 GATE_POWER_INA228 = "power_only and power_monitor == ina228"
 GATE_PMU_PROFILE = "has_armv8m_pmu and per_layer_profiling and not power_only"
 GATE_TRANSFER_PROBE = "transfer_timeout_probe and not power_only"
+GATE_MODEL_ONLY_SWEEP = "sweep_evidence and not per_layer_profiling and not power_only"
+GATE_SWEEP_EVIDENCE = "sweep_evidence and not power_only"
 GATE_STREAM_EVIDENCE = "stream_evidence"
 
 GATE_TRANSFER_DIAGNOSTIC = "transfer_diagnostics != off and per_layer_profiling and not power_only"

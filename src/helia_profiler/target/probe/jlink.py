@@ -35,6 +35,7 @@ from pathlib import Path
 from ...errors import CaptureError, ConfigError
 from ...platform import CoreArch
 from .base import DebugMemorySession
+from .reservation import reserve_probe
 
 log = logging.getLogger("hpx")
 
@@ -254,14 +255,15 @@ def inspect_probe_target(probe: JLinkProbe, *, device: str) -> JLinkProbeMatch:
     """
     cmd = _jlink_target_cmd(device=device, jlink_serial=probe.serial)
     for attempt in range(_PROBE_INSPECTION_ATTEMPTS):
-        result = _invoke_jlink(
-            cmd,
-            script="exit\n",
-            timeout_s=_DEFAULT_TIMEOUT_S,
-            error_cls=ConfigError,
-            timeout_message=f"Timed out while querying J-Link serial '{probe.serial}'.",
-            timeout_hint="Check that the probe is connected and not in use by another process.",
-        )
+        with reserve_probe(probe.serial):
+            result = _invoke_jlink(
+                cmd,
+                script="exit\n",
+                timeout_s=_DEFAULT_TIMEOUT_S,
+                error_cls=ConfigError,
+                timeout_message=f"Timed out while querying J-Link serial '{probe.serial}'.",
+                timeout_hint="Check that the probe is connected and not in use by another process.",
+            )
 
         detected_core = _parse_detected_core((result.stdout or "") + "\n" + (result.stderr or ""))
         if detected_core is not None or attempt + 1 == _PROBE_INSPECTION_ATTEMPTS:

@@ -63,10 +63,10 @@ def test_the_walk_finds_every_group_and_leaf(cli_payload):
     """
     counts = cli_payload["counts"]
     assert counts["groups"] == 8, counts["group_names"]
-    assert counts["leaf_commands"] == 24, counts["leaf_command_names"]
-    assert counts["top_level_entries"] == 18
-    assert counts["options"] == 138
-    assert counts["arguments"] == 16
+    assert counts["leaf_commands"] == 25, counts["leaf_command_names"]
+    assert counts["top_level_entries"] == 19
+    assert counts["options"] == 142
+    assert counts["arguments"] == 17
     assert {"results inspect", "results show", "results export"} <= set(
         counts["leaf_command_names"]
     )
@@ -145,8 +145,8 @@ def test_the_configuration_walk_records_what_it_could_not_reach():
     payload = extract_schema.build()
     counts = payload["counts"]
     assert counts["classes"] == 15
-    assert counts["declaredFields"] == 115
-    assert counts["schemaProperties"] == 115
+    assert counts["declaredFields"] == 116
+    assert counts["schemaProperties"] == 116
     assert counts["unreachableFromRoot"] == ["MonitorBoardPreset"]
     assert payload["x-hpx"]["fieldIndex"]["MonitorBoardPreset"]
 

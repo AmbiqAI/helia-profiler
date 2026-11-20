@@ -36,6 +36,7 @@ REFUSED = {
 
 #: Reads in this package that cannot change fixture firmware, with the reason.
 ALLOWED = {
+    ("target/probe/reservation.py", "LOCALAPPDATA"): "Windows probe lock location; no build input",
     ("fixtures/build.py", "<name>"): "the fixture refusal check itself",
     ("fixtures/build.py", "HPX_COMPILER_LAUNCHER"): "the fixture refusal check itself",
     (

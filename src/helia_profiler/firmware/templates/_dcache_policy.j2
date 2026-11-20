@@ -21,4 +21,6 @@
 {% endif %}
 {% if has_dcache | default(false) and not power_only | default(false) %}
     hpx_printf("HPX_DCACHE={{ dcache | default('on') }}\n");
+{% elif sweep_evidence | default(false) and has_dcache is defined and not has_dcache and not power_only | default(false) %}
+    hpx_printf("HPX_DCACHE=off\n");
 {% endif %}

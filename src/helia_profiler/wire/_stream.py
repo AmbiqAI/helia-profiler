@@ -21,6 +21,7 @@ from ._model import (
     GATE_LAYER_CALLBACKS,
     GATE_LAYER_PROFILE,
     GATE_MODEL_ONLY,
+    GATE_MODEL_ONLY_SWEEP,
     GATE_NOT_POWER_ONLY,
     GATE_NOT_STIMER_WINDOW,
     GATE_POWER_ONLY,
@@ -184,7 +185,8 @@ START_HEADER_SPECS: tuple[WireSpec, ...] = (
         key=WireKey.DCACHE,
         condition=GATE_DCACHE_METADATA,
         value_shape="on | off",
-        note="An off request requires a matching report; old on/default streams may omit it.",
+        note="An off request requires a matching report. Sweep firmware also reports off "
+        "on targets without a CPU data cache. Older on/default streams may omit the field.",
     ),
     _spec(
         WireKey.VERSION.wire,
@@ -939,6 +941,16 @@ HEARTBEAT_SPECS: tuple[WireSpec, ...] = (
         condition=GATE_NOT_POWER_ONLY,
         engine_conditions={EngineType.HELIA_AOT: GATE_LAYER_PROFILE},
         value_shape="pass=<n>",
+    ),
+    _spec(
+        heartbeat_token(HeartbeatPhase.MODEL_ONLY_WARMUP),
+        WireKind.HEARTBEAT,
+        "A model-only sweep completed one warmup inference.",
+        WireConsumer.DIAGNOSTIC,
+        WireCriticality.DIAGNOSTIC,
+        engines=AOT_ENGINES,
+        condition=GATE_MODEL_ONLY_SWEEP,
+        value_shape="iter=<n>",
     ),
     _spec(
         heartbeat_token(HeartbeatPhase.FLUSHING),

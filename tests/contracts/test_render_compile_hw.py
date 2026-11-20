@@ -157,7 +157,12 @@ _MATRIX: tuple[_HwCase, ...] = (
         "apollo510",
         "helia-aot",
         "hpx_profiler",
-        aot_overrides=(("per_layer_profiling", False), ("pmu_passes", ()), ("pmu_pass_names", ())),
+        aot_overrides=(
+            ("per_layer_profiling", False),
+            ("pmu_passes", ()),
+            ("pmu_pass_names", ()),
+            ("sweep_evidence", True),
+        ),
     ),
     _HwCase(
         "510-aot-profile-arenas",
@@ -253,7 +258,7 @@ _MATRIX: tuple[_HwCase, ...] = (
         "hpx_profiler",
         aot_arenas=True,
         aot_transfer=True,
-        aot_overrides=(("stream_evidence", True), ("input_fill", "lcg")),
+        aot_overrides=(("stream_evidence", True), ("sweep_evidence", True), ("input_fill", "lcg")),
     ),
     _HwCase(
         "510-aot-profile-busy",

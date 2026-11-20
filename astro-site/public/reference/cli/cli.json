@@ -8,7 +8,7 @@
     "pydantic": "2.13.4"
   },
   "counts": {
-    "leaf_commands": 24,
+    "leaf_commands": 25,
     "leaf_command_names": [
       "analyze",
       "boards",
@@ -32,6 +32,7 @@
       "runtimes list",
       "runtimes prepare",
       "runtimes show",
+      "sweep",
       "target reset",
       "validate build"
     ],
@@ -46,7 +47,7 @@
       "target",
       "validate"
     ],
-    "top_level_entries": 18,
+    "top_level_entries": 19,
     "epilogs": 10,
     "epilog_commands": [
       "analyze",
@@ -60,8 +61,8 @@
       "run",
       "validate"
     ],
-    "options": 138,
-    "arguments": 16,
+    "options": 142,
+    "arguments": 17,
     "options_with_panel": 57,
     "panel_names": [
       "PMU profiling",
@@ -4226,6 +4227,173 @@
             "panels": []
           }
         ]
+      },
+      {
+        "path": [
+          "sweep"
+        ],
+        "name": "sweep",
+        "kind": "command",
+        "usage": "hpx sweep [OPTIONS] PLANS",
+        "short_help": "Measure plan candidates on the selected board.",
+        "help": "Measure plan candidates on the selected board.",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/app.py",
+          "line": 749
+        },
+        "arguments": [
+          {
+            "name": "plans",
+            "kind": "argument",
+            "declaration": "plans",
+            "opts": [
+              "plans"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "list[Path]",
+            "default": null,
+            "required": true,
+            "help": "Ordered heliaAOT candidate plans.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": -1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "options": [
+          {
+            "name": "config",
+            "kind": "option",
+            "declaration": "--config",
+            "opts": [
+              "--config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "file",
+              "class": "TyperPath",
+              "exists": true,
+              "file_okay": true,
+              "dir_okay": false,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": null,
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output",
+            "kind": "option",
+            "declaration": "--output",
+            "opts": [
+              "--output"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": "Sweep artifacts and measurement cache.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "reference",
+            "kind": "option",
+            "declaration": "--reference-digest",
+            "opts": [
+              "--reference-digest"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "list[str]",
+            "default": null,
+            "required": true,
+            "help": "FNV1a64 per output, in tensor order.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "remeasure",
+            "kind": "option",
+            "declaration": "--remeasure",
+            "opts": [
+              "--remeasure"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "str",
+              "class": "StringParamType"
+            },
+            "python_type": "Optional[list[str]]",
+            "default": null,
+            "required": false,
+            "help": "Recapture this plan SHA-256.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": true,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
       },
       {
         "path": [

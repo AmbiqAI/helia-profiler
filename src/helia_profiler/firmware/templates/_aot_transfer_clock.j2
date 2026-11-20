@@ -1,9 +1,9 @@
-static bool hpx_transfer_clock_valid(uint32_t cycles, uint32_t ticks) {
+static bool hpx_transfer_clock_valid(uint32_t cycles, uint32_t ticks, bool allow_subtick = false) {
     // STIMER bounds DWT: PMU passes rewrite DWT and cannot supply this clock.
     const uint64_t low = (uint64_t)(ticks > 0U ? ticks - 1U : 0U) * SystemCoreClock;
     const uint64_t high = ((uint64_t)ticks + 1U) * SystemCoreClock;
     const uint64_t measured = (uint64_t)cycles * HPX_STIMER_HZ;
-    return SystemCoreClock > 0U && cycles > 0U && ticks > 0U &&
+    return SystemCoreClock > 0U && cycles > 0U && (ticks > 0U || allow_subtick) &&
         high < (uint64_t)UINT32_MAX * HPX_STIMER_HZ &&
         high * 105U < (uint64_t)UINT32_MAX * HPX_STIMER_HZ * 100U &&
         measured * 100U >= low * 95U && measured * 100U <= high * 105U;

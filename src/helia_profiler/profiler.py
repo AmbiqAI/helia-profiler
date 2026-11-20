@@ -6,7 +6,7 @@ Composes the pipeline stages and delegates to ``PipelineRunner``.
 from __future__ import annotations
 
 from .config import ProfileConfig
-from .pipeline import PipelineContext, PipelineObserver, PipelineRunner, ProgressSink
+from .pipeline import PipelineContext, PipelineObserver, PipelineRunner, ProgressSink, Stage
 from .stages import (
     AnalyzeModelStage,
     BuildFirmwareStage,
@@ -35,29 +35,36 @@ def build_default_pipeline(
     progress_sink: ProgressSink | None = None,
 ) -> PipelineRunner:
     return PipelineRunner(
-        [
-            PreflightStage(),
-            EnsureBoardPoweredStage(),
-            ResolvePlatformStage(),
-            ResolveJLinkProbeStage(),
-            PrepareEngineStage(),
-            AnalyzeModelStage(),
-            PlanMemoryStage(),
-            GenerateFirmwareStage(),
-            BuildFirmwareStage(),
-            VerifyPlacementStage(),
-            FlashFirmwareStage(),
-            CapturePmuStage(),
-            PlanPowerRunStage(),
-            BuildPowerFirmwareStage(),
-            FlashPowerFirmwareStage(),
-            CapturePowerStage(),
-            CollectPowerTerminalStage(),
-            GenerateReportStage(),
-        ],
-        observer=observer,
-        progress_sink=progress_sink,
+        build_stages() + capture_stages(), observer=observer, progress_sink=progress_sink
     )
+
+
+def build_stages() -> list[Stage]:
+    return [
+        PreflightStage(),
+        EnsureBoardPoweredStage(),
+        ResolvePlatformStage(),
+        ResolveJLinkProbeStage(),
+        PrepareEngineStage(),
+        AnalyzeModelStage(),
+        PlanMemoryStage(),
+        GenerateFirmwareStage(),
+        BuildFirmwareStage(),
+        VerifyPlacementStage(),
+    ]
+
+
+def capture_stages() -> list[Stage]:
+    return [
+        FlashFirmwareStage(),
+        CapturePmuStage(),
+        PlanPowerRunStage(),
+        BuildPowerFirmwareStage(),
+        FlashPowerFirmwareStage(),
+        CapturePowerStage(),
+        CollectPowerTerminalStage(),
+        GenerateReportStage(),
+    ]
 
 
 def run_profile(

@@ -673,3 +673,30 @@ successful latency observations from these configuration facts.
 Saved-run mapping `hpx-run-4` adds source-bound linker inputs and build
 verification to retained producer facts. It accompanies the version changes in
 the [platform guide](../concepts/platforms/). The separate profile mapping is unchanged.
+
+## Compare candidate heliaAOT plans on one board
+
+Use one model and base configuration with an explicit J-Link serial. Supply the
+reference FNV-1a 64-bit digest for each output tensor in model order. Generate
+the reference using the same input bytes, initialization and model as the sweep.
+
+```sh
+hpx sweep candidate-a.json candidate-b.json --config board.yml \
+  --reference-digest 7bf3417b56b21eaf --output ./sweep-results
+```
+
+The example digest must be replaced with the reference for your model. The
+sweep builds each supplied plan and processes candidates in argument order.
+Each invocation has a separate directory under `runs/`. Its `sweep.json`
+records measured, cached and failed candidates. Each successful candidate
+links to a schema-1 measurement with the requested and converted plan hashes.
+A failed candidate produces a diagnostic and the other candidates continue.
+The command exits unsuccessfully if any candidate failed.
+
+Reuse the output directory to consult its measurement cache. Pass
+`--remeasure PLAN_SHA256` to take a fresh measurement for one plan under the
+current conditions. A failed remeasurement is recorded in its own run index. The
+cache keeps the last successful measurement and links to that earlier run.
+Instrumented inference cycles and output identity refer
+to the same timed runs. When enabled, separately measured clean-window energy is reported as
+`clean_window_energy_uj`. The instrumented measurement leaves `energy_uj` null.

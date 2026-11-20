@@ -148,3 +148,26 @@ def test_power_policy_failure_uses_terminal_failure_path(engine):
     source = _render("apollo510", "rtt", engine, power_only=True, overrides={"dcache": "off"})
     assert 'hpx_power_terminal_fail("dcache_config", cache_status)' in source
     assert "HPX_DCACHE=" not in source
+
+
+@pytest.mark.parametrize("reported", ["off", None, "on"])
+def test_sweep_on_soc_without_cpu_dcache_requires_explicit_off(tmp_path, reported):
+    from tests.contracts.conftest import make_pmu_ctx
+
+    ctx = make_pmu_ctx(
+        tmp_path,
+        board="apollo4p_evb",
+        engine="helia-aot",
+        extra={"profiling": {"sweep_evidence": True}},
+    )
+    assert ctx.profile_run is not None
+    ctx.publish_profile_deployment(
+        DeploymentRecord(firmware=ctx.profile_run.firmware, target_id="test", deployed_at="test")
+    )
+    result = PmuResult(meta=FirmwareMeta(dcache=reported))
+    if reported == "off":
+        ctx.publish_profile_result(result)
+        assert ctx.captured_pmu.meta.dcache == "off"
+    else:
+        with pytest.raises(CaptureError, match="data-cache"):
+            ctx.publish_profile_result(result)

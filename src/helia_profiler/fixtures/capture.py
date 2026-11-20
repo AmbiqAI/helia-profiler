@@ -199,6 +199,15 @@ def capture_fixture(
     request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
 ) -> FixtureCaptureResult:
     """Capture one bounded raw terminal snapshot and persist every attempted operation."""
+    from ..target.probe.reservation import reserve_probe
+
+    with reserve_probe(request.jlink_serial):
+        return _capture_fixture(request, guard=guard)
+
+
+def _capture_fixture(
+    request: FixtureCaptureRequest, *, guard: FixtureCaptureGuard
+) -> FixtureCaptureResult:
     require(
         request.target.board != "apollo510b_evb"
         or (request.power_sync is None and request.psram_weights is None),
