@@ -824,3 +824,25 @@ class TestPreflightNpuBackendEngineGate:
 
         with patch("helia_profiler.evaluation.is_available", return_value=True):
             _check_npu_backend(ctx.config)
+
+
+def test_profile_model_size_and_digest_follow_the_same_open_file(tmp_path, monkeypatch):
+    import hashlib
+
+    from helia_profiler.stages.resolve_platform import read_model_info
+
+    model = tmp_path / "proxy.tflite"
+    replacement = tmp_path / "new.tflite"
+    model.write_bytes(b"original")
+    replacement.write_bytes(b"replacement data")
+    original_open = Path.open
+
+    def replace_before_open(path, *args, **kwargs):
+        if path == model:
+            replacement.replace(model)
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", replace_before_open)
+    info = read_model_info(model)
+    assert info.size_bytes == len(b"replacement data")
+    assert info.sha256 == hashlib.sha256(b"replacement data").hexdigest()

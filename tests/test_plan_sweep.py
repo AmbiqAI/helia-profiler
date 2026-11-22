@@ -278,7 +278,7 @@ def test_failed_remeasurement_preserves_last_successful_receipt(tmp_path, monkey
             tmp_path / name,
             ("0" * 16,),
             force,
-            module._sha(b"model"),
+            module.read_model_info(model),
         )
 
     initial = run("first", False)
@@ -298,8 +298,8 @@ def test_sweep_hashes_model_once_and_refuses_a_different_conversion(tmp_path, mo
     from types import SimpleNamespace
 
     model = tmp_path / "proxy.tflite"
-    model.write_bytes(b"model")
-    expected = hashlib.sha256(b"model").hexdigest()
+    model.write_bytes(b"TFL3model")
+    expected = hashlib.sha256(b"TFL3model").hexdigest()
     config = load_config(
         None,
         {
@@ -314,15 +314,18 @@ def test_sweep_hashes_model_once_and_refuses_a_different_conversion(tmp_path, mo
     converted = tmp_path / "wrong_plan.json"
     converted.write_text(json.dumps({"model": {"sha256": "0" * 64}, "schedule": {"pool": None}}))
     calls = []
-    hash_file = module.sha256_file
+    from helia_profiler.results.serde import sha256_file_with_size
 
     def tracked(path):
         calls.append(path)
-        return hash_file(path)
+        return sha256_file_with_size(path)
 
     def build(runner, candidate):
         from helia_profiler.pipeline import PipelineContext
         from helia_profiler.stages import ResolvePlatformStage
+        from helia_profiler.stages.preflight import _check_model
+
+        _check_model(candidate.model.path, candidate.engine.type)
 
         ctx = PipelineContext(config=candidate, work_dir=tmp_path)
         (platform,) = [stage for stage in runner._stages if isinstance(stage, ResolvePlatformStage)]
@@ -339,15 +342,12 @@ def test_sweep_hashes_model_once_and_refuses_a_different_conversion(tmp_path, mo
         return real_read(path)
 
     monkeypatch.setattr(Path, "read_bytes", guarded_read)
-    monkeypatch.setattr(module, "sha256_file", tracked)
-    monkeypatch.setattr("helia_profiler.stages.resolve_platform.sha256_file", tracked)
-    monkeypatch.setattr(
-        module,
-        "_validate_plan",
-        lambda plan, digest, _: (
-            None if digest == expected else pytest.fail("incorrect preflight digest")
-        ),
-    )
+    monkeypatch.setattr("helia_profiler.stages.resolve_platform.sha256_file_with_size", tracked)
+
+    def validate(plan, digest, options):
+        assert json.loads(plan.read_bytes())["model"]["sha256"] == digest == expected
+
+    monkeypatch.setattr(module, "_validate_plan", validate)
     monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
     monkeypatch.setattr(module.PipelineRunner, "run", build)
     rows = module.sweep(config, plans, tmp_path / "out", reference_outputs=("0" * 16,))
