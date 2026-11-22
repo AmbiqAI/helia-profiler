@@ -59,6 +59,8 @@
         "weights_cache",
         "application_load"
       ],
+      "if": {"required": ["cache_regime"]},
+      "then": {"properties": {"weights_cache": {"const": "on"}}},
       "properties": {
         "target": {
           "type": "string",

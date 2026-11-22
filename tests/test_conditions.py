@@ -64,6 +64,15 @@ def test_conditions_come_from_the_config_and_the_capture(tmp_path: Path) -> None
     )
 
 
+@pytest.mark.parametrize("board", ["apollo3p_evb", "apollo4p_evb"])
+def test_ordinary_capture_on_a_target_without_dcache_omits_regime(tmp_path, board):
+    ctx = make_pmu_ctx(tmp_path, board=board, engine="helia-rt")
+    set_profile_result(ctx, _pmu())
+    conditions = run_conditions(ctx).to_dict()
+    assert conditions["weights_cache"] == "off"
+    assert "cache_regime" not in conditions
+
+
 def test_cpu_hz_is_the_configured_clock_whatever_the_device_measured(tmp_path: Path) -> None:
     configured = ctx_platform_mhz(_ctx(tmp_path)) * 1_000_000
     assert configured > 0

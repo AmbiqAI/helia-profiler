@@ -35,7 +35,10 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
     elif meta.system_clock_hz:
         cpu_hz = meta.system_clock_hz
     weights_memory = _weights_memory(ctx)
-    weights_cache = meta.dcache or "on"
+    weights_cache = meta.dcache
+    if weights_cache is None:
+        soc = get_soc_for_board(ctx.config.target.board, registry=ctx.config.platform_registry)
+        weights_cache = "on" if soc.capabilities.memory.has_dcache else "off"
     return Conditions(
         target=_target_name(ctx),
         cpu_hz=cpu_hz,

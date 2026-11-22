@@ -220,9 +220,10 @@ class Conditions:
             lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
             ``psram``); ``None`` when hpx set no placement rule for them.
         weights_cache: The reported data-cache policy, ``on`` or ``off``.
-            Missing cache metadata in older firmware retains the ``on`` baseline.
+            For captures without a reported policy, HPX uses the target’s D-cache capability.
         external_memory_clock: The PSRAM interface clock in MHz; ``None``
             when the run used no PSRAM.
+        cache_regime: Constant-cache preparation for each instrumented run, when recorded.
         application_load: What else the core ran during the capture; ``none``
             for every run this release makes.
     """

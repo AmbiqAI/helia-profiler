@@ -13,6 +13,8 @@
     },
     "conditions": {
       "type": "object", "required": ["target", "weights_memory"],
+      "if": {"required": ["cache_regime"]},
+      "then": {"properties": {"weights_cache": {"const": "on"}}},
       "properties": {
         "target": {"type": "string", "minLength": 1},
         "cpu_hz": {"type": ["integer", "null"]},
