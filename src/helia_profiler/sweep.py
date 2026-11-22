@@ -68,7 +68,9 @@ def _write(path: Path, record: object) -> None:
     write_text_atomically(path, json.dumps(record, indent=2, allow_nan=False) + "\n")
 
 
-def _read_cache(entry: Path, root: Path, key: str, digest: str, converted: str) -> SweepRow | None:
+def _read_cache(
+    entry: Path, root: Path, key: str, digest: str, converted: str, model_hash: str
+) -> SweepRow | None:
     try:
         receipt = read_json(entry.read_bytes(), label="cached measurement")
         saved = (root / receipt["path"]).resolve()
@@ -83,6 +85,8 @@ def _read_cache(entry: Path, root: Path, key: str, digest: str, converted: str) 
             converted,
             key,
         ):
+            return None
+        if data.get("model_sha256") != model_hash:
             return None
         if data["output_identical"] is not True or data["dma_failures"] != 0:
             return None
@@ -157,7 +161,7 @@ def _measure(
     )
     entry = root / "cache" / (key + ".json")
     if not force and not config.power.enabled and entry.is_file():
-        cached = _read_cache(entry, root, key, digest, converted_sha)
+        cached = _read_cache(entry, root, key, digest, converted_sha, model_hash)
         if cached is not None:
             return cached
     try:
@@ -175,6 +179,7 @@ def _measure(
         power = load_run_summary(attempt / "summary.json").power
         if power is not None and power.clean_workload == AOT_CLEAN_WORKLOAD:
             measurement["clean_window_energy_uj"] = power.energy_per_inference_uj
+    measurement["model_sha256"] = model_hash
     measurement["cache_key"] = key
     measurement["converted_plan_sha256"] = converted_sha
     measurement["pool_bytes"] = pool_bytes

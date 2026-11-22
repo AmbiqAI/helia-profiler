@@ -67,6 +67,7 @@ def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
     path = tmp_path / "measurement.json"
     record = dict(
         plan_sha256="A",
+        model_sha256="M",
         converted_plan_sha256="C",
         cache_key="K",
         output_identical=True,
@@ -80,10 +81,17 @@ def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
     entry.write_text(
         json.dumps({"key": "K", "path": path.name, "sha256": module._sha(path.read_bytes())})
     )
-    assert module._read_cache(entry, tmp_path, "K", "A", "C") is not None
-    assert module._read_cache(entry, tmp_path, "K", "B", "C") is None
-    assert module._read_cache(entry, tmp_path, "K", "A", "D") is None
-    assert module._read_cache(entry, tmp_path, "L", "A", "C") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "M") is not None
+    assert module._read_cache(entry, tmp_path, "K", "B", "C", "M") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "D", "M") is None
+    assert module._read_cache(entry, tmp_path, "L", "A", "C", "M") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "N") is None
+    del record["model_sha256"]
+    path.write_text(json.dumps(record))
+    entry.write_text(
+        json.dumps({"key": "K", "path": path.name, "sha256": module._sha(path.read_bytes())})
+    )
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "M") is None
 
 
 def test_incomplete_plan_with_matching_digest_is_rejected_before_capture(tmp_path, monkeypatch):
@@ -266,6 +274,10 @@ def test_failed_remeasurement_preserves_last_successful_receipt(tmp_path, monkey
 
     initial = run("first", False)
     assert initial.status == "measured"
+    assert initial.measurement is not None
+    assert json.loads((tmp_path / initial.measurement).read_text())["model_sha256"] == module._sha(
+        model.read_bytes()
+    )
     assert run("failed", True).status == "failed"
     reused = run("reuse", False)
     assert reused.status == "cached"
