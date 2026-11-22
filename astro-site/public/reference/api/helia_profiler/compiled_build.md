@@ -159,12 +159,11 @@ records must be the ones the plan states: engine, board, model,
 toolchain and its version, arena and weights placement, arena size,
 clock profile and the lifecycle's invocation counts.
 
-The runtime version and commit and the kernel commit are compared
-wherever both the plan and the build state one; a build or plan
-that states none of a fact is not compared on it. heliaRT and
-heliaAOT compare with the plan's pins. LiteRT compares with this HPX's
-prepared LiteRT record, because the plan pins the modules an ordinary
-profile builds from source, which a fixture build does not link.
+Verification compares the recorded runtime version, source commit and
+kernel commit wherever both sides state them. A recognized heliaRT
+archive supplies its release's kernel pin. Custom heliaRT builds and
+heliaAOT use the frozen plan's pins. LiteRT uses the prepared runtime
+record for the version the fixture linked.
 
 **Raises**
 
@@ -184,7 +183,7 @@ save(path: str | Path, *, roots: Mapping[str, Path]) -> Path
 
 Write the build as JSON with paths relative to *roots* and return its path.
 
-Source: `src/helia_profiler/runs/compiled.py:199`
+Source: `src/helia_profiler/runs/compiled.py:198`
 
 ### helia_profiler.CompiledBuild.load
 
@@ -198,7 +197,7 @@ load(path: str | Path, *, roots: Mapping[str, Path]) -> CompiledBuild
 
 Read and verify a build written by :meth:`save`, resolving paths under *roots*.
 
-Source: `src/helia_profiler/runs/compiled.py:224`
+Source: `src/helia_profiler/runs/compiled.py:223`
 
 ### helia_profiler.CompiledBuild.run
 
@@ -239,7 +238,7 @@ the device is touched.
 | ConfigError | The build does not verify, *expect* cannot be compared, or *power* does not fit the build or the run API's rail-energy route. |
 | CaptureError | The device reports counts other than the build's. |
 
-Source: `src/helia_profiler/runs/compiled.py:266`
+Source: `src/helia_profiler/runs/compiled.py:265`
 
 ## helia_profiler.RunResultError
 
@@ -405,7 +404,7 @@ One capture from a :class:`CompiledBuild`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/compiled.py:413`
+Source: `src/helia_profiler/runs/compiled.py:412`
 
 ### helia_profiler.RunResult.compiled
 
@@ -415,7 +414,7 @@ Source: `src/helia_profiler/runs/compiled.py:413`
 compiled: CompiledBuild
 ```
 
-Source: `src/helia_profiler/runs/compiled.py:420`
+Source: `src/helia_profiler/runs/compiled.py:419`
 
 ### helia_profiler.RunResult.capture
 
@@ -425,7 +424,7 @@ Source: `src/helia_profiler/runs/compiled.py:420`
 capture: FixtureCaptureResult
 ```
 
-Source: `src/helia_profiler/runs/compiled.py:421`
+Source: `src/helia_profiler/runs/compiled.py:420`
 
 ### helia_profiler.RunResult.identity
 
@@ -435,7 +434,7 @@ Source: `src/helia_profiler/runs/compiled.py:421`
 identity: RunIdentity
 ```
 
-Source: `src/helia_profiler/runs/compiled.py:422`
+Source: `src/helia_profiler/runs/compiled.py:421`
 
 ### helia_profiler.RunResult.verification
 
@@ -445,7 +444,7 @@ Source: `src/helia_profiler/runs/compiled.py:422`
 verification: Verification | None
 ```
 
-Source: `src/helia_profiler/runs/compiled.py:423`
+Source: `src/helia_profiler/runs/compiled.py:422`
 
 ### helia_profiler.RunResult.power
 
@@ -455,7 +454,7 @@ Source: `src/helia_profiler/runs/compiled.py:423`
 power: FixtureRailPowerRequest | FixtureBoardPowerRequest | None = None
 ```
 
-Source: `src/helia_profiler/runs/compiled.py:424`
+Source: `src/helia_profiler/runs/compiled.py:423`
 
 ### helia_profiler.RunResult.succeeded
 
@@ -467,7 +466,7 @@ succeeded: bool
 
 True only for a ``success`` capture.
 
-Source: `src/helia_profiler/runs/compiled.py:427`
+Source: `src/helia_profiler/runs/compiled.py:426`
 
 ### helia_profiler.RunResult.energy
 
@@ -485,7 +484,7 @@ hash-pinned raw instrument trace, and the protocol-2 READY, GO,
 gate and DONE samples in ``completion``. A failed capture measures
 none.
 
-Source: `src/helia_profiler/runs/compiled.py:432`
+Source: `src/helia_profiler/runs/compiled.py:431`
 
 ### helia_profiler.RunResult.save
 
@@ -509,7 +508,7 @@ one of *roots*. :func:`load_run` reads it back.
 | --- | --- |
 | ConfigError | *build* is not this run's compiled build, a file is missing or changed, a path is under no root, or the identity or verification does not recompute from the build and capture. |
 
-Source: `src/helia_profiler/runs/compiled.py:443`
+Source: `src/helia_profiler/runs/compiled.py:442`
 
 ## helia_profiler.build
 
@@ -546,7 +545,7 @@ downloaded or built. The result is verified before it is returned.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/compiled.py:462`
+Source: `src/helia_profiler/runs/compiled.py:461`
 
 ## helia_profiler.load_build
 
@@ -560,7 +559,7 @@ Read and verify a compiled build written by :meth:`CompiledBuild.save`.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/compiled.py:671`
+Source: `src/helia_profiler/runs/compiled.py:670`
 
 ## helia_profiler.run_build
 
@@ -585,4 +584,4 @@ Flash *compiled*'s image, capture one run and compare outputs; see :meth:`Compil
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/compiled.py:676`
+Source: `src/helia_profiler/runs/compiled.py:675`
