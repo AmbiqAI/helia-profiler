@@ -357,7 +357,7 @@ def test_runtimes_cli_lists_and_shows_records() -> None:
         "litert      85638f0  default tensorflow/tflite-micro@85638f0b  apollo510_evb/lp: a8w8"
         in listed.output
     )
-    assert "helia-aot   1.10.0    default AmbiqAI/helia-aot@1f4fa17f  -" in listed.output
+    assert "helia-aot   1.10.0   default AmbiqAI/helia-aot@1f4fa17f  -" in listed.output
 
     shown = runner.invoke(app, ["runtimes", "show", "helia-rt"])
     assert shown.exit_code == 0, shown.output
