@@ -76,6 +76,7 @@
             "null"
           ]
         },
+        "cache_regime": {"enum": ["cold", "warm"]},
         "weights_cache": {
           "type": "string"
         },

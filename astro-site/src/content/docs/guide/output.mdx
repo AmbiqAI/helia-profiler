@@ -146,6 +146,10 @@ fields in new runs:
 | `validity` | `valid`, `degraded`, `invalid` | none | the run's verdict from the same evaluation the manifest records |
 | `issues[]` | code, severity, message, context | none | the structured reasons; every code is on the [issue codes](../../reference/issue-codes/) page |
 
+With the weights cache enabled, `conditions.cache_regime` records the preparation of the constants before each instrumented run. On Apollo5, heliaAOT stream evidence cleans and invalidates HPX-bound PSRAM constant arenas (`cold`). The ordinary window and MRAM weights use `warm`: the firmware leaves those cache lines as it finds them. This describes preparation, not a measured hit rate. With weights caching disabled the field is absent. Older bundles can also omit it.
+
+On the fc64 proxy at 96 MHz with 48 MHz PSRAM, the in-place plan took 275,118 cycles per inference cold and 196,800 warm. Its streamed counterpart took 246,494 cold and 244,800 warm. Compare candidates under the same regime. A calibration carries the recorded regime, and `hpx calibrate --merge` refuses differing conditions.
+
 `memory` (from `MemorySection`):
 
 | Field | Unit | What it measures |

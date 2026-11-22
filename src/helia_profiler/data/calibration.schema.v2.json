@@ -17,6 +17,7 @@
         "target": {"type": "string", "minLength": 1},
         "cpu_hz": {"type": ["integer", "null"]},
         "weights_memory": {"type": "string"},
+        "cache_regime": {"enum": ["cold", "warm"]},
         "weights_cache": {"type": "string"},
         "external_memory_clock": {"type": ["integer", "null"]},
         "application_load": {"type": "string"}

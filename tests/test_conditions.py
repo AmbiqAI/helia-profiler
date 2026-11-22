@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.engines import EngineType
-from helia_profiler.engines.base import HeliaAotArtifacts
+from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.errors import EngineError
 from helia_profiler.evaluation.comparability import assess_comparability
 from helia_profiler.evaluation.compare import RunArtifacts
-from helia_profiler.placement import Placement
+from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.report import write_report
 from helia_profiler.report.conditions import run_conditions
 from helia_profiler.results import (
@@ -58,6 +58,7 @@ def test_conditions_come_from_the_config_and_the_capture(tmp_path: Path) -> None
         cpu_hz=ctx_platform_mhz(ctx) * 1_000_000,
         weights_memory="mram",
         weights_cache="on",
+        cache_regime="warm",
         external_memory_clock=None,
         application_load="none",
     )
@@ -121,6 +122,36 @@ def _aot_artifacts(
         aot_memory_intent_json=aot_memory_intent_json,
         report_files=report_files,
     )
+
+
+@pytest.mark.parametrize(
+    ("placement", "stream_evidence", "dcache", "expected"),
+    [
+        (Placement.PSRAM, True, "on", "cold"),
+        (Placement.PSRAM, False, "on", "warm"),
+        (Placement.MRAM, True, "on", "warm"),
+        (Placement.PSRAM, True, "off", None),
+    ],
+)
+def test_aot_cache_regime(tmp_path, placement, stream_evidence, dcache, expected):
+    ctx = _ctx(
+        tmp_path,
+        engine="helia-aot",
+        extra={
+            "model": {"weights_location": placement.value},
+            "profiling": {"stream_evidence": stream_evidence},
+        },
+        dcache=dcache,
+    )
+    region = ArenaRegion(0, "weights", 64, 16, ArenaRole.CONSTANT, placement.value, placement)
+    ctx.engine_artifacts = dataclasses.replace(
+        _aot_artifacts(tmp_path), aot_allocate_arenas=False, aot_arena_regions=[region]
+    )
+    recorded = run_conditions(ctx).to_dict()
+    if expected is None:
+        assert "cache_regime" not in recorded
+    else:
+        assert recorded["cache_regime"] == expected
 
 
 def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
@@ -234,6 +265,8 @@ def test_every_artifact_records_the_same_conditions(tmp_path: Path, cache_mode: 
         "weights_cache": cache_mode,
         "application_load": "none",
     }
+    if cache_mode == "on":
+        expected["cache_regime"] = "warm"
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     metadata = json.loads((out / "run_metadata.json").read_text(encoding="utf-8"))
     assert summary["schema_version"] == RUN_SUMMARY_SCHEMA_VERSION == 22

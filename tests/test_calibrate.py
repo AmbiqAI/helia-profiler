@@ -376,6 +376,22 @@ def test_a_plan_for_another_model_is_refused(tmp_path: Path) -> None:
         read_bundle(stale)
 
 
+def test_merge_refuses_cold_and_warm_calibrations(tmp_path: Path) -> None:
+    output = tmp_path / "calibration.json"
+    for regime in ("cold", "warm"):
+        capture = bundle(
+            tmp_path / regime,
+            cycles={0: 1.0, 1: 1.0, 2: 1.0},
+            conditions={**CONDITIONS, "cache_regime": regime},
+        )
+        if regime == "cold":
+            calibrate([capture], output=output)
+        else:
+            with pytest.raises(CalibrationError, match="cache_regime"):
+                calibrate([capture], output=output, merge=True)
+    assert json.loads(output.read_bytes())["conditions"]["cache_regime"] == "cold"
+
+
 def test_bundles_under_other_conditions_are_refused(tmp_path: Path) -> None:
     auto, _ = two_bundles(tmp_path)
     mram = bundle(
