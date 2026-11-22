@@ -59,7 +59,7 @@ def _cache_regime(ctx: PipelineContext, weights_memory: str | None) -> str:
         return "warm"
     placements = {r.placement for r in artifacts.aot_arena_regions if r.role is ArenaRole.CONSTANT}
     if Placement.PSRAM in placements and (
-        weights_memory == "psram" or (weights_memory is None and placements == {Placement.PSRAM})
+        weights_memory == "psram" or placements == {Placement.PSRAM}
     ):
         return "cold"
     return "warm"

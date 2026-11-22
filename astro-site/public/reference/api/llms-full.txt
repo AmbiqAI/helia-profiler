@@ -7288,7 +7288,7 @@ Build toolchain versions (populated by stage 4).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/models.py:356`
+Source: `src/helia_profiler/results/models.py:357`
 
 ### helia_profiler.ToolchainInfo.compiler
 
@@ -7298,7 +7298,7 @@ Source: `src/helia_profiler/results/models.py:356`
 compiler: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:360`
+Source: `src/helia_profiler/results/models.py:361`
 
 ### helia_profiler.ToolchainInfo.compiler_version
 
@@ -7308,7 +7308,7 @@ Source: `src/helia_profiler/results/models.py:360`
 compiler_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:361`
+Source: `src/helia_profiler/results/models.py:362`
 
 ### helia_profiler.ToolchainInfo.cmake_version
 
@@ -7318,7 +7318,7 @@ Source: `src/helia_profiler/results/models.py:361`
 cmake_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:362`
+Source: `src/helia_profiler/results/models.py:363`
 
 ## helia_profiler.MemoryPlan
 
@@ -7344,7 +7344,7 @@ the firmware template generator for placement macros / linker hints.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/results/models.py:557`
+Source: `src/helia_profiler/results/models.py:558`
 
 ### helia_profiler.MemoryPlan.engine
 
@@ -7354,7 +7354,7 @@ Source: `src/helia_profiler/results/models.py:557`
 engine: EngineType
 ```
 
-Source: `src/helia_profiler/results/models.py:567`
+Source: `src/helia_profiler/results/models.py:568`
 
 ### helia_profiler.MemoryPlan.regions
 
@@ -7364,7 +7364,7 @@ Source: `src/helia_profiler/results/models.py:567`
 regions: tuple[MemoryRegionUsage, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:568`
+Source: `src/helia_profiler/results/models.py:569`
 
 ### helia_profiler.MemoryPlan.model_weight_bytes
 
@@ -7374,7 +7374,7 @@ Source: `src/helia_profiler/results/models.py:568`
 model_weight_bytes: int = 0
 ```
 
-Source: `src/helia_profiler/results/models.py:570`
+Source: `src/helia_profiler/results/models.py:571`
 
 ### helia_profiler.MemoryPlan.has_overflow
 
@@ -7384,7 +7384,7 @@ Source: `src/helia_profiler/results/models.py:570`
 has_overflow: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:574`
+Source: `src/helia_profiler/results/models.py:575`
 
 ### helia_profiler.MemoryPlan.region
 
@@ -7394,7 +7394,7 @@ Source: `src/helia_profiler/results/models.py:574`
 region(name: str | MemoryRegion) -> MemoryRegionUsage | None
 ```
 
-Source: `src/helia_profiler/results/models.py:580`
+Source: `src/helia_profiler/results/models.py:581`
 
 ---
 
@@ -11507,7 +11507,7 @@ Accumulated run metadata — enriched by stages, consumed by reports.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:413`
+Source: `src/helia_profiler/results/models.py:414`
 
 ### helia_profiler.RunMetadata.hpx_version
 
@@ -11517,7 +11517,7 @@ Source: `src/helia_profiler/results/models.py:413`
 hpx_version: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:417`
+Source: `src/helia_profiler/results/models.py:418`
 
 ### helia_profiler.RunMetadata.run_id
 
@@ -11527,7 +11527,7 @@ Source: `src/helia_profiler/results/models.py:417`
 run_id: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:418`
+Source: `src/helia_profiler/results/models.py:419`
 
 ### helia_profiler.RunMetadata.timestamp
 
@@ -11537,7 +11537,7 @@ Source: `src/helia_profiler/results/models.py:418`
 timestamp: str = ''
 ```
 
-Source: `src/helia_profiler/results/models.py:419`
+Source: `src/helia_profiler/results/models.py:420`
 
 ### helia_profiler.RunMetadata.config_snapshot
 
@@ -11547,7 +11547,7 @@ Source: `src/helia_profiler/results/models.py:419`
 config_snapshot: dict[str, Any] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:420`
+Source: `src/helia_profiler/results/models.py:421`
 
 ### helia_profiler.RunMetadata.platform
 
@@ -11557,7 +11557,7 @@ Source: `src/helia_profiler/results/models.py:420`
 platform: PlatformInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:421`
+Source: `src/helia_profiler/results/models.py:422`
 
 ### helia_profiler.RunMetadata.platform_provenance
 
@@ -11567,7 +11567,7 @@ Source: `src/helia_profiler/results/models.py:421`
 platform_provenance: PlatformSnapshot | None = field(default=None, kw_only=True)
 ```
 
-Source: `src/helia_profiler/results/models.py:422`
+Source: `src/helia_profiler/results/models.py:423`
 
 ### helia_profiler.RunMetadata.linker_verifications
 
@@ -11577,7 +11577,7 @@ Source: `src/helia_profiler/results/models.py:422`
 linker_verifications: tuple[LinkerVerification, ...] = field(default=(), kw_only=True)
 ```
 
-Source: `src/helia_profiler/results/models.py:423`
+Source: `src/helia_profiler/results/models.py:424`
 
 ### helia_profiler.RunMetadata.model
 
@@ -11587,7 +11587,7 @@ Source: `src/helia_profiler/results/models.py:423`
 model: ModelInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:424`
+Source: `src/helia_profiler/results/models.py:425`
 
 ### helia_profiler.RunMetadata.toolchain
 
@@ -11597,7 +11597,7 @@ Source: `src/helia_profiler/results/models.py:424`
 toolchain: ToolchainInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:425`
+Source: `src/helia_profiler/results/models.py:426`
 
 ### helia_profiler.RunMetadata.build_images
 
@@ -11607,7 +11607,7 @@ Source: `src/helia_profiler/results/models.py:425`
 build_images: tuple[BuildImage, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:428`
+Source: `src/helia_profiler/results/models.py:429`
 
 ### helia_profiler.RunMetadata.engine
 
@@ -11617,7 +11617,7 @@ Source: `src/helia_profiler/results/models.py:428`
 engine: EngineInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:429`
+Source: `src/helia_profiler/results/models.py:430`
 
 ### helia_profiler.RunMetadata.firmware
 
@@ -11627,7 +11627,7 @@ Source: `src/helia_profiler/results/models.py:429`
 firmware: FirmwareMeta | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:430`
+Source: `src/helia_profiler/results/models.py:431`
 
 ### helia_profiler.RunMetadata.memory_plan
 
@@ -11637,7 +11637,7 @@ Source: `src/helia_profiler/results/models.py:430`
 memory_plan: 'MemoryPlan | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:431`
+Source: `src/helia_profiler/results/models.py:432`
 
 ### helia_profiler.RunMetadata.timing
 
@@ -11647,7 +11647,7 @@ Source: `src/helia_profiler/results/models.py:431`
 timing: TimingInfo | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:432`
+Source: `src/helia_profiler/results/models.py:433`
 
 ### helia_profiler.RunMetadata.compatibility
 
@@ -11657,7 +11657,7 @@ Source: `src/helia_profiler/results/models.py:432`
 compatibility: CompatibilityResolution | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:433`
+Source: `src/helia_profiler/results/models.py:434`
 
 ### helia_profiler.RunMetadata.dependencies
 
@@ -11667,7 +11667,7 @@ Source: `src/helia_profiler/results/models.py:433`
 dependencies: 'DependencyProvenance | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:434`
+Source: `src/helia_profiler/results/models.py:435`
 
 ### helia_profiler.RunMetadata.identity
 
@@ -11677,7 +11677,7 @@ Source: `src/helia_profiler/results/models.py:434`
 identity: 'RunIdentity | None' = None
 ```
 
-Source: `src/helia_profiler/results/models.py:437`
+Source: `src/helia_profiler/results/models.py:438`
 
 ### helia_profiler.RunMetadata.conditions
 
@@ -11687,7 +11687,7 @@ Source: `src/helia_profiler/results/models.py:437`
 conditions: Conditions | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:440`
+Source: `src/helia_profiler/results/models.py:441`
 
 ---
 
@@ -12236,7 +12236,7 @@ target: str
 
 heliaAOT's canonical name for the board profiled.
 
-Source: `src/helia_profiler/results/models.py:230`
+Source: `src/helia_profiler/results/models.py:231`
 
 ### helia_profiler.Conditions.cpu_hz
 
@@ -12249,7 +12249,7 @@ cpu_hz: int | None = None
 The configured core clock. The on-device measurement
 jitters from run to run and stays in ``firmware.measured_clock_hz``.
 
-Source: `src/helia_profiler/results/models.py:231`
+Source: `src/helia_profiler/results/models.py:232`
 
 ### helia_profiler.Conditions.weights_memory
 
@@ -12263,7 +12263,7 @@ The memory hpx placed the model's constants in, as a
 lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
 ``psram``); ``None`` when hpx set no placement rule for them.
 
-Source: `src/helia_profiler/results/models.py:232`
+Source: `src/helia_profiler/results/models.py:233`
 
 ### helia_profiler.Conditions.weights_cache
 
@@ -12274,9 +12274,9 @@ weights_cache: str = 'on'
 ```
 
 The reported data-cache policy, ``on`` or ``off``.
-Missing cache metadata in older firmware retains the ``on`` baseline.
+For captures without a reported policy, HPX uses the target’s D-cache capability.
 
-Source: `src/helia_profiler/results/models.py:233`
+Source: `src/helia_profiler/results/models.py:234`
 
 ### helia_profiler.Conditions.external_memory_clock
 
@@ -12289,7 +12289,7 @@ external_memory_clock: int | None = None
 The PSRAM interface clock in MHz; ``None``
 when the run used no PSRAM.
 
-Source: `src/helia_profiler/results/models.py:234`
+Source: `src/helia_profiler/results/models.py:235`
 
 ### helia_profiler.Conditions.application_load
 
@@ -12302,7 +12302,7 @@ application_load: str = 'none'
 What else the core ran during the capture; ``none``
 for every run this release makes.
 
-Source: `src/helia_profiler/results/models.py:235`
+Source: `src/helia_profiler/results/models.py:236`
 
 ### helia_profiler.Conditions.cache_regime
 
@@ -12312,7 +12312,9 @@ Source: `src/helia_profiler/results/models.py:235`
 cache_regime: str | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:236`
+Constant-cache preparation for each instrumented run, when recorded.
+
+Source: `src/helia_profiler/results/models.py:237`
 
 ### helia_profiler.Conditions.to_dict
 
@@ -12324,7 +12326,7 @@ to_dict() -> dict[str, Any]
 
 JSON-ready form; ``external_memory_clock`` is absent without PSRAM.
 
-Source: `src/helia_profiler/results/models.py:238`
+Source: `src/helia_profiler/results/models.py:239`
 
 ### helia_profiler.Conditions.from_dict
 
@@ -12344,7 +12346,7 @@ Read a recorded ``conditions`` block.
 | --- | --- |
 | ValueError | when a field is missing or has the wrong type. |
 
-Source: `src/helia_profiler/results/models.py:253`
+Source: `src/helia_profiler/results/models.py:254`
 
 ## helia_profiler.PmuResult
 
@@ -12369,7 +12371,7 @@ Complete PMU profiling result across all presets.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:290`
+Source: `src/helia_profiler/results/models.py:291`
 
 ### helia_profiler.PmuResult.meta
 
@@ -12379,7 +12381,7 @@ Source: `src/helia_profiler/results/models.py:290`
 meta: FirmwareMeta
 ```
 
-Source: `src/helia_profiler/results/models.py:294`
+Source: `src/helia_profiler/results/models.py:295`
 
 ### helia_profiler.PmuResult.presets
 
@@ -12389,7 +12391,7 @@ Source: `src/helia_profiler/results/models.py:294`
 presets: dict[str, PresetResult] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:295`
+Source: `src/helia_profiler/results/models.py:296`
 
 ### helia_profiler.PmuResult.layers
 
@@ -12399,7 +12401,7 @@ Source: `src/helia_profiler/results/models.py:295`
 layers: list[LayerResult] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:296`
+Source: `src/helia_profiler/results/models.py:297`
 
 ### helia_profiler.PmuResult.overflow_detected
 
@@ -12409,7 +12411,7 @@ Source: `src/helia_profiler/results/models.py:296`
 overflow_detected: bool = False
 ```
 
-Source: `src/helia_profiler/results/models.py:297`
+Source: `src/helia_profiler/results/models.py:298`
 
 ### helia_profiler.PmuResult.groups
 
@@ -12419,7 +12421,7 @@ Source: `src/helia_profiler/results/models.py:297`
 groups: dict[str, list[LayerResult]] = field(default_factory=dict)
 ```
 
-Source: `src/helia_profiler/results/models.py:302`
+Source: `src/helia_profiler/results/models.py:303`
 
 ### helia_profiler.PmuResult.raw_output
 
@@ -12429,7 +12431,7 @@ Source: `src/helia_profiler/results/models.py:302`
 raw_output: tuple[str, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:304`
+Source: `src/helia_profiler/results/models.py:305`
 
 ### helia_profiler.PmuResult.transfer_evidence
 
@@ -12439,7 +12441,7 @@ Source: `src/helia_profiler/results/models.py:304`
 transfer_evidence: tuple[TransferEvidence, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:305`
+Source: `src/helia_profiler/results/models.py:306`
 
 ### helia_profiler.PmuResult.transfer_diagnostics
 
@@ -12449,7 +12451,7 @@ Source: `src/helia_profiler/results/models.py:305`
 transfer_diagnostics: tuple[TransferDiagnostic, ...] = ()
 ```
 
-Source: `src/helia_profiler/results/models.py:306`
+Source: `src/helia_profiler/results/models.py:307`
 
 ## helia_profiler.ProfileResult
 
@@ -12481,7 +12483,7 @@ This in-memory result does not define a saved-record schema.
 
 **API tier:** `stable`
 
-Source: `src/helia_profiler/results/models.py:731`
+Source: `src/helia_profiler/results/models.py:732`
 
 ### helia_profiler.ProfileResult.pmu
 
@@ -12491,7 +12493,7 @@ Source: `src/helia_profiler/results/models.py:731`
 pmu: PmuResult
 ```
 
-Source: `src/helia_profiler/results/models.py:743`
+Source: `src/helia_profiler/results/models.py:744`
 
 ### helia_profiler.ProfileResult.power
 
@@ -12501,7 +12503,7 @@ Source: `src/helia_profiler/results/models.py:743`
 power: PowerResult | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:744`
+Source: `src/helia_profiler/results/models.py:745`
 
 ### helia_profiler.ProfileResult.power_observation
 
@@ -12511,7 +12513,7 @@ Source: `src/helia_profiler/results/models.py:744`
 power_observation: PowerObservation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:745`
+Source: `src/helia_profiler/results/models.py:746`
 
 ### helia_profiler.ProfileResult.power_terminal
 
@@ -12521,7 +12523,7 @@ Source: `src/helia_profiler/results/models.py:745`
 power_terminal: PowerTerminalRecord | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:746`
+Source: `src/helia_profiler/results/models.py:747`
 
 ### helia_profiler.ProfileResult.on_device_power
 
@@ -12531,7 +12533,7 @@ Source: `src/helia_profiler/results/models.py:746`
 on_device_power: OnDevicePowerSummary | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:747`
+Source: `src/helia_profiler/results/models.py:748`
 
 ### helia_profiler.ProfileResult.metadata
 
@@ -12541,7 +12543,7 @@ Source: `src/helia_profiler/results/models.py:747`
 metadata: RunMetadata = field(default_factory=RunMetadata)
 ```
 
-Source: `src/helia_profiler/results/models.py:748`
+Source: `src/helia_profiler/results/models.py:749`
 
 ### helia_profiler.ProfileResult.report_paths
 
@@ -12551,7 +12553,7 @@ Source: `src/helia_profiler/results/models.py:748`
 report_paths: list[Path] = field(default_factory=list)
 ```
 
-Source: `src/helia_profiler/results/models.py:749`
+Source: `src/helia_profiler/results/models.py:750`
 
 ### helia_profiler.ProfileResult.evaluation
 
@@ -12561,7 +12563,7 @@ Source: `src/helia_profiler/results/models.py:749`
 evaluation: RunEvaluation | None = None
 ```
 
-Source: `src/helia_profiler/results/models.py:750`
+Source: `src/helia_profiler/results/models.py:751`
 
 ### helia_profiler.ProfileResult.layers
 
@@ -12573,7 +12575,7 @@ layers: list[LayerResult]
 
 Merged per-layer results across all PMU presets.
 
-Source: `src/helia_profiler/results/models.py:753`
+Source: `src/helia_profiler/results/models.py:754`
 
 ### helia_profiler.ProfileResult.total_cycles
 
@@ -12583,7 +12585,7 @@ Source: `src/helia_profiler/results/models.py:753`
 total_cycles: float | None
 ```
 
-Source: `src/helia_profiler/results/models.py:758`
+Source: `src/helia_profiler/results/models.py:759`
 
 ### helia_profiler.ProfileResult.layer_count
 
@@ -12593,7 +12595,7 @@ Source: `src/helia_profiler/results/models.py:758`
 layer_count: int
 ```
 
-Source: `src/helia_profiler/results/models.py:762`
+Source: `src/helia_profiler/results/models.py:763`
 
 ### helia_profiler.ProfileResult.overflow_detected
 
@@ -12603,7 +12605,7 @@ Source: `src/helia_profiler/results/models.py:762`
 overflow_detected: bool
 ```
 
-Source: `src/helia_profiler/results/models.py:766`
+Source: `src/helia_profiler/results/models.py:767`
 
 ---
 

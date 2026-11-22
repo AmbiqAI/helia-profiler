@@ -163,6 +163,21 @@ def test_aot_cache_regime(tmp_path, placement, stream_evidence, dcache, expected
         assert recorded["cache_regime"] == expected
 
 
+def test_per_tensor_psram_placement_determines_actual_cache_preparation(tmp_path):
+    ctx = _ctx(
+        tmp_path,
+        engine="helia-aot",
+        extra={"model": {"weights_location": "mram"}, "profiling": {"stream_evidence": True}},
+    )
+    region = ArenaRegion(0, "weights", 64, 16, ArenaRole.CONSTANT, "psram", Placement.PSRAM)
+    ctx.engine_artifacts = dataclasses.replace(
+        _aot_artifacts(tmp_path), aot_allocate_arenas=False, aot_arena_regions=[region]
+    )
+    conditions = run_conditions(ctx)
+    assert conditions.weights_memory == "mram"
+    assert conditions.cache_regime == "cold"
+
+
 def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     ctx = _ctx(
         tmp_path,
