@@ -18,7 +18,7 @@
       "const": "hpx.run-summary"
     },
     "schema_version": {
-      "const": 22
+      "const": 23
     },
     "engine": {
       "type": "string",
