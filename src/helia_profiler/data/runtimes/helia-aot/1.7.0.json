@@ -2,7 +2,7 @@
   "schema": "helia-profiler/runtime@1",
   "name": "helia-aot",
   "version": "1.7.0",
-  "default": true,
+  "default": false,
   "source": {
     "repo": "AmbiqAI/helia-aot",
     "commit": "aef9b9c66522c191ae892326609926a5bc387ea4"

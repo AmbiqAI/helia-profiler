@@ -27,7 +27,7 @@
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
     # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
-      url = "https://files.pythonhosted.org/packages/22/85/2244768c3290b1106f55a573cdb2ea30b3ed8864207a62254637d91c373b/helia_aot-1.7.0.tar.gz";
+      url = "https://files.pythonhosted.org/packages/a6/06/dbb2eef4d8851cc23a06f4c9cb46b2f13d9b2c76194fe918099f79692cf6/helia_aot-1.10.0.tar.gz";
       flake = false;
     };
   };
