@@ -1,7 +1,7 @@
 {
   "schema": "hpx.compatibility-baseline",
   "schema_version": 1,
-  "baseline_id": "hpx-neuralspotx-0.9.2-2026-11-08.2",
+  "baseline_id": "hpx-neuralspotx-0.9.2-2026-11-22",
   "neuralspotx": {
     "package": "neuralspotx",
     "version": "0.9.2",
@@ -34,7 +34,7 @@
     },
     "ns-cmsis-nn": {
       "url": "https://github.com/AmbiqAI/ns-cmsis-nn.git",
-      "ref": "9f793bd9343b60e794f915b285bd7b7c4a885abe"
+      "ref": "fa2b727edf27121b54f7a580f5b1e56c009b7713"
     },
     "nsx-executorch": {
       "url": "https://github.com/AmbiqAI/nsx-executorch.git",
@@ -76,7 +76,7 @@
     },
     "nsx-cmsis-nn": {
       "project": "ns-cmsis-nn",
-      "ref": "9f793bd9343b60e794f915b285bd7b7c4a885abe"
+      "ref": "fa2b727edf27121b54f7a580f5b1e56c009b7713"
     },
     "nsx-executorch": {
       "project": "nsx-executorch",

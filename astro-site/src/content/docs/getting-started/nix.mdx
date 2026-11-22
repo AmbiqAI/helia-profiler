@@ -29,7 +29,7 @@ hpx doctor
 | Arm GNU Toolchain | `flake.lock` (nixpkgs `gcc-arm-embedded`) | 15.2.Rel1 |
 | Arm Toolchain for Embedded (ATfE) | `nix/atfe.nix` | 22.1.0 |
 | SEGGER J-Link software | `nix/jlink.nix` | 9.62 |
-| ns-cmsis-nn (CORE), NSX SDK and modules (including the `nsx-tflite-micro` LiteRT Micro module), heliaRT | `src/helia_profiler/data/compatibility-baseline-v1.json`, plus the neuralSPOT-X registry lock it names | ns-cmsis-nn v7.47.0, heliaRT 2.5.0 and the other refs listed there; LiteRT Micro source helia-rt v2.2.1 (`9f2da6f1`) through the neuralSPOT-X 0.9.2 registry |
+| ns-cmsis-nn (CORE), NSX SDK and modules (including the `nsx-tflite-micro` LiteRT Micro module), heliaRT | `src/helia_profiler/data/compatibility-baseline-v1.json`, plus the neuralSPOT-X registry lock it names | ns-cmsis-nn v7.47.2, heliaRT 2.5.0 and the other refs listed there; LiteRT Micro source helia-rt v2.2.1 (`9f2da6f1`) through the neuralSPOT-X 0.9.2 registry |
 
 The last row is not chosen by the flake. hpx fetches those modules at the pinned commits when it builds firmware, through the same baseline on every install path. Selecting a different heliaAOT release does not move any of them.
 
@@ -87,7 +87,8 @@ Each heliaAOT release needs a minimum ns-cmsis-nn. The flake checks the selected
 
 | heliaAOT | Minimum ns-cmsis-nn | Baseline in this commit |
 |---|---|---|
-| 0.33.0 and later, including 1.0 | 7.47.0 | v7.47.0: supported |
+| 0.33.0, 1.7.0 | 7.47.0 | v7.47.2: supported |
+| 1.10.0 | 7.47.2 for all supported operators | v7.47.2: supported |
 
 Releases older than 0.33.0 have no rule and are refused.
 

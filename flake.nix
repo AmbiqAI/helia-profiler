@@ -334,7 +334,10 @@
           accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
           v7_46_0 = "4a937fe7988935e1cfc2d8a41859fdada042c17c";
           v7_47_0 = "9f793bd9343b60e794f915b285bd7b7c4a885abe";
+          v7_47_2 = "fa2b727edf27121b54f7a580f5b1e56c009b7713";
           compatCases = {
+            "1.10.0 rejected on v7.47.0" = !accepts "1.10.0" v7_47_0;
+            "1.10.0 on v7.47.2" = accepts "1.10.0" v7_47_2;
             "0.33.0 rejected on v7.46.0" = !accepts "0.33.0" v7_46_0;
             "0.33.0 on v7.47.0" = accepts "0.33.0" v7_47_0;
             "1.0.0 on v7.47.0" = accepts "1.0.0" v7_47_0;
