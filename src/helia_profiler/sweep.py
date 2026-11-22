@@ -23,6 +23,7 @@ from .pipeline import PipelineRunner
 from .profiler import build_stages, capture_stages
 from .results import ResultValidity
 from .results.run_summary import load_run_summary
+from .results.serde import sha256_file
 from .sweep_evidence import admit_measurement
 from .target.probe.reservation import reserve_probe
 
@@ -131,6 +132,7 @@ def _measure(
     attempt: Path,
     references: tuple[str, ...],
     force: bool,
+    model_sha: str,
 ) -> SweepRow:
     args = config.engine.config["aot_args"]
     args = {**args, "optimization": {**args["optimization"], "plan": str(plan)}}
@@ -140,7 +142,7 @@ def _measure(
         work_dir=root / "build" / digest,
         output=replace(config.output, dir=attempt),
     )
-    ctx = PipelineRunner(build_stages()).run(candidate)
+    ctx = PipelineRunner(build_stages(model_sha256=model_sha)).run(candidate)
     if ctx.engine_artifacts is None or ctx.profile_run is None:
         raise ValueError("Candidate build produced no profile firmware")
     (converted,) = [p for p in ctx.engine_artifacts.report_files if p.name.endswith("_plan.json")]
@@ -153,9 +155,9 @@ def _measure(
         pool_bytes = 0 if pool is None else pool["bytes"]
     except (KeyError, TypeError) as exc:
         raise ValueError(f"Invalid model or schedule in converted plan: {exc}") from exc
-    if model_hash != _sha(config.model.path.read_bytes()):
+    if model_hash != model_sha:
         raise ValueError("Converted plan and requested model differ")
-    image = _sha(ctx.profile_run.firmware.binary_path.read_bytes())
+    image = sha256_file(ctx.profile_run.firmware.binary_path)
     key = _measurement_key(
         candidate, model_hash, digest, converted_sha, image, ctx.resolved_jlink_serial, references
     )
@@ -246,7 +248,7 @@ def sweep(
         raise ConfigError(
             "Candidate identities must be unique and contain every requested remeasurement"
         )
-    model_sha = _sha(config.model.path.read_bytes())
+    model_sha = sha256_file(config.model.path)
     inline = config.engine.config.get("aot_args")
     if inline is not None and not isinstance(inline, dict):
         raise ConfigError("engine.config.aot_args must be a mapping")
@@ -276,7 +278,14 @@ def sweep(
                 if digest in invalid:
                     raise ValueError(invalid[digest])
                 row = _measure(
-                    config, plan, digest, root, attempt, reference_outputs, digest in remeasure
+                    config,
+                    plan,
+                    digest,
+                    root,
+                    attempt,
+                    reference_outputs,
+                    digest in remeasure,
+                    model_sha,
                 )
             except (HpxError, ValueError, OSError) as exc:
                 row = SweepRow(

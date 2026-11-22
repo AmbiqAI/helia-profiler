@@ -39,11 +39,11 @@ def build_default_pipeline(
     )
 
 
-def build_stages() -> list[Stage]:
+def build_stages(*, model_sha256: str | None = None) -> list[Stage]:
     return [
         PreflightStage(),
         EnsureBoardPoweredStage(),
-        ResolvePlatformStage(),
+        ResolvePlatformStage(model_sha256=model_sha256),
         ResolveJLinkProbeStage(),
         PrepareEngineStage(),
         AnalyzeModelStage(),
