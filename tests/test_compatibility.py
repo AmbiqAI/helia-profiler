@@ -46,7 +46,7 @@ def test_default_baseline_has_exact_qualified_refs(tmp_path: Path) -> None:
     assert baseline.project("nsx-tflite-micro").ref == "7afcf2b4170e039caf4c49f91e2c45d5869be333"
     assert baseline.project("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
     assert baseline.module("arm-cmsis-nn").ref == "6d21a6f821fb72541173a6c4d05d83329fa74f7c"
-    assert baseline.project("ns-cmsis-nn").ref == "9f793bd9343b60e794f915b285bd7b7c4a885abe"
+    assert baseline.project("ns-cmsis-nn").ref == "fa2b727edf27121b54f7a580f5b1e56c009b7713"
     assert baseline.project("nsx-executorch").ref == "5514ac1ea8439b3fe615d180bf68c75a9dabb48e"
     assert len(baseline.fingerprint) == 64
 
@@ -65,7 +65,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "ns-cmsis-nn": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
+        "ns-cmsis-nn": "fa2b727edf27121b54f7a580f5b1e56c009b7713",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "helia-rt": "3d704a7151a1e663a0cc16db76fbf02bf54a7647",
         # nsx-sensors: INA228 driver pinned for the shunt-cal register
@@ -80,7 +80,7 @@ def test_baseline_has_no_unrelated_ref_drift() -> None:
         "nsx-pmu-armv8m": "5725c065a0c3603132f1064ee2684d1fa8587c88",
         "nsx-tflite-micro": "7afcf2b4170e039caf4c49f91e2c45d5869be333",
         "arm-cmsis-nn": "6d21a6f821fb72541173a6c4d05d83329fa74f7c",
-        "nsx-cmsis-nn": "9f793bd9343b60e794f915b285bd7b7c4a885abe",
+        "nsx-cmsis-nn": "fa2b727edf27121b54f7a580f5b1e56c009b7713",
         "nsx-executorch": "5514ac1ea8439b3fe615d180bf68c75a9dabb48e",
         "nsx-helia-rt": "3d704a7151a1e663a0cc16db76fbf02bf54a7647",
         "nsx-sensors": "c219a2bc98c62f96819fae20ab6c8911fcea3e25",
@@ -169,7 +169,6 @@ def test_helia_rt_and_core_pins_agree_across_the_baseline() -> None:
     assert (helia_rt.version, helia_rt.source.commit) == (HELIART_VERSION, HELIART_SOURCE_COMMIT)
     assert baseline.project("helia-rt").ref == HELIART_SOURCE_COMMIT
     assert helia_rt.kernels is not None
-    assert helia_rt.kernels.commit == baseline.project("ns-cmsis-nn").ref
     executorch = runtime("executorch")
     assert executorch is not None
     assert baseline.project("nsx-executorch").ref == executorch.source.commit

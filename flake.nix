@@ -27,7 +27,7 @@
     # release, or a Git revision of the private AmbiqAI/helia-aot repository, with
     # --override-input (see the Nix environment guide, getting-started/nix).
     helia-aot = {
-      url = "https://files.pythonhosted.org/packages/22/85/2244768c3290b1106f55a573cdb2ea30b3ed8864207a62254637d91c373b/helia_aot-1.7.0.tar.gz";
+      url = "https://files.pythonhosted.org/packages/a6/06/dbb2eef4d8851cc23a06f4c9cb46b2f13d9b2c76194fe918099f79692cf6/helia_aot-1.10.0.tar.gz";
       flake = false;
     };
   };
@@ -334,7 +334,10 @@
           accepts = version: ref: (builtins.tryEval (probe version ref).requiredNsCmsisNn).success;
           v7_46_0 = "4a937fe7988935e1cfc2d8a41859fdada042c17c";
           v7_47_0 = "9f793bd9343b60e794f915b285bd7b7c4a885abe";
+          v7_47_2 = "fa2b727edf27121b54f7a580f5b1e56c009b7713";
           compatCases = {
+            "1.10.0 rejected on v7.47.0" = !accepts "1.10.0" v7_47_0;
+            "1.10.0 on v7.47.2" = accepts "1.10.0" v7_47_2;
             "0.33.0 rejected on v7.46.0" = !accepts "0.33.0" v7_46_0;
             "0.33.0 on v7.47.0" = accepts "0.33.0" v7_47_0;
             "1.0.0 on v7.47.0" = accepts "1.0.0" v7_47_0;

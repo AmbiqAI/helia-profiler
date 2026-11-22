@@ -89,12 +89,11 @@ class CompiledBuild:
         toolchain and its version, arena and weights placement, arena size,
         clock profile and the lifecycle's invocation counts.
 
-        The runtime version and commit and the kernel commit are compared
-        wherever both the plan and the build state one; a build or plan
-        that states none of a fact is not compared on it. heliaRT and
-        heliaAOT compare with the plan's pins. LiteRT compares with this HPX's
-        prepared LiteRT record, because the plan pins the modules an ordinary
-        profile builds from source, which a fixture build does not link.
+        Verification compares the recorded runtime version, source commit and
+        kernel commit wherever both sides state them. A recognized heliaRT
+        archive supplies its release's kernel pin. Custom heliaRT builds and
+        heliaAOT use the frozen plan's pins. LiteRT uses the prepared runtime
+        record for the version the fixture linked.
 
         Raises:
             ConfigError: Naming the first fact that does not match.
@@ -553,19 +552,22 @@ class _LinkedRuntime:
 def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _LinkedRuntime | None:
     """What a fixture build of *plan* links, or ``None`` when the plan states no runtime.
 
-    heliaRT and heliaAOT link the runtime and kernel commits the plan pins.
-    LiteRT does not: the plan pins the tflite-micro and CMSIS-NN modules an
-    ordinary profile builds from source, while a fixture build links a
-    prepared LiteRT record (``hpx runtimes prepare litert``). A build is
-    compared with the record of the version it linked (*linked_version*), so
-    a saved build keeps verifying after this HPX's default changes; a new
-    build links the default.
+    A prepared heliaRT release carries its own kernels. Its source revision
+    and version still come from the plan. LiteRT uses the prepared release
+    for both facts, using the linked version when verifying a saved build.
     """
     from ..runtime.records import runtime
 
     planned = plan.runtime
     if planned is None:
         return None
+    if planned.name == "helia-rt" and linked_version is not None and planned.version is not None:
+        record = runtime("helia-rt", planned.version)
+        if record is None or record.kernels is None:
+            raise ConfigError(f"No prepared kernel record for heliaRT {planned.version}")
+        return _LinkedRuntime(
+            planned.name, planned.version, planned.source_commit, record.kernels.commit
+        )
     if planned.name != "litert":
         return _LinkedRuntime(
             planned.name, planned.version, planned.source_commit, planned.kernels_commit

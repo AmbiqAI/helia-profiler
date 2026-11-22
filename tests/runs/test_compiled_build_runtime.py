@@ -59,7 +59,8 @@ def _linked(tmp_path: Path, engine: str, **commits: str):
         assert LITERT.kernels is not None
         pinned = (LITERT.source.commit, LITERT.kernels.commit)
     elif engine == "helia-rt":
-        pinned = (plan.runtime.source_commit, plan.runtime.kernels_commit)
+        assert RT.kernels is not None
+        pinned = (plan.runtime.source_commit, RT.kernels.commit)
     else:
         pinned = (plan.runtime.version, plan.runtime.kernels_commit)
     assert pinned[0] is not None and pinned[1] is not None
@@ -108,6 +109,14 @@ def test_a_helia_rt_plan_refuses_another_prepared_release(tmp_path):
         ConfigError, match="runtime version '2.2.0' differs from its plan's '2.5.0'"
     ):
         compiled(plan, build, Lifecycle.CARRY).verify()
+
+
+def test_custom_helia_rt_archive_can_link_the_frozen_source_and_kernel(tmp_path):
+    plan, _ = _linked(tmp_path, "helia-rt")
+    assert plan.runtime is not None and plan.runtime.kernels_commit is not None
+    plan, build = _linked(tmp_path, "helia-rt", kernels=plan.runtime.kernels_commit)
+    assert build.runtime_source is not None
+    compiled(plan, build, Lifecycle.CARRY).verify()
 
 
 def test_litert_compares_with_the_prepared_record_not_the_profile_modules(tmp_path):

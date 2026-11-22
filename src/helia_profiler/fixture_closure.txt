@@ -66,6 +66,7 @@ data/run_metadata.schema.v3.json
 data/run_summary.schema.v1.json
 data/runtimes/executorch/0.1.0.json
 data/runtimes/helia-aot/0.33.0.json
+data/runtimes/helia-aot/1.10.0.json
 data/runtimes/helia-aot/1.7.0.json
 data/runtimes/helia-rt/1.21.3.json
 data/runtimes/helia-rt/2.1.0.json

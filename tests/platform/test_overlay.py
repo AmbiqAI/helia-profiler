@@ -210,7 +210,7 @@ def test_unchanged_overlay_roundtrips_with_same_intent_and_resolved_config(tmp_p
     assert loaded.intent_hash == freeze_config(loaded.config()).intent_hash
 
 
-def test_new_absent_field_does_not_invalidate_retained_builtin_plan(tmp_path, monkeypatch):
+def test_builtin_plans_omit_absent_overlay_and_preserve_baseline_guard(tmp_path, monkeypatch):
     root = Path(__file__).resolve().parents[2]
     build = json.loads((root / "examples/results/run-api-synthetic/build.json").read_text())
     old = FrozenRun.from_dict(build["plan"])
@@ -219,9 +219,15 @@ def test_new_absent_field_does_not_invalidate_retained_builtin_plan(tmp_path, mo
     source = {"version": old.runtime.version, "commit": old.runtime.source_commit}
     monkeypatch.setattr("helia_profiler.results.dependencies.installed_aot_source", lambda: source)
     model = root / "examples/results/run-api-synthetic/inputs/tiny_cnn.tflite"
-    cfg = old.config(model=model)
-    assert cfg.target.platform_overlay is None
-    assert freeze_config(cfg).intent_hash == old.intent_hash
+    with pytest.raises(ConfigError, match="frozen against baseline"):
+        old.config(model=model)
+    settings = dict(build["plan"]["settings"])
+    settings["model"] = {**settings["model"], "path": str(model)}
+    current = freeze_config(load_config(None, settings))
+    assert "platform_overlay" not in current.settings["target"]
+    replayed = current.config()
+    assert replayed.target.platform_overlay is None
+    assert freeze_config(replayed).intent_hash == current.intent_hash
 
 
 def test_two_overlay_configs_do_not_mutate_each_other(tmp_path):
