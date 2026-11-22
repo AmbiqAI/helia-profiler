@@ -129,7 +129,7 @@ nested memory and analysis tables described below:
 
 (the engine, layer and cycle values are from the shipped bundle
 `examples/results/hardware-validation-2026-09-16/apollo510_evb-kws-rt-ns-arm-none-eabi-gcc-rtt-auto/`,
-which retains schema version 5. New runs use schema version 22; use the
+which retains schema version 5. New runs use schema version 23; use the
 producing HPX release to read historical bundles without rewriting them). Top-level
 fields in new runs:
 
@@ -142,7 +142,7 @@ fields in new runs:
 | `overflow_detected` | bool | none | any counter saturated its 32-bit accumulator in any pass |
 | `top_layers[]` | `op`, `cycles`, `pct` | cycles, percent of `total_cycles` | the heaviest layers |
 | `platform_provenance` | object | none | the retained catalog identity, selected target and effective HPX facts; see [Platform facts and policy](../concepts/platforms/) |
-| `conditions` | `target`, `cpu_hz`, `weights_memory`, `weights_cache`, `external_memory_clock`, `application_load` | name, Hz, memory, state, MHz, name | the board conditions the measurements refer to, in heliaOptimus's vocabulary: heliaAOT's name for the board, the configured core clock (the on-device measurement stays in `run_metadata.json`'s `firmware.measured_clock_hz`), where hpx placed the constants (`null` when it set no rule), the reported data-cache policy (`on` or `off`, controlled by `profiling.dcache` for Apollo5 profiles), the PSRAM clock (only when the run used PSRAM) and the application load (`none`). A heliaOptimus planner matches a calibration file written from the run by passing the same conditions: `target`, `cpu_hz`, `weights_memory`, `weights_cache`, `application_load=none` and, when present, `external_memory_clock` |
+| `conditions` | `target`, `cpu_hz`, `weights_memory`, `weights_cache`, `external_memory_clock`, `application_load`, `cache_regime` | name, Hz, memory, state, MHz, name, preparation | the board conditions the measurements refer to, in heliaOptimus's vocabulary: heliaAOT's name for the board, the configured core clock (the on-device measurement stays in `run_metadata.json`'s `firmware.measured_clock_hz`), where hpx placed the constants (`null` when it set no rule), the reported data-cache policy (`on` or `off`, controlled by `profiling.dcache` for Apollo5 profiles), the PSRAM clock (only when the run used PSRAM) and the application load (`none`). A heliaOptimus planner matches a calibration file written from the run by passing the same conditions: `target`, `cpu_hz`, `weights_memory`, `weights_cache`, `application_load=none` and, when present, `external_memory_clock` and `cache_regime` |
 | `validity` | `valid`, `degraded`, `invalid` | none | the run's verdict from the same evaluation the manifest records |
 | `issues[]` | code, severity, message, context | none | the structured reasons; every code is on the [issue codes](../../reference/issue-codes/) page |
 
