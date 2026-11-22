@@ -111,6 +111,14 @@ def test_a_helia_rt_plan_refuses_another_prepared_release(tmp_path):
         compiled(plan, build, Lifecycle.CARRY).verify()
 
 
+def test_custom_helia_rt_archive_can_link_the_frozen_source_and_kernel(tmp_path):
+    plan, _ = _linked(tmp_path, "helia-rt")
+    assert plan.runtime is not None and plan.runtime.kernels_commit is not None
+    plan, build = _linked(tmp_path, "helia-rt", kernels=plan.runtime.kernels_commit)
+    assert build.runtime_source is not None
+    compiled(plan, build, Lifecycle.CARRY).verify()
+
+
 def test_litert_compares_with_the_prepared_record_not_the_profile_modules(tmp_path):
     plan, build = _linked(tmp_path, "litert")
     assert plan.runtime is not None and plan.runtime.source_commit != LITERT.source.commit

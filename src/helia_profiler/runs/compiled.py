@@ -89,12 +89,11 @@ class CompiledBuild:
         toolchain and its version, arena and weights placement, arena size,
         clock profile and the lifecycle's invocation counts.
 
-        The runtime version and commit and the kernel commit are compared
-        wherever both the plan and the build state one; a build or plan
-        that states none of a fact is not compared on it. heliaRT and
-        heliaAOT compare with the plan's pins. LiteRT compares with this HPX's
-        prepared LiteRT record, because the plan pins the modules an ordinary
-        profile builds from source, which a fixture build does not link.
+        Verification compares the recorded runtime version, source commit and
+        kernel commit wherever both sides state them. A recognized heliaRT
+        archive supplies its release's kernel pin. Custom heliaRT builds and
+        heliaAOT use the frozen plan's pins. LiteRT uses the prepared runtime
+        record for the version the fixture linked.
 
         Raises:
             ConfigError: Naming the first fact that does not match.
@@ -562,7 +561,7 @@ def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _Link
     planned = plan.runtime
     if planned is None:
         return None
-    if planned.name == "helia-rt" and planned.version is not None:
+    if planned.name == "helia-rt" and linked_version is not None and planned.version is not None:
         record = runtime("helia-rt", planned.version)
         if record is None or record.kernels is None:
             raise ConfigError(f"No prepared kernel record for heliaRT {planned.version}")
