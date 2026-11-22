@@ -553,19 +553,22 @@ class _LinkedRuntime:
 def _linked_runtime(plan: FrozenRun, linked_version: str | None = None) -> _LinkedRuntime | None:
     """What a fixture build of *plan* links, or ``None`` when the plan states no runtime.
 
-    heliaRT and heliaAOT link the runtime and kernel commits the plan pins.
-    LiteRT does not: the plan pins the tflite-micro and CMSIS-NN modules an
-    ordinary profile builds from source, while a fixture build links a
-    prepared LiteRT record (``hpx runtimes prepare litert``). A build is
-    compared with the record of the version it linked (*linked_version*), so
-    a saved build keeps verifying after this HPX's default changes; a new
-    build links the default.
+    A prepared heliaRT release carries its own kernels. Its source revision
+    and version still come from the plan. LiteRT uses the prepared release
+    for both facts, using the linked version when verifying a saved build.
     """
     from ..runtime.records import runtime
 
     planned = plan.runtime
     if planned is None:
         return None
+    if planned.name == "helia-rt" and planned.version is not None:
+        record = runtime("helia-rt", planned.version)
+        if record is None or record.kernels is None:
+            raise ConfigError(f"No prepared kernel record for heliaRT {planned.version}")
+        return _LinkedRuntime(
+            planned.name, planned.version, planned.source_commit, record.kernels.commit
+        )
     if planned.name != "litert":
         return _LinkedRuntime(
             planned.name, planned.version, planned.source_commit, planned.kernels_commit

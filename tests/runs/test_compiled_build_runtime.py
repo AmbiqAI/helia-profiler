@@ -59,7 +59,8 @@ def _linked(tmp_path: Path, engine: str, **commits: str):
         assert LITERT.kernels is not None
         pinned = (LITERT.source.commit, LITERT.kernels.commit)
     elif engine == "helia-rt":
-        pinned = (plan.runtime.source_commit, plan.runtime.kernels_commit)
+        assert RT.kernels is not None
+        pinned = (plan.runtime.source_commit, RT.kernels.commit)
     else:
         pinned = (plan.runtime.version, plan.runtime.kernels_commit)
     assert pinned[0] is not None and pinned[1] is not None
