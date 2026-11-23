@@ -59,10 +59,14 @@ release pull requests from Conventional Commits.
 ## [0.6.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.3...v0.6.4) (2026-11-23)
 
 
+### Compatibility
+
+HPX 0.6.4 writes and reads run summaries at schema version 23. Read existing v22 summaries with the HPX release that produced them. Calibration files remain at schema v2 and can omit the new cache-regime field.
+
 ### Features
 
 * **runtime:** adopt heliaAOT 1.10.0 with CORE 7.47.2 ([#709](https://github.com/AmbiqAI/helia-profiler/issues/709)) ([61ada67](https://github.com/AmbiqAI/helia-profiler/commit/61ada67d0d8949b93cf3f3ca74bdc7e80f1c7143)), closes [#708](https://github.com/AmbiqAI/helia-profiler/issues/708)
-* sweep heliaAOT candidate plans on one target ([#707](https://github.com/AmbiqAI/helia-profiler/issues/707)) ([6000a92](https://github.com/AmbiqAI/helia-profiler/commit/6000a925f5126dcd1badf39f6c73f354fc9edfb4)), closes [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+* sweep heliaAOT candidate plans on one target ([#707](https://github.com/AmbiqAI/helia-profiler/issues/707)) ([6000a92](https://github.com/AmbiqAI/helia-profiler/commit/6000a925f5126dcd1badf39f6c73f354fc9edfb4)), refs [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
 
 
 ### Bug Fixes
