@@ -12,7 +12,6 @@ identifies what the plan asks for and excludes the HPX release.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import re
@@ -21,7 +20,7 @@ from pathlib import Path
 from types import MappingProxyType, UnionType
 from typing import TYPE_CHECKING, Any, Mapping, TypeVar, get_args, get_type_hints
 
-from .._files import write_text_atomically
+from .._files import sha256_file_with_size, write_text_atomically
 from .._semantic_hash import require, semantic_hash
 from ..config.platform import config_platform
 from ..errors import ConfigError
@@ -411,12 +410,13 @@ def freeze_config(config: ProfileConfig) -> FrozenRun:
     model_path = Path(config.model.path).expanduser().absolute()
     baseline = config.compatibility_baseline
     resolution = _compatibility(config)
+    model_hash, model_size = _file_identity(model_path)
     return FrozenRun(
         settings=settings,
         model=FrozenModel(
             path=str(model_path),
-            sha256=_file_sha256(model_path),
-            size_bytes=model_path.stat().st_size,
+            sha256=model_hash,
+            size_bytes=model_size,
         ),
         baseline_id=baseline.baseline_id,
         baseline_fingerprint=baseline.fingerprint,
@@ -817,8 +817,12 @@ def _drop(settings: dict[str, Any], path: tuple[str, ...]) -> None:
 
 
 def _file_sha256(path: Path) -> str:
+    return _file_identity(path)[0]
+
+
+def _file_identity(path: Path) -> tuple[str, int]:
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        return sha256_file_with_size(path)
     except OSError as exc:
         raise ConfigError(f"Cannot read {path}: {exc}") from exc
 

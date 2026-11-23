@@ -19,7 +19,7 @@ from ..platform.provenance import PlatformSnapshot
 if TYPE_CHECKING:
     from .capture import FixtureCaptureRequest
 
-from .._files import FixtureFile, RootedPaths, read_json
+from .._files import FixtureFile, RootedPaths, read_json, verified_size
 from ..engines import EngineType
 from ..engines.base import EngineSource
 from ..placement import Placement
@@ -304,13 +304,13 @@ def verify_fixture_build(build: FixtureBuild) -> None:
     for name in _FILE_FIELDS:
         value = getattr(build, name)
         if value is not None:
-            value.read()
+            verified_size(value)
     for name in _FILES_FIELDS:
         for value in getattr(build, name):
-            value.read()
+            verified_size(value)
     for io in build.inputs:
         _tensor(asdict(io.tensor))
-        if not isinstance(io.role, FixtureRole) or len(io.data.read()) != io.tensor.size_bytes:
+        if not isinstance(io.role, FixtureRole) or verified_size(io.data) != io.tensor.size_bytes:
             raise ValueError("Incomplete fixture input/state bytes")
     for tensor in build.output_tensors:
         _tensor(asdict(tensor))
@@ -323,7 +323,7 @@ def verify_fixture_build(build: FixtureBuild) -> None:
         if len(build.outputs) != len(build.output_tensors) or build.expected != build.outputs[0]:
             raise ValueError("Incomplete legacy reference outputs")
         if any(
-            len(f.read()) != t.size_bytes
+            verified_size(f) != t.size_bytes
             for f, t in zip(build.outputs, build.output_tensors, strict=True)
         ):
             raise ValueError("Legacy reference output byte extent mismatch")

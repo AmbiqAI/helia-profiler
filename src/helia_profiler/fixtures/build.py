@@ -7,7 +7,7 @@ import json
 import os
 from dataclasses import asdict, replace
 
-from .._files import FixtureFile
+from .._files import FixtureFile, sha256_file
 from ..config import ProfileConfig
 from ..config.platform import config_platform
 from ..deps.compatibility import resolve_compatibility
@@ -318,7 +318,7 @@ def build_fixed_fixture(
     app = ctx.resolved_firmware_dir
 
     def pin(path):
-        return FixtureFile(path, hashlib.sha256(path.read_bytes()).hexdigest())
+        return FixtureFile(path, sha256_file(path))
 
     sources = tuple(pin(path) for path in sorted((app / "src").glob("*")) if path.is_file())
     if compile and ctx.profile_run is None:

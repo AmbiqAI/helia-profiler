@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Protocol, cast
 
-from .._files import FixtureFile
+from .._files import FixtureFile, verified_size
 from ..platform.provenance import PlatformSnapshot
 from ..target.probe.flash import flash_binary
 from ..target.probe.jlink import (
@@ -427,7 +427,7 @@ def _capture_fixture(
                 "Unexpected core",
             )
         guard.check(require_free=True, remaining_s=max(240, request.settle_seconds + 180))
-        flash_image.read()
+        verified_size(flash_image)
         flash_binary(
             binary_path=flash_image.path,
             device=request.device,

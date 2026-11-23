@@ -262,7 +262,7 @@ cannot take).
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/record.py:62`
+Source: `src/helia_profiler/runs/record.py:69`
 
 ### helia_profiler.RunResultError.code
 
@@ -272,7 +272,7 @@ Source: `src/helia_profiler/runs/record.py:62`
 code = code
 ```
 
-Source: `src/helia_profiler/runs/record.py:77`
+Source: `src/helia_profiler/runs/record.py:84`
 
 ## helia_profiler.RunResultRecord
 
@@ -300,7 +300,7 @@ run it records.
 
 **API tier:** `experimental`
 
-Source: `src/helia_profiler/runs/record.py:81`
+Source: `src/helia_profiler/runs/record.py:88`
 
 ### helia_profiler.RunResultRecord.path
 
@@ -310,7 +310,7 @@ Source: `src/helia_profiler/runs/record.py:81`
 path: Path
 ```
 
-Source: `src/helia_profiler/runs/record.py:91`
+Source: `src/helia_profiler/runs/record.py:98`
 
 ### helia_profiler.RunResultRecord.size_bytes
 
@@ -320,7 +320,7 @@ Source: `src/helia_profiler/runs/record.py:91`
 size_bytes: int
 ```
 
-Source: `src/helia_profiler/runs/record.py:92`
+Source: `src/helia_profiler/runs/record.py:99`
 
 ### helia_profiler.RunResultRecord.sha256
 
@@ -330,7 +330,7 @@ Source: `src/helia_profiler/runs/record.py:92`
 sha256: str
 ```
 
-Source: `src/helia_profiler/runs/record.py:93`
+Source: `src/helia_profiler/runs/record.py:100`
 
 ### helia_profiler.RunResultRecord.hpx_version
 
@@ -340,7 +340,7 @@ Source: `src/helia_profiler/runs/record.py:93`
 hpx_version: str
 ```
 
-Source: `src/helia_profiler/runs/record.py:94`
+Source: `src/helia_profiler/runs/record.py:101`
 
 ### helia_profiler.RunResultRecord.result
 
@@ -350,7 +350,7 @@ Source: `src/helia_profiler/runs/record.py:94`
 result: RunResult
 ```
 
-Source: `src/helia_profiler/runs/record.py:95`
+Source: `src/helia_profiler/runs/record.py:102`
 
 ### helia_profiler.RunResultRecord.document
 
@@ -360,7 +360,7 @@ Source: `src/helia_profiler/runs/record.py:95`
 document: Mapping[str, Any]
 ```
 
-Source: `src/helia_profiler/runs/record.py:96`
+Source: `src/helia_profiler/runs/record.py:103`
 
 ## helia_profiler.load_run
 
@@ -380,7 +380,7 @@ Read and verify a run result saved by :meth:`RunResult.save`, resolving paths un
 | --- | --- |
 | RunResultError | A ``ConfigError`` naming the first check that fails: the schema or version, the compiled build, a pinned file, the identity or the output comparison. |
 
-Source: `src/helia_profiler/runs/record.py:99`
+Source: `src/helia_profiler/runs/record.py:106`
 
 ## helia_profiler.RunResult
 

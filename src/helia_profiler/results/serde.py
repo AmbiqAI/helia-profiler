@@ -12,31 +12,14 @@ nested reads, number coercion, ``None`` stripping) (#229 D6).
 from __future__ import annotations
 
 import csv
-import hashlib
 import math
 from dataclasses import fields
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+from .._files import sha256_file as sha256_file
+from .._files import sha256_file_with_size as sha256_file_with_size
 from ..errors import ReportError
-
-
-def sha256_file(path: Path) -> str:
-    """Streaming sha256 of a file (1 MiB chunks).
-
-    The one implementation behind artifact digests, lock stamps, and
-    workspace fingerprints (#229 D6).
-    """
-    return sha256_file_with_size(path)[0]
-
-
-def sha256_file_with_size(path: Path) -> tuple[str, int]:
-    """Digest and length of the same byte stream."""
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-        return digest.hexdigest(), stream.tell()
 
 
 def write_dict_csv(

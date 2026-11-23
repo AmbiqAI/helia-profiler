@@ -278,8 +278,9 @@ def _load_pte_sidecar(model_path: Path) -> dict[str, Any] | None:
     but a sidecar that does not describe this exact PTE is a hard error,
     never silently ignored.
     """
-    import hashlib
     import json
+
+    from .._files import sha256_file
 
     sidecar = Path(f"{model_path}.json")
     if not sidecar.is_file():
@@ -296,7 +297,7 @@ def _load_pte_sidecar(model_path: Path) -> dict[str, Any] | None:
             f"{sidecar} has unsupported sidecar schema {manifest.get('schema')!r}",
             hint=f"Expected {PTE_SIDECAR_SCHEMA}; re-export with a matching helia-torch.",
         )
-    actual = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    actual = sha256_file(model_path)
     if manifest.get("pte_sha256") != actual:
         raise EngineError(
             f"{sidecar} describes a different PTE (sha {manifest.get('pte_sha256')}, "

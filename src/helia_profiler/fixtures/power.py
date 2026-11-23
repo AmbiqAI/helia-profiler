@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from threading import RLock
 from typing import TYPE_CHECKING, Callable, Protocol
 
-from .._files import FixtureFile
+from .._files import FixtureFile, verified_size
 from ..power.base import PowerResult
 from ..power.joulescope.driver import JoulescopeDriver
 from ..power.metadata import MeasurementScope, PowerIntegrity, classify_observation
@@ -278,7 +278,7 @@ def fixture_rail_energy(
         raise ValueError("Rail energy/power/duration disagree")
     _validate_trace_coverage(observation)
     completion = _batch_completion(observation, request, raw)
-    raw.read()
+    verified_size(raw)
     return FixtureRailEnergy(
         timing.iterations,
         GROSS_RAIL_SCOPE,

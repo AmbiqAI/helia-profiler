@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
 
-from .._files import FixtureFile
+from .._files import FixtureFile, verified_size
 from ..engines import EngineType
 from ..engines.base import EngineSource
 from ..placement import Placement
@@ -94,10 +94,10 @@ class FixedFixture:
     output_tensor: Int8Tensor
 
     def verify(self) -> None:
-        self.model.read()
+        verified_size(self.model)
         if (
-            len(self.input.read()) != self.input_tensor.size
-            or len(self.expected.read()) != self.output_tensor.size
+            verified_size(self.input) != self.input_tensor.size
+            or verified_size(self.expected) != self.output_tensor.size
         ):
             raise ValueError("Full fixture tensor byte extent mismatch")
 
@@ -143,7 +143,7 @@ class TypedFixture:
     outputs: tuple[FixtureIO, ...] | tuple[FixtureOutput, ...]
 
     def verify(self) -> None:
-        self.model.read()
+        verified_size(self.model)
         if not self.inputs or not self.outputs:
             raise ValueError("Typed fixture requires inputs and outputs")
         if not (
@@ -156,7 +156,7 @@ class TypedFixture:
         ):
             raise ValueError("Invalid fixture tensor role")
         for io in (*self.inputs, *self.outputs):
-            if isinstance(io, FixtureIO) and len(io.data.read()) != io.tensor.size_bytes:
+            if isinstance(io, FixtureIO) and verified_size(io.data) != io.tensor.size_bytes:
                 raise ValueError(f"Fixture tensor {io.tensor.name} byte extent mismatch")
 
     @property

@@ -7,6 +7,7 @@ import importlib.resources as resources
 import json
 from pathlib import Path
 
+from ._files import sha256_file
 from .errors import ConfigError
 
 _MODELS = {
@@ -39,10 +40,7 @@ def _materialize_model(name: str) -> Path:
         )
 
     destination = _cache_root() / name / expected_digest[:12] / filename
-    if (
-        destination.is_file()
-        and hashlib.sha256(destination.read_bytes()).hexdigest() == expected_digest
-    ):
+    if destination.is_file() and sha256_file(destination) == expected_digest:
         return destination
 
     destination.parent.mkdir(parents=True, exist_ok=True)

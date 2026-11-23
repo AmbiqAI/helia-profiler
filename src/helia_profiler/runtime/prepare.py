@@ -7,7 +7,6 @@ cache under ``runtimes/<name>/<version>/``.
 
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import os
@@ -29,7 +28,7 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-from .._files import FixtureFile
+from .._files import FixtureFile, sha256_file
 from ..config import DEFAULT_DOWNLOAD_API_S, DEFAULT_DOWNLOAD_ASSET_S
 from ..errors import ConfigError
 from .archive import PreparedUpstreamRuntime
@@ -213,7 +212,7 @@ def _stage_helia_rt(
             target = include / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
-            headers[name] = _sha256(target)
+            headers[name] = sha256_file(target)
     library = _library_name(_core_tag(FIXTURE_BOARD), _toolchain_tag("atfe"), _HELIA_RT_VARIANT)
     archive = staging / "runtime.a"
     shutil.copyfile(dist / "lib" / library, archive)
@@ -228,7 +227,7 @@ def _stage_helia_rt(
     manifest = {
         "schema_version": 2,
         "stack": "helia-rt",
-        "archive_sha256": _sha256(archive),
+        "archive_sha256": sha256_file(archive),
         "providers": {
             "helia-rt": {
                 "url": f"https://github.com/{record.source.repo}",
@@ -428,12 +427,12 @@ def _stage_tflm(record: RuntimeRecord, kernels: RuntimeSource, tree: Path, stagi
             target = staging / "include" / name
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(path, target)
-            headers[name] = _sha256(target)
+            headers[name] = sha256_file(target)
     archive = staging / "runtime.a"
     shutil.copyfile(tree.parent / "runtime.a", archive)
     manifest = {
         "schema_version": 1,
-        "archive_sha256": _sha256(archive),
+        "archive_sha256": sha256_file(archive),
         "providers": {
             "tflite-micro": {
                 "url": f"https://github.com/{record.source.repo}",
@@ -506,13 +505,9 @@ def _load(record: RuntimeRecord, directory: Path) -> PreparedArchive:
         PreparedUpstreamRuntime(
             archive=FixtureFile(directory / "runtime.a", archive_sha256),
             header_root=directory / "include",
-            manifest=FixtureFile(manifest, _sha256(manifest)),
+            manifest=FixtureFile(manifest, sha256_file(manifest)),
         ),
     )
-
-
-def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _read(path: Path) -> str:

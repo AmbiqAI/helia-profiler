@@ -72,52 +72,6 @@ FLOAT32 = 'float32'
 
 Source: `src/helia_profiler/fixtures/io.py:22`
 
-## helia_profiler.FixtureFile
-
-`class` · `python`
-
-```python
-FixtureFile(path: Path, sha256: str) -> None
-```
-
-`dataclass`
-
-A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.
-
-**API tier:** `experimental`
-
-Source: `src/helia_profiler/_files.py:16`
-
-### helia_profiler.FixtureFile.path
-
-`attribute` · `python`
-
-```python
-path: Path
-```
-
-Source: `src/helia_profiler/_files.py:20`
-
-### helia_profiler.FixtureFile.sha256
-
-`attribute` · `python`
-
-```python
-sha256: str
-```
-
-Source: `src/helia_profiler/_files.py:21`
-
-### helia_profiler.FixtureFile.read
-
-`method` · `python`
-
-```python
-read() -> bytes
-```
-
-Source: `src/helia_profiler/_files.py:23`
-
 ## helia_profiler.FixtureTimingScope
 
 `class` · `python`
@@ -155,6 +109,52 @@ RESTORE_AND_INVOKE = 'restore_and_invoke'
 ```
 
 Source: `src/helia_profiler/fixtures/types.py:35`
+
+## helia_profiler.FixtureFile
+
+`class` · `python`
+
+```python
+FixtureFile(path: Path, sha256: str) -> None
+```
+
+`dataclass`
+
+A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.
+
+**API tier:** `experimental`
+
+Source: `src/helia_profiler/_files.py:32`
+
+### helia_profiler.FixtureFile.path
+
+`attribute` · `python`
+
+```python
+path: Path
+```
+
+Source: `src/helia_profiler/_files.py:36`
+
+### helia_profiler.FixtureFile.sha256
+
+`attribute` · `python`
+
+```python
+sha256: str
+```
+
+Source: `src/helia_profiler/_files.py:37`
+
+### helia_profiler.FixtureFile.read
+
+`method` · `python`
+
+```python
+read() -> bytes
+```
+
+Source: `src/helia_profiler/_files.py:39`
 
 ## helia_profiler.analyze_run_model
 
