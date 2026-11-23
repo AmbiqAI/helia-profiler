@@ -220,9 +220,10 @@ class Conditions:
             lowercase heliaAOT memory type (``dtcm``, ``sram``, ``mram``,
             ``psram``); ``None`` when hpx set no placement rule for them.
         weights_cache: The reported data-cache policy, ``on`` or ``off``.
-            Missing cache metadata in older firmware retains the ``on`` baseline.
+            For captures without a reported policy, HPX uses the target’s D-cache capability.
         external_memory_clock: The PSRAM interface clock in MHz; ``None``
             when the run used no PSRAM.
+        cache_regime: Constant-cache preparation for each instrumented run, when recorded.
         application_load: What else the core ran during the capture; ``none``
             for every run this release makes.
     """
@@ -233,6 +234,7 @@ class Conditions:
     weights_cache: str = "on"
     external_memory_clock: int | None = None
     application_load: str = "none"
+    cache_regime: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """JSON-ready form; ``external_memory_clock`` is absent without PSRAM."""
@@ -245,6 +247,8 @@ class Conditions:
         if self.external_memory_clock is not None:
             out["external_memory_clock"] = self.external_memory_clock
         out["application_load"] = self.application_load
+        if self.cache_regime is not None:
+            out["cache_regime"] = self.cache_regime
         return out
 
     @classmethod
@@ -270,7 +274,11 @@ class Conditions:
         application_load = data.get("application_load", "none")
         if not isinstance(weights_cache, str) or not isinstance(application_load, str):
             raise ValueError("conditions.weights_cache and application_load must be strings")
+        regime = data.get("cache_regime")
+        if "cache_regime" in data and (regime not in ("cold", "warm") or weights_cache != "on"):
+            raise ValueError("conditions.cache_regime requires cold or warm and weights_cache on")
         return cls(
+            cache_regime=regime,
             target=target,
             cpu_hz=cpu_hz,
             weights_memory=weights_memory,

@@ -18,7 +18,7 @@
       "const": "hpx.run-summary"
     },
     "schema_version": {
-      "const": 22
+      "const": 23
     },
     "engine": {
       "type": "string",
@@ -59,6 +59,8 @@
         "weights_cache",
         "application_load"
       ],
+      "if": {"required": ["cache_regime"]},
+      "then": {"properties": {"weights_cache": {"const": "on"}}},
       "properties": {
         "target": {
           "type": "string",
@@ -76,6 +78,7 @@
             "null"
           ]
         },
+        "cache_regime": {"enum": ["cold", "warm"]},
         "weights_cache": {
           "type": "string"
         },

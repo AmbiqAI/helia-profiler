@@ -14,7 +14,7 @@ from ..engines.helia_aot.compile import (
     user_wildcard_kinds,
 )
 from ..errors import EngineError
-from ..placement import Placement
+from ..placement import ArenaRole, Placement
 from ..platform import get_soc_for_board
 from ..results.models import Conditions
 
@@ -34,13 +34,35 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
         cpu_hz = platform.cpu_clock_mhz * 1_000_000
     elif meta.system_clock_hz:
         cpu_hz = meta.system_clock_hz
+    weights_memory = _weights_memory(ctx)
+    weights_cache = meta.dcache
+    if weights_cache is None:
+        soc = get_soc_for_board(ctx.config.target.board, registry=ctx.config.platform_registry)
+        weights_cache = "on" if soc.capabilities.memory.has_dcache else "off"
     return Conditions(
         target=_target_name(ctx),
         cpu_hz=cpu_hz,
-        weights_memory=_weights_memory(ctx),
-        weights_cache=meta.dcache or "on",
+        weights_memory=weights_memory,
+        weights_cache=weights_cache,
+        cache_regime=_cache_regime(ctx, weights_memory) if weights_cache == "on" else None,
         external_memory_clock=_external_memory_clock_mhz(ctx),
     )
+
+
+def _cache_regime(ctx: PipelineContext, weights_memory: str | None) -> str:
+    artifacts = ctx.engine_artifacts
+    if (
+        not ctx.config.profiling.stream_evidence
+        or not isinstance(artifacts, HeliaAotArtifacts)
+        or artifacts.aot_allocate_arenas
+    ):
+        return "warm"
+    placements = {r.placement for r in artifacts.aot_arena_regions if r.role is ArenaRole.CONSTANT}
+    if Placement.PSRAM in placements and (
+        weights_memory == "psram" or placements == {Placement.PSRAM}
+    ):
+        return "cold"
+    return "warm"
 
 
 def _target_name(ctx: PipelineContext) -> str:

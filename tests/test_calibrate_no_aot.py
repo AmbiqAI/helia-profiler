@@ -46,6 +46,25 @@ def test_a_bad_tolerance_is_refused_before_any_bundle_is_read(tmp_path: Path) ->
     assert result.exit_code == 1 and "--tolerance must be a fraction" in flat(result.output)
 
 
+@pytest.mark.parametrize(
+    "schema_file", ["calibration.schema.v2.json", "run_summary.schema.v1.json"]
+)
+def test_cache_off_with_a_regime_is_refused_by_both_schemas(schema_file):
+    from importlib.resources import files
+
+    schema = json.loads(files("helia_profiler.data").joinpath(schema_file).read_bytes())
+    validator = Draft202012Validator(schema["properties"]["conditions"])
+    conditions = {
+        "target": "apollo510_evb",
+        "weights_memory": "psram",
+        "weights_cache": "off",
+        "cpu_hz": 96_000_000,
+        "application_load": "none",
+    }
+    assert validator.is_valid(conditions)
+    assert not validator.is_valid({**conditions, "cache_regime": "cold"})
+
+
 def _entry(document: dict[str, Any]) -> dict[str, Any]:
     return document["operator_cycles"]["0:fc"][0]
 

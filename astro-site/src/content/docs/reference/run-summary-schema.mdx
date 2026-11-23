@@ -6,7 +6,7 @@ description: "Current summary.json reader and writer boundaries, with the histor
 ## Current contract
 
 The ordinary profile artifact `summary.json` uses schema `hpx.run-summary`.
-The current version is 22, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
+The current version is 23, declared by `RUN_SUMMARY_SCHEMA_VERSION` in
 `helia_profiler.results.run_summary` and re-exported by `report.contracts`.
 This schema is separate from the saved-run `hpx.run-result` format.
 
@@ -186,3 +186,7 @@ recorded separately in run metadata. Physical capacities and verified
 application budgets have distinct ownership; fixed stack reservations are
 accounted once. Unknown or unsupported source/layout information does not
 qualify default memory accounting. [#657](https://github.com/AmbiqAI/helia-profiler/issues/657).
+
+### Version 23
+
+Captures with the weights cache enabled record the preparation of the constants in `conditions.cache_regime`. Captures on targets without a data cache record `weights_cache: off`. Read version 22 summaries with the HPX release that produced them.
