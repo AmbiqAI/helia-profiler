@@ -129,83 +129,6 @@
           "summary": "IO tensor element types a fixture can declare."
         },
         {
-          "description": "`dataclass`\n\nA file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.\n\n**API tier:** `experimental`",
-          "examples": [],
-          "id": "helia_profiler.FixtureFile",
-          "kind": "class",
-          "language": "python",
-          "members": [
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureFile.path",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "path",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "path: Path",
-              "source": {
-                "line": 20,
-                "path": "src/helia_profiler/_files.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L20"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureFile.sha256",
-              "kind": "attribute",
-              "language": "python",
-              "members": [],
-              "name": "sha256",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "sha256: str",
-              "source": {
-                "line": 21,
-                "path": "src/helia_profiler/_files.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L21"
-              },
-              "summary": ""
-            },
-            {
-              "description": "",
-              "examples": [],
-              "id": "helia_profiler.FixtureFile.read",
-              "kind": "method",
-              "language": "python",
-              "members": [],
-              "name": "read",
-              "params": [],
-              "raises": [],
-              "returns": [],
-              "signature": "read() -> bytes",
-              "source": {
-                "line": 23,
-                "path": "src/helia_profiler/_files.py",
-                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L23"
-              },
-              "summary": ""
-            }
-          ],
-          "name": "FixtureFile",
-          "params": [],
-          "raises": [],
-          "returns": [],
-          "signature": "FixtureFile(path: Path, sha256: str) -> None",
-          "source": {
-            "line": 16,
-            "path": "src/helia_profiler/_files.py",
-            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L16"
-          },
-          "summary": "A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."
-        },
-        {
           "description": "What the timed span covers.\n\n``INVOKE_ONLY`` brackets each invocation; ``RESTORE_AND_INVOKE`` brackets\nthe timed loop, so restoring the fixed inputs before each invocation is\ninside the span.\n\n**API tier:** `experimental`",
           "examples": [],
           "id": "helia_profiler.FixtureTimingScope",
@@ -262,6 +185,83 @@
             "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L26"
           },
           "summary": "What the timed span covers."
+        },
+        {
+          "description": "`dataclass`\n\nA file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.\n\n**API tier:** `experimental`",
+          "examples": [],
+          "id": "helia_profiler.FixtureFile",
+          "kind": "class",
+          "language": "python",
+          "members": [
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureFile.path",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "path",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "path: Path",
+              "source": {
+                "line": 36,
+                "path": "src/helia_profiler/_files.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L36"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureFile.sha256",
+              "kind": "attribute",
+              "language": "python",
+              "members": [],
+              "name": "sha256",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "sha256: str",
+              "source": {
+                "line": 37,
+                "path": "src/helia_profiler/_files.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L37"
+              },
+              "summary": ""
+            },
+            {
+              "description": "",
+              "examples": [],
+              "id": "helia_profiler.FixtureFile.read",
+              "kind": "method",
+              "language": "python",
+              "members": [],
+              "name": "read",
+              "params": [],
+              "raises": [],
+              "returns": [],
+              "signature": "read() -> bytes",
+              "source": {
+                "line": 39,
+                "path": "src/helia_profiler/_files.py",
+                "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L39"
+              },
+              "summary": ""
+            }
+          ],
+          "name": "FixtureFile",
+          "params": [],
+          "raises": [],
+          "returns": [],
+          "signature": "FixtureFile(path: Path, sha256: str) -> None",
+          "source": {
+            "line": 32,
+            "path": "src/helia_profiler/_files.py",
+            "url": "https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L32"
+          },
+          "summary": "A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."
         },
         {
           "description": "Read a LiteRT model's public inputs and outputs without selecting an engine.\n\n**API tier:** `experimental`",

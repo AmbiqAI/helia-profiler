@@ -20,7 +20,7 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 
 [Machine-readable model](/helia-profiler/reference/api/helia_profiler/run_inputs.json)
 
-<RefMembers label="On this page" items={[{"id":"helia_profiler.FixtureDType","name":"FixtureDType","kind":"class","summary":"IO tensor element types a fixture can declare."},{"id":"helia_profiler.FixtureFile","name":"FixtureFile","kind":"class","summary":"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."},{"id":"helia_profiler.FixtureTimingScope","name":"FixtureTimingScope","kind":"class","summary":"What the timed span covers."},{"id":"helia_profiler.analyze_run_model","name":"analyze_run_model","kind":"function","summary":"Read a LiteRT model's public inputs and outputs without selecting an engine."},{"id":"helia_profiler.FixtureStatePolicy","name":"FixtureStatePolicy","kind":"class","summary":"Internal state behavior; input restoration is independent of this policy."},{"id":"helia_profiler.FixtureRole","name":"FixtureRole","kind":"class","summary":"Role of one fixture tensor; outputs are always SIGNAL."},{"id":"helia_profiler.PerTensorQuantization","name":"PerTensorQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.PerAxisQuantization","name":"PerAxisQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.FixtureMethod","name":"FixtureMethod","kind":"class","summary":"Select input-restoration timing and, optionally, the internal-state policy."},{"id":"helia_profiler.analyze_run_model_for_engine","name":"analyze_run_model_for_engine","kind":"function","summary":"Read a model's public inputs and outputs as engine's fixture integration admits them."},{"id":"helia_profiler.FixtureTensor","name":"FixtureTensor","kind":"class","summary":"One named model input or output with its dtype, shape and quantization."},{"id":"helia_profiler.FixtureIO","name":"FixtureIO","kind":"class","summary":"One model input with its fixed bytes, or one output with its expected bytes."},{"id":"helia_profiler.TypedFixtureModelAnalysis","name":"TypedFixtureModelAnalysis","kind":"class","summary":"A model's public inputs and outputs in model order, with its graph facts."},{"id":"helia_profiler.FixtureOutput","name":"FixtureOutput","kind":"class","summary":"One complete output declaration, without a reference answer."},{"id":"helia_profiler.TypedFixture","name":"TypedFixture","kind":"class","summary":"Fixed input bytes and complete ordered outputs for a model."}]} />
+<RefMembers label="On this page" items={[{"id":"helia_profiler.FixtureDType","name":"FixtureDType","kind":"class","summary":"IO tensor element types a fixture can declare."},{"id":"helia_profiler.FixtureTimingScope","name":"FixtureTimingScope","kind":"class","summary":"What the timed span covers."},{"id":"helia_profiler.FixtureFile","name":"FixtureFile","kind":"class","summary":"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."},{"id":"helia_profiler.analyze_run_model","name":"analyze_run_model","kind":"function","summary":"Read a LiteRT model's public inputs and outputs without selecting an engine."},{"id":"helia_profiler.FixtureStatePolicy","name":"FixtureStatePolicy","kind":"class","summary":"Internal state behavior; input restoration is independent of this policy."},{"id":"helia_profiler.FixtureRole","name":"FixtureRole","kind":"class","summary":"Role of one fixture tensor; outputs are always SIGNAL."},{"id":"helia_profiler.PerTensorQuantization","name":"PerTensorQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.PerAxisQuantization","name":"PerAxisQuantization","kind":"class","summary":"API tier: experimental"},{"id":"helia_profiler.FixtureMethod","name":"FixtureMethod","kind":"class","summary":"Select input-restoration timing and, optionally, the internal-state policy."},{"id":"helia_profiler.analyze_run_model_for_engine","name":"analyze_run_model_for_engine","kind":"function","summary":"Read a model's public inputs and outputs as engine's fixture integration admits them."},{"id":"helia_profiler.FixtureTensor","name":"FixtureTensor","kind":"class","summary":"One named model input or output with its dtype, shape and quantization."},{"id":"helia_profiler.FixtureIO","name":"FixtureIO","kind":"class","summary":"One model input with its fixed bytes, or one output with its expected bytes."},{"id":"helia_profiler.TypedFixtureModelAnalysis","name":"TypedFixtureModelAnalysis","kind":"class","summary":"A model's public inputs and outputs in model order, with its graph facts."},{"id":"helia_profiler.FixtureOutput","name":"FixtureOutput","kind":"class","summary":"One complete output declaration, without a reference answer."},{"id":"helia_profiler.TypedFixture","name":"TypedFixture","kind":"class","summary":"Fixed input bytes and complete ordered outputs for a model."}]} />
 
 <RefSymbol
   id={"helia_profiler.FixtureDType"}
@@ -110,67 +110,6 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
 </RefSymbol>
 
 <RefSymbol
-  id={"helia_profiler.FixtureFile"}
-  name={"FixtureFile"}
-  kind={"class"}
-  language={"python"}
-  signature={"FixtureFile(path: Path, sha256: str) -> None"}
-  level={2}
-  summary={"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."}
-  source={{"path":"src/helia_profiler/_files.py","line":16,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L16"}}
->
-
-  `dataclass`
-
-  A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.
-
-  **API tier:** `experimental`
-
-  <RefSymbol
-    id={"helia_profiler.FixtureFile.path"}
-    name={"path"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"path: Path"}
-    level={3}
-    source={{"path":"src/helia_profiler/_files.py","line":20,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L20"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.FixtureFile.sha256"}
-    name={"sha256"}
-    kind={"attribute"}
-    language={"python"}
-    signature={"sha256: str"}
-    level={3}
-    source={{"path":"src/helia_profiler/_files.py","line":21,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L21"}}
-  >
-
-
-
-  </RefSymbol>
-
-  <RefSymbol
-    id={"helia_profiler.FixtureFile.read"}
-    name={"read"}
-    kind={"method"}
-    language={"python"}
-    signature={"read() -> bytes"}
-    level={3}
-    source={{"path":"src/helia_profiler/_files.py","line":23,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L23"}}
-  >
-
-
-
-  </RefSymbol>
-
-</RefSymbol>
-
-<RefSymbol
   id={"helia_profiler.FixtureTimingScope"}
   name={"FixtureTimingScope"}
   kind={"class"}
@@ -211,6 +150,67 @@ Generated from the `src/helia_profiler` tree `__DOCS_SOURCE_TREE__`.
     signature={"RESTORE_AND_INVOKE = 'restore_and_invoke'"}
     level={3}
     source={{"path":"src/helia_profiler/fixtures/types.py","line":35,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/fixtures/types.py#L35"}}
+  >
+
+
+
+  </RefSymbol>
+
+</RefSymbol>
+
+<RefSymbol
+  id={"helia_profiler.FixtureFile"}
+  name={"FixtureFile"}
+  kind={"class"}
+  language={"python"}
+  signature={"FixtureFile(path: Path, sha256: str) -> None"}
+  level={2}
+  summary={"A file pinned by its SHA-256; :meth:read refuses bytes that no longer match."}
+  source={{"path":"src/helia_profiler/_files.py","line":32,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L32"}}
+>
+
+  `dataclass`
+
+  A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match.
+
+  **API tier:** `experimental`
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.path"}
+    name={"path"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"path: Path"}
+    level={3}
+    source={{"path":"src/helia_profiler/_files.py","line":36,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L36"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.sha256"}
+    name={"sha256"}
+    kind={"attribute"}
+    language={"python"}
+    signature={"sha256: str"}
+    level={3}
+    source={{"path":"src/helia_profiler/_files.py","line":37,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L37"}}
+  >
+
+
+
+  </RefSymbol>
+
+  <RefSymbol
+    id={"helia_profiler.FixtureFile.read"}
+    name={"read"}
+    kind={"method"}
+    language={"python"}
+    signature={"read() -> bytes"}
+    level={3}
+    source={{"path":"src/helia_profiler/_files.py","line":39,"url":"https://github.com/AmbiqAI/helia-profiler/blob/__DOCS_SOURCE_REF__/src/helia_profiler/_files.py#L39"}}
   >
 
 
