@@ -1,0 +1,19 @@
+{
+  "schema": "helia-profiler/runtime@1",
+  "name": "helia-aot",
+  "version": "1.11.0",
+  "default": true,
+  "source": {
+    "repo": "AmbiqAI/helia-aot",
+    "commit": "844cc56069d59d37de3cdaa87832d7f0d6f78e14"
+  },
+  "precisions": {
+    "fp32": "supported",
+    "fp16": "supported",
+    "a8w8": "supported",
+    "a16w8": "supported"
+  },
+  "qualified": [],
+  "transfer_observer": true,
+  "catalog_platform_schema": 1
+}

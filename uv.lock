@@ -381,7 +381,7 @@ wheels = [
 
 [[package]]
 name = "helia-aot"
-version = "1.10.0"
+version = "1.11.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ai-edge-litert" },
@@ -397,9 +397,9 @@ dependencies = [
     { name = "tqdm" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a6/06/dbb2eef4d8851cc23a06f4c9cb46b2f13d9b2c76194fe918099f79692cf6/helia_aot-1.10.0.tar.gz", hash = "sha256:b99d768d7b4622200b32a34fdc17dfd77c531c6deef182cc70da5488dea73a20", size = 802609, upload-time = "2026-11-22T05:14:52.628Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fa/99/db530171b9a65faa7652c73069c4cb4642d7181159a00e8062af96bec13d/helia_aot-1.11.0.tar.gz", hash = "sha256:a1768d31576a08d9b06143e9dcb9445b1bd398270e42001d2e824e8b96ebb26e", size = 812877, upload-time = "2026-11-22T22:17:19.351Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/49/cc/15c363e76788aabc3b729a36347aa549a66717b88f5d9a0ad539c2f1da5f/helia_aot-1.10.0-py3-none-any.whl", hash = "sha256:686f28ba18b12d99f351f7c555149898ba853b3bf12b4519d32b2ee9b88d4a16", size = 1046827, upload-time = "2026-11-22T05:14:51.283Z" },
+    { url = "https://files.pythonhosted.org/packages/10/0b/402e5e47ebc40c1c2d7b07cb4b88be3971c8c8166bc9a02b643493906d39/helia_aot-1.11.0-py3-none-any.whl", hash = "sha256:a9e14566b8c266d9a413ebbd901a21d85f11df9b60cb082055d6650aa7a21fb1", size = 1058062, upload-time = "2026-11-22T22:17:17.624Z" },
 ]
 
 [[package]]

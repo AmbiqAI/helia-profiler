@@ -25,7 +25,7 @@ hpx doctor
 |---|---|---|
 | nixpkgs, Python, CMake, Ninja, uv | `flake.lock` (nixpkgs) | Python 3.12, CMake 4.3, Ninja 1.13, uv 0.11 |
 | Python packages | `uv.lock` | for example neuralspotx 0.9.2, ai-edge-litert 2.2.0 |
-| heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 1.10.0 |
+| heliaAOT | the `helia-aot` flake input, recorded in `flake.lock` | 1.11.0 |
 | Arm GNU Toolchain | `flake.lock` (nixpkgs `gcc-arm-embedded`) | 15.2.Rel1 |
 | Arm Toolchain for Embedded (ATfE) | `nix/atfe.nix` | 22.1.0 |
 | SEGGER J-Link software | `nix/jlink.nix` | 9.62 |
@@ -41,7 +41,7 @@ The `helia-aot` input selects the heliaAOT source. By default it is the PyPI sou
 
 ```bash
 nix develop --override-input helia-aot \
-  https://files.pythonhosted.org/packages/a6/06/dbb2eef4d8851cc23a06f4c9cb46b2f13d9b2c76194fe918099f79692cf6/helia_aot-1.10.0.tar.gz
+  https://files.pythonhosted.org/packages/fa/99/db530171b9a65faa7652c73069c4cb4642d7181159a00e8062af96bec13d/helia_aot-1.11.0.tar.gz
 ```
 
 **A Git revision.** heliaAOT's repository is private, so this needs SSH access to `AmbiqAI/helia-aot`. The revision must be the commit in the matching runtime record (`source.commit`), and a checkout with uncommitted changes is refused:
@@ -88,7 +88,7 @@ Each heliaAOT release needs a minimum ns-cmsis-nn. The flake checks the selected
 | heliaAOT | Minimum ns-cmsis-nn | Baseline in this commit |
 |---|---|---|
 | 0.33.0, 1.7.0 | 7.47.0 | v7.47.2: supported |
-| 1.10.0 | 7.47.2 for all supported operators | v7.47.2: supported |
+| 1.10.0, 1.11.0 | 7.47.2 for all supported operators | v7.47.2: supported |
 
 Releases older than 0.33.0 have no rule and are refused.
 
