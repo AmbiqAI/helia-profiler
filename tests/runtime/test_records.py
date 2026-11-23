@@ -413,7 +413,7 @@ def test_observer_is_an_explicit_released_runtime_fact(tmp_path):
     current = runtime("helia-aot")
     assert current is not None and current.transfer_observer
     assert current.version == "1.11.0" and not current.qualified
-    assert current.source.commit == "844cc5609022b2fd7de1d827e0eb84b900b2ea9e"
+    assert current.source.commit == "844cc56069d59d37de3cdaa87832d7f0d6f78e14"
     previous = runtime("helia-aot", "0.33.0")
     assert previous is not None and not previous.transfer_observer and not previous.default
 

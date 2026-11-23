@@ -13,6 +13,22 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 
+def sha256_file_with_size(path: Path) -> tuple[str, int]:
+    """SHA-256 and byte count from one open file, using a reusable buffer."""
+    digest = hashlib.sha256()
+    buffer = memoryview(bytearray(256 * 1024))
+    size = 0
+    with path.open("rb", buffering=0) as stream:
+        while count := stream.readinto(buffer):
+            digest.update(buffer[:count])
+            size += count
+    return digest.hexdigest(), size
+
+
+def sha256_file(path: Path) -> str:
+    return sha256_file_with_size(path)[0]
+
+
 @dataclass(frozen=True)
 class FixtureFile:
     """A file pinned by its SHA-256; :meth:`read` refuses bytes that no longer match."""
@@ -26,6 +42,15 @@ class FixtureFile:
         if hashlib.sha256(data).hexdigest() != self.sha256:
             raise ValueError(f"Fixture hash mismatch: {self.path}")
         return data
+
+
+def verified_size(item: FixtureFile) -> int:
+    """Verify a pinned file without loading its contents."""
+    _digest(item.sha256)
+    digest, size = sha256_file_with_size(item.path)
+    if digest != item.sha256:
+        raise ValueError(f"Fixture hash mismatch: {item.path}")
+    return size
 
 
 def _digest(value: object) -> str:

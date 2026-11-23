@@ -29,7 +29,14 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any
 
-from .._files import RootedPaths, read_json, write_bytes_atomically, write_text_atomically
+from .._files import (
+    RootedPaths,
+    read_json,
+    sha256_file_with_size,
+    verified_size,
+    write_bytes_atomically,
+    write_text_atomically,
+)
 from ..errors import ConfigError
 
 if TYPE_CHECKING:
@@ -296,18 +303,18 @@ class _Files:
 
     def file(self, item: FixtureFile) -> dict[str, Any]:
         """*item*, refused unless its bytes still match its sha256."""
-        return self._entry(item.path, item.read)
-
-    def pin(self, path: Path) -> dict[str, Any]:
-        return self._entry(path, path.read_bytes)
-
-    def _entry(self, path: Path, read: Callable[[], bytes]) -> dict[str, Any]:
         try:
-            data = read()
+            size = verified_size(item)
         except (OSError, ValueError) as exc:
             raise ConfigError(f"Cannot save the run result: {exc}") from exc
-        digest = hashlib.sha256(data).hexdigest()
-        return {**self.place(path), "sha256": digest, "size_bytes": len(data)}
+        return {**self.place(item.path), "sha256": item.sha256, "size_bytes": size}
+
+    def pin(self, path: Path) -> dict[str, Any]:
+        try:
+            digest, size = sha256_file_with_size(path)
+        except OSError as exc:
+            raise ConfigError(f"Cannot save the run result: {exc}") from exc
+        return {**self.place(path), "sha256": digest, "size_bytes": size}
 
     def locate(self, value: Any) -> Path:
         try:
@@ -320,12 +327,12 @@ class _Files:
         entry = _fields(value, ("root", "path", "sha256", "size_bytes"), label)
         path = self.locate({"root": entry["root"], "path": entry["path"]})
         try:
-            data = path.read_bytes()
+            digest, size = sha256_file_with_size(path)
         except OSError as exc:
             raise RunResultError(
                 "artifact_changed", f"The run's {label} {path} is missing: {exc}", hint=_HINT
             ) from exc
-        if len(data) != entry["size_bytes"] or hashlib.sha256(data).hexdigest() != entry["sha256"]:
+        if size != entry["size_bytes"] or digest != entry["sha256"]:
             raise RunResultError(
                 "artifact_changed",
                 f"The run's {label} {path} is not the file it recorded "
