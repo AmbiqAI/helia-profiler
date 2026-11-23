@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from .config import ProfileConfig
 from .pipeline import PipelineContext, PipelineObserver, PipelineRunner, ProgressSink, Stage
+from .results import ModelInfo
 from .stages import (
     AnalyzeModelStage,
     BuildFirmwareStage,
@@ -39,11 +40,11 @@ def build_default_pipeline(
     )
 
 
-def build_stages() -> list[Stage]:
+def build_stages(*, model_info: ModelInfo | None = None) -> list[Stage]:
     return [
         PreflightStage(),
         EnsureBoardPoweredStage(),
-        ResolvePlatformStage(),
+        ResolvePlatformStage(model_info=model_info),
         ResolveJLinkProbeStage(),
         PrepareEngineStage(),
         AnalyzeModelStage(),

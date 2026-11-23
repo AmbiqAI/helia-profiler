@@ -21,8 +21,10 @@ from .errors import ConfigError, HpxError
 from .firmware.workload import AOT_CLEAN_WORKLOAD
 from .pipeline import PipelineRunner
 from .profiler import build_stages, capture_stages
-from .results import ResultValidity
+from .results import ModelInfo, ResultValidity
 from .results.run_summary import load_run_summary
+from .results.serde import sha256_file
+from .stages.resolve_platform import read_model_info
 from .sweep_evidence import admit_measurement
 from .target.probe.reservation import reserve_probe
 
@@ -68,7 +70,9 @@ def _write(path: Path, record: object) -> None:
     write_text_atomically(path, json.dumps(record, indent=2, allow_nan=False) + "\n")
 
 
-def _read_cache(entry: Path, root: Path, key: str, digest: str, converted: str) -> SweepRow | None:
+def _read_cache(
+    entry: Path, root: Path, key: str, digest: str, converted: str, model_hash: str
+) -> SweepRow | None:
     try:
         receipt = read_json(entry.read_bytes(), label="cached measurement")
         saved = (root / receipt["path"]).resolve()
@@ -83,6 +87,8 @@ def _read_cache(entry: Path, root: Path, key: str, digest: str, converted: str) 
             converted,
             key,
         ):
+            return None
+        if data.get("model_sha256") != model_hash:
             return None
         if data["output_identical"] is not True or data["dma_failures"] != 0:
             return None
@@ -127,6 +133,7 @@ def _measure(
     attempt: Path,
     references: tuple[str, ...],
     force: bool,
+    model_info: ModelInfo,
 ) -> SweepRow:
     args = config.engine.config["aot_args"]
     args = {**args, "optimization": {**args["optimization"], "plan": str(plan)}}
@@ -136,7 +143,7 @@ def _measure(
         work_dir=root / "build" / digest,
         output=replace(config.output, dir=attempt),
     )
-    ctx = PipelineRunner(build_stages()).run(candidate)
+    ctx = PipelineRunner(build_stages(model_info=model_info)).run(candidate)
     if ctx.engine_artifacts is None or ctx.profile_run is None:
         raise ValueError("Candidate build produced no profile firmware")
     (converted,) = [p for p in ctx.engine_artifacts.report_files if p.name.endswith("_plan.json")]
@@ -149,15 +156,15 @@ def _measure(
         pool_bytes = 0 if pool is None else pool["bytes"]
     except (KeyError, TypeError) as exc:
         raise ValueError(f"Invalid model or schedule in converted plan: {exc}") from exc
-    if model_hash != _sha(config.model.path.read_bytes()):
+    if model_hash != model_info.sha256:
         raise ValueError("Converted plan and requested model differ")
-    image = _sha(ctx.profile_run.firmware.binary_path.read_bytes())
+    image = sha256_file(ctx.profile_run.firmware.binary_path)
     key = _measurement_key(
         candidate, model_hash, digest, converted_sha, image, ctx.resolved_jlink_serial, references
     )
     entry = root / "cache" / (key + ".json")
     if not force and not config.power.enabled and entry.is_file():
-        cached = _read_cache(entry, root, key, digest, converted_sha)
+        cached = _read_cache(entry, root, key, digest, converted_sha, model_hash)
         if cached is not None:
             return cached
     try:
@@ -175,6 +182,7 @@ def _measure(
         power = load_run_summary(attempt / "summary.json").power
         if power is not None and power.clean_workload == AOT_CLEAN_WORKLOAD:
             measurement["clean_window_energy_uj"] = power.energy_per_inference_uj
+    measurement["model_sha256"] = model_hash
     measurement["cache_key"] = key
     measurement["converted_plan_sha256"] = converted_sha
     measurement["pool_bytes"] = pool_bytes
@@ -241,7 +249,7 @@ def sweep(
         raise ConfigError(
             "Candidate identities must be unique and contain every requested remeasurement"
         )
-    model_sha = _sha(config.model.path.read_bytes())
+    model_info = read_model_info(config.model.path)
     inline = config.engine.config.get("aot_args")
     if inline is not None and not isinstance(inline, dict):
         raise ConfigError("engine.config.aot_args must be a mapping")
@@ -258,7 +266,7 @@ def sweep(
         plan = root / "plans" / (digest + ".json")
         write_bytes_atomically(plan, data)
         try:
-            _validate_plan(plan, model_sha, model_options)
+            _validate_plan(plan, model_info.sha256, model_options)
         except ValueError as exc:
             invalid[digest] = str(exc)
     session = root / "runs" / uuid4().hex
@@ -271,7 +279,14 @@ def sweep(
                 if digest in invalid:
                     raise ValueError(invalid[digest])
                 row = _measure(
-                    config, plan, digest, root, attempt, reference_outputs, digest in remeasure
+                    config,
+                    plan,
+                    digest,
+                    root,
+                    attempt,
+                    reference_outputs,
+                    digest in remeasure,
+                    model_info,
                 )
             except (HpxError, ValueError, OSError) as exc:
                 row = SweepRow(

@@ -37,7 +37,7 @@ def test_sweep_records_build_failure_and_continues(tmp_path, monkeypatch):
     validated = []
     monkeypatch.setattr(module, "_validate_plan", lambda path, *_: validated.append(path))
 
-    def measure(config, plan, digest, root, attempt, references, force):
+    def measure(config, plan, digest, root, attempt, references, force, model_sha):
         assert len(validated) == len(plans)
         seen.append(json.loads(plan.read_text())["name"])
         if len(seen) == 1:
@@ -67,6 +67,7 @@ def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
     path = tmp_path / "measurement.json"
     record = dict(
         plan_sha256="A",
+        model_sha256="M",
         converted_plan_sha256="C",
         cache_key="K",
         output_identical=True,
@@ -80,10 +81,17 @@ def test_swapped_cache_receipt_cannot_supply_another_plans_cycles(tmp_path):
     entry.write_text(
         json.dumps({"key": "K", "path": path.name, "sha256": module._sha(path.read_bytes())})
     )
-    assert module._read_cache(entry, tmp_path, "K", "A", "C") is not None
-    assert module._read_cache(entry, tmp_path, "K", "B", "C") is None
-    assert module._read_cache(entry, tmp_path, "K", "A", "D") is None
-    assert module._read_cache(entry, tmp_path, "L", "A", "C") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "M") is not None
+    assert module._read_cache(entry, tmp_path, "K", "B", "C", "M") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "D", "M") is None
+    assert module._read_cache(entry, tmp_path, "L", "A", "C", "M") is None
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "N") is None
+    del record["model_sha256"]
+    path.write_text(json.dumps(record))
+    entry.write_text(
+        json.dumps({"key": "K", "path": path.name, "sha256": module._sha(path.read_bytes())})
+    )
+    assert module._read_cache(entry, tmp_path, "K", "A", "C", "M") is None
 
 
 def test_incomplete_plan_with_matching_digest_is_rejected_before_capture(tmp_path, monkeypatch):
@@ -123,7 +131,7 @@ def test_interruption_preserves_completed_index(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "_validate_plan", lambda *_: None)
     monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
 
-    def measure(config, plan, digest, root, attempt, references, force):
+    def measure(config, plan, digest, root, attempt, references, force, model_sha):
         if plan.read_text() == "two":
             raise KeyboardInterrupt()
         return module.SweepRow(digest, "measured")
@@ -185,7 +193,7 @@ def test_prevalidation_matches_configured_subgraph(
         paths.append(path)
     measured = []
 
-    def measure(config, plan, digest, root, attempt, references, force):
+    def measure(config, plan, digest, root, attempt, references, force, model_sha):
         measured.append(json.loads(plan.read_text())["model"]["subgraph"])
         return module.SweepRow(digest, "measured")
 
@@ -262,12 +270,90 @@ def test_failed_remeasurement_preserves_last_successful_receipt(tmp_path, monkey
     )
 
     def run(name, force):
-        return module._measure(config, plan, digest, tmp_path, tmp_path / name, ("0" * 16,), force)
+        return module._measure(
+            config,
+            plan,
+            digest,
+            tmp_path,
+            tmp_path / name,
+            ("0" * 16,),
+            force,
+            module.read_model_info(model),
+        )
 
     initial = run("first", False)
     assert initial.status == "measured"
+    assert initial.measurement is not None
+    assert json.loads((tmp_path / initial.measurement).read_text())["model_sha256"] == module._sha(
+        model.read_bytes()
+    )
     assert run("failed", True).status == "failed"
     reused = run("reuse", False)
     assert reused.status == "cached"
     assert reused.measurement == initial.measurement
     assert len(captures) == 2
+
+
+def test_sweep_hashes_model_once_and_refuses_a_different_conversion(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    model = tmp_path / "proxy.tflite"
+    model.write_bytes(b"TFL3model")
+    expected = hashlib.sha256(b"TFL3model").hexdigest()
+    config = load_config(
+        None,
+        {
+            "model": {"path": model},
+            "engine": {"type": "helia-aot"},
+            "target": {"jlink_serial": "123"},
+        },
+    )
+    plans = [tmp_path / f"{i}.json" for i in range(2)]
+    for i, plan in enumerate(plans):
+        plan.write_text(json.dumps({"candidate": i, "model": {"sha256": expected}}))
+    converted = tmp_path / "wrong_plan.json"
+    converted.write_text(json.dumps({"model": {"sha256": "0" * 64}, "schedule": {"pool": None}}))
+    calls = []
+    from helia_profiler.results.serde import sha256_file_with_size
+
+    def tracked(path):
+        calls.append(path)
+        return sha256_file_with_size(path)
+
+    def build(runner, candidate):
+        from helia_profiler.pipeline import PipelineContext
+        from helia_profiler.stages import ResolvePlatformStage
+        from helia_profiler.stages.preflight import _check_model
+
+        _check_model(candidate.model.path, candidate.engine.type)
+
+        ctx = PipelineContext(config=candidate, work_dir=tmp_path)
+        (platform,) = [stage for stage in runner._stages if isinstance(stage, ResolvePlatformStage)]
+        platform.run(ctx)
+        assert ctx.run_metadata.model is not None and ctx.run_metadata.model.sha256 == expected
+        return SimpleNamespace(
+            engine_artifacts=SimpleNamespace(report_files=[converted]), profile_run=object()
+        )
+
+    real_read = Path.read_bytes
+
+    def guarded_read(path):
+        assert path != model, "whole-model allocation"
+        return real_read(path)
+
+    monkeypatch.setattr(Path, "read_bytes", guarded_read)
+    monkeypatch.setattr("helia_profiler.stages.resolve_platform.sha256_file_with_size", tracked)
+
+    def validate(plan, digest, options):
+        assert json.loads(plan.read_bytes())["model"]["sha256"] == digest == expected
+
+    monkeypatch.setattr(module, "_validate_plan", validate)
+    monkeypatch.setattr(module, "reserve_probe", lambda _: nullcontext())
+    monkeypatch.setattr(module.PipelineRunner, "run", build)
+    rows = module.sweep(config, plans, tmp_path / "out", reference_outputs=("0" * 16,))
+    assert calls == [model]
+    assert len(rows) == 2
+    assert all(
+        row.status == "failed" and "Converted plan and requested model differ" in (row.error or "")
+        for row in rows
+    )

@@ -2,19 +2,29 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
+from dataclasses import replace
+from pathlib import Path
 
 from ..config.platform import config_platform
 from ..errors import ConfigError, PlatformError
 from ..pipeline import PipelineContext
 from ..platform import PmuTier, get_board, get_soc_for_board, link_family_for_toolchain
 from ..results import ModelInfo, PlatformInfo
+from ..results.serde import sha256_file_with_size
 
 log = logging.getLogger("hpx")
 
 
+def read_model_info(path: Path) -> ModelInfo:
+    digest, size = sha256_file_with_size(path)
+    return ModelInfo(name=path.name, size_bytes=size, sha256=digest)
+
+
 class ResolvePlatformStage:
+    def __init__(self, *, model_info: ModelInfo | None = None) -> None:
+        self._model_info = model_info
+
     @property
     def name(self) -> str:
         return "resolve_platform"
@@ -94,11 +104,10 @@ class ResolvePlatformStage:
                 hint="Check the 'model.path' in your config or positional argument.",
             )
 
-        model_bytes = model_path.read_bytes()
-        ctx.run_metadata.model = ModelInfo(
-            name=model_path.name,
-            size_bytes=len(model_bytes),
-            sha256=hashlib.sha256(model_bytes).hexdigest(),
+        ctx.run_metadata.model = (
+            replace(self._model_info)
+            if self._model_info is not None
+            else read_model_info(model_path)
         )
         ctx.report_progress(
             f"{board.name} at {cpu_speed.mhz} MHz · {model_path.name}",
