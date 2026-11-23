@@ -56,6 +56,26 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.3...v0.6.4) (2026-11-23)
+
+
+### Compatibility
+
+HPX 0.6.4 writes and reads run summaries at schema version 23. Read existing v22 summaries with the HPX release that produced them. Calibration files remain at schema v2 and can omit the new cache-regime field.
+
+### Features
+
+* **runtime:** adopt heliaAOT 1.10.0 with CORE 7.47.2 ([#709](https://github.com/AmbiqAI/helia-profiler/issues/709)) ([61ada67](https://github.com/AmbiqAI/helia-profiler/commit/61ada67d0d8949b93cf3f3ca74bdc7e80f1c7143)), closes [#708](https://github.com/AmbiqAI/helia-profiler/issues/708)
+* sweep heliaAOT candidate plans on one target ([#707](https://github.com/AmbiqAI/helia-profiler/issues/707)) ([6000a92](https://github.com/AmbiqAI/helia-profiler/commit/6000a925f5126dcd1badf39f6c73f354fc9edfb4)), refs [#648](https://github.com/AmbiqAI/helia-profiler/issues/648)
+
+
+### Bug Fixes
+
+* **capture:** record the weights cache regime in conditions ([#712](https://github.com/AmbiqAI/helia-profiler/issues/712)) ([dfc302d](https://github.com/AmbiqAI/helia-profiler/commit/dfc302de85907785437c6ae60f9b62998b908088)), closes [#705](https://github.com/AmbiqAI/helia-profiler/issues/705)
+* **platform:** correct the Apollo5 MRAM placement base ([#703](https://github.com/AmbiqAI/helia-profiler/issues/703)) ([18bf3c6](https://github.com/AmbiqAI/helia-profiler/commit/18bf3c60b8056abc5db227899af23437a5af9f6f))
+* **platform:** treat an unrecorded catalog D-cache size as unknown ([#704](https://github.com/AmbiqAI/helia-profiler/issues/704)) ([6b89c8b](https://github.com/AmbiqAI/helia-profiler/commit/6b89c8ba6e8893db509f3687a72e238e4b249164))
+* **sweep:** bind measurements to the model digest ([#711](https://github.com/AmbiqAI/helia-profiler/issues/711)) ([2ea36f5](https://github.com/AmbiqAI/helia-profiler/commit/2ea36f5dfbe7adb0c6450a8cc3794bb8a7f82f18)), closes [#710](https://github.com/AmbiqAI/helia-profiler/issues/710)
+
 ## [0.6.3](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.2...v0.6.3) (2026-11-17)
 
 
