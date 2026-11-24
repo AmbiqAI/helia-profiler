@@ -6,6 +6,17 @@
    then shows in the run's outputs. #}
 {% macro poison_pool(indent) %}{% for region in pool_regions %}
 {{ indent }}memset(hpx_arena_buf_{{ region.region_id }}, 0x5A, {{ region.size }}U);{% endfor %}{% endmacro %}
+{% macro invalidate_psram_constants(timed) %}{% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
+        {
+            am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
+            if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U) {
+{% if timed and transport == "rtt" %}                hpx_rtt_set_blocking();
+{% elif timed and transport == "usb_cdc" %}                usb_timer_resume();
+{% endif %}                hpx_printf("HPX_ERROR=psram_cache_invalidation_failed:region=%d\n", {{ region.region_id }});
+                hpx_park();
+            }
+        }
+{% endfor %}{% endmacro %}
 {#- main_aot.cc — heliaPROFILER firmware entry point for the heliaAOT engine.
 
    The firmware skeleton -- boot, transport preamble, PSRAM/clean-window
@@ -586,15 +597,7 @@ hpx_aot_check_runs();{% endblock %}
         // pool and with each PSRAM constant arena cleaned and invalidated, so
         // a late or missing copy shows in the outputs and every constant read
         // reaches the MSPI controller.{{ poison_pool("        ") }}
-{% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
-        {
-            am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
-            if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U) {
-                hpx_printf("HPX_ERROR=psram_cache_invalidation_failed:region=%d\n", {{ region.region_id }});
-                hpx_park();
-            }
-        }
-{% endfor %}{% endif %}{% if sweep_evidence | default(false) %}
+{{ invalidate_psram_constants(true) }}{% endif %}{% if sweep_evidence | default(false) %}
         const uint32_t sweep_start = hpx_stimer_ticks();{% endif %}
 {%- endblock %}
 
@@ -623,12 +626,7 @@ hpx_aot_check_runs();{% endblock %}
     for (int diagnostic_iter = 0; diagnostic_iter < {{ transfer_diagnostic_iterations }}; ++diagnostic_iter) {
 {{ self.engine_reset_inputs() }}
 {% if stream_evidence %}{{ poison_pool("        ") }}
-{% for region in arena_regions if region.placement == "psram" and region.role == "constant" %}
-        {
-            am_hal_cachectrl_range_t range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
-            (void)am_hal_cachectrl_dcache_invalidate(&range, true);
-        }
-{% endfor %}{% endif %}
+{{ invalidate_psram_constants(false) }}{% endif %}
 {% if transfer_diagnostics == "trace" %}
         hpx_transfer_trace_prepare();
 {% endif %}
