@@ -123,11 +123,13 @@ def test_static_samples_are_timed_and_checked_without_operator_callbacks(tmp_pat
         ([{"residency": "stream", "memory": "PSRAM"}] * 2, "psram"),
         (
             [
-                {"residency": "pin", "memory": "MRAM", "destination_memory": "DTCM"},
-                {"residency": "direct", "memory": "DTCM"},
+                {"residency": "pin", "memory": "PSRAM", "destination_memory": "DTCM"},
+                {"residency": "stream", "memory": "PSRAM"},
+                {"residency": "direct", "memory": "PSRAM"},
             ],
-            "dtcm",
+            "psram",
         ),
+        ([{"residency": "pin", "memory": "MRAM", "destination_memory": "DTCM"}], "mram"),
         (
             [{"residency": "direct", "memory": "MRAM"}, {"residency": "stream", "memory": "PSRAM"}],
             None,
@@ -137,12 +139,13 @@ def test_static_samples_are_timed_and_checked_without_operator_callbacks(tmp_pat
         ([], None),
     ],
 )
-def test_sweep_uses_converted_placements_for_unrecorded_weights_memory(tmp_path, tensors, expected):
+@pytest.mark.parametrize("recorded_memory", [None, "dtcm"])
+def test_sweep_records_the_converted_constant_source(tmp_path, tensors, expected, recorded_memory):
     pytest.importorskip("helia_aot")
     run = bundle(
         tmp_path / "table",
         cycles={0: 1, 1: 2, 2: 3},
-        conditions={**CONDITIONS, "weights_memory": None},
+        conditions={**CONDITIONS, "weights_memory": recorded_memory},
     )
     path = run / "hpx_plan.json"
     plan = json.loads(path.read_text())

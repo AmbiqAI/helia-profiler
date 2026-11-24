@@ -503,7 +503,7 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     checks_payload = json.loads(collection.members["checks.json"])
     assert "checks" in checks_payload and "versions" in checks_payload
     compatibility_payload = json.loads(collection.members["compatibility.json"])
-    assert compatibility_payload["baseline_id"] == "hpx-neuralspotx-0.9.2-2026-11-22"
+    assert compatibility_payload["baseline_id"] == "hpx-neuralspotx-0.9.2-2026-11-24"
     assert compatibility_payload["neuralspotx"]["version"] == "0.9.2"
     assert (
         compatibility_payload["neuralspotx"]["sha256"]
@@ -515,7 +515,7 @@ def test_collect_support_bundle_always_includes_checks_and_compatibility() -> No
     )
     assert (
         compatibility_payload["projects"]["nsx-ambiq-sdk"]["ref"]
-        == "acc97030b7158f81dc11f8df68fc43b8346f6dfe"
+        == "5ee90bf384cf757216bfab688bd6b887017f1f52"
     )
 
 

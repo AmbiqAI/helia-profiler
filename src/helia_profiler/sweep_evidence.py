@@ -139,8 +139,22 @@ def _timing(raw: str, reference_outputs: tuple[str, ...], cache: object) -> _Tim
     )
 
 
+def _tensor_memory(tensor: dict[str, Any], field: str) -> str:
+    value = tensor.get(field)
+    if not isinstance(value, str) or value.lower() not in {
+        "dtcm",
+        "itcm",
+        "sram",
+        "mram",
+        "psram",
+        "nor",
+    }:
+        raise ValueError(f"Converted plan has an unknown constant {field}: {value!r}")
+    return value.lower()
+
+
 def _converted_weights_memory(plan: dict[str, Any]) -> str:
-    """Resolve the one weights memory represented by the compiled constant storage roots."""
+    """Return the common source memory of the converted constant storage roots."""
     tensors = plan.get("tensors")
     if not isinstance(tensors, list) or not tensors:
         raise ValueError("Converted plan has no constant placement evidence for weights_memory")
@@ -152,22 +166,12 @@ def _converted_weights_memory(plan: dict[str, Any]) -> str:
             "pin",
         ):
             raise ValueError("Converted plan has an unknown constant residency")
-        # A pinned constant is read from its destination after model initialization.
-        field = "destination_memory" if tensor["residency"] == "pin" else "memory"
-        memory = tensor.get(field)
-        if not isinstance(memory, str) or memory.lower() not in {
-            "dtcm",
-            "itcm",
-            "sram",
-            "mram",
-            "psram",
-            "nor",
-        }:
-            raise ValueError(f"Converted plan has an unknown constant {field}: {memory!r}")
-        memories.add(memory.lower())
+        memories.add(_tensor_memory(tensor, "memory"))
+        if tensor["residency"] == "pin":
+            _tensor_memory(tensor, "destination_memory")
     if len(memories) != 1:
         raise ValueError(
-            f"Converted plan has mixed weights memories: {', '.join(sorted(memories))}"
+            f"Converted plan has mixed constant source memories: {', '.join(sorted(memories))}"
         )
     return memories.pop()
 
@@ -193,7 +197,9 @@ def admit_measurement(
         plan = _plan(run, name)
         recorded = run.summary.get("conditions")
         memory = None
-        if isinstance(recorded, dict) and recorded.get("weights_memory") is None:
+        if "tensors" in plan or (
+            isinstance(recorded, dict) and recorded.get("weights_memory") is None
+        ):
             memory = _converted_weights_memory(plan)
         if manifest.bundle_type == "profile-model-only":
             _require_usable_cycles(run, name)

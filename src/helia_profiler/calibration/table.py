@@ -727,7 +727,7 @@ def _conditions(
     recorded = run.summary.get("conditions")
     if not isinstance(recorded, dict):
         raise CalibrationError(f"Bundle {source} records no conditions.")
-    if converted_memory is not None and recorded.get("weights_memory") is None:
+    if converted_memory is not None:
         recorded = {**recorded, "weights_memory": converted_memory}
     refusal = _conditions_refusal(recorded)
     if refusal == _UNPLACED:
