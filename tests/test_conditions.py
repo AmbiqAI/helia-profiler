@@ -201,7 +201,10 @@ def test_mixed_psram_cache_preparation(tmp_path, other, expected):
             "arena_regions": regions,
         },
     )
-    assert f'prepared ? "{expected or "unknown"}" : "unknown"' in rendered
+    assert f'"{expected or "unknown"}");' in rendered
+    failure = rendered.index("if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U)")
+    error = rendered.index("HPX_ERROR=psram_cache_invalidation_failed:region=%d", failure)
+    assert rendered.index("hpx_park();", error) < rendered.index("uint32_t infer_start_cyc", error)
     assert run_conditions(ctx).cache_regime == expected
 
 

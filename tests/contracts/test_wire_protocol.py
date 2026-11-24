@@ -438,7 +438,11 @@ def _matrix() -> list[_Render]:
             "apollo510",
             "rtt",
             "helia-aot",
-            overrides={"stream_evidence": True, "sweep_evidence": True},
+            overrides={
+                "stream_evidence": True,
+                "sweep_evidence": True,
+                "arena_regions": [_PSRAM_BLOB_REGION],
+            },
         ),
         *(
             _Render(
@@ -790,6 +794,12 @@ _PREDICATES = {
         bool(v.get("sweep_evidence")) and not v.get("per_layer_profiling", True) and not _power(v)
     ),
     "sweep_evidence and not power_only": lambda v: bool(v.get("sweep_evidence")) and not _power(v),
+    "stream_evidence and per_layer_profiling and not power_only and PSRAM constant arenas": lambda v: (
+        bool(v.get("stream_evidence"))
+        and v.get("per_layer_profiling", True)
+        and not v.get("power_only")
+        and any(r["role"] == "constant" and r["placement"] == "psram" for r in _regions(v))
+    ),
     "stream_evidence": lambda v: bool(v.get("stream_evidence")),
     "transfer_timeout_probe and not power_only": (
         lambda v: bool(v.get("transfer_timeout_probe")) and not _power(v)
@@ -1113,6 +1123,7 @@ def test_error_code_catalogue():
         "psram_info_failed",
         "bind_arena_failed",
         "const_blob_psram_write_failed",
+        "psram_cache_invalidation_failed",
         "model_init_failed",
         "model_run_failed",
         "transfer_bind_failed",

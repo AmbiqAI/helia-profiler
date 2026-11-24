@@ -114,6 +114,10 @@ ERROR_HINTS: dict[FirmwareErrorCode, str] = {
         "actually has PSRAM populated and that --weights-location / "
         "--arena-location psram is appropriate for this hardware."
     ),
+    FirmwareErrorCode.PSRAM_CACHE_INVALIDATION_FAILED: (
+        "The target could not prepare the PSRAM constant arena for cold-cache measurement. "
+        "Check the reported region against the bound PSRAM address and size."
+    ),
     FirmwareErrorCode.PSRAM_INFO_FAILED: (
         "PSRAM initialised but its info query failed, so the firmware has no "
         "base address to place PSRAM data at.  This is a driver/hardware "

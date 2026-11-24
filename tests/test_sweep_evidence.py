@@ -198,12 +198,12 @@ static uint32_t SystemCoreClock = 96000000U;
         helper
         + """
 int main() {
-    hpx_sweep_report(96000U, 33U, true, true);
-    hpx_sweep_report(96000U, 1466050U, true, true);
-    hpx_sweep_report(1000U, 0U, true, true);
-    hpx_sweep_report(1000U, 0U, false, true);
-    hpx_sweep_report(96000U, 0U, true, true);
-    hpx_sweep_report(0U, 0U, true, true);
+    hpx_sweep_report(96000U, 33U, true);
+    hpx_sweep_report(96000U, 1466050U, true);
+    hpx_sweep_report(1000U, 0U, true);
+    hpx_sweep_report(1000U, 0U, false);
+    hpx_sweep_report(96000U, 0U, true);
+    hpx_sweep_report(0U, 0U, true);
 }
 """
     )
@@ -330,7 +330,7 @@ void hpx_aot_check_runs() {
     assert(polling);
     if (hpx_aot_status) throw hpx_aot_status;
 }
-void hpx_sweep_report(uint32_t cycles, uint32_t ticks, bool, bool) {
+void hpx_sweep_report(uint32_t cycles, uint32_t ticks, bool) {
     assert(polling && cycles == 100 && ticks == 100);
     ++reports;
 }

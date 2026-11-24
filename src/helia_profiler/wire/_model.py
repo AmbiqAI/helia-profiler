@@ -215,6 +215,7 @@ class FirmwareErrorCode(StrEnum):
     ALLOC_TENSORS_FAILED = "alloc_tensors_failed"
     DCACHE_CONFIG = "dcache_config"
     PSRAM_INIT_FAILED = "psram_init_failed"
+    PSRAM_CACHE_INVALIDATION_FAILED = "psram_cache_invalidation_failed"
     PSRAM_INFO_FAILED = "psram_info_failed"
     BIND_ARENA_FAILED = "bind_arena_failed"
     CONST_BLOB_PSRAM_WRITE_FAILED = "const_blob_psram_write_failed"
