@@ -54,7 +54,7 @@ def verify_external_mram(ctx: PipelineContext, binary: Path, *, role: str) -> No
         if len(matches) == 1:
             symbol = matches[0]
             if symbol.size >= region.size and any(
-                interval.start <= symbol.address and symbol.address + region.size <= interval.end
+                interval.start <= symbol.address and symbol.address + symbol.size <= interval.end
                 for interval in allowed or ()
             ):
                 continue

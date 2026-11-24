@@ -230,7 +230,9 @@ def test_every_placement_maps_to_its_physical_region() -> None:
     }
 
 
-@pytest.mark.parametrize("failure", [None, "missing", "dtcm", "crosses_end", "short"])
+@pytest.mark.parametrize(
+    "failure", [None, "missing", "dtcm", "crosses_end", "padded_extent", "short"]
+)
 def test_external_mram_requires_the_whole_linked_blob(tmp_path, failure):
     ctx = _ctx(tmp_path, board="apollo510b_evb", engine="helia-aot", toolchain="arm-none-eabi-gcc")
     ctx.engine_artifacts = HeliaAotArtifacts(
@@ -250,10 +252,14 @@ def test_external_mram_requires_the_whole_linked_blob(tmp_path, failure):
     assert layout is not None
     allowed = next(r.allowed for r in layout.regions if r.region == Placement.MRAM.region)
     assert allowed
-    address = {"crosses_end": allowed[0].end - 16, "dtcm": 0x20000000}.get(
-        failure, allowed[0].start
+    address = {
+        "crosses_end": allowed[0].end - 16,
+        "padded_extent": allowed[0].end - 64,
+        "dtcm": 0x20000000,
+    }.get(failure, allowed[0].start)
+    symbol = SymbolEntry(
+        "_ZL16hpx_const_blob_1", address, {"short": 32, "padded_extent": 68}.get(failure, 64), "r"
     )
-    symbol = SymbolEntry("_ZL16hpx_const_blob_1", address, 32 if failure == "short" else 64, "r")
     ctx.memory_symbols = () if failure == "missing" else (symbol,)
     if failure:
         with pytest.raises(BuildError, match="Cannot verify external constant arena 1"):
