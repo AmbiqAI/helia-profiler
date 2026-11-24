@@ -167,7 +167,7 @@ Token-then-payload lines. The space after the token defeats the key/value regex,
 
 | Token | Scope | Condition | Consumer | Criticality | Notes |
 | --- | --- | --- | --- | --- | --- |
-| `HPX_CONST_BLOB_LOADED` | helia-aot | `not allocate_arenas and arena_regions with blob_filename` | `unconsumed` | `diagnostic` | One constant sidecar blob was copied into its bound arena. Value: `region=<id> size=<bytes>`. Space-separated, so the generic key/value regex never matches it: this line reaches no host consumer at all. |
+| `HPX_CONST_BLOB_LOADED` | helia-aot | `not allocate_arenas and arena_regions with blob_filename and placement != mram` | `unconsumed` | `diagnostic` | One constant sidecar blob was copied into its bound arena. Value: `region=<id> size=<bytes>`. Space-separated, so the generic key/value regex never matches it: this line reaches no host consumer at all. |
 
 ## Heartbeat phases
 

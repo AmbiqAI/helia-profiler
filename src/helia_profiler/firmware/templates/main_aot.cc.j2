@@ -264,13 +264,6 @@ static void hpx_aot_check_runs(void) {
 {% include "_npu_init.j2" %}
 {% endif %}
 {% if not allocate_arenas and arena_regions %}
-    // External arena mode: allocate and bind arena buffers before model_init.
-    //
-    // Each region has a "placement" (tcm | sram | psram | <default>) that
-    // controls where its backing storage lives. PSRAM-placed regions are
-    // assigned at runtime from the PSRAM base pointer (PSRAM is external
-    // MSPI XIP and is not in the linker MEMORY map, so static .psram_bss
-    // sections are not available).
 {% set psram_arena_regions = arena_regions | selectattr("placement", "equalto", "psram") | list %}
 {% for region in arena_regions %}
 {% if region.placement == "psram" %}
@@ -280,6 +273,10 @@ static void hpx_aot_check_runs(void) {
     // region tripped -Wunused-but-set-variable (#187 gate).
     static uint32_t hpx_arena_psram_offset_{{ region.region_id }} = 0;
 {% endif %}
+{% elif region.placement == "mram" %}
+    static_assert(hpx_const_blob_{{ region.region_id }}_len == {{ region.size }}, "MRAM sidecar must cover its entire arena");
+    // AOT's bind API takes a mutable pointer even for a constant-only region.
+    auto *hpx_arena_buf_{{ region.region_id }} = const_cast<uint8_t *>(hpx_const_blob_{{ region.region_id }});
 {% elif region.placement == "tcm" %}
     NSX_MEM_FAST_BSS alignas({{ region.alignment }}) static uint8_t hpx_arena_buf_storage_{{ region.region_id }}[{{ region.size }}];
     static uint8_t *hpx_arena_buf_{{ region.region_id }} = hpx_arena_buf_storage_{{ region.region_id }};
@@ -354,12 +351,8 @@ static void hpx_aot_check_runs(void) {
     }
     hpx_printf("HPX_ARENAS_BOUND=%d\n", {{ arena_regions | length }});
 
-    // Load constant arena sidecar blobs into bound arena buffers.
-    // The AOT compiler emits constant data (weights/biases) as binary
-    // sidecar files — the profiler app embeds them into flash and
-    // copies them into the arena buffers before model_init.
 {% for region in arena_regions %}
-{% if region.blob_filename %}
+{% if region.blob_filename and region.placement != "mram" %}
 {% if region.placement == "psram" %}
     if (nsx_psram_write(
             hpx_arena_psram_offset_{{ region.region_id }},

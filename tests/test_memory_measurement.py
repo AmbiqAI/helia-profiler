@@ -538,7 +538,7 @@ class TestSymbolMatchingRegressionPins:
     def test_hal_symbols_do_not_false_positive_the_matcher(self):
         """am_hal_gpio_pincfg_input ENDS WITH g_input — a bare
         suffix test matched a 4-byte MRAM constant and flipped verdicts."""
-        from helia_profiler.hostenv.memory_measurement import _match_symbols
+        from helia_profiler.hostenv.memory_measurement import match_symbols
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         symbols = (
@@ -546,18 +546,18 @@ class TestSymbolMatchingRegressionPins:
             SymbolEntry("_ZL7g_input", 0x20005000, 1960, "b"),
             SymbolEntry("g_input", 0x20006000, 1960, "b"),
         )
-        matched = _match_symbols(("g_input",), symbols)
+        matched = match_symbols(("g_input",), symbols)
         assert [m.name for m in matched] == ["_ZL7g_input", "g_input"]
 
     def test_zero_size_symbols_never_match(self):
         """llvm-nm reports st_size verbatim — armlink's linker
         markers are 0 and a zero-size 'match' manufactures
         measured_size=0, delta=-planned."""
-        from helia_profiler.hostenv.memory_measurement import _match_symbols
+        from helia_profiler.hostenv.memory_measurement import match_symbols
         from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 
         symbols = (SymbolEntry("g_pui32Stack", 0x20000000, 0, "b"),)
-        assert _match_symbols(("g_pui32Stack",), symbols) == ()
+        assert match_symbols(("g_pui32Stack",), symbols) == ()
 
     def test_psram_consumers_are_unmatchable_even_when_the_pointer_matches(
         self,

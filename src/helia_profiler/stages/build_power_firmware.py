@@ -11,6 +11,7 @@ from ..firmware.image import record_build_image
 from ..pipeline import PipelineContext
 from ..power.diagnostics import count_noun
 from ..results import FirmwareArtifact
+from .verify_placement import verify_external_mram
 
 log = logging.getLogger("hpx")
 
@@ -92,6 +93,7 @@ class BuildPowerFirmwareStage:
         binary_path = find_target_binary(ctx.build_dir, "hpx_profiler_power")
         if binary_path is None:
             raise BuildError("Incremental build succeeded but hpx_profiler_power was not found.")
+        verify_external_mram(ctx, binary_path, role="power")
         ctx.publish_power_firmware(
             FirmwareArtifact(
                 role="power",

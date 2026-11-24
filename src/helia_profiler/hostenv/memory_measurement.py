@@ -204,7 +204,7 @@ def _name_matches(symbol_name: str, candidate: str) -> bool:
     return symbol_name == candidate or symbol_name == f"_ZL{len(candidate)}{candidate}"
 
 
-def _match_symbols(
+def match_symbols(
     candidates: tuple[str, ...], symbols: tuple[SymbolEntry, ...]
 ) -> tuple[SymbolEntry, ...]:
     """Every SIZED symbol matching any candidate, deduped by
@@ -265,7 +265,7 @@ def reconcile_memory(
                 # look for is not a failure to find.
                 status, matched = "unmatchable", ()
             else:
-                matched = _match_symbols(tuple(candidates), symbols)
+                matched = match_symbols(tuple(candidates), symbols)
                 status = "matched" if matched else "missing"
             measured_size = sum(m.size for m in matched) if status == "matched" else None
             measured_region = (

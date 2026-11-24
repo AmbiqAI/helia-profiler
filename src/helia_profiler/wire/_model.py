@@ -501,7 +501,9 @@ GATE_AOT_PSRAM_ARENAS = "not allocate_arenas and arena_regions with placement ==
 GATE_AOT_PSRAM_METADATA = (
     "not allocate_arenas and arena_regions with placement == psram and not power_only"
 )
-GATE_AOT_CONST_BLOBS = "not allocate_arenas and arena_regions with blob_filename"
+GATE_AOT_CONST_BLOBS = (
+    "not allocate_arenas and arena_regions with blob_filename and placement != mram"
+)
 GATE_AOT_CONST_BLOBS_IN_PSRAM = (
     "not allocate_arenas and arena_regions with blob_filename and placement == psram"
 )

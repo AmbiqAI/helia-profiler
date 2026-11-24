@@ -16,6 +16,7 @@ from ..hostenv.toolchain_probe import (
 from ..pipeline import PipelineContext
 from ..platform.placement import MemoryRegion
 from ..results import FirmwareArtifact, MeasuredMemoryRegions, ToolchainInfo
+from .verify_placement import verify_external_mram
 
 log = logging.getLogger("hpx")
 
@@ -85,6 +86,7 @@ class BuildFirmwareStage:
         inventory = symbol_inventory(
             binary_path, toolchain, timeout_s=ctx.config.timeouts.binary_probe_s
         )
+        ctx.memory_symbols = None
         if inventory is not None:
             symbols, unparsed = inventory
             if unparsed:
@@ -102,6 +104,7 @@ class BuildFirmwareStage:
             ctx.memory_reconciliation = reconcile_memory(
                 ctx.memory_plan, ctx.memory_regions, ctx.memory_symbols
             )
+        verify_external_mram(ctx, binary_path, role="profile")
         ctx.publish_profile_firmware(
             FirmwareArtifact(
                 role="profile",

@@ -198,7 +198,9 @@ def _extract_memory_plan(result: Any, *, allocate_arenas: bool = True) -> Memory
         role = _name(region.role)
         constant = role == ArenaRole.CONSTANT.value
         symbol = region.symbol
-        if not allocate_arenas and not constant:
+        if not allocate_arenas and constant and runtime_key == "MRAM":
+            symbol = f"hpx_const_blob_{region.id}"
+        elif not allocate_arenas and not constant:
             # hpx's main_aot.cc.j2 owns external scratch/persistent storage (#179).
             symbol = f"hpx_arena_buf_storage_{region.id}"
         buckets.setdefault(runtime_key, []).append(

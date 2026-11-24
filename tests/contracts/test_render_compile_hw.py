@@ -679,6 +679,14 @@ _AOT_ARENA_REGIONS: tuple[dict, ...] = (
         "blob_filename": None,
         "role": "scratch",
     },
+    {
+        "region_id": 4,
+        "placement": "mram",
+        "alignment": 64,
+        "size": 37,
+        "blob_filename": "c4.bin",
+        "role": "constant",
+    },
 )
 
 
@@ -698,7 +706,9 @@ def _write_const_blob_header(scratch: Path, region: dict) -> None:
     blob = scratch / region["blob_filename"]
     blob.write_bytes(bytes(i % 255 + 1 for i in range(region["size"])))
     symbol = f"hpx_const_blob_{region['region_id']}"
-    (scratch / f"{symbol}.h").write_text(_blob_to_header(blob, symbol), encoding="utf-8")
+    (scratch / f"{symbol}.h").write_text(
+        _blob_to_header(blob, symbol, region["alignment"]), encoding="utf-8"
+    )
 
 
 def _aot_prefix_in(app_dir: Path) -> str | None:
@@ -1268,7 +1278,9 @@ def test_aot_arena_real_toolchain_preparation_uses_generated_blob_headers(tmp_pa
             assert symbol not in text
             continue
         header = (scratch / f"{symbol}.h").read_text(encoding="utf-8")
-        assert header == _blob_to_header(scratch / region["blob_filename"], symbol)
+        assert header == _blob_to_header(
+            scratch / region["blob_filename"], symbol, region["alignment"]
+        )
         assert f"{symbol}_len = {region['size']};" in header
         assert f'#include "{symbol}.h"' in text
     assert "hpx_const_blob_0,\n            sizeof(hpx_const_blob_0)) != 0)" in text

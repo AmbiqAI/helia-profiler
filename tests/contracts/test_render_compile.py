@@ -467,6 +467,22 @@ def _build_cases() -> list[_CompileCase]:
         )
     )
 
+    cases.append(
+        _CompileCase(
+            case_id="apollo510|rtt|helia-aot|mram-in-place",
+            text=_render(
+                "apollo510",
+                "rtt",
+                "helia-aot",
+                overrides={
+                    "allocate_arenas": False,
+                    "arena_regions": [{**transfer_regions[1], "placement": "mram", "size": 1}],
+                },
+            ),
+            vars=_common_kwargs("apollo510", "rtt"),
+        )
+    )
+
     # profiling.input_fill: lcg refills every input from the fixed-seed LCG in
     # both binaries.
     for power_only in (False, True):
@@ -786,6 +802,40 @@ def test_gate_fails_on_an_unused_local_variable(tmp_path):
     assert result.returncode != 0, "gate passed a TU with an unused local variable"
     assert "hpx_orphaned_by_injection" in result.stderr
     assert "-Wunused-variable" in result.stderr or "unused" in result.stderr
+
+
+@pytest.mark.parametrize("size", [37, 40])
+def test_mram_sidecar_padding_cannot_cover_logical_arena_bytes(tmp_path, size):
+    from helia_profiler.firmware.headers import _blob_to_header
+
+    region = {
+        "region_id": 1,
+        "placement": "mram",
+        "size": size,
+        "alignment": 16,
+        "role": "constant",
+        "blob_filename": "weights.bin",
+    }
+    case = _CompileCase(
+        case_id="mram_length",
+        text=_render(
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"allocate_arenas": False, "arena_regions": [region]},
+        ),
+        vars=_common_kwargs("apollo510", "rtt"),
+    )
+    case_dir = _prepare_case_dir(case, tmp_path / "app")
+    blob = tmp_path / "weights.bin"
+    blob.write_bytes(bytes(37))
+    (case_dir / "hpx_const_blob_1.h").write_text(_blob_to_header(blob, "hpx_const_blob_1"))
+    result = _compile(case_dir, _part_define(case.vars))
+    if size == 37:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode != 0
+        assert "MRAM sidecar must cover its entire arena" in result.stderr
 
 
 @pytest.mark.parametrize("power_only", [False, True])

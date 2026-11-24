@@ -351,7 +351,10 @@ def generate_app(ctx: PipelineContext) -> Path:
                     if blob_path.exists():
                         header_name = f"hpx_const_blob_{region.region_id}.h"
                         symbol = f"hpx_const_blob_{region.region_id}"
-                        _write_text(src_dir / header_name, _blob_to_header(blob_path, symbol))
+                        _write_text(
+                            src_dir / header_name,
+                            _blob_to_header(blob_path, symbol, region.alignment),
+                        )
                         log.info(
                             "Embedded constant blob %s (%d bytes) → %s",
                             region.blob_filename,
@@ -359,11 +362,8 @@ def generate_app(ctx: PipelineContext) -> Path:
                             header_name,
                         )
                     else:
-                        log.warning(
-                            "Constant arena %d references blob %s but file not found at %s",
-                            region.region_id,
-                            region.blob_filename,
-                            blob_path,
+                        raise FirmwareError(
+                            f"Constant arena {region.region_id} sidecar not found: {blob_path}"
                         )
     else:
         # TFLM / heliaRT: embed model as byte array, use TFLM profiler.

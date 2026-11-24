@@ -1369,3 +1369,21 @@ def test_pmu_storage_seam_rejects_unknown_vocabulary(monkeypatch):
             # the traceback (#172).
             with pytest.raises(UndefinedError, match="engine_pmu_storage_sram_resident"):
                 render(transport="rtt", template_name="seam_child.cc.j2")
+
+
+def test_external_mram_constant_binds_sidecar_in_place():
+    out = _render_aot(
+        arena_regions=[
+            dict(
+                region_id=1,
+                placement="mram",
+                alignment=64,
+                size=37,
+                blob_filename="weights.bin",
+                role="constant",
+            )
+        ]
+    )
+    assert "hpx_arena_buf_storage_1" not in out
+    assert "memcpy(hpx_arena_buf_1" not in out
+    assert "const_cast<uint8_t *>(hpx_const_blob_1)" in out

@@ -291,6 +291,17 @@ class TestPrepareArtifactFlags:
         assert unset.isdisjoint(artifacts.cmake_vars)
         assert unset <= artifacts.reserved_cmake_options
 
+    @pytest.mark.parametrize(("role", "sidecar"), [("scratch", "arena.bin"), ("constant", None)])
+    def test_external_mram_requires_a_constant_sidecar(self, monkeypatch, tmp_path, role, sidecar):
+        result = Result(
+            regions=(RegionView(1, "MRAM", "MRAM", role, size=64, sidecar_file=sidecar),)
+        )
+        config = _aot_cfg({"config": {"aot_args": {"memory": {"allocate_arenas": False}}}})
+        with pytest.raises(
+            EngineError, match="External MRAM arena 1 requires a read-only constant"
+        ):
+            _prepare(monkeypatch, tmp_path, config, result)
+
     def test_a_stream_pool_in_internal_arena_mode_is_refused(self, monkeypatch, tmp_path):
         """hpx binds no region when heliaAOT allocates its arenas, so the pool would
         stay unbound and model_init would fail on the board with status 10."""
