@@ -1807,7 +1807,7 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         projects = manifest["module_registry"]["projects"]
-        assert projects["nsx-ambiq-sdk"]["revision"] == "acc97030b7158f81dc11f8df68fc43b8346f6dfe"
+        assert projects["nsx-ambiq-sdk"]["revision"] == "5ee90bf384cf757216bfab688bd6b887017f1f52"
         assert projects["neuralspotx"]["revision"] == "62ca121a73b906f6ca8a82d4146b3c69d9587c5d"
 
     def test_atomiq110_pins_nsx_core_and_npu_module_entries(self, tmp_path: Path, fake_dist: Path):
@@ -1838,7 +1838,7 @@ class TestNsxModuleOverrides:
 
         manifest = yaml.safe_load((app_dir / "nsx.yml").read_text())
         registry = manifest["module_registry"]
-        sdk_ref = "acc97030b7158f81dc11f8df68fc43b8346f6dfe"
+        sdk_ref = "5ee90bf384cf757216bfab688bd6b887017f1f52"
         assert registry["projects"]["nsx-ambiq-sdk"]["revision"] == sdk_ref
         assert registry["modules"]["nsx-core"]["revision"] == sdk_ref
         assert registry["modules"]["nsx-npu"]["revision"] == sdk_ref
@@ -1948,6 +1948,10 @@ class TestNsxModuleOverrides:
         registry = manifest["module_registry"]
         assert registry["modules"]["nsx-interrupt"]["project"] == "nsx-ambiq-sdk"
         assert registry["modules"]["nsx-psram"]["project"] == "nsx-ambiq-sdk"
+        assert (
+            registry["modules"]["nsx-psram"]["revision"]
+            == registry["projects"]["nsx-ambiq-sdk"]["revision"]
+        )
 
     def test_power_sync_modules_resolve_through_profile_overrides(
         self, tmp_path: Path, fake_dist: Path
@@ -2043,7 +2047,7 @@ class TestNsxModuleOverrides:
         registry = nsx_yml["module_registry"]
         assert (
             registry["projects"]["nsx-ambiq-sdk"]["revision"]
-            == "acc97030b7158f81dc11f8df68fc43b8346f6dfe"
+            == "5ee90bf384cf757216bfab688bd6b887017f1f52"
         )
         assert (
             registry["projects"]["neuralspotx"]["revision"]

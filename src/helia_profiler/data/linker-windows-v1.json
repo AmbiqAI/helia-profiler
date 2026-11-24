@@ -23,7 +23,7 @@
   },
   "schema": "hpx.linker-windows",
   "schema_version": 1,
-  "sdk_commit": "acc97030b7158f81dc11f8df68fc43b8346f6dfe",
+  "sdk_commit": "5ee90bf384cf757216bfab688bd6b887017f1f52",
   "socs": {
     "apollo330P": {
       "families": {

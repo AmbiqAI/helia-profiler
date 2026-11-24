@@ -580,6 +580,21 @@ def test_without_stream_evidence_no_run_is_poisoned_or_invalidated():
     assert "HPX_STREAM_EVIDENCE" not in source
 
 
+def test_diagnostic_cache_failure_reports_over_blocking_rtt():
+    source = _render_aot(
+        transport="rtt",
+        arena_region="psram",
+        arena_regions=_POOL_REGIONS,
+        stream_evidence=True,
+        transfer_diagnostics="timing",
+        transfer_diagnostic_iterations=1,
+    )
+    diagnostic = source.index("for (int diagnostic_iter")
+    check = source.index("if (am_hal_cachectrl_dcache_invalidate", diagnostic)
+    error = source.index("HPX_ERROR=psram_cache_invalidation_failed", check)
+    assert "hpx_rtt_set_blocking();" in source[check:error]
+
+
 def test_the_stream_evidence_block_runs_what_it_says(tmp_path: Path):
     compiler = shutil.which("c++")
     if compiler is None:
@@ -591,17 +606,24 @@ def test_the_stream_evidence_block_runs_what_it_says(tmp_path: Path):
         r"""
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 typedef struct { uint32_t ui32StartAddr; uint32_t ui32Size; } am_hal_cachectrl_range_t;
 static am_hal_cachectrl_range_t invalidated[4];
 static int invalidations = 0;
+static unsigned hal_status;
+static bool blocking;
+static void hpx_rtt_set_blocking() { blocking = true; }
+#define hpx_printf std::printf
+static void hpx_park() { std::exit(blocking ? 2 : 3); }
 static uint32_t am_hal_cachectrl_dcache_invalidate(am_hal_cachectrl_range_t *range, bool clean) {
     if (clean) invalidated[invalidations++] = *range;
-    return 0U;
+    return hal_status;
 }
 static uint8_t pool[48], constants[4100];
 static uint8_t *hpx_arena_buf_1 = constants, *hpx_arena_buf_2 = pool;
-int main() {
+int main(int argc, char **) {
+    hal_status = argc > 1;
 """
         + _evidence_block(source)
         + r"""
@@ -621,6 +643,9 @@ int main() {
     result = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "48 1 1 4100"
+    failure = subprocess.run([str(executable), "fail"], capture_output=True, text=True)
+    assert failure.returncode == 2
+    assert failure.stdout.strip() == "HPX_ERROR=psram_cache_invalidation_failed:region=1"
 
 
 def _callback(source: str) -> str:

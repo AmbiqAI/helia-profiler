@@ -178,6 +178,36 @@ def test_per_tensor_psram_placement_determines_actual_cache_preparation(tmp_path
     assert conditions.cache_regime == "cold"
 
 
+@pytest.mark.parametrize(("other", "expected"), [(Placement.TCM, "cold"), (Placement.MRAM, None)])
+def test_mixed_psram_cache_preparation(tmp_path, other, expected):
+    from tests.contracts.test_firmware_render_snapshots import _render
+
+    ctx = _ctx(tmp_path, engine="helia-aot", extra={"profiling": {"stream_evidence": True}})
+    regions = [
+        ArenaRegion(i, "weights", 64, 16, ArenaRole.CONSTANT, where.value, where, "weights.bin")
+        for i, where in enumerate((Placement.PSRAM, other))
+    ]
+    ctx.engine_artifacts = dataclasses.replace(
+        _aot_artifacts(tmp_path), aot_allocate_arenas=False, aot_arena_regions=regions
+    )
+    rendered = _render(
+        "apollo510",
+        "rtt",
+        "helia-aot",
+        overrides={
+            "allocate_arenas": False,
+            "stream_evidence": True,
+            "sweep_evidence": True,
+            "arena_regions": regions,
+        },
+    )
+    assert f'"{expected or "unknown"}");' in rendered
+    failure = rendered.index("if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U)")
+    error = rendered.index("HPX_ERROR=psram_cache_invalidation_failed:region=%d", failure)
+    assert rendered.index("hpx_park();", error) < rendered.index("uint32_t infer_start_cyc", error)
+    assert run_conditions(ctx).cache_regime == expected
+
+
 def test_aot_target_and_user_constant_rule(tmp_path: Path) -> None:
     ctx = _ctx(
         tmp_path,

@@ -110,6 +110,7 @@ def _measurement_key(
         json.dumps(
             [
                 __version__,
+                "source-weights-memory",
                 model_hash,
                 digest,
                 converted_sha,

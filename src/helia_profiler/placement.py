@@ -8,6 +8,7 @@ spelling and keeps the fastest-fit *policy*, which is hpx's concern.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -24,6 +25,12 @@ from .platform.placement import (
 if TYPE_CHECKING:
     from .platform import SocDef
     from .results import MemoryPlan
+
+
+def psram_invalidation_covers_weights(placements: Iterable[str]) -> bool:
+    """PSRAM range invalidation covers every cacheable constant. DTCM bypasses D-cache."""
+    regions = set(placements)
+    return Placement.PSRAM in regions and regions <= {Placement.PSRAM, Placement.TCM}
 
 
 def region_capacity(region: MemoryRegion, declared: int, layout: LinkerInput | None) -> int:

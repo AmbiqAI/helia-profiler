@@ -123,11 +123,13 @@ def test_static_samples_are_timed_and_checked_without_operator_callbacks(tmp_pat
         ([{"residency": "stream", "memory": "PSRAM"}] * 2, "psram"),
         (
             [
-                {"residency": "pin", "memory": "MRAM", "destination_memory": "DTCM"},
-                {"residency": "direct", "memory": "DTCM"},
+                {"residency": "pin", "memory": "PSRAM", "destination_memory": "DTCM"},
+                {"residency": "stream", "memory": "PSRAM"},
+                {"residency": "direct", "memory": "PSRAM"},
             ],
-            "dtcm",
+            "psram",
         ),
+        ([{"residency": "pin", "memory": "MRAM", "destination_memory": "DTCM"}], "mram"),
         (
             [{"residency": "direct", "memory": "MRAM"}, {"residency": "stream", "memory": "PSRAM"}],
             None,
@@ -137,12 +139,13 @@ def test_static_samples_are_timed_and_checked_without_operator_callbacks(tmp_pat
         ([], None),
     ],
 )
-def test_sweep_uses_converted_placements_for_unrecorded_weights_memory(tmp_path, tensors, expected):
+@pytest.mark.parametrize("recorded_memory", [None, "dtcm"])
+def test_sweep_records_the_converted_constant_source(tmp_path, tensors, expected, recorded_memory):
     pytest.importorskip("helia_aot")
     run = bundle(
         tmp_path / "table",
         cycles={0: 1, 1: 2, 2: 3},
-        conditions={**CONDITIONS, "weights_memory": None},
+        conditions={**CONDITIONS, "weights_memory": recorded_memory},
     )
     path = run / "hpx_plan.json"
     plan = json.loads(path.read_text())
@@ -150,6 +153,8 @@ def test_sweep_uses_converted_placements_for_unrecorded_weights_memory(tmp_path,
     path.write_text(json.dumps(plan))
     (run / "firmware_output.txt").write_text(_RAW)
     publish_manifest(run)
+    if tensors == []:
+        expected = recorded_memory
     if expected is None:
         with pytest.raises(ValueError, match="Converted plan"):
             admit_measurement(run, plan_sha256="f" * 64, reference_outputs=_REFERENCES)
@@ -193,12 +198,12 @@ static uint32_t SystemCoreClock = 96000000U;
         helper
         + """
 int main() {
-    hpx_sweep_report(96000U, 33U, true, true);
-    hpx_sweep_report(96000U, 1466050U, true, true);
-    hpx_sweep_report(1000U, 0U, true, true);
-    hpx_sweep_report(1000U, 0U, false, true);
-    hpx_sweep_report(96000U, 0U, true, true);
-    hpx_sweep_report(0U, 0U, true, true);
+    hpx_sweep_report(96000U, 33U, true);
+    hpx_sweep_report(96000U, 1466050U, true);
+    hpx_sweep_report(1000U, 0U, true);
+    hpx_sweep_report(1000U, 0U, false);
+    hpx_sweep_report(96000U, 0U, true);
+    hpx_sweep_report(0U, 0U, true);
 }
 """
     )
@@ -325,7 +330,7 @@ void hpx_aot_check_runs() {
     assert(polling);
     if (hpx_aot_status) throw hpx_aot_status;
 }
-void hpx_sweep_report(uint32_t cycles, uint32_t ticks, bool, bool) {
+void hpx_sweep_report(uint32_t cycles, uint32_t ticks, bool) {
     assert(polling && cycles == 100 && ticks == 100);
     ++reports;
 }

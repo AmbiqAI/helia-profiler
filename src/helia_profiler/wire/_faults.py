@@ -103,6 +103,17 @@ ERROR_SPECS: tuple[WireSpec, ...] = (
         has_host_hint=True,
     ),
     _spec(
+        error_token(FirmwareErrorCode.PSRAM_CACHE_INVALIDATION_FAILED),
+        WireKind.ERROR,
+        "Cache invalidation of a PSRAM constant arena failed before the timed inference.",
+        WireConsumer.TRANSPORT_CONTROL,
+        WireCriticality.PROTOCOL,
+        engines=AOT_ENGINES,
+        condition="stream_evidence and per_layer_profiling and not power_only and PSRAM constant arenas",
+        value_shape="psram_cache_invalidation_failed:region=<id>",
+        has_host_hint=True,
+    ),
+    _spec(
         error_token(FirmwareErrorCode.BIND_ARENA_FAILED),
         WireKind.ERROR,
         "Binding one external arena region to the heliaAOT model failed.",

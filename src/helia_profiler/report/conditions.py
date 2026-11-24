@@ -14,7 +14,7 @@ from ..engines.helia_aot.compile import (
     user_wildcard_kinds,
 )
 from ..errors import EngineError
-from ..placement import ArenaRole, Placement
+from ..placement import ArenaRole, Placement, psram_invalidation_covers_weights
 from ..platform import get_soc_for_board
 from ..results.models import Conditions
 
@@ -44,12 +44,12 @@ def run_conditions(ctx: PipelineContext) -> Conditions:
         cpu_hz=cpu_hz,
         weights_memory=weights_memory,
         weights_cache=weights_cache,
-        cache_regime=_cache_regime(ctx, weights_memory) if weights_cache == "on" else None,
+        cache_regime=_cache_regime(ctx) if weights_cache == "on" else None,
         external_memory_clock=_external_memory_clock_mhz(ctx),
     )
 
 
-def _cache_regime(ctx: PipelineContext, weights_memory: str | None) -> str:
+def _cache_regime(ctx: PipelineContext) -> str | None:
     artifacts = ctx.engine_artifacts
     if (
         not ctx.config.profiling.stream_evidence
@@ -58,10 +58,8 @@ def _cache_regime(ctx: PipelineContext, weights_memory: str | None) -> str:
     ):
         return "warm"
     placements = {r.placement for r in artifacts.aot_arena_regions if r.role is ArenaRole.CONSTANT}
-    if Placement.PSRAM in placements and (
-        weights_memory == "psram" or placements == {Placement.PSRAM}
-    ):
-        return "cold"
+    if Placement.PSRAM in placements:
+        return "cold" if psram_invalidation_covers_weights(placements) else None
     return "warm"
 
 

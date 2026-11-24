@@ -689,6 +689,8 @@ hpx sweep candidate-a.json candidate-b.json --config board.yml \
   --reference-digest 7bf3417b56b21eaf --output ./sweep-results
 ```
 
+In a sweep measurement, `conditions.weights_memory` is the common **source** memory of the converted constants. For example, a plan with PSRAM constants can pin some into DTCM and stream others through a DTCM pool. Its measurement records `psram`. The converted plan records each tensor’s residency and destination. A plan with genuinely different source memories cannot be represented by this single field. With stream evidence enabled, a capture can report cold PSRAM alongside pinned DTCM constants: HPX invalidates the PSRAM ranges before each timed inference, and DTCM bypasses the data cache.
+
 The example digest must be replaced with the reference for your model. The
 sweep builds each supplied plan and processes candidates in argument order.
 Each invocation has a separate directory under `runs/`. Its `sweep.json`
