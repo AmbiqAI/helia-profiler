@@ -10,7 +10,7 @@
         {
             am_hal_cachectrl_range_t hpx_range = {(uint32_t)(uintptr_t)hpx_arena_buf_{{ region.region_id }}, {{ region.size }}U};
             if (am_hal_cachectrl_dcache_invalidate(&hpx_range, true) != 0U) {
-{% if timed and transport == "rtt" %}                hpx_rtt_set_blocking();
+{% if transport == "rtt" %}                hpx_rtt_set_blocking();
 {% elif timed and transport == "usb_cdc" %}                usb_timer_resume();
 {% endif %}                hpx_printf("HPX_ERROR=psram_cache_invalidation_failed:region=%d\n", {{ region.region_id }});
                 hpx_park();

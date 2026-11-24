@@ -580,6 +580,21 @@ def test_without_stream_evidence_no_run_is_poisoned_or_invalidated():
     assert "HPX_STREAM_EVIDENCE" not in source
 
 
+def test_diagnostic_cache_failure_reports_over_blocking_rtt():
+    source = _render_aot(
+        transport="rtt",
+        arena_region="psram",
+        arena_regions=_POOL_REGIONS,
+        stream_evidence=True,
+        transfer_diagnostics="timing",
+        transfer_diagnostic_iterations=1,
+    )
+    diagnostic = source.index("for (int diagnostic_iter")
+    check = source.index("if (am_hal_cachectrl_dcache_invalidate", diagnostic)
+    error = source.index("HPX_ERROR=psram_cache_invalidation_failed", check)
+    assert "hpx_rtt_set_blocking();" in source[check:error]
+
+
 def test_the_stream_evidence_block_runs_what_it_says(tmp_path: Path):
     compiler = shutil.which("c++")
     if compiler is None:
