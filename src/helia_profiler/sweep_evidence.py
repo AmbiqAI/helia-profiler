@@ -197,7 +197,8 @@ def admit_measurement(
         plan = _plan(run, name)
         recorded = run.summary.get("conditions")
         memory = None
-        if "tensors" in plan or (
+        # A weightless graph has no storage root to supersede its recorded condition.
+        if plan.get("tensors", []) != [] or (
             isinstance(recorded, dict) and recorded.get("weights_memory") is None
         ):
             memory = _converted_weights_memory(plan)

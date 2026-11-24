@@ -153,6 +153,8 @@ def test_sweep_records_the_converted_constant_source(tmp_path, tensors, expected
     path.write_text(json.dumps(plan))
     (run / "firmware_output.txt").write_text(_RAW)
     publish_manifest(run)
+    if tensors == []:
+        expected = recorded_memory
     if expected is None:
         with pytest.raises(ValueError, match="Converted plan"):
             admit_measurement(run, plan_sha256="f" * 64, reference_outputs=_REFERENCES)
