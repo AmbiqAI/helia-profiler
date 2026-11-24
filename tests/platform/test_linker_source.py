@@ -165,7 +165,7 @@ def test_request_is_present_even_in_an_existing_build_tree(tmp_path):
 
 
 @pytest.fixture
-def linked_pipeline(configured, tmp_path, monkeypatch):
+def linked_pipeline(configured, tmp_path, monkeypatch, request):
     from contextlib import contextmanager
 
     from helia_profiler.config import load_config
@@ -183,7 +183,7 @@ def linked_pipeline(configured, tmp_path, monkeypatch):
         None,
         {
             "model": {"path": str(model)},
-            "engine": {"type": "helia-rt"},
+            "engine": {"type": getattr(request, "param", "helia-rt")},
             "power": {"enabled": True, "firmware": "dedicated"},
             "work_dir": str(tmp_path / "work"),
         },
@@ -572,3 +572,61 @@ def test_completed_split_operand_before_script_keeps_its_position(configured, ro
     ]
     path.write_text(json.dumps(data), encoding="utf-8")
     assert _verify(configured, role=role).verified
+
+
+@pytest.mark.parametrize("linked_pipeline", ["helia-aot"], indirect=True)
+@pytest.mark.parametrize(
+    "failure", [None, "missing", "short", "outside", "unavailable", "partial", "unverified_linker"]
+)
+def test_external_mram_checks_power_image_before_publication(linked_pipeline, monkeypatch, failure):
+    from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
+    from helia_profiler.errors import BuildError
+    from helia_profiler.firmware import build_app
+    from helia_profiler.hostenv.toolchain_probe import SymbolEntry
+    from helia_profiler.placement import ArenaRole, Placement
+    from helia_profiler.results import PowerRunPlan
+    from helia_profiler.stages.build_power_firmware import BuildPowerFirmwareStage
+    from tests.pipeline_context_helpers import set_profile_firmware
+
+    ctx, root, layout, _, _ = linked_pipeline
+    build, binary = build_app(ctx)
+    set_profile_firmware(ctx, build_dir=build, binary_path=binary)
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        aot_prefix="hpx",
+        aot_module_name="model",
+        aot_cmake_target="model",
+        helia_aot_version="test",
+        engine_header="model.h",
+        aot_allocate_arenas=False,
+        aot_arena_regions=[
+            ArenaRegion(
+                1, "weights", 64, 16, ArenaRole.CONSTANT, "mram", Placement.MRAM, "weights.bin"
+            )
+        ],
+    )
+    mram = next(r.app_window for r in layout.regions if r.region == Placement.MRAM.region)
+    profile_blob = SymbolEntry("hpx_const_blob_1", mram.start, 64, "r")
+    ctx.memory_symbols = (profile_blob,)
+    power_blob = replace(
+        profile_blob,
+        address=mram.end if failure == "outside" else mram.start + 64,
+        size=32 if failure == "short" else 64,
+    )
+
+    def inventory(path, *args, **kwargs):
+        assert path == build / "hpx_profiler_power"
+        if failure == "unavailable":
+            return None
+        return (() if failure == "missing" else (power_blob,)), int(failure == "partial")
+
+    monkeypatch.setattr("helia_profiler.stages.verify_placement.symbol_inventory", inventory)
+    if failure == "unverified_linker":
+        (root / layout.script.path).write_text("changed power linker", encoding="utf-8")
+    ctx.publish_power_plan(PowerRunPlan("dedicated", 11, count_source="configured"))
+    if failure:
+        with pytest.raises(BuildError, match="linked power image"):
+            BuildPowerFirmwareStage().run(ctx)
+        assert ctx.power_firmware is None
+    else:
+        BuildPowerFirmwareStage().run(ctx)
+        assert ctx.power_firmware is not None
