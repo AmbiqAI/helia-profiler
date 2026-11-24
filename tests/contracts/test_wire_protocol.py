@@ -691,7 +691,9 @@ def _aot_psram(v: dict) -> bool:
 
 
 def _aot_blobs(v: dict) -> bool:
-    return _aot_external(v) and any(r["blob_filename"] for r in _regions(v))
+    return _aot_external(v) and any(
+        r["blob_filename"] and r["placement"] != "mram" for r in _regions(v)
+    )
 
 
 def _aot_psram_blobs(v: dict) -> bool:
@@ -750,7 +752,7 @@ _PREDICATES = {
     (
         "not allocate_arenas and arena_regions with placement == psram and not power_only"
     ): lambda v: _aot_psram(v) and not _power(v),
-    "not allocate_arenas and arena_regions with blob_filename": _aot_blobs,
+    "not allocate_arenas and arena_regions with blob_filename and placement != mram": _aot_blobs,
     (
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
