@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import jinja2
 
+from ..placement import psram_invalidation_covers_weights
 from ..wire import POWER_TERMINAL_VERSION, STIMER_HZ, STIMER_SETTLE_TICKS
 from .headers import word_padded
 
@@ -22,6 +23,7 @@ cast("dict[str, Any]", _jinja_env.globals).update(
     stimer_hz=STIMER_HZ,
     stimer_settle_ticks=STIMER_SETTLE_TICKS,
 )
+_jinja_env.filters["psram_invalidation_covers_weights"] = psram_invalidation_covers_weights
 _jinja_env.filters["word_padded"] = word_padded
 
 

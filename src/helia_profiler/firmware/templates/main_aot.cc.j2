@@ -87,8 +87,7 @@
 {%- endblock %}
 
 {% set constant_regions = arena_regions | selectattr("role", "equalto", "constant") | list %}
-{% set psram_constants = constant_regions | selectattr("placement", "equalto", "psram") | list %}
-{% if stream_evidence and psram_constants and psram_constants == constant_regions %}
+{% if stream_evidence and constant_regions | map(attribute="placement") | psram_invalidation_covers_weights %}
 {% set cache_preparation = "cold" %}
 {% elif not stream_evidence and warmup > 0 %}
 {% set cache_preparation = "warm" %}
