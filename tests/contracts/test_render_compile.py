@@ -804,6 +804,40 @@ def test_gate_fails_on_an_unused_local_variable(tmp_path):
     assert "-Wunused-variable" in result.stderr or "unused" in result.stderr
 
 
+@pytest.mark.parametrize("size", [37, 40])
+def test_mram_sidecar_padding_cannot_cover_logical_arena_bytes(tmp_path, size):
+    from helia_profiler.firmware.headers import _blob_to_header
+
+    region = {
+        "region_id": 1,
+        "placement": "mram",
+        "size": size,
+        "alignment": 16,
+        "role": "constant",
+        "blob_filename": "weights.bin",
+    }
+    case = _CompileCase(
+        case_id="mram_length",
+        text=_render(
+            "apollo510",
+            "rtt",
+            "helia-aot",
+            overrides={"allocate_arenas": False, "arena_regions": [region]},
+        ),
+        vars=_common_kwargs("apollo510", "rtt"),
+    )
+    case_dir = _prepare_case_dir(case, tmp_path / "app")
+    blob = tmp_path / "weights.bin"
+    blob.write_bytes(bytes(37))
+    (case_dir / "hpx_const_blob_1.h").write_text(_blob_to_header(blob, "hpx_const_blob_1"))
+    result = _compile(case_dir, _part_define(case.vars))
+    if size == 37:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode != 0
+        assert "MRAM sidecar must cover its entire arena" in result.stderr
+
+
 @pytest.mark.parametrize("power_only", [False, True])
 def test_transfer_cases_compile_the_provider_code(tmp_path, power_only):
     """The transfer cases reach the code under __has_include, so a provider
