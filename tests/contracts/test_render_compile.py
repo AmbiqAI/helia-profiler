@@ -467,6 +467,22 @@ def _build_cases() -> list[_CompileCase]:
         )
     )
 
+    cases.append(
+        _CompileCase(
+            case_id="apollo510|rtt|helia-aot|mram-in-place",
+            text=_render(
+                "apollo510",
+                "rtt",
+                "helia-aot",
+                overrides={
+                    "allocate_arenas": False,
+                    "arena_regions": [{**transfer_regions[1], "placement": "mram", "size": 1}],
+                },
+            ),
+            vars=_common_kwargs("apollo510", "rtt"),
+        )
+    )
+
     # profiling.input_fill: lcg refills every input from the fixed-seed LCG in
     # both binaries.
     for power_only in (False, True):

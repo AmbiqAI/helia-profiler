@@ -8,10 +8,13 @@ fails before deployment.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from ..engines import EngineType
+from ..engines.base import HeliaAotArtifacts
 from ..errors import BuildError
-from ..hostenv.toolchain_probe import symbol_address
+from ..hostenv.memory_measurement import match_symbols
+from ..hostenv.toolchain_probe import symbol_address, symbol_inventory
 from ..pipeline import PipelineContext
 from ..placement import Placement
 from ..platform import soc_placement_ranges
@@ -22,6 +25,43 @@ log = logging.getLogger("hpx")
 #: (``main.cc.j2``).  Mangled to ``_ZL15g_arena_storage`` by C++ compilers;
 #: matched as a suffix so both mangled and plain forms resolve.
 _ARENA_SYMBOL = "g_arena_storage"
+
+
+def verify_external_mram(ctx: PipelineContext, binary: Path, *, role: str) -> None:
+    """Check each directly bound constant against this image's linked MRAM intervals."""
+    artifacts = ctx.engine_artifacts
+    if not isinstance(artifacts, HeliaAotArtifacts) or artifacts.aot_allocate_arenas:
+        return
+    regions = [r for r in artifacts.aot_arena_regions if r.placement is Placement.MRAM]
+    if not regions:
+        return
+    layout = next((v.layout for v in ctx.run_metadata.linker_verifications if v.role == role), None)
+    allowed = (
+        next((r.allowed for r in layout.regions if r.region == Placement.MRAM.region), None)
+        if layout
+        else None
+    )
+    symbols = ctx.memory_symbols if role == "profile" else None
+    if role == "power":
+        inventory = symbol_inventory(
+            binary, ctx.config.target.toolchain, timeout_s=ctx.config.timeouts.binary_probe_s
+        )
+        if inventory and not inventory[1]:
+            symbols = inventory[0]
+    for region in regions:
+        name = f"hpx_const_blob_{region.region_id}"
+        matches = match_symbols((name,), symbols or ())
+        if len(matches) == 1:
+            symbol = matches[0]
+            if symbol.size >= region.size and any(
+                interval.start <= symbol.address and symbol.address + region.size <= interval.end
+                for interval in allowed or ()
+            ):
+                continue
+        raise BuildError(
+            f"Cannot verify external constant arena {region.region_id} ({name}, "
+            f"{region.size} bytes) in MRAM in the linked {role} image."
+        )
 
 
 class VerifyPlacementStage:

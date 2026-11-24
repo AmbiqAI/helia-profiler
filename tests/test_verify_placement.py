@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 from helia_profiler.config import load_config
+from helia_profiler.engines.base import ArenaRegion, HeliaAotArtifacts
 from helia_profiler.errors import BuildError
+from helia_profiler.hostenv.toolchain_probe import SymbolEntry
 from helia_profiler.pipeline import PipelineContext
-from helia_profiler.placement import Placement
+from helia_profiler.placement import ArenaRole, Placement
 from helia_profiler.platform import (
     MemoryRange,
     get_soc_for_board,
@@ -226,3 +228,35 @@ def test_every_placement_maps_to_its_physical_region() -> None:
         Placement.MRAM: MemoryRegion.MRAM,
         Placement.PSRAM: MemoryRegion.PSRAM,
     }
+
+
+@pytest.mark.parametrize("failure", [None, "missing", "dtcm", "crosses_end", "short"])
+def test_external_mram_requires_the_whole_linked_blob(tmp_path, failure):
+    ctx = _ctx(tmp_path, board="apollo510b_evb", engine="helia-aot", toolchain="arm-none-eabi-gcc")
+    ctx.engine_artifacts = HeliaAotArtifacts(
+        engine_header="model.h",
+        aot_prefix="hpx",
+        aot_module_name="model",
+        aot_cmake_target="model",
+        helia_aot_version="test",
+        aot_allocate_arenas=False,
+        aot_arena_regions=[
+            ArenaRegion(
+                1, "weights", 64, 16, ArenaRole.CONSTANT, "mram", Placement.MRAM, "weights.bin"
+            )
+        ],
+    )
+    layout = ctx.run_metadata.linker_verifications[0].layout
+    assert layout is not None
+    allowed = next(r.allowed for r in layout.regions if r.region == Placement.MRAM.region)
+    assert allowed
+    address = {"crosses_end": allowed[0].end - 16, "dtcm": 0x20000000}.get(
+        failure, allowed[0].start
+    )
+    symbol = SymbolEntry("_ZL16hpx_const_blob_1", address, 32 if failure == "short" else 64, "r")
+    ctx.memory_symbols = () if failure == "missing" else (symbol,)
+    if failure:
+        with pytest.raises(BuildError, match="Cannot verify external constant arena 1"):
+            verify_placement.verify_external_mram(ctx, ctx.built_binary_path, role="profile")
+    else:
+        verify_placement.verify_external_mram(ctx, ctx.built_binary_path, role="profile")

@@ -90,7 +90,7 @@ def test_external_arenas_bind_hpx_storage_and_sidecar_files(tmp_path: Path):
     assert plan is not None
     by_name = {c.name: c.symbol for region in plan.regions for c in region.consumers}
     assert by_name == {
-        "mram_constant_arena_1": None,
+        "mram_constant_arena_1": "hpx_const_blob_1",
         "sram_scratch_arena_0": "hpx_arena_buf_storage_0",
     }
     regions = _extract_arena_regions(result, "hpx")

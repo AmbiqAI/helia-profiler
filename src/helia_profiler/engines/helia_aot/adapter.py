@@ -407,6 +407,15 @@ class HeliaAOTAdapter:
         memory_plan = _extract_memory_plan(result, allocate_arenas=allocate_arenas)
         arena_regions = _extract_arena_regions(result, prefix)
         _check_pool_bound(arena_regions, allocate_arenas=allocate_arenas)
+        if not allocate_arenas:
+            for region in arena_regions:
+                if region.placement is Placement.MRAM and (
+                    region.role is not ArenaRole.CONSTANT or not region.blob_filename
+                ):
+                    raise EngineError(
+                        f"External MRAM arena {region.region_id} requires a read-only constant "
+                        "region with a sidecar to bind in place."
+                    )
 
         extra_modules = _build_extra_modules(config, cmsis_nn_ref, module_name, aot_module_dir)
 

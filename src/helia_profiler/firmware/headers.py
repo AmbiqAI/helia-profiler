@@ -74,11 +74,11 @@ def _model_to_header(model_path: Path, weights_region: str = "mram") -> str:
     return "\n".join(lines) + "\n"
 
 
-def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
+def _blob_to_header(blob_path: Path, symbol_name: str, alignment: int = 16) -> str:
     """Convert a sidecar constant blob to a C header (xxd-style byte array).
 
-    The blob is placed in ``.rodata`` (const, stays in flash/MRAM) so it
-    can be memcpy'd into the runtime arena buffer at boot.  ``sizeof`` is
+    The blob is placed in ``.rodata`` (const, stays in flash/MRAM) for direct
+    binding or staging into writable memory.  ``sizeof`` is
     the word-padded size; ``<symbol>_len`` is the blob's byte count.
     """
     data = blob_path.read_bytes()
@@ -87,7 +87,7 @@ def _blob_to_header(blob_path: Path, symbol_name: str) -> str:
         f"// Constant arena sidecar blob: {blob_path.name}",
         "#pragma once",
         "#include <stddef.h>",
-        f"alignas(16) static const unsigned char {symbol_name}[] = {{",
+        f"alignas({max(16, alignment)}) static const unsigned char {symbol_name}[] = {{",
         *_byte_lines(data),
         "};",
         f"static const size_t {symbol_name}_len = {len(data)};",
