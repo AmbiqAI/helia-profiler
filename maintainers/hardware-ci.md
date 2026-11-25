@@ -296,7 +296,7 @@ Every runner exports the board it owns and the probe serials it may open:
 | `HPX_BOARD` | the one board this runner owns |
 | `HPX_JLINK_SERIAL` | that board's J-Link serial |
 | `HPX_JOULESCOPE_SERIAL` | serial of a Joulescope dedicated to the board; unset if none |
-| `BENCH_BOARD` | the board's id on its host, what `bench-agent lock` takes |
+| `FARM_BOARD` | the board's id on its host, what `farm-agent lock` takes |
 
 The first step of every job checks that `HPX_BOARD` matches the matrix board
 and derives `--jlink-serials`, `--power-boards` and `--power-serials` from those
@@ -457,7 +457,7 @@ The runner must already provide:
 - ATfE plus `ATFE_ROOT` when selected toolchains include `atfe`
 - Git LFS support for model fixtures
 - `jq` on `PATH` for the provenance steps
-- `bench-agent` on `PATH` and `BENCH_BOARD` for the board lock
+- `farm-agent` on `PATH` and `FARM_BOARD` for the board lock
 - optional Joulescope access and wiring when `power` is `on` or `both`
 
 ATfE runs require `ATFE_ROOT` to point at the Arm Toolchain for Embedded install
@@ -509,7 +509,7 @@ skips scheduled runs without one, so Zoo runs do not displace its nightlies.
 ## Board lock
 
 Right after the contract checks, the job takes the board's lock with
-`bench-agent lock "$BENCH_BOARD" --holder ci --reason <run URL>`, and a
+`farm-agent lock "$FARM_BOARD" --holder ci --reason <run URL>`, and a
 `Release the board lock` step frees it once `hpx validate` ends. The lock
 serialises the board between people and CI: `bench who` on a laptop shows
 `ci` as the holder with the run URL as the reason while a job runs.
@@ -522,10 +522,10 @@ board and re-run the job. The lock's ttl (6 hours) outlives the job's
 To release a stuck CI lock by hand, on the host that owns the board:
 
 ```bash
-sudo bench-agent unlock <board-id> --force
+sudo farm-agent unlock <board-id> --force
 ```
 
-`bench-agent status` on the host lists every board with its holder.
+`farm-agent status` on the host lists every board with its holder.
 
 ## Real-toolchain compile gate (#187 Tier 2)
 

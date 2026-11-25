@@ -225,16 +225,16 @@ jobs:
       - name: Take the board lock
         id: lock
         run: |
-          if [[ -z "${BENCH_BOARD:-}" ]]; then
-            echo "::error::runner does not export BENCH_BOARD; check the runner contract" >&2
+          if [[ -z "${FARM_BOARD:-}" ]]; then
+            echo "::error::runner does not export FARM_BOARD; check the runner contract" >&2
             exit 2
           fi
-          if ! command -v bench-agent > /dev/null; then
-            echo "::error::runner has no bench-agent on PATH; check the runner contract" >&2
+          if ! command -v farm-agent > /dev/null; then
+            echo "::error::runner has no farm-agent on PATH; check the runner contract" >&2
             exit 2
           fi
           # Untagged: the runner's orphan cleanup skips it.
-          if ! held="$(env -u RUNNER_TRACKING_ID bench-agent lock "${BENCH_BOARD}" \
+          if ! held="$(env -u RUNNER_TRACKING_ID farm-agent lock "${FARM_BOARD}" \
               --holder ci \
               --reason "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
               --timeout 1800 \
@@ -575,7 +575,7 @@ jobs:
       - name: Release the board lock
         if: always() && steps.lock.outcome == 'success'
         run: |
-          if ! freed="$(bench-agent unlock "${BENCH_BOARD}" 2>&1)"; then
+          if ! freed="$(farm-agent unlock "${FARM_BOARD}" 2>&1)"; then
             if [[ "${freed}" != *"is free"* ]]; then
               echo "::error::${freed}" >&2
               exit 1
