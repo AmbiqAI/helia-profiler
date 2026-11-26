@@ -236,6 +236,7 @@ _MATRIX: tuple[_HwCase, ...] = (
             ("transfer_diagnostics", "trace"),
             ("transfer_diagnostic_iterations", 1),
             ("transfer_trace_max_pieces", 4),
+            ("transfer_costs", True),
         ),
     ),
     _HwCase(

@@ -79,6 +79,10 @@
         "slug": "reference/cli/target"
       },
       {
+        "label": "hpx transfers",
+        "slug": "reference/cli/transfers"
+      },
+      {
         "label": "hpx validate",
         "slug": "reference/cli/validate"
       }

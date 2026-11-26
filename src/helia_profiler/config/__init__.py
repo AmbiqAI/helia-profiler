@@ -633,10 +633,21 @@ class ProfileConfig:
                     "Define other boards under target.custom_boards."
                 ),
             )
+        if self.profiling.transfer_provider_plan is not None and not self.profiling.transfer_costs:
+            raise ConfigError("A transfer provider plan requires profiling.transfer_costs")
+        if self.profiling.transfer_costs and (
+            self.target.board not in {"apollo510_evb", "apollo510b_evb"}
+            or self.power.enabled
+            or self.profiling.dcache != "on"
+        ):
+            raise ConfigError(
+                "Transfer costs need Apollo510/510B, D-cache on and power capture disabled"
+            )
         if self.engine.type is not EngineType.HELIA_AOT:
             for setting, value in (
                 ("input_fill", self.profiling.input_fill is not InputFill.ZERO),
                 ("transfer_timeout_probe", self.profiling.transfer_timeout_probe),
+                ("transfer_costs", self.profiling.transfer_costs),
                 ("stream_evidence", self.profiling.stream_evidence),
                 ("sweep_evidence", self.profiling.sweep_evidence),
                 ("transfer_diagnostics", self.profiling.transfer_diagnostics != "off"),

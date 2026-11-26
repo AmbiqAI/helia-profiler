@@ -318,7 +318,11 @@ def parse_firmware_output(
         overflow_detected=overflow_detected,
         groups=groups,
         raw_output=tuple(lines)
-        if firmware_meta.per_layer_profiling is False or WireKey.AOT_RUN_EVIDENCE in meta_kv
+        if (
+            firmware_meta.per_layer_profiling is False
+            or WireKey.AOT_RUN_EVIDENCE in meta_kv
+            or WireKey.XFER_START in meta_kv
+        )
         else (),
         transfer_evidence=tuple(transfer.records),
         transfer_diagnostics=tuple(diagnostics.records),

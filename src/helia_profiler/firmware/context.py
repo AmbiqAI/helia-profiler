@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -18,6 +19,7 @@ from ..platform.counters import (
     validate_group_selection,
 )
 from ..target.lifecycle import resolve_power_lockstep
+from ..transfers.matrix import Cell, schedule_cells
 from ..transport.usb_identity import USB_MARKER_PRODUCT, usb_marker_serial
 from .op_resolver import build_resolver_plan
 
@@ -258,6 +260,9 @@ class EngineContext:
     transfer_diagnostics: str = "off"
     transfer_diagnostic_iterations: int = 1
     transfer_trace_max_pieces: int = 256
+    transfer_costs: bool = False
+    companion_provider: bool = False
+    transfer_geometry: tuple[Cell, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -281,12 +286,19 @@ class FirmwareRenderContext:
         soc = ctx.resolved_soc
         board = ctx.resolved_board
         artifacts = ctx.prepared_artifacts
-        if config.profiling.transfer_diagnostics != "off":
+        if config.profiling.transfer_diagnostics != "off" or config.profiling.transfer_costs:
             if (
                 not isinstance(artifacts, HeliaAotArtifacts)
                 or not artifacts.per_layer_profiling
                 or not config.profiling.per_layer
-                or artifacts.aot_transfer_cmake_target is None
+                or (
+                    artifacts.aot_transfer_cmake_target is None
+                    and not (
+                        config.profiling.transfer_costs
+                        and config.profiling.transfer_provider_plan
+                        and config.profiling.transfer_diagnostics == "off"
+                    )
+                )
                 or artifacts.resolved_backend == "ethos_u"
                 or soc.capabilities.clock.clean_window_timer != "stimer"
             ):
@@ -295,7 +307,25 @@ class FirmwareRenderContext:
                     "an emitted DMA provider and a supported CPU/STIMER target.",
                     hint="Use a supported CPU module or set profiling.transfer_diagnostics: off.",
                 )
-        if config.profiling.transfer_diagnostics == "trace":
+        geometry = ()
+        if config.profiling.transfer_costs:
+            assert isinstance(artifacts, HeliaAotArtifacts)
+            sources = [
+                r
+                for r in arena_regions or ()
+                if r.role is ArenaRole.CONSTANT and r.placement is Placement.PSRAM
+            ]
+            if len(sources) != 1:
+                raise FirmwareError(
+                    "Transfer calibration requires one PSRAM constant source arena; found "
+                    + str(len(sources))
+                )
+            if config.profiling.transfer_provider_plan is None:
+                from ..transfers.provider import converted_plan
+
+                plan = converted_plan(artifacts.report_files, artifacts.aot_prefix)
+                geometry = schedule_cells(json.loads(plan.read_bytes()))
+        if config.profiling.transfer_diagnostics == "trace" or config.profiling.transfer_costs:
             from ..runtime.records import runtime
 
             assert isinstance(artifacts, HeliaAotArtifacts)
@@ -505,6 +535,9 @@ class FirmwareRenderContext:
                 transfer_timeout_probe=config.profiling.transfer_timeout_probe,
                 stream_evidence=config.profiling.stream_evidence,
                 sweep_evidence=config.profiling.sweep_evidence,
+                transfer_costs=config.profiling.transfer_costs,
+                transfer_geometry=geometry,
+                companion_provider=config.profiling.transfer_provider_plan is not None,
                 transfer_diagnostics=config.profiling.transfer_diagnostics,
                 transfer_diagnostic_iterations=config.profiling.transfer_diagnostic_iterations,
                 transfer_trace_max_pieces=config.profiling.transfer_trace_max_pieces,
@@ -632,6 +665,9 @@ class FirmwareRenderContext:
             "transfer_timeout_probe": self.engine.transfer_timeout_probe,
             "stream_evidence": self.engine.stream_evidence,
             "sweep_evidence": self.engine.sweep_evidence,
+            "transfer_costs": self.engine.transfer_costs,
+            "transfer_geometry": self.engine.transfer_geometry,
+            "companion_provider": self.engine.companion_provider,
             "transfer_diagnostics": self.engine.transfer_diagnostics,
             "transfer_diagnostic_iterations": self.engine.transfer_diagnostic_iterations,
             "transfer_trace_max_pieces": self.engine.transfer_trace_max_pieces,

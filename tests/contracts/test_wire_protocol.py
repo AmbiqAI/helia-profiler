@@ -440,6 +440,7 @@ def _matrix() -> list[_Render]:
             "helia-aot",
             overrides={
                 "stream_evidence": True,
+                "transfer_costs": True,
                 "sweep_evidence": True,
                 "arena_regions": [_PSRAM_BLOB_REGION],
             },
@@ -760,6 +761,7 @@ _PREDICATES = {
     (
         "not allocate_arenas and arena_regions with blob_filename and placement == psram"
     ): _aot_psram_blobs,
+    "transfer_costs and not power_only": lambda v: bool(v.get("transfer_costs")) and not _power(v),
     "busy_loop_probe": lambda v: bool(v["busy_loop_probe"]),
     "has_armv8m_pmu and per_layer_profiling and not power_only": lambda v: v.get(
         "per_layer_profiling", True

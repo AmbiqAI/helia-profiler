@@ -706,3 +706,34 @@ cache keeps the last successful measurement and links to that earlier run.
 Instrumented inference cycles and output identity refer
 to the same timed runs. When enabled, separately measured clean-window energy is reported as
 `clean_window_energy_uj`. The instrumented measurement leaves `energy_uj` null.
+
+## Measuring PSRAM copy costs
+
+Run `hpx transfers --config slow.yml --provider-plan scheduled.json -o transfers.json`
+with the slow calibration's board serial, clock, PSRAM weights, D-cache enabled,
+RTT transport and power capture disabled. The optional plan lets heliaAOT
+generate a DMA provider when the slow calibration reads its weights in place.
+Only that provider is linked alongside the original model. For a model with
+its own generated DMA provider, omit the option.
+
+Match the transfer table to slow and fast operator calibrations by their
+non-null `capture.setup.pairing_digest`. The table records synchronous CPU
+copies twice per size, once after invalidation and once after reading the
+whole source. DMA rows identify the number of pieces in a single ticket.
+An infeasible shape has a reason and null timings. The raw per-repetition
+observations stay in each row, and the adjacent `.runs` directory retains
+the firmware output and verified HPX run bundle.
+
+`issue_cycles` measures submission. `complete_cycles` ends at the last
+provider callback. `wait_cycles` measures a reader arriving immediately after
+submission. These intervals overlap. To estimate the CPU time lost to a
+copy while doing arithmetic, use `inflight_core_loss_cycles`, the signed
+difference between identical work with and without DMA. The raw samples also
+record a separate foreground loop reading DTCM. A real operator with different
+memory traffic can experience a different slowdown.
+
+`scheduled_units` repeats the provider plan’s actual offsets and lengths.
+When several tickets issue at the same schedule point, `coissued_groups`
+times them together. Use that single foreground span for the group. Summing
+the individual ticket losses would count overlapping work more than once.
+Source verification, clock checks and logging occur outside the copy timing.

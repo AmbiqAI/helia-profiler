@@ -1,0 +1,177 @@
+{% set provider = "costprobe" if companion_provider | default(false) else aot_prefix %}
+#include "{{ provider }}_nsx_transfer.h"
+#include "nsx_psram.h"
+{% if not sweep_evidence | default(false) and transfer_diagnostics | default("off") == "off" %}{% include "_aot_transfer_clock.j2" %}{% endif %}
+static {{ provider }}_model_context_t cost_context{};
+static void cost_bind(const {{ provider }}_nsx_transfer_options_t *options) {
+    const int32_t status = {{ provider }}_nsx_transfer_bind(&cost_context, options);
+    if (status) {
+        hpx_printf("HPX_ERROR=transfer_bind_failed:%ld\n", (long)status);
+        hpx_park();
+    }
+}
+// Each aligned destination lies inside canonical DTCM. The source is the
+// model's already-loaded PSRAM constant arena and remains read-only.
+NSX_MEM_FAST_BSS alignas({{ transfer_alignment }}) static uint8_t cost_dst[{{ transfer_destination_bytes }}];
+static uint32_t cost_sink;
+static volatile uint32_t cost_callbacks, cost_epoch, cost_offsets[8];
+static __attribute__((noinline)) void cost_observe(void *, const {{ provider }}_nsx_transfer_piece_t *) {
+    uint32_t i = cost_callbacks;
+    if (i < 8U) cost_offsets[i] = DWT->CYCCNT - cost_epoch;
+    cost_callbacks = i + 1U;
+}
+NSX_MEM_FAST_BSS static volatile uint32_t cost_data[{{ transfer_work_words }}];
+static __attribute__((noinline, noclone)) uint32_t cost_work(uint32_t loops, bool memory, uint32_t start) {
+    uint32_t v = 1U;
+    for (uint32_t i = 0; i < loops; ++i) {
+        if (memory) v += cost_data[i & {{ transfer_work_words - 1 }}U];
+        v = v * 1664525U + 1013904223U;
+        __asm volatile("" : "+r"(v));
+    }
+    cost_sink = v;
+    __asm volatile("" : : "r"(cost_sink) : "memory");
+    return DWT->CYCCNT - start;
+}
+struct CostPiece { uint32_t ticket, src, dst, bytes; };
+struct CostCell { uint32_t bytes, pieces, cold; CostPiece parts[8]; };
+static const CostCell cost_cells[] = {
+{% for cell in transfer_cells() + (transfer_geometry | default(())) %}    { {{ cell.size }}, {{ cell.pieces }}, {{ 1 if cell.regime == "cold" else 0 }}, { {% if cell.pieces <= 8 %}{% for part in cell.descriptors %}{ {{ part | join(", ") }} }, {% endfor %}{% endif %} } },
+{% endfor %}};
+struct CostTimes {
+    uint32_t issue, complete, wait, arrival, ready, loops, alone, active, memory_alone, memory_active, callbacks[8];
+};
+static void cost_poison(uint8_t *dst, const uint8_t *src, uint32_t bytes) {
+    for (uint32_t i = 0; i < bytes; ++i) dst[i] = uint8_t(~src[i]);
+}
+static uint32_t cost_dma(const CostCell &cell, const uint8_t *src, unsigned rep,
+                         CostTimes &times, uint32_t &detail) {
+    const auto *p = cost_context.transfer;
+    // Separate idle-completion, immediate-reader and overlap trials.
+    for (unsigned trial = 0; trial < 4; ++trial) {
+        for (unsigned i = 0; i < cell.pieces; ++i) {
+            const auto &part = cell.parts[i];
+            cost_poison(cost_dst + part.dst, src + part.src, part.bytes);
+        }
+        const bool memory = trial == 3;
+        uint32_t &alone = memory ? times.memory_alone : times.alone;
+        uint32_t &active = memory ? times.memory_active : times.active;
+        if (trial >= 2 && (rep & 1U) == 0) {
+            alone = cost_work(times.loops, memory, DWT->CYCCNT);
+        }
+        cost_callbacks = 0;
+        const uint32_t wall = hpx_stimer_ticks();
+        cost_epoch = DWT->CYCCNT;
+        for (unsigned i = 0; i < cell.pieces; ++i) {
+            const auto &part = cell.parts[i];
+            detail = p->issue(p->self, part.ticket, cost_dst + part.dst, src + part.src, part.bytes);
+            if (detail) return 2;
+        }
+        const uint32_t issued = DWT->CYCCNT;
+        if (trial == 0) {
+            while (cost_callbacks < cell.pieces) {
+                if (DWT->CYCCNT - cost_epoch > SystemCoreClock / 2U || hpx_stimer_ticks() - wall > HPX_STIMER_HZ / 2U) return 3;
+            }
+            times.complete = cost_offsets[cell.pieces - 1U];
+            times.loops = times.complete + 256U;
+        } else if (trial >= 2) {
+            if (!memory) times.issue = issued - cost_epoch;
+            active = cost_work(times.loops, memory, issued);
+            if (cost_callbacks != cell.pieces || cost_offsets[cell.pieces - 1U] > issued - cost_epoch + active) return 5;
+            if (!memory) for (unsigned i = 0; i < cell.pieces; ++i) times.callbacks[i] = cost_offsets[i];
+        }
+        uint32_t before = DWT->CYCCNT;
+        for (unsigned i = 0; i < cell.pieces; ++i) {
+            if (i && cell.parts[i].ticket == cell.parts[i-1].ticket) continue;
+            detail = p->wait(p->self, cell.parts[i].ticket);
+            if (detail) return 3;
+        }
+        uint32_t wait = DWT->CYCCNT - before;
+        if (detail) return 3;
+        if (trial == 0) times.ready = wait;
+        if (trial == 1) { times.arrival = before - cost_epoch; times.wait = wait; }
+        if (trial >= 2 && (rep & 1U)) {
+            alone = cost_work(times.loops, memory, DWT->CYCCNT);
+        }
+        for (unsigned i = 0; i < cell.pieces; ++i) {
+            const auto &part = cell.parts[i];
+            if (memcmp(cost_dst + part.dst, src + part.src, part.bytes)) return 4;
+        }
+    }
+    return 0;
+}
+static void hpx_transfer_cost_matrix(const uint8_t *arena, uint32_t extent) {
+    nsx_psram_info_t info{};
+    const int32_t info_status = nsx_psram_get_info(&info);
+    if (info_status) {
+        hpx_printf("HPX_ERROR=psram_info_failed:%ld\n", (long)info_status);
+        hpx_park();
+    }
+    {{ provider }}_nsx_transfer_options_t options{};
+    options.observe = cost_observe;
+    cost_bind(&options);
+    uint32_t start = DWT->CYCCNT;
+    uint32_t bracket = DWT->CYCCNT - start;
+    cost_epoch = DWT->CYCCNT;
+    cost_callbacks = 0;
+    start = DWT->CYCCNT;
+    cost_observe(nullptr, nullptr);
+    const uint32_t observer = DWT->CYCCNT - start;
+    hpx_printf("HPX_XFER_START=%u,%u,%u,%u,%u,%u,%u,%u\n", (unsigned)SystemCoreClock,
+               (unsigned)info.configured_clock_hz, (unsigned)info.async_depth,
+               (unsigned){{ provider }}_transfer_pieces_in_flight, (unsigned)bracket, (unsigned)observer, (unsigned)(uintptr_t)cost_work, (unsigned)(uintptr_t)cost_data);
+    unsigned index = 0;
+    for (const auto &cell : cost_cells) {
+        uint32_t detail = 0, status = 0;
+        if (cell.pieces > {{ provider }}_transfer_pieces_in_flight || cell.pieces > 8U) {
+            status = 6; detail = {{ provider }}_transfer_pieces_in_flight;
+        } else if (!cell.parts[0].bytes) status = 1;
+        for (unsigned i = 0; !status && i < (cell.pieces ? cell.pieces : 1U); ++i) {
+            const auto &part = cell.parts[i];
+            if (part.src > extent || part.bytes > extent - part.src ||
+                part.dst > sizeof(cost_dst) || part.bytes > sizeof(cost_dst) - part.dst) {
+                status = 8; detail = extent;
+            }
+        }
+        for (unsigned rep = 0; !status && rep < {{ transfer_repetitions }}U; ++rep) {
+            const uint8_t *src = arena;
+            CostTimes t{};
+            const uint32_t wall_start = hpx_stimer_ticks();
+            const uint32_t cycle_start = DWT->CYCCNT;
+            if (cell.pieces) {
+                status = cost_dma(cell, src, rep, t, detail);
+                if (status) {
+                    const int32_t abort_status = cost_context.transfer->abort(cost_context.transfer->self);
+                    if (abort_status) {
+                        hpx_printf("HPX_ERROR=model_run_failed:%ld,stage=transfer_probe_abort,cell=%u\n", (long)abort_status, index);
+                        hpx_park();
+                    }
+                }
+            } else {
+                cost_poison(cost_dst, src, cell.bytes);
+                if (cell.cold) {
+                    am_hal_cachectrl_range_t range = {(uint32_t)(uintptr_t)src, cell.bytes};
+                    detail = am_hal_cachectrl_dcache_invalidate(&range, true);
+                    if (detail) { status = 7; break; }
+                }
+                uint32_t begin = DWT->CYCCNT;
+                memcpy(cost_dst, src, cell.bytes);
+                __DSB();
+                t.complete = DWT->CYCCNT - begin;
+                if (memcmp(cost_dst, src, cell.bytes)) status = 4;
+            }
+            if (status) break;
+            const uint32_t elapsed = DWT->CYCCNT - cycle_start;
+            const uint32_t ticks = hpx_stimer_ticks() - wall_start;
+            if (!hpx_transfer_clock_valid(elapsed, ticks, true)) { status = 9; detail = ticks; break; }
+            hpx_printf("HPX_XFER_SAMPLE=%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u", index, rep,
+                       (unsigned)t.issue,(unsigned)t.complete,(unsigned)t.wait,(unsigned)t.arrival,
+                       (unsigned)t.ready,(unsigned)t.loops,(unsigned)t.alone,(unsigned)t.active,(unsigned)t.memory_alone,(unsigned)t.memory_active);
+            for (unsigned i = 0; i < cell.pieces; ++i) hpx_printf(",%u", (unsigned)t.callbacks[i]);
+            hpx_printf("\n");
+        }
+        if (status) hpx_printf("HPX_XFER_FAIL=%u,%u,%u\n", index,(unsigned)status,(unsigned)detail);
+        ++index;
+    }
+    hpx_printf("HPX_XFER_END=%u\n", index);
+    cost_bind(nullptr);
+}

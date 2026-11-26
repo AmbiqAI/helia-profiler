@@ -8,6 +8,7 @@ from typing import Any, cast
 import jinja2
 
 from ..placement import psram_invalidation_covers_weights
+from ..transfers.matrix import DESTINATION_ALIGNMENT, FOREGROUND_WORDS, REPETITIONS, SIZES, matrix
 from ..wire import POWER_TERMINAL_VERSION, STIMER_HZ, STIMER_SETTLE_TICKS
 from .headers import word_padded
 
@@ -19,6 +20,11 @@ _jinja_env = jinja2.Environment(
 # Wire facts the host checks, so the firmware cannot drift from them. jinja2
 # types ``globals`` as its own builtin helpers only.
 cast("dict[str, Any]", _jinja_env.globals).update(
+    transfer_cells=matrix,
+    transfer_destination_bytes=max(SIZES),
+    transfer_alignment=DESTINATION_ALIGNMENT,
+    transfer_work_words=FOREGROUND_WORDS,
+    transfer_repetitions=REPETITIONS,
     power_terminal_version=POWER_TERMINAL_VERSION,
     stimer_hz=STIMER_HZ,
     stimer_settle_ticks=STIMER_SETTLE_TICKS,

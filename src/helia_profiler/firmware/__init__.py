@@ -259,6 +259,12 @@ def generate_app(ctx: PipelineContext) -> Path:
         arena_regions=aot_arena_regions,
     )
     template_vars = render_context.to_template_vars()
+    if config.profiling.transfer_provider_plan is not None:
+        from ..transfers.provider import emit_provider
+
+        template_vars["transfer_geometry"] = emit_provider(
+            config, app_dir, config.profiling.transfer_provider_plan
+        )
     has_armv8m_pmu = render_context.pmu.has_armv8m_pmu
 
     compiler_launcher = _resolve_compiler_launcher(config)

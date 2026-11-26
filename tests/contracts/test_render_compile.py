@@ -274,8 +274,10 @@ def _build_cases() -> list[_CompileCase]:
                 vars=render.vars,
                 headers=aot_transfer_headers(
                     observer=render.vars.get("transfer_diagnostics") == "trace"
+                    or bool(render.vars.get("transfer_costs"))
                 )
                 if render.vars.get("transfer_diagnostics", "off") != "off"
+                or render.vars.get("transfer_costs")
                 else {},
             )
         )
@@ -419,6 +421,7 @@ def _build_cases() -> list[_CompileCase]:
                     "helia-aot",
                     overrides={
                         "arena_regions": transfer_regions,
+                        "transfer_costs": mode == "trace",
                         "transfer_diagnostics": mode,
                         "transfer_diagnostic_iterations": 2,
                         "transfer_trace_max_pieces": 4,
