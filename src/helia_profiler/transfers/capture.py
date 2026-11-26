@@ -37,8 +37,7 @@ class _RetainProvider:
         return False
 
     def run(self, ctx: PipelineContext) -> None:
-        assert ctx.profile_run is not None
-        app = ctx.profile_run.firmware.app_dir
+        app = ctx.resolved_firmware_dir
         companion = ctx.config.profiling.transfer_provider_plan is not None
         artifacts = ctx.prepared_artifacts
         assert isinstance(artifacts, HeliaAotArtifacts)

@@ -50,7 +50,7 @@ def test_retains_the_model_providers_resolved_module_and_prefix(tmp_path):
     ctx.prepared_artifacts = Mock(
         spec=HeliaAotArtifacts, aot_module_name="custom_model", aot_prefix="custom"
     )
-    ctx.profile_run.firmware.app_dir = tmp_path
+    ctx.resolved_firmware_dir = tmp_path
     ctx.config = Mock()
     ctx.config.profiling.transfer_provider_plan = None
     evidence = _RetainProvider(tmp_path / "retained")
