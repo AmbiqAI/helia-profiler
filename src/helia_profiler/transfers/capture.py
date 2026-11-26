@@ -13,6 +13,7 @@ from ..calibration.setup import _setup
 from ..calibration.table import _require_usable_cycles
 from ..config import ProfileConfig
 from ..engines import EngineType
+from ..engines.base import HeliaAotArtifacts
 from ..errors import ConfigError
 from ..evaluation.compare import load_run_artifacts
 from ..pipeline import PipelineContext, PipelineRunner
@@ -39,8 +40,10 @@ class _RetainProvider:
         assert ctx.profile_run is not None
         app = ctx.profile_run.firmware.app_dir
         companion = ctx.config.profiling.transfer_provider_plan is not None
-        base = app / ("probe_provider" if companion else "modules/hpx_model")
-        prefix = "costprobe" if companion else "hpx"
+        artifacts = ctx.prepared_artifacts
+        assert isinstance(artifacts, HeliaAotArtifacts)
+        base = app / "probe_provider" if companion else app / "modules" / artifacts.aot_module_name
+        prefix = "costprobe" if companion else artifacts.aot_prefix
         self.plan.parent.mkdir(parents=True)
         shutil.copyfile(base / f"{prefix}_plan.json", self.plan)
         shutil.copyfile(base / "src" / f"{prefix}_nsx_transfer.c", self.source)

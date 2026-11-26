@@ -33,3 +33,27 @@ def test_probe_only_settings_pair_but_hardware_and_toolchain_are_held(tmp_path):
             parent = parent.setdefault(key, {})
         parent[path[-1]] = value
         assert _setup(replace(run, metadata=changed), str(slow)).pairing_digest != digest, path
+
+
+def test_retains_the_model_providers_resolved_module_and_prefix(tmp_path):
+    from unittest.mock import Mock
+
+    from helia_profiler.engines.base import HeliaAotArtifacts
+    from helia_profiler.pipeline import PipelineContext
+    from helia_profiler.transfers.capture import _RetainProvider
+
+    module = tmp_path / "modules" / "custom_model"
+    (module / "src").mkdir(parents=True)
+    (module / "src/custom_nsx_transfer.c").write_text("provider")
+    (module / "custom_plan.json").write_text("{}")
+    ctx = Mock(spec=PipelineContext)
+    ctx.prepared_artifacts = Mock(
+        spec=HeliaAotArtifacts, aot_module_name="custom_model", aot_prefix="custom"
+    )
+    ctx.profile_run.firmware.app_dir = tmp_path
+    ctx.config = Mock()
+    ctx.config.profiling.transfer_provider_plan = None
+    evidence = _RetainProvider(tmp_path / "retained")
+    evidence.run(ctx)
+    assert evidence.source.read_text() == "provider"
+    assert evidence.plan.read_text() == "{}"
