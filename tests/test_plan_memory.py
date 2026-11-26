@@ -999,3 +999,20 @@ def test_planning_failure_reaches_cli_without_becoming_a_skip(
     with pytest.raises(SystemExit) as exc:
         _cmd_profile()
     assert exc.value.code == exit_code
+
+
+def test_transfer_cost_probe_accounts_for_dtcm_storage_and_alignment(tmp_path):
+    from helia_profiler.results import MemoryPlan
+    from helia_profiler.stages.plan_memory import _add_hpx_owned_consumers
+
+    ctx = _make_ctx(
+        tmp_path, {"engine": {"type": "helia-aot"}, "profiling": {"transfer_costs": True}}
+    )
+    plan = _add_hpx_owned_consumers(MemoryPlan(engine=EngineType.HELIA_AOT, regions=()), ctx)
+    region = plan.region(MemoryRegion.DTCM)
+    assert region is not None
+    assert {c.name: c.size for c in region.consumers if c.name.startswith("transfer_")} == {
+        "transfer_destination": 65536,
+        "transfer_foreground_data": 256,
+        "transfer_alignment_allowance": 4095,
+    }

@@ -8,6 +8,8 @@ from typing import Any
 
 SIZES = tuple(1024 << i for i in range(7))
 REPETITIONS = 64
+DESTINATION_ALIGNMENT = 4096
+FOREGROUND_WORDS = 64
 
 
 @dataclass(frozen=True)

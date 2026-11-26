@@ -12,7 +12,7 @@ static void cost_bind(const {{ provider }}_nsx_transfer_options_t *options) {
 }
 // Each aligned destination lies inside canonical DTCM. The source is the
 // model's already-loaded PSRAM constant arena and remains read-only.
-NSX_MEM_FAST_BSS alignas(4096) static uint8_t cost_dst[65536];
+NSX_MEM_FAST_BSS alignas({{ transfer_alignment }}) static uint8_t cost_dst[{{ transfer_destination_bytes }}];
 static uint32_t cost_sink;
 static volatile uint32_t cost_callbacks, cost_epoch, cost_offsets[8];
 static __attribute__((noinline)) void cost_observe(void *, const {{ provider }}_nsx_transfer_piece_t *) {
@@ -20,11 +20,11 @@ static __attribute__((noinline)) void cost_observe(void *, const {{ provider }}_
     if (i < 8U) cost_offsets[i] = DWT->CYCCNT - cost_epoch;
     cost_callbacks = i + 1U;
 }
-NSX_MEM_FAST_BSS static volatile uint32_t cost_data[64];
+NSX_MEM_FAST_BSS static volatile uint32_t cost_data[{{ transfer_work_words }}];
 static __attribute__((noinline, noclone)) uint32_t cost_work(uint32_t loops, bool memory, uint32_t start) {
     uint32_t v = 1U;
     for (uint32_t i = 0; i < loops; ++i) {
-        if (memory) v += cost_data[i & 63U];
+        if (memory) v += cost_data[i & {{ transfer_work_words - 1 }}U];
         v = v * 1664525U + 1013904223U;
         __asm volatile("" : "+r"(v));
     }

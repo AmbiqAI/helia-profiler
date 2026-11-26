@@ -492,6 +492,22 @@ def _add_hpx_owned_consumers(plan: MemoryPlan, ctx: PipelineContext) -> MemoryPl
     additions: list[tuple[MemoryRegion, MemoryConsumer]] = []
 
     fixture = ctx.fixture
+    if fixture is None and ctx.config.profiling.transfer_costs:
+        from ..transfers.matrix import DESTINATION_ALIGNMENT, FOREGROUND_WORDS, SIZES
+
+        # The linker decides the preceding section offset. Allow the maximum
+        # padding for the 4 KiB boundary required by the DMA destination.
+        for name, size, symbol in (
+            ("transfer_destination", max(SIZES), "cost_dst"),
+            ("transfer_foreground_data", 4 * FOREGROUND_WORDS, "cost_data"),
+            ("transfer_alignment_allowance", DESTINATION_ALIGNMENT - 1, None),
+        ):
+            additions.append(
+                (
+                    MemoryRegion.DTCM,
+                    MemoryConsumer(name=name, size=size, kind=ConsumerKind.OTHER, symbol=symbol),
+                )
+            )
     if fixture is not None:
         # The fixed-input wrapper exposes terminals instead of allocating
         # the ordinary PMU/transport objects. Its unannotated RAM statics
