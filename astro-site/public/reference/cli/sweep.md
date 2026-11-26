@@ -10,7 +10,7 @@ hpx sweep [OPTIONS] PLANS
 
 Measure plan candidates on the selected board.
 
-Defined in `src/helia_profiler/cli/app.py` line 749.
+Defined in `src/helia_profiler/cli/app.py` line 751.
 
 ### Arguments
 

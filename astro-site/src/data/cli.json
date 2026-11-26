@@ -8,7 +8,7 @@
     "pydantic": "2.13.4"
   },
   "counts": {
-    "leaf_commands": 25,
+    "leaf_commands": 26,
     "leaf_command_names": [
       "analyze",
       "boards",
@@ -34,6 +34,7 @@
       "runtimes show",
       "sweep",
       "target reset",
+      "transfers",
       "validate build"
     ],
     "groups": 8,
@@ -47,7 +48,7 @@
       "target",
       "validate"
     ],
-    "top_level_entries": 19,
+    "top_level_entries": 20,
     "epilogs": 10,
     "epilog_commands": [
       "analyze",
@@ -61,7 +62,7 @@
       "run",
       "validate"
     ],
-    "options": 142,
+    "options": 145,
     "arguments": 17,
     "options_with_panel": 57,
     "panel_names": [
@@ -88,7 +89,7 @@
     "hidden": false,
     "source": {
       "path": "src/helia_profiler/cli/app.py",
-      "line": 50
+      "line": 51
     },
     "arguments": [],
     "options": [
@@ -135,7 +136,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 532
+          "line": 533
         },
         "arguments": [
           {
@@ -623,7 +624,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 678
+          "line": 680
         },
         "arguments": [],
         "options": [],
@@ -644,7 +645,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 692
+              "line": 694
             },
             "arguments": [],
             "options": [],
@@ -665,7 +666,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 685
+              "line": 687
             },
             "arguments": [],
             "options": [],
@@ -826,7 +827,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 611
+          "line": 613
         },
         "arguments": [
           {
@@ -2238,7 +2239,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 88
+          "line": 89
         },
         "arguments": [
           {
@@ -4051,7 +4052,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 707
+          "line": 709
         },
         "arguments": [],
         "options": [],
@@ -4072,7 +4073,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 714
+              "line": 716
             },
             "arguments": [],
             "options": [],
@@ -4093,7 +4094,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 731
+              "line": 733
             },
             "arguments": [
               {
@@ -4167,7 +4168,7 @@
             "hidden": false,
             "source": {
               "path": "src/helia_profiler/cli/app.py",
-              "line": 721
+              "line": 723
             },
             "arguments": [
               {
@@ -4242,7 +4243,7 @@
         "hidden": false,
         "source": {
           "path": "src/helia_profiler/cli/app.py",
-          "line": 749
+          "line": 751
         },
         "arguments": [
           {
@@ -4520,6 +4521,123 @@
             "panels": []
           }
         ]
+      },
+      {
+        "path": [
+          "transfers"
+        ],
+        "name": "transfers",
+        "kind": "command",
+        "usage": "hpx transfers [OPTIONS]",
+        "short_help": "Measure PSRAM-to-DTCM copy costs on the selected board.",
+        "help": "Measure PSRAM-to-DTCM copy costs on the selected board.",
+        "epilog": null,
+        "deprecated": false,
+        "hidden": false,
+        "source": {
+          "path": "src/helia_profiler/cli/transfers_cmd.py",
+          "line": 9
+        },
+        "arguments": [],
+        "options": [
+          {
+            "name": "config",
+            "kind": "option",
+            "declaration": "--config",
+            "opts": [
+              "--config"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "file",
+              "class": "TyperPath",
+              "exists": true,
+              "file_okay": true,
+              "dir_okay": false,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": null,
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "output",
+            "kind": "option",
+            "declaration": "--output",
+            "opts": [
+              "--output",
+              "-o"
+            ],
+            "aliases": [
+              "-o"
+            ],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "path",
+              "class": "TyperPath",
+              "exists": false,
+              "file_okay": true,
+              "dir_okay": true,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path",
+            "default": null,
+            "required": true,
+            "help": null,
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          },
+          {
+            "name": "provider_plan",
+            "kind": "option",
+            "declaration": "--provider-plan",
+            "opts": [
+              "--provider-plan"
+            ],
+            "aliases": [],
+            "secondary_opts": [],
+            "metavar": null,
+            "type": {
+              "name": "file",
+              "class": "TyperPath",
+              "exists": true,
+              "file_okay": true,
+              "dir_okay": false,
+              "readable": true,
+              "writable": false
+            },
+            "python_type": "Path | None",
+            "default": null,
+            "required": false,
+            "help": "Emit an independent DMA provider from this plan, retaining the calibration model settings.",
+            "panel": null,
+            "is_flag": false,
+            "multiple": false,
+            "count": false,
+            "nargs": 1,
+            "hidden": false,
+            "envvar": []
+          }
+        ],
+        "panels": []
       },
       {
         "path": [
