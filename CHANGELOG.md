@@ -56,6 +56,25 @@ release pull requests from Conventional Commits.
   capture taken while it was still settling says so.
 
 
+## [0.6.5](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.4...v0.6.5) (2026-11-26)
+
+
+### Features
+
+* measure board transfer costs for Optimus ([#722](https://github.com/AmbiqAI/helia-profiler/issues/722)) ([91436ac](https://github.com/AmbiqAI/helia-profiler/commit/91436ac4c385105879542fe0e512acfdb368166e)), closes [#721](https://github.com/AmbiqAI/helia-profiler/issues/721)
+
+
+### Bug Fixes
+
+* **ci:** use farm-agent and FARM_BOARD after the farm rename ([#720](https://github.com/AmbiqAI/helia-profiler/issues/720)) ([0c3c05b](https://github.com/AmbiqAI/helia-profiler/commit/0c3c05bf534e3d3a7acd1e7af5d7f2f1ec1a0f50))
+* **firmware:** bind external MRAM constants in place ([#718](https://github.com/AmbiqAI/helia-profiler/issues/718)) ([c7d9b5b](https://github.com/AmbiqAI/helia-profiler/commit/c7d9b5b704b259e06f499190ca6ed6ba3b0ab618))
+* **sweep:** measure mixed constant placements and support scheduled PSRAM reads ([#719](https://github.com/AmbiqAI/helia-profiler/issues/719)) ([5216469](https://github.com/AmbiqAI/helia-profiler/commit/5216469bf0c291c8d58f60647d6ec281916c3f87))
+
+
+### Performance Improvements
+
+* stream file identity checks and adopt heliaAOT 1.11.0 ([#713](https://github.com/AmbiqAI/helia-profiler/issues/713)) ([3d9ae60](https://github.com/AmbiqAI/helia-profiler/commit/3d9ae602d541bfc405abf56878594d5b0e5a9f2e))
+
 ## [0.6.4](https://github.com/AmbiqAI/helia-profiler/compare/v0.6.3...v0.6.4) (2026-11-23)
 
 
