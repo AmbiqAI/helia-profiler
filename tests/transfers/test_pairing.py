@@ -45,10 +45,14 @@ def test_retains_the_model_providers_resolved_module_and_prefix(tmp_path):
     module = tmp_path / "modules" / "custom_model"
     (module / "src").mkdir(parents=True)
     (module / "src/custom_nsx_transfer.c").write_text("provider")
-    (module / "custom_plan.json").write_text("{}")
+    plan = tmp_path / "custom_plan.json"
+    plan.write_text("{}")
     ctx = Mock(spec=PipelineContext)
     ctx.prepared_artifacts = Mock(
-        spec=HeliaAotArtifacts, aot_module_name="custom_model", aot_prefix="custom"
+        spec=HeliaAotArtifacts,
+        aot_module_name="custom_model",
+        aot_prefix="custom",
+        report_files=(plan,),
     )
     ctx.resolved_firmware_dir = tmp_path
     ctx.config = Mock()
@@ -57,3 +61,34 @@ def test_retains_the_model_providers_resolved_module_and_prefix(tmp_path):
     evidence.run(ctx)
     assert evidence.source.read_text() == "provider"
     assert evidence.plan.read_text() == "{}"
+
+
+def test_companion_uses_one_source_and_needs_no_primary_plan(tmp_path):
+    from helia_profiler.engines.base import ArenaRegion
+    from helia_profiler.errors import FirmwareError
+    from helia_profiler.firmware.context import FirmwareRenderContext
+    from helia_profiler.placement import ArenaRole, Placement
+    from tests.test_model_only import _ctx
+
+    ctx = _ctx(tmp_path, per_layer=True)
+    ctx.config = replace(
+        ctx.config,
+        profiling=replace(
+            ctx.config.profiling,
+            transfer_costs=True,
+            transfer_provider_plan=tmp_path / "scheduled.json",
+        ),
+    )
+    ctx.engine_artifacts = replace(
+        ctx.prepared_artifacts,
+        helia_aot_version="1.11.0",
+        aot_op_manifest=[{"idx": 0, "id": 4, "op_type": "ADD"}],
+        report_files=(),
+    )
+    region = ArenaRegion(0, "weights", 65536, 4, ArenaRole.CONSTANT, "PSRAM", Placement.PSRAM)
+    with pytest.raises(FirmwareError, match="one PSRAM constant source"):
+        FirmwareRenderContext.from_pipeline_context(
+            ctx, arena_regions=[region, replace(region, region_id=1)]
+        )
+    view = FirmwareRenderContext.from_pipeline_context(ctx, arena_regions=[region])
+    assert view.engine.companion_provider and not view.engine.transfer_geometry

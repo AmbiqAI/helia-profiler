@@ -715,7 +715,7 @@ hpx_aot_check_runs();{% endblock %}
 {% if transport == "rtt" %}
     hpx_rtt_set_blocking();
 {% endif %}{% if transfer_costs | default(false) and not power_only | default(false) %}
-{% set sources = arena_regions | selectattr("role", "equalto", "constant") | selectattr("placement", "equalto", "psram") | sort(attribute="size", reverse=true) %}
+{% set sources = arena_regions | selectattr("role", "equalto", "constant") | selectattr("placement", "equalto", "psram") | list %}
 {% if sources %}
     hpx_transfer_cost_matrix(hpx_arena_buf_{{ sources[0].region_id }}, {{ sources[0].size }}U);
 {% else %}

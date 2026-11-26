@@ -310,8 +310,21 @@ class FirmwareRenderContext:
         geometry = ()
         if config.profiling.transfer_costs:
             assert isinstance(artifacts, HeliaAotArtifacts)
-            (plan,) = [p for p in artifacts.report_files if p.name.endswith("_plan.json")]
-            geometry = schedule_cells(json.loads(plan.read_bytes()))
+            sources = [
+                r
+                for r in arena_regions or ()
+                if r.role is ArenaRole.CONSTANT and r.placement is Placement.PSRAM
+            ]
+            if len(sources) != 1:
+                raise FirmwareError(
+                    "Transfer calibration requires one PSRAM constant source arena; found "
+                    + str(len(sources))
+                )
+            if config.profiling.transfer_provider_plan is None:
+                from ..transfers.provider import converted_plan
+
+                plan = converted_plan(artifacts.report_files, artifacts.aot_prefix)
+                geometry = schedule_cells(json.loads(plan.read_bytes()))
         if config.profiling.transfer_diagnostics == "trace" or config.profiling.transfer_costs:
             from ..runtime.records import runtime
 

@@ -21,6 +21,7 @@ from ..platform.catalog import _builtin_catalog
 from ..profiler import build_stages, capture_stages
 from ..results import ResultValidity
 from .matrix import REPETITIONS, SIZES, matrix, schedule_cells
+from .provider import converted_plan
 from .record import read_rows
 
 
@@ -44,7 +45,12 @@ class _RetainProvider:
         base = app / "probe_provider" if companion else app / "modules" / artifacts.aot_module_name
         prefix = "costprobe" if companion else artifacts.aot_prefix
         self.plan.parent.mkdir(parents=True)
-        shutil.copyfile(base / f"{prefix}_plan.json", self.plan)
+        plan = (
+            base / "costprobe_plan.json"
+            if companion
+            else converted_plan(artifacts.report_files, prefix)
+        )
+        shutil.copyfile(plan, self.plan)
         shutil.copyfile(base / "src" / f"{prefix}_nsx_transfer.c", self.source)
 
 
