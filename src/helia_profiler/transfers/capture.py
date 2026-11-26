@@ -3,23 +3,47 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import replace
 from pathlib import Path
 from uuid import uuid4
 
-from .._files import write_text_atomically
+from .._files import sha256_file, write_text_atomically
 from ..calibration.setup import _setup
-from ..calibration.table import _plan, _require_usable_cycles
+from ..calibration.table import _require_usable_cycles
 from ..config import ProfileConfig
 from ..engines import EngineType
 from ..errors import ConfigError
 from ..evaluation.compare import load_run_artifacts
-from ..pipeline import PipelineRunner
+from ..pipeline import PipelineContext, PipelineRunner
+from ..platform.catalog import _builtin_catalog
 from ..profiler import build_stages, capture_stages
 from ..results import ResultValidity
-from ..target.probe.reservation import reserve_probe
 from .matrix import REPETITIONS, SIZES, matrix, schedule_cells
 from .record import read_rows
+
+
+class _RetainProvider:
+    """Copy the provider and its plan while the build workspace is still locked."""
+
+    name = "retain_transfer_provider"
+
+    def __init__(self, directory: Path) -> None:
+        self.plan = directory / "plan.json"
+        self.source = directory / "provider.c"
+
+    def should_skip(self, ctx: PipelineContext) -> bool:
+        return False
+
+    def run(self, ctx: PipelineContext) -> None:
+        assert ctx.profile_run is not None
+        app = ctx.profile_run.firmware.app_dir
+        companion = ctx.config.profiling.transfer_provider_plan is not None
+        base = app / ("probe_provider" if companion else "modules/hpx_model")
+        prefix = "costprobe" if companion else "hpx"
+        self.plan.parent.mkdir(parents=True)
+        shutil.copyfile(base / f"{prefix}_plan.json", self.plan)
+        shutil.copyfile(base / "src" / f"{prefix}_nsx_transfer.c", self.source)
 
 
 def measure_transfers(
@@ -48,9 +72,9 @@ def measure_transfers(
         ),
         output=replace(config.output, dir=bundle),
     )
-    with reserve_probe(serial):
-        ctx = PipelineRunner(build_stages()).run(cfg)
-        PipelineRunner(capture_stages()).run_stages(ctx)
+    evidence = _RetainProvider(bundle.with_suffix(".provider"))
+    ctx = PipelineRunner([*build_stages(), evidence, *capture_stages()]).run(cfg)
+    geometry = schedule_cells(json.loads(evidence.plan.read_bytes()))
     if ctx.run_evaluation is None or ctx.run_evaluation.validity != ResultValidity.VALID:
         raise ValueError(f"Transfer probe capture did not pass evaluation: {bundle}")
     run = load_run_artifacts(bundle)
@@ -59,7 +83,6 @@ def measure_transfers(
     if setup.pairing_digest is None:
         raise ValueError("Transfer capture lacks a calibration pairing digest")
     curves = matrix()
-    geometry = schedule_cells(_plan(run, str(bundle)))
     rows, probe = read_rows(ctx.captured_pmu.raw_output, curves + geometry)
     held = ctx.run_metadata.conditions
     if (
@@ -95,6 +118,13 @@ def measure_transfers(
             },
             "method": {
                 "timer": "DWT_CYCCNT",
+                "provider_source_sha256": sha256_file(evidence.source),
+                "provider": "heliaAOT nsx-psram",
+                "dcache_capacity_kib": _builtin_catalog()
+                .resolve(cfg.target.board)
+                .core_options.dcache_kb,
+                "foreground_code": "default firmware text; runtime address in foreground_address",
+                "memory_diagnostic_data": "DTCM; runtime address in foreground_data_address",
                 "completion": "final provider ISR callback, core awake",
                 "reader": "immediate provider wait",
                 "foreground": "identical out-of-line register LCG, alternating baseline before/after DMA",
@@ -107,7 +137,12 @@ def measure_transfers(
             },
         },
         "transfers": rows[: len(curves)],
-        "scheduled_units": rows[len(curves) :],
+        "scheduled_units": [
+            row for cell, row in zip(geometry, rows[len(curves) :], strict=True) if not cell.members
+        ],
+        "coissued_groups": [
+            row for cell, row in zip(geometry, rows[len(curves) :], strict=True) if cell.members
+        ],
     }
     write_text_atomically(output, json.dumps(document, indent=2, allow_nan=False) + "\n")
     return bundle

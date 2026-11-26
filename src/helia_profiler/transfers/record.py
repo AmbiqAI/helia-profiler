@@ -34,7 +34,7 @@ def read_rows(
         if finished:
             raise ValueError("Unexpected transfer record after completion")
         if tag == WireKey.XFER_START.wire and not meta:
-            cpu, psram, depth, slots, bracket, observer = _numbers(payload, 6)
+            cpu, psram, depth, slots, bracket, observer, code, data = _numbers(payload, 8)
             if not all((cpu, psram, depth, slots)):
                 raise ValueError("Missing transfer clock or queue capacity")
             meta = dict(
@@ -44,6 +44,8 @@ def read_rows(
                 provider_slots=slots,
                 bracket_cycles=bracket,
                 observer_call_cycles=observer,
+                foreground_address=code,
+                foreground_data_address=data,
             )
             continue
         if tag == WireKey.XFER_END.wire and meta and not samples and len(rows) == len(cells):
@@ -65,6 +67,7 @@ def read_rows(
                 6: "not_run",
                 7: "issue_failed",
                 8: "not_run",
+                9: "not_run",
             }.get(status)
             if i != len(rows) or failure is None:
                 raise ValueError("Unexpected failed transfer cell")
@@ -76,7 +79,8 @@ def read_rows(
                 5: "foreground coverage",
                 6: "provider capacity",
                 7: "cache preparation",
-                8: "source extent",
+                8: "source or destination extent",
+                9: "DWT/STIMER disagreement",
             }[status]
             rows.append(_row(cell, failure, f"{reason} ({detail})", []))
             samples = []
@@ -164,6 +168,11 @@ def _row(
             repetitions=samples,
         ),
     )
+    if cell.members:
+        row["evidence"]["ticket_pieces"] = [
+            dict(ticket=ticket, source_offset=src, destination_offset=dst, bytes=n)
+            for ticket, src, dst, n in cell.descriptors
+        ]
     if dma:
         row["pieces"] = cell.pieces
     if samples:

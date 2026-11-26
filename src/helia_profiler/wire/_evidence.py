@@ -40,7 +40,7 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
             (
                 WireKey.XFER_START,
                 "Transfer probe clocks and capacities.",
-                "<cpu_hz>,<psram_hz>,<queue>,<slots>,<bracket>,<observer_call>",
+                "<cpu_hz>,<psram_hz>,<queue>,<slots>,<bracket>,<observer_call>,<foreground_address>,<data_address>",
             ),
             (
                 WireKey.XFER_SAMPLE,

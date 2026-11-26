@@ -3,7 +3,7 @@ import pytest
 from helia_profiler.transfers.matrix import REPETITIONS, Cell, matrix
 from helia_profiler.transfers.record import read_rows
 
-START = "HPX_XFER_START=96000000,96000000,8,8,2,8"
+START = "HPX_XFER_START=96000000,96000000,8,8,2,8,4194304,536870912"
 
 
 def test_matrix_covers_all_piece_counts_and_both_cpu_regimes():
@@ -64,17 +64,41 @@ def test_converted_geometry_retains_both_offsets():
 
     plan = {
         "schedule": {
+            "pool": {"memory": "DTCM"},
             "units": [
                 {
                     "engine": "dma",
+                    "id": 0,
+                    "issue_after": None,
                     "source_memory": "PSRAM",
                     "bytes": 9600,
                     "pool_offset": 6592,
                     "source_offset": 4992,
                 }
-            ]
+            ],
         }
     }
     (cell,) = schedule_cells(plan)
     assert cell.lengths == (1600, 4096, 3904)
     assert cell.source_offset == 4992
+
+
+def test_coissued_group_keeps_distinct_tickets_and_offsets():
+    from helia_profiler.transfers.matrix import schedule_cells
+
+    unit = dict(engine="dma", source_memory="PSRAM", issue_after=None, bytes=1024)
+    plan = {
+        "schedule": {
+            "pool": {"memory": "DTCM"},
+            "units": [
+                dict(unit, id=1, source_offset=0, pool_offset=0),
+                dict(unit, id=3, source_offset=1280, pool_offset=3840),
+            ],
+        }
+    }
+    first, second, group = schedule_cells(plan)
+    assert group.members == (first, second)
+    assert group.descriptors == ((1, 0, 0, 1024), (3, 1280, 3840, 256), (3, 1536, 4096, 768))
+    plan["schedule"]["pool"]["memory"] = "SRAM"
+    with pytest.raises(ValueError, match="DTCM"):
+        schedule_cells(plan)

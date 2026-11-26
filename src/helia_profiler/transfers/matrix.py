@@ -18,9 +18,29 @@ class Cell:
     offset: int = 0
     source_offset: int = 0
 
+    ticket: int = 0
+    members: tuple[Cell, ...] = ()
+
+    @property
+    def descriptors(self) -> tuple[tuple[int, int, int, int], ...]:
+        """Provider ticket, source offset, destination offset and bytes per issue."""
+        descriptors = []
+        for unit in self.members or (self,):
+            offset = 0
+            for length in unit.lengths:
+                descriptors.append(
+                    (unit.ticket, unit.source_offset + offset, unit.offset + offset, length)
+                )
+                offset += length
+        return tuple(descriptors)
+
     @property
     def lengths(self) -> tuple[int, ...]:
         """Aligned consecutive pieces, each within a 4 KiB DTCM window."""
+        if self.members:
+            return tuple(n for unit in self.members for n in unit.lengths)
+        if self.pieces > 8:
+            return ()
         if not self.pieces:
             return (self.size,)
         spans = []
@@ -56,7 +76,11 @@ def matrix() -> tuple[Cell, ...]:
 
 def schedule_cells(plan: dict[str, Any]) -> tuple[Cell, ...]:
     """Reproduce the converted DMA unit offsets separately from the price curves."""
+    pool = plan["schedule"]["pool"]
+    if not pool or str(pool["memory"]).lower() != "dtcm":
+        raise ValueError("Transfer calibration requires a DTCM stream pool")
     cells = []
+    groups: dict[str | None, list[Cell]] = {}
     for unit in plan["schedule"]["units"]:
         if unit["engine"] != "dma" or unit["source_memory"].lower() != "psram":
             continue
@@ -64,7 +88,19 @@ def schedule_cells(plan: dict[str, Any]) -> tuple[Cell, ...]:
         if any(type(v) is not int or v < 0 or v % 4 for v in (size, offset, source)) or not size:
             raise ValueError("Invalid DMA calibration geometry")
         pieces = (offset % 4096 + size + 4095) // 4096
-        cells.append(Cell(size, pieces, "none", offset, source))
+        cell = Cell(size, pieces, "none", offset, source, unit["id"])
+        cells.append(cell)
+        groups.setdefault(unit["issue_after"], []).append(cell)
+    for members in groups.values():
+        if len(members) > 1:
+            cells.append(
+                Cell(
+                    sum(c.size for c in members),
+                    sum(c.pieces for c in members),
+                    "none",
+                    members=tuple(members),
+                )
+            )
     return tuple(cells)
 
 

@@ -731,3 +731,9 @@ copy while doing arithmetic, use `inflight_core_loss_cycles`, the signed
 difference between identical work with and without DMA. The raw samples also
 record a separate foreground loop reading DTCM. A real operator with different
 memory traffic can experience a different slowdown.
+
+`scheduled_units` repeats the provider plan’s actual offsets and lengths.
+When several tickets issue at the same schedule point, `coissued_groups`
+times them together. Use that single foreground span for the group. Summing
+the individual ticket losses would count overlapping work more than once.
+Source verification, clock checks and logging occur outside the copy timing.

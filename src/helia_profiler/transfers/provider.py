@@ -1,13 +1,15 @@
 """Build a probe-only provider without changing the model calibration's AOT settings."""
 
+import json
 from pathlib import Path
 
 from ..config import ProfileConfig
 from ..engines.helia_aot.compile import _compiler_target, _run_aot_compiler, effective_aot_args
 from ..errors import FirmwareError
+from .matrix import Cell, schedule_cells
 
 
-def emit_provider(config: ProfileConfig, directory: Path, plan: Path) -> None:
+def emit_provider(config: ProfileConfig, directory: Path, plan: Path) -> tuple[Cell, ...]:
     args = effective_aot_args(config)
     args["optimization"] = {**args.get("optimization", {}), "plan": str(plan.resolve())}
     target = _compiler_target(config, args)
@@ -16,3 +18,6 @@ def emit_provider(config: ProfileConfig, directory: Path, plan: Path) -> None:
     )
     if not (directory / "probe_provider/src/costprobe_nsx_transfer.c").is_file():
         raise FirmwareError("The transfer probe plan did not emit an asynchronous NSX provider")
+    return schedule_cells(
+        json.loads((directory / "probe_provider/costprobe_plan.json").read_bytes())
+    )
