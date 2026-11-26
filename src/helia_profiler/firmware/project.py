@@ -465,6 +465,7 @@ def render_project_files(ctx: ProjectRenderContext) -> None:
                 if isinstance(ctx.artifacts, HeliaAotArtifacts)
                 else ""
             ),
+            companion_provider=ctx.config.profiling.transfer_provider_plan is not None,
             aot_transfer_cmake_target=(
                 ctx.artifacts.aot_transfer_cmake_target
                 if isinstance(ctx.artifacts, HeliaAotArtifacts)

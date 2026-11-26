@@ -33,6 +33,37 @@ RUN_EVIDENCE_SPECS: tuple[WireSpec, ...] = (
             WireCriticality.METRIC,
             key=key,
             engines=AOT_ENGINES,
+            condition="transfer_costs and not power_only",
+            value_shape=shape,
+        )
+        for key, description, shape in (
+            (
+                WireKey.XFER_START,
+                "Transfer probe clocks and capacities.",
+                "<cpu_hz>,<psram_hz>,<queue>,<slots>,<bracket>,<observer_call>",
+            ),
+            (
+                WireKey.XFER_SAMPLE,
+                "One verified transfer trial.",
+                "<cell>,<rep>,<issue>,<complete>,<wait>,<arrival>,<ready_wait>,<loops>,<alone>,<active>,<memory_alone>,<memory_active>[,<callback>...]",
+            ),
+            (
+                WireKey.XFER_FAIL,
+                "Failed cell, including the provider status when available.",
+                "<cell>,<status>,<detail>",
+            ),
+            (WireKey.XFER_END, "End of transfer matrix.", "<cell_count>"),
+        )
+    ),
+    *(
+        _spec(
+            key.wire,
+            WireKind.KEY_VALUE,
+            description,
+            WireConsumer.TRANSFER_EVIDENCE,
+            WireCriticality.METRIC,
+            key=key,
+            engines=AOT_ENGINES,
             condition=GATE_TRANSFER_TRACE,
             runtime_gate="transfer_diagnostics is trace; inside its standalone diagnostic frame",
             value_shape=shape,

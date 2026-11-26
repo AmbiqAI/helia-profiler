@@ -34,6 +34,7 @@ cli/results_cmd.py
 cli/run_app.py
 cli/run_cmds.py
 cli/runtimes_cmd.py
+cli/transfers_cmd.py
 cli/validate_cmd.py
 cli/validation_app.py
 config/__init__.py
@@ -128,6 +129,7 @@ firmware/render.py
 firmware/templates/CMakeLists.txt.j2
 firmware/templates/_aot_layer_profiler.j2
 firmware/templates/_aot_transfer_clock.j2
+firmware/templates/_aot_transfer_costs.j2
 firmware/templates/_aot_transfer_diagnostics.j2
 firmware/templates/_aot_transfer_evidence.j2
 firmware/templates/_aot_transfer_trace.j2
@@ -323,6 +325,11 @@ target/probe/base.py
 target/probe/flash.py
 target/probe/jlink.py
 target/probe/reservation.py
+transfers/__init__.py
+transfers/capture.py
+transfers/matrix.py
+transfers/provider.py
+transfers/record.py
 transport/__init__.py
 transport/base.py
 transport/firmware_errors.py

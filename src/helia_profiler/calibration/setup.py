@@ -34,6 +34,8 @@ if TYPE_CHECKING:
 SETUP_EXCLUDED: frozenset[str] = frozenset(
     {
         "config.power",
+        "config.profiling.transfer_costs",
+        "config.profiling.transfer_provider_plan",
         "config.output",
         "config.timeouts",
         "config.verbose",

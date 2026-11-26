@@ -441,6 +441,10 @@ def generate_app(ctx: PipelineContext) -> Path:
         else:
             log.info("Engine module: %s → %s", extra_mod.name, primary_dst)
 
+    if config.profiling.transfer_provider_plan is not None:
+        from ..transfers.provider import emit_provider
+
+        emit_provider(config, app_dir, config.profiling.transfer_provider_plan)
     log.info("Generated profiler app at %s", app_dir)
     return app_dir
 

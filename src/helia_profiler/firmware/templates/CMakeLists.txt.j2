@@ -54,11 +54,13 @@ nsx_bootstrap_app(
 {% if engine_type == "helia-aot" or engine_type == "executorch" %}
 add_executable(hpx_profiler
     src/main.cc
-)
+{% if companion_provider | default(false) %}    probe_provider/src/costprobe_nsx_transfer.c
+{% endif %})
 
 target_include_directories(hpx_profiler PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
-)
+{% if companion_provider | default(false) %}    ${CMAKE_CURRENT_LIST_DIR}/probe_provider/includes-api
+{% endif %})
 
 target_link_libraries(hpx_profiler PRIVATE
     nsx::board

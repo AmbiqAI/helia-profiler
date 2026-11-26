@@ -192,7 +192,7 @@ static void hpx_transfer_bind(const {{ aot_prefix }}_nsx_transfer_options_t *opt
 {% endif %}
 #endif
 
-{% if transfer_timeout_probe and not power_only | default(false) %}
+{% if transfer_costs | default(false) and not power_only | default(false) %}{% include "_aot_transfer_costs.j2" %}{% endif %}{% if transfer_timeout_probe and not power_only | default(false) %}
 #ifdef HPX_AOT_TRANSFER
 static void hpx_transfer_print_recovery(int32_t bind, int32_t init, int32_t run, uint32_t pending) {
     hpx_printf("HPX_TRANSFER_RECOVERY=%ld,%ld,%ld,%lu\n", (long)bind, (long)init, (long)run,
@@ -714,6 +714,13 @@ hpx_aot_check_runs();{% endblock %}
 {% endif %}
 {% if transport == "rtt" %}
     hpx_rtt_set_blocking();
+{% endif %}{% if transfer_costs | default(false) and not power_only | default(false) %}
+{% set sources = arena_regions | selectattr("role", "equalto", "constant") | selectattr("placement", "equalto", "psram") | sort(attribute="size", reverse=true) %}
+{% if sources %}
+    hpx_transfer_cost_matrix(hpx_arena_buf_{{ sources[0].region_id }}, {{ sources[0].size }}U);
+{% else %}
+#error "Transfer costs need a PSRAM constant arena"
+{% endif %}
 {% endif %}
     // The last run's outputs in full, then the inputs every run received.
     for (int i = 0; i < {{ aot_prefix }}_num_outputs; i++) {

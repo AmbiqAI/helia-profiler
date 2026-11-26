@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import field
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import ConfigDict, field_validator, model_validator
@@ -136,6 +137,10 @@ class ProfilingConfig:
     # MSPI controller. This extra maintenance applies to instrumented runs;
     # the clean window follows profiling.dcache. Reports HPX_STREAM_EVIDENCE=1.
     stream_evidence: bool = False
+    #: Run the PSRAM transfer-cost matrix after model profiling.
+    transfer_costs: bool = field(default=False, metadata={"omit_default": True})
+    #: Optional probe-only AOT plan for a model calibration without a DMA provider.
+    transfer_provider_plan: Path | None = field(default=None, metadata={"omit_default": True})
     #: Record whole-inference timing, provider status and output digests for each sweep sample.
     sweep_evidence: bool = field(default=False, metadata={"omit_default": True})
     #: Separate transfer observation runs; ordinary PMU passes never poll DMA state.

@@ -321,6 +321,13 @@ typedef struct {
 } fake_io_buffer_t;
 
 typedef struct {
+    int32_t (*issue)(void *, uint32_t, void *, const void *, size_t);
+    int32_t (*wait)(void *, uint32_t);
+    int32_t (*abort)(void *);
+    void *self;
+} fake_transfer_provider_t;
+
+typedef struct {
     fake_operator_callback_t callback;
     void *user_data;
     fake_io_buffer_t inputs[4];
@@ -328,6 +335,7 @@ typedef struct {
     void **arena_buffers;
     size_t *arena_sizes;
     int8_t **tensor_ptrs;
+    const fake_transfer_provider_t *transfer;
 } fake_model_context_t;
 
 typedef int32_t fake_arena_region_t;

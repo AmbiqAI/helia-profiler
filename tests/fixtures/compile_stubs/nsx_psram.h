@@ -33,6 +33,7 @@ typedef struct {
     uintptr_t base_address;
     uint32_t size_bytes;
     uint32_t configured_clock_hz;
+    uint32_t async_depth;
     uint32_t capabilities;
     int state;
     uint32_t last_init_status;
